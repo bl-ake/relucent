@@ -13,8 +13,15 @@ from pyvis.network import Network
 from tqdm.auto import tqdm
 
 from .model import NN
+import random
 
 disposeDefaultEnv()
+
+
+def set_seeds(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 @cache
