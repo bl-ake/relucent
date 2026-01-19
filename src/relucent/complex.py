@@ -625,11 +625,11 @@ class Complex:
             G = nx.relabel_nodes(G, {poly: i for i, poly in enumerate(self)})
         return G
 
-    def recover_from_dual_graph(self, G, initial_bv, source=0):
+    def recover_from_dual_graph(self, G, initial_bv, source):
         G = G.copy()
         initial_p = self.add_bv(initial_bv)
         G.nodes[source]["poly"] = initial_p
-        for edge in tqdm(nx.edge_bfs(G, source=0), desc="Recovering Polyhedra", total=G.number_of_edges()):
+        for edge in tqdm(nx.edge_bfs(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
             poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
             poly2_bv = poly1.bv.clone()
             assert poly2_bv[0, shi] != 0
