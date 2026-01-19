@@ -20,7 +20,7 @@ dependencies = [ ## TODO: Constrain Versions
     "Pillow",
 ]
 authors = [{ name = "Blake B. Gaines" }]
-license = "GPL-3.0-or-later"
+license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 [project.optional-dependencies]
