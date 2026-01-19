@@ -1,3 +1,13 @@
+try:
+    from torch import __version__
+    from torchvision import __version__  # noqa
+except ImportError:
+    raise ImportError(
+        "Relucent requires PyTorch to be installed manually. "
+        "Please install the version compatible with your system from: "
+        "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
+    )
+
 from .bvs import BVManager
 from .complex import Complex
 from .poly import Polyhedron
