@@ -6,16 +6,25 @@ build-backend = "uv_build"
 name = "relucent"
 version = "0.1.0"
 requires-python = ">= 3.13, <3.14"
+
+dependencies = [
+    "pandas>=2.3",
+    "gurobipy>=12.0",
+    "networkx>=3.6",
+    "matplotlib>=3.10",
+    "numpy>=2.4",
+    "Pillow>=12.1",
+    "plotly>=6.3",
+    "scikit_learn>=1.8",
+    "scipy>=1.17",
+    "tqdm>=4.67",
+]
 authors = [{ name = "Blake B. Gaines" }]
 license = "AGPL-3.0-or-later"
 readme = "README.md"
-dynamic = ["dependencies"]               # Tells build tools to look elsewhere
 
 [project.optional-dependencies]
-cli = ["pyvis", "kaleido"]
+cli = ["torch>=2.13", "torchvision", "pyvis>=0.3", "kaleido"]
 
 [project.urls]
 Homepage = "https://github.com/bl-ake/relucent"
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
