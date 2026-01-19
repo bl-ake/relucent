@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 version = "0.1.0"
-requires-python = ">= 3.12, <3.14"
+requires-python = ">= 3.13, <3.14"
 dependencies = [ ## TODO: Constrain Versions
     "torch",
     "torchvision",
@@ -19,7 +19,7 @@ dependencies = [ ## TODO: Constrain Versions
     "plotly",
     "Pillow",
 ]
-authors = [{ name = "Blake Gaines", email = "blakebgaines@gmail.com" }]
+authors = [{ name = "Blake B. Gaines" }]
 license = "GPL-3.0-or-later"
 readme = "README.md"
 
@@ -27,4 +27,4 @@ readme = "README.md"
 cli = ["pyvis", "kaleido"]
 
 [project.urls]
-Homepage = "https://github.com/blake-gaines/Relu-Complexes"
+Homepage = "https://github.com/bl-ake/relucent"
