@@ -1,0 +1,30 @@
+[build-system]
+requires = ["uv_build >= 0.9.5, <0.10.0"]
+build-backend = "uv_build"
+
+[project]
+name = "relucent"
+version = "0.1.0"
+requires-python = ">= 3.12, <3.14"
+dependencies = [ ## TODO: Constrain Versions
+    "torch",
+    "torchvision",
+    "pandas",
+    "gurobipy",
+    "networkx",
+    "numpy",
+    "scipy",
+    "tqdm",
+    "matplotlib",
+    "plotly",
+    "Pillow",
+]
+authors = [{ name = "Blake Gaines", email = "blakebgaines@gmail.com" }]
+license = "GPL-3.0-or-later"
+readme = "README.md"
+
+[project.optional-dependencies]
+cli = ["pyvis", "kaleido"]
+
+[project.urls]
+Homepage = "https://github.com/blake-gaines/Relu-Complexes"
