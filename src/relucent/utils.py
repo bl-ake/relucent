@@ -9,7 +9,6 @@ import torch
 from gurobipy import Env, disposeDefaultEnv
 from matplotlib import colormaps
 from PIL import Image
-from pyvis.network import Network
 from tqdm.auto import tqdm
 
 from .model import NN
@@ -155,6 +154,8 @@ def data_graph(
     max_num_examples=3,
     save_file="./graph.html",
 ):
+    from pyvis.network import Network
+
     if class_labels is True and dataset is not None:
         class_labels = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
 
