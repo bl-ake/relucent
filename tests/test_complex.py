@@ -1,6 +1,8 @@
-from relucent import Complex, set_seeds, get_mlp_model
-import torch
 import networkx as nx
+import numpy as np
+import torch
+
+from relucent import Complex, get_mlp_model, set_seeds
 
 
 def test_complex_one():
@@ -113,9 +115,30 @@ def test_path_one():
     assert all([(p1.bv != p2.bv).sum().item() == 1 for p1, p2 in zip(path[:-1], path[1:])])
 
 
+def test_starter_code():
+    network = get_mlp_model(widths=[2, 10, 5, 1])
+
+    cplx = Complex(network)
+
+    cplx.bfs()
+
+    fig = cplx.plot(bound=10000)
+
+    fig.show()
+
+    sum(len(p.shis) for p in cplx) / len(cplx)
+
+    input_point = np.random.random(network.input_shape)
+    p = cplx.point2poly(input_point)
+    print(p.halfspaces[p.shis, :])
+
+    print(cplx.get_dual_graph())
+
+
 if __name__ == "__main__":
     test_complex_one()
     test_complex_two()
     test_search_one()
     test_search_two()
     test_path_one()
+    test_starter_code()
