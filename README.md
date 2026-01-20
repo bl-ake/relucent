@@ -1,4 +1,5 @@
 [![Usable](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml/badge.svg)](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml)
+[![Latest Release](https://img.shields.io/github/v/tag/bl-ake/relucent?label=Latest%20Release)](https://github.com/bl-ake/relucent/releases)
 
 # Relucent
 Explore polyhedral complexes associated with the activation states of ReLU neural networks
