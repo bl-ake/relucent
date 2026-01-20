@@ -6,10 +6,8 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-import sys
-import os
-import relucent
-from relucent import Complex
+# import sys
+# import os
 
 autodoc_default_options = {
     "members": True,
