@@ -12,9 +12,9 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 
-from .bvs import BVManager, BVPriorityQueue
-from .poly import Polyhedron
-from .utils import BlockingQueue, NonBlockingQueue, get_colors, get_env
+from relucent.bvs import BVManager, BVPriorityQueue
+from relucent.poly import Polyhedron
+from relucent.utils import BlockingQueue, NonBlockingQueue, get_colors, get_env
 
 
 def set_globals(get_net, get_volumes=True):
@@ -615,10 +615,10 @@ class Complex:
         """Return a networkx Graph of the connectivity graph of the complex
         relabel: if True, nodes are indexed by the same indices as self.index2poly, otherwise they are indexed by Polyhedron objects themselves
         plot: if True, return a graph ready to be plotted by pyvis
-            node_color: if "Wl2", color nodes by Wl2 value
-            node_size: if "volume", size nodes by their calculated volume
-            cmap: if node_color == "Wl2", use this colormap
-            match_locations: if True, force graph nodes to be plotted at the center points of their polyhedra
+        node_color: if "Wl2", color nodes by Wl2 value
+        node_size: if "volume", size nodes by their calculated volume
+        cmap: if node_color == "Wl2", use this colormap
+        match_locations: if True, force graph nodes to be plotted at the center points of their polyhedra
         """
         G = nx.Graph()
         for poly in self:

@@ -10,7 +10,7 @@ from gurobipy import GRB, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
-from .utils import get_env
+from relucent.utils import get_env
 
 
 def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, sense=GRB.MAXIMIZE):

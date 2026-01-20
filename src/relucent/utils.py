@@ -11,7 +11,7 @@ from matplotlib import colormaps
 from PIL import Image
 from tqdm.auto import tqdm
 
-from .model import NN
+from relucent.model import NN
 import random
 
 disposeDefaultEnv()
