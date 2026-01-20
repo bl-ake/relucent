@@ -18,12 +18,21 @@ from relucent.utils import BlockingQueue, NonBlockingQueue, get_colors, get_env
 
 
 def set_globals(get_net, get_volumes=True):
-    """Set global variables for workers when using multiprocessing.
-    This should never be used by the main process
+    """Initialize global variables for worker processes in multiprocessing.
 
-    Use:
-        with mp.Pool(nworkers, initializer=set_globals, initargs=(net,)) as pool:
-            ...
+    This function should only be used as an initializer for multiprocessing pools,
+    never called directly by the main process. It sets up the network, environment,
+    and volume calculation settings that worker processes need.
+
+    Args:
+        get_net: The neural network object to be used by worker processes.
+        get_volumes: Whether to compute volumes for polyhedra when input dimension <= 6.
+            Defaults to True.
+
+    Example:
+        >>> with mp.Pool(nworkers, initializer=set_globals, initargs=(net,)) as pool:
+        ...     # Use pool for parallel processing
+        ...     pass
     """
     global env
     env = get_env()
@@ -36,7 +45,23 @@ def set_globals(get_net, get_volumes=True):
 
 
 def poly_calculations(task, **kwargs):
-    """Worker function used by parallel_add() and all searchers"""
+    """Worker function for computing polyhedron properties in parallel.
+
+    This function is used by parallel_add() and all search methods to compute
+    halfspaces, center, inradius, interior point, and supporting hyperplane
+    indices (SHIs) for a given sign sequence.
+
+    Args:
+        task: Either a sign sequence or a tuple containing (sign sequence, ...) with
+            additional data to be passed through.
+        **kwargs: Additional arguments passed to get_shis() method, such as
+            'collect_info' or 'bound'.
+
+    Returns:
+        tuple: If successful, returns (Polyhedron, *rest) where rest contains
+            any additional data from the input task. If a ValueError occurs
+            during computation, returns (error, *rest).
+    """
     bv = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(net, bv)
@@ -63,7 +88,21 @@ def poly_calculations(task, **kwargs):
 
 
 def get_ip(p, shi):
-    """Get an interior point for a neighbor of p on the other side of BH with index <shi>. Used for A*."""
+    """Get an interior point for a neighbor polyhedron across a supporting hyperplane.
+
+    This function is used by the A* search algorithm to find interior points for
+    neighboring polyhedra. It flips the element of the sign sequence at the specified
+    supporting hyperplane index (SHI) and attempts to find an interior point,
+    increasing the search radius if necessary.
+
+    Args:
+        p: The source Polyhedron object.
+        shi: The index of the supporting hyperplane to cross.
+
+    Returns:
+        tuple: If successful, returns (neighbor_polyhedron, shi). If a ValueError
+            occurs, returns (error, None).
+    """
     try:
         bv = p.bv.copy()
         bv[0, shi] = -bv[0, shi]
@@ -79,7 +118,22 @@ def get_ip(p, shi):
 
 
 def astar_calculations(task, **kwargs):
-    """Worker function used for A*"""
+    """Worker function for computing polyhedron properties in A* search.
+
+    Similar to poly_calculations, but specifically designed for A* search algorithm.
+    Computes center, inradius, interior point, and supporting hyperplane indices
+    for polyhedra during pathfinding.
+
+    Args:
+        task: Either a Polyhedron object or a tuple containing (Polyhedron, ...)
+            with additional data to be passed through.
+        **kwargs: Additional arguments passed to get_shis() method, such as
+            'collect_info' or 'bound'.
+
+    Returns:
+        tuple: If successful, returns (Polyhedron, *rest). If an exception occurs
+            during SHI computation, returns (Polyhedron, error, *rest).
+    """
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     p.net = net
@@ -104,7 +158,11 @@ def astar_calculations(task, **kwargs):
 
 
 class Complex:
-    """Provides methods for calculating, storing, and searching the h-representations of the polyhedrons in a network's complex"""
+    """Manages the polyhedral complex of a neural network.
+
+    This class provides methods for calculating, storing, and searching the h-representations
+    (halfspace representations) of polyhedra in the complex.
+    """
 
     def __init__(self, net):
         self.net = net
@@ -130,7 +188,19 @@ class Complex:
                     self.bvi2maski.append((i, it.multi_index))
 
     def __getitem__(self, key):
-        """Returns the Polyhedron with the given key, which can be a sign sequence (np.ndarray or torch.Tensor) or a Polyhedron object"""
+        """Retrieve a Polyhedron from the complex by its key.
+
+        Args:
+            key: Can be either:
+                - A sign sequence as np.ndarray or torch.Tensor
+                - A Polyhedron object (returns the stored version)
+
+        Returns:
+            Polyhedron: The polyhedron associated with the given key.
+
+        Raises:
+            KeyError: If the polyhedron with the given key is not in the complex.
+        """
         if isinstance(key, Polyhedron):
             return self.index2poly[self.bvm[key.bv]]
         elif isinstance(key, (np.ndarray, torch.Tensor)):
@@ -146,7 +216,11 @@ class Complex:
             return False
 
     def __iter__(self):
-        """Iterate over all Polyhedrons in the Complex in the order they were added"""
+        """Iterate over all Polyhedra in the complex.
+
+        Yields:
+            Polyhedron: Polyhedra in the order they were added to the complex.
+        """
         for p in self.index2poly:
             yield p
 
@@ -155,12 +229,21 @@ class Complex:
 
     @property
     def dim(self):
-        """The complex's input dimension"""
+        """The input dimension of the network."""
         return np.prod(self.net.input_shape)
 
     @torch.no_grad()
     def bv_iterator(self, batch):
-        """For a batch of data points, yield the sign sequences for each layer in the network"""
+        """Generate sign sequences for each ReLU layer from a batch of data points.
+
+        Args:
+            batch: A batch of input data points as a torch.Tensor or np.ndarray.
+                Will be reshaped to match the network's input shape.
+
+        Yields:
+            torch.Tensor: Sign sequences for each ReLU layer in
+                the network, indicating the activation pattern of that layer.
+        """
         x = (
             torch.tensor(batch, device=self.net.device, dtype=self.net.dtype)
             if isinstance(batch, np.ndarray)
@@ -174,30 +257,86 @@ class Complex:
                     break
 
     def point2bv(self, batch, numpy=False):
-        """Convert a batch of data points to a batch of sign sequences, do not add to Complex"""
+        """Convert a batch of data points to sign sequences.
+
+        Computes the combined sign sequence across all ReLU layers for the given
+        data points. Does not add the resulting polyhedra to the complex.
+
+        Args:
+            batch: A batch of input data points as a torch.Tensor or np.ndarray.
+            numpy: If True, return result as numpy array; otherwise return torch.Tensor.
+                Defaults to False.
+
+        Returns:
+            torch.Tensor or np.ndarray: The sign sequences for
+                the input batch, with shape (batch_size, total_ReLU_neurons).
+        """
         result = torch.hstack(list(self.bv_iterator(batch)))
         return result.detach().cpu().numpy() if numpy else result
 
     def point2poly(self, point, check_exists=True, numpy=False):
-        """Convert a data point to a Polyhedron, do not add to Complex"""
+        """Convert a data point to its corresponding Polyhedron.
+
+        Finds the polyhedron that contains the given data point. Does not add
+        the polyhedron to the complex.
+
+        Args:
+            point: A single data point as a torch.Tensor or np.ndarray.
+            check_exists: If True, return the existing polyhedron from the complex
+                if it already exists. Defaults to True.
+            numpy: If True, treat input as numpy array. Defaults to False.
+
+        Returns:
+            Polyhedron: The polyhedron containing the given point.
+        """
         bv = self.point2bv(point, numpy=numpy)
         return self.bv2poly(bv, check_exists=check_exists)
 
     def bv2poly(self, bv, check_exists=True):
-        """Convert a sign sequence to a Polyhedron, do not add to Complex"""
+        """Convert a sign sequence to a Polyhedron.
+
+        Creates a Polyhedron object from the given sign sequence. Does not add
+        it to the complex.
+
+        Args:
+            bv: A sign sequence as a torch.Tensor or np.ndarray.
+            check_exists: If True, return the existing polyhedron from the complex
+                if it already exists. Defaults to True.
+
+        Returns:
+            Polyhedron: The polyhedron corresponding to the given sign sequence.
+        """
         if check_exists and bv in self:
             return self[bv]
         else:
             return Polyhedron(self.net, bv)
 
     def add_bv(self, bv, check_exists=True):
-        """Convert a sign sequence to a Polyhedron and add to Complex"""
+        """Convert a sign sequence to a Polyhedron and add it to the complex.
+
+        Args:
+            bv: A sign sequence as a torch.Tensor or np.ndarray.
+            check_exists: If True, return the existing polyhedron from the complex
+                if it already exists. Defaults to True.
+
+        Returns:
+            Polyhedron: The polyhedron that was added (or already existed) in the complex.
+        """
         p = self.bv2poly(bv, check_exists=check_exists)
         p = self.add_polyhedron(p)
         return p
 
     def add_polyhedron(self, p, overwrite=False):
-        """Add a Polyhedron to the Complex"""
+        """Add a Polyhedron to the complex.
+
+        Args:
+            p: The Polyhedron object to add.
+            overwrite: If True and the polyhedron already exists, replace it with
+                the new one. Defaults to False.
+
+        Returns:
+            Polyhedron: The polyhedron that was added (or already existed) in the complex.
+        """
         if p not in self:
             self.index2poly.append(p)
             self.bvm.add(p.bv)
@@ -206,20 +345,34 @@ class Complex:
         return self[p]
 
     def add_point(self, data, numpy=False):
-        """Get the Polyhedron that contains a data point and add it to Complex"""
+        """Find the polyhedron containing a data point and add it to the complex.
+
+        Args:
+            data: A single data point as a torch.Tensor or np.ndarray.
+            numpy: If True, treat input as numpy array. Defaults to False.
+
+        Returns:
+            Polyhedron: The polyhedron containing the given point, now stored in the complex.
+        """
         p = self.point2poly(data, numpy=numpy)
         p = self.add_polyhedron(p)
         return p
 
     def clean_data(self):
-        """Clean the data of all Polyhedrons in the Complex, reduces memory usage"""
+        """Clean cached data from all polyhedra in the complex.
+
+        This method calls clean_data() on each polyhedron, which removes most of their
+        computed data.
+        """
         for poly in self:
             poly.clean_data()
 
     @torch.no_grad()
     def adjacent_polyhedra(self, poly):
-        """Get the Polyhedra that are adjacent (across one BH) to the given Polyhedron"""
-        """Also works for lower-dimensional polyhedrons"""
+        """Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.
+
+        Also works on lower-dimensional polyhedra.
+        """
         ps = set()
         shis = poly.shis
         for shi in shis:
@@ -227,11 +380,27 @@ class Complex:
                 continue
             bv = poly.bv.clone()
             bv[0, shi] = -bv[0, shi]
-            self.add_bv(bv)
+            ps.add()
         return ps
 
-    def parallel_add(self, points, nworkers=None, bound=1e5, **kwargs):
-        """Add a batch of Polyhedrons from a list of data points in parallel"""
+    def parallel_add(self, points, nworkers=None, bound=1e6, **kwargs):
+        """Add multiple polyhedra from data points using parallel processing.
+
+        Processes a batch of data points in parallel, computing their corresponding
+        polyhedra and adding them to the complex.
+
+        Args:
+            points: A list or iterable of data points (each as torch.Tensor or np.ndarray).
+            nworkers: Number of worker processes to use. If None, uses the number
+                of CPU cores. Defaults to None.
+            bound: Constraint radius for numerical stability when computing halfspaces.
+                Defaults to 1e6.
+            **kwargs: Additional arguments passed to poly_calculations() and get_shis().
+
+        Returns:
+            list: A list of Polyhedron objects (or None for failed computations)
+                corresponding to the input points.
+        """
         nworkers = nworkers or os.process_cpu_count()
         print(f"Running on {nworkers} workers")
 
@@ -258,18 +427,44 @@ class Complex:
         verbose=1,
         **kwargs,
     ):
-        """Search for Polyhedrons in the Complex by discovering neighbors
-        See the following functions for examples of how to use this function to define a search strategy
+        """Search for polyhedra in the complex by discovering neighbors.
 
-        start: a point from which to start the search
-        max_depth: the maximum depth to search
-        max_polys: the maximum number of Polyhedrons to search
-        queue: an instance of a Queue-type object that defines the order in which Polyhedrons are searched
-        bound: contain the search in a cube of this radius around the origin, can be important for numerical stability
-        nworkers: the number of workers to use for parallel processing
-        get_volumes: whether to compute the volumes of the Polyhedrons when the input space is low-dimensional (<= 5)
-        verbose: whether to print progress
-        kwargs: additional arguments to pass to Polyhedron.get_shis
+        This is a generic search method that can be configured for different
+        traversal strategies (BFS, DFS, random walk) by providing different
+        queue types. It starts from a given point and explores the complex by
+        crossing supporting hyperplanes to discover adjacent polyhedra.
+
+        See bfs(), dfs(), and random_walk() for examples of how to use this
+        function to define specific search strategies.
+
+        Args:
+            start: Starting point for the search. Can be a torch.Tensor data point
+                or None (defaults to origin). Defaults to None.
+            max_depth: Maximum search depth (number of hyperplane crossings).
+                Defaults to infinity.
+            max_polys: Maximum number of polyhedra to discover. Defaults to infinity.
+            queue: Queue object that defines the order in which polyhedra are
+                searched. Must have push() and pop() methods. If None, uses
+                BlockingQueue (FIFO). Defaults to None.
+            bound: Constraint radius for numerical stability when computing halfspaces.
+                Important for numerical stability. Defaults to 1e5.
+            nworkers: Number of worker processes for parallel computation. If None,
+                uses the number of CPU cores. Defaults to None.
+            get_volumes: Whether to compute volumes for polyhedra when input
+                dimension <= 6. Defaults to True.
+            verbose: Whether to print progress information. Defaults to 1.
+            **kwargs: Additional arguments passed to Polyhedron.get_shis().
+
+        Returns:
+            dict: Search information dictionary containing:
+                - "Search Depth": Maximum depth reached
+                - "Avg # Facets Uncorrected": Average number of facets per polyhedron
+                - "Search Time": Elapsed time in seconds
+                - "Bad SHI Computations": List of failed computations
+                - "Complete": Whether search completed (no unprocessed items)
+
+        Raises:
+            ValueError: If the start point lies on a hyperplane (has zero in BV).
         """
         found_bvs = BVManager()
         nworkers = nworkers or os.process_cpu_count()
@@ -363,12 +558,45 @@ class Complex:
         return search_info
 
     def bfs(self, **kwargs):
+        """Perform breadth-first search of the complex.
+
+        Explores the complex using a breadth-first strategy, discovering all
+        polyhedra at depth d before moving to depth d+1. Uses a FIFO queue.
+
+        Args:
+            **kwargs: All arguments accepted by searcher().
+
+        Returns:
+            dict: Search information dictionary (see searcher() documentation).
+        """
         return self.searcher(**kwargs)
 
     def dfs(self, **kwargs):
+        """Perform depth-first search of the complex.
+
+        Explores the complex using a depth-first strategy, following paths as
+        deeply as possible before backtracking. Uses a LIFO queue.
+
+        Args:
+            **kwargs: All arguments accepted by searcher().
+
+        Returns:
+            dict: Search information dictionary (see searcher() documentation).
+        """
         return self.searcher(queue=BlockingQueue(pop=lambda x: x.popleft()), **kwargs)
 
     def random_walk(self, **kwargs):
+        """Perform random walk search of the complex.
+
+        Explores the complex by randomly selecting which polyhedron to explore
+        next from the queue.
+
+        Args:
+            **kwargs: All arguments accepted by searcher().
+
+        Returns:
+            dict: Search information dictionary (see searcher() documentation).
+        """
         return self.searcher(
             queue=list(),
             pop=lambda x: x.pop(random.randrange(0, len(x) - 1)),
@@ -413,20 +641,49 @@ class Complex:
         return None
 
     def greedy_path(self, start, end):
-        """Greedily finds a path from start to end, can get pretty slow
-        start and end should be data points"""
+        """Greedily find a path between two data points.
+
+        Attempts to find a path through adjacent polyhedra from start to end
+        using a greedy strategy. This method can be slow for large complexes
+        as it explores many paths.
+
+        Args:
+            start: Starting data point as torch.Tensor or np.ndarray.
+            end: Ending data point as torch.Tensor or np.ndarray.
+
+        Returns:
+            list or None: A list of Polyhedron objects representing the path
+                from start to end, or None if no path is found.
+        """
         start = self.add_point(start, numpy=True)
         end = self.add_point(end, numpy=True)
         return self._greedy_path_helper(start, end)
 
     def hamming_astar(self, start, end, nworkers=1, bound=1e5, max_polys=float("inf"), show_pbar=True, **kwargs):
-        """Use A* to find a path from start to end
-        Heuristic is hamming distance, plus euclidean distance between interior points to break ties (should be admissible)
-        start and end should be data points
-        bound: contain the search in a cube of this radius around the origin, can be important for numerical stability
-        nworkers: the number of workers to use for parallel processing
-        max_polys: the maximum number of polyhedrons to search
-        show_pbar: whether to print progress
+        """Find a path between two data points using A* search algorithm.
+
+        Uses the A* pathfinding algorithm with a heuristic based on Hamming
+        distance between sign sequences, plus Euclidean distance between interior
+        points to break ties. The heuristic should be admissible for optimal paths.
+
+        Args:
+            start: Starting data point as torch.Tensor or np.ndarray.
+            end: Ending data point as torch.Tensor or np.ndarray.
+            nworkers: Number of worker processes for parallel computation.
+                Defaults to 1.
+            bound: Constraint radius for numerical stability when computing halfspaces.
+                Important for numerical stability. Defaults to 1e5.
+            max_polys: Maximum number of polyhedra to explore during search.
+                Defaults to infinity.
+            show_pbar: Whether to display a progress bar. Defaults to True.
+            **kwargs: Additional arguments passed to get_shis().
+
+        Returns:
+            list or None: A list of Polyhedron objects representing the path
+                from start to end, or None if no path is found.
+
+        Raises:
+            ValueError: If the start point lies exactly on a neuron's boundary.
         """
 
         start = self.add_point(start, numpy=True)
@@ -604,21 +861,53 @@ class Complex:
             return None
 
     def get_poly_attrs(self, attrs):
-        """For a list of Polyhedron attributes (e.g. ["finite", "Wl2"]), return a dictionary of lists of attribute values based on the order of self.index2poly
-        Useful for building tabular representations of polyhedra in the complex
+        """Extract specified attributes from all polyhedra in the complex.
+
+        Useful for building tabular representations or dataframes of polyhedra
+        properties. Attributes are returned in the same order as polyhedra were
+        added to the complex.
+
+        Args:
+            attrs: A list of attribute names to extract (e.g., ["finite", "Wl2"]).
+
+        Returns:
+            dict: A dictionary mapping attribute names to lists of attribute
+                values, with one value per polyhedron in the complex based on the order
+                they were added.
         """
-        return {attr: [getattr(poly, "_".join(attr.lower().split("_"))) for poly in self] for attr in attrs}
+        return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
     def get_dual_graph(
         self, relabel=False, plot=False, node_color=None, node_size=None, cmap="viridis", match_locations=False
     ):
-        """Return a networkx Graph of the connectivity graph of the complex
-        relabel: if True, nodes are indexed by the same indices as self.index2poly, otherwise they are indexed by Polyhedron objects themselves
-        plot: if True, return a graph ready to be plotted by pyvis
-        node_color: if "Wl2", color nodes by Wl2 value
-        node_size: if "volume", size nodes by their calculated volume
-        cmap: if node_color == "Wl2", use this colormap
-        match_locations: if True, force graph nodes to be plotted at the center points of their polyhedra
+        """Construct the dual graph of the complex.
+
+        The dual graph represents the connectivity structure of the complex,
+        where nodes are polyhedra and edges connect adjacent polyhedra (those
+        sharing a supporting hyperplane).
+
+        Args:
+            relabel: If True, nodes are indexed by integers matching self.index2poly
+                indices. If False, nodes are Polyhedron objects. Defaults to False.
+            plot: If True, prepare the graph for visualization with pyvis by
+                adding layout and styling attributes. Defaults to False.
+            node_color: If "Wl2", color nodes by their Wl2 (weight norm) value.
+                If "volume", color by volume. If None, no special coloring.
+                Defaults to None.
+            node_size: If "volume", size nodes proportionally to their volume.
+                If None, use default size. Defaults to None.
+            cmap: Colormap to use when node_color is specified. Defaults to "viridis".
+            match_locations: If True, position graph nodes at the center points
+                of their polyhedra (only works for 2D complexes). Defaults to False.
+
+        Returns:
+            networkx.Graph: The dual graph of the complex. Nodes are polyhedra
+                (or integers if relabel=True), edges connect adjacent polyhedra
+                and have a "shi" attribute indicating which supporting hyperplane
+                they cross.
+
+        Raises:
+            ValueError: If match_locations is True and the complex is not 2D.
         """
         G = nx.Graph()
         for poly in self:
@@ -676,13 +965,24 @@ class Complex:
         return G
 
     def recover_from_dual_graph(self, G, initial_bv, source):
-        """Recover a Complex object from it's connectivity graph
-        Can be useful for storing large complexes since you only need to store the graph structure and the BH indices on the edge features
-        See an example of this in the unit tests
+        """Recover a complex from its connectivity graph.
 
-        G: nx.Graph
-        initial_bv: torch.Tensor or np.ndarray of an initial polyhedron
-        source: key of the node representing the initial polyhedron
+        Reconstructs polyhedra in the complex by traversing the adjacency graph
+        of top-dimensional cells, using the supporting hyperplane indices stored
+        on edges to determine how to flip sign sequence elements. This is useful
+        for storing large complexes efficiently, as you only need to store the
+        graph structure and SHI indices on edges rather than full polyhedron data.
+
+        Args:
+            G: A networkx.Graph representing the dual graph. Edges must have
+                a "shi" attribute indicating the supporting hyperplane index.
+            initial_bv: The sign sequence of a starting polyhedron
+                as torch.Tensor or np.ndarray.
+            source: The node key in G representing the initial polyhedron.
+
+        Returns:
+            networkx.Graph: The graph with polyhedron objects stored in node
+                attributes under the "poly" key.
         """
         G = G.copy()
         initial_p = self.add_bv(initial_bv)
@@ -702,13 +1002,28 @@ class Complex:
         return G
 
     def plot(self, label_regions=False, color=None, highlight_regions=None, bv_name=False, bound=None, **kwargs):
-        """Plot the complex in 2 dimensions
-        label_regions: if True, label each polyhedron with it's string representation
-        color: if "Wl2", color each polyhedron by it's Wl2 value
-        highlight_regions: if not None, highlight the polyhedra in this list
-        bv_name: if True, label each polyhedron with it's full sign seqeunce
-        kwargs: passed to plot2d() of each polyhedron
-        bound: passed to plot2d() of each polyhedron
+        """Plot the complex in 2D using plotly.
+
+        Creates a 2D visualization of the complex, showing all polyhedra as
+        regions in the input space. Only works for 2D input spaces.
+
+        Args:
+            label_regions: If True, add text labels showing each polyhedron's
+                string representation at its center. Defaults to False.
+            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
+                If None, use an equitable graph coloring. Defaults to None.
+            highlight_regions: If provided, highlight these polyhedra in red.
+                Can be a list of Polyhedron objects or their string representations.
+                Defaults to None.
+            bv_name: If True, use the full sign sequence as
+                the legend label for each polyhedron. Defaults to False.
+            bound: Constraint radius for plotting bounds. Passed to each
+                polyhedron's plot2d() method. Defaults to None.
+            **kwargs: Additional arguments passed to each polyhedron's plot2d() method.
+
+        Returns:
+            plotly.graph_objects.Figure: A plotly figure containing the 2D plot
+                of the complex.
         """
         fig = go.Figure()
         polys = list(self)
@@ -766,13 +1081,27 @@ class Complex:
         project=True,
         **kwargs,
     ):
-        """Plot the complex in 3 dimensions
-        label_regions: if True, label each polyhedron with it's string representation
-        color: if "Wl2", color each polyhedron by it's Wl2 value
-        highlight_regions: if not None, highlight the polyhedra in this list
-        show_axes: if True, show the axes
-        project: if True, also show the complex on the xy plane
-        kwargs: passed to plot3d() of each polyhedron
+        """Plot the complex in 3D using plotly.
+
+        Creates a 3D visualization of the complex, showing all polyhedra as
+        regions in the input space. Only works for 3D input spaces.
+
+        Args:
+            label_regions: If True, add text labels showing each polyhedron's
+                string representation. Defaults to False.
+            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
+                If None, use an equitable graph coloring. Defaults to None.
+            highlight_regions: If provided, highlight these polyhedra in red.
+                Can be a list of Polyhedron objects or their string representations.
+                Defaults to None.
+            show_axes: If True, display the coordinate axes. Defaults to False.
+            project: If True, also show a projection of the complex onto the
+                xy plane. Defaults to True.
+            **kwargs: Additional arguments passed to each polyhedron's plot3d() method.
+
+        Returns:
+            plotly.graph_objects.Figure: A plotly figure containing the 3D plot
+                of the complex.
         """
         fig = go.Figure()
         polys = list(self)

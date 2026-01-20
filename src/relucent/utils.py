@@ -18,7 +18,11 @@ disposeDefaultEnv()
 
 
 def set_seeds(seed):
-    """Set all random seeds to a given value"""
+    """Set all RNG seeds to a given value.
+
+    Args:
+        seed: Integer seed value.
+    """
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -26,7 +30,15 @@ def set_seeds(seed):
 
 @cache
 def get_env():
-    """Get a gurobi environment. This value is cached to avoid starting up multiple environments, so for more control, pass in the environment directly"""
+    """Get a cached Gurobi environment.
+
+    Creates and caches a Gurobi environment with logging disabled. This avoids
+    the overhead of creating multiple environments. For more control over the
+    environment, create and pass one directly to functions that need it.
+
+    Returns:
+        gurobipy.Env: A Gurobi environment with logging disabled.
+    """
     env = Env(logfilename="", empty=True)
     env.setParam("OutputFlag", 0)
     env.setParam("LogToConsole", 0)
@@ -40,6 +52,14 @@ class NonBlockingQueue:
     stopFlag = "<stop>"
 
     def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
+        """Initialize a non-blocking queue.
+
+        Args:
+            queue_class: The underlying container class (e.g., deque, list).
+                Defaults to deque.
+            pop: Function to pop an element from the queue. Defaults to deque.pop().
+            push: Function to push an element to the queue. Defaults to deque.append().
+        """
         self.deque = queue_class()
         self.pop_element = pop
         self.push_element = push
@@ -73,13 +93,17 @@ class BlockingQueue:
     stopFlag = "<stop>"
 
     def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
-        """Create a blocking queue
+        """Create a blocking queue.
 
-        queue_class: the type of queue to use (defines how elemenets are stored and popped)
-        pop: function to pop an element from the queue
-        push: function to push an element to the queue
+        Args:
+            queue_class: The underlying container class (e.g., deque, list).
+                Defaults to deque.
+            pop: Function to pop an element from the queue. Defaults to deque.pop().
+            push: Function to push an element to the queue. Defaults to deque.append().
 
-        Note: pop and push can both be functions with kwargs, the corresponding methods in this class will pass their arguments along
+        Note:
+            pop and push can both be functions with kwargs; the corresponding
+            methods in this class will pass their arguments along.
         """
         self.deque = queue_class()
         self.pop_element = pop
@@ -118,6 +142,21 @@ class BlockingQueue:
 
 
 def split_sequential(model, split_layer):
+    """Split a neural network into two sequential parts.
+
+    Creates two separate NN objects by splitting the model at a specified layer.
+    The first network contains layers up to and including split_layer, and the
+    second contains all subsequent layers.
+
+    Args:
+        model: The NN object to split.
+        split_layer: Name of the layer at which to split (this layer goes to
+            the first network).
+
+    Returns:
+        tuple: (nn1, nn2) where nn1 contains layers up to split_layer and
+            nn2 contains the remaining layers.
+    """
     layers1, layers2 = OrderedDict(), OrderedDict()
     current_layers = layers1
     for name, layer in model.layers.items():
@@ -163,7 +202,39 @@ def data_graph(
     max_num_examples=3,
     save_file="./graph.html",
 ):
-    """Create a pyvis graph from a dataframe of nodes and edges"""
+    """Create an interactive pyvis graph from dataframes of nodes and edges.
+
+    Creates a visual graph representation where nodes can contain images of
+    data examples. Useful for visualizing relationships in datasets or
+    polyhedral complexes.
+
+    Args:
+        node_df: DataFrame with node information. Each row should have 'data'
+            (list of examples) and optionally 'title', 'label', 'size', etc.
+        edge_df: DataFrame with edge information. Index should be (node1, node2)
+            tuples, and rows can have 'title', 'label', 'value', etc.
+        dataset: Optional dataset object for extracting class labels. Defaults to None.
+        draw_function: Function to draw individual data examples. Should accept
+            'data' and 'ax' parameters. Defaults to None.
+        class_labels: If True and dataset is provided, shows class proportions
+            as pie charts. Defaults to True.
+        node_title_formatter: Function to format node titles. Defaults to using
+            'title' column or string representation.
+        node_label_formatter: Function to format node labels. Defaults to using
+            'label' column or index.
+        node_size_formatter: Function to determine node sizes. Defaults to using
+            'size' column or 10.
+        edge_title_formatter: Function to format edge titles. Defaults to using
+            'title' column or empty string.
+        edge_label_formatter: Function to format edge labels. Defaults to using
+            'label' column or empty string.
+        edge_value_formatter: Function to determine edge values/weights.
+            Defaults to using 'value' column or 1.
+        max_images: Maximum number of node images to generate. Defaults to 3000.
+        max_num_examples: Maximum number of data examples to show per node.
+            Defaults to 3.
+        save_file: Path to save the HTML graph file. Defaults to "./graph.html".
+    """
     from pyvis.network import Network
 
     if class_labels is True and dataset is not None:

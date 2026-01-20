@@ -9,6 +9,21 @@ class NN(nn.Module):
     """Neural network class that interfaces with the rest of the package"""
 
     def __init__(self, layers=None, input_shape=None, device=None, dtype=None):
+        """Initialize a neural network.
+
+        Args:
+            layers: Dictionary of layers (nn.ModuleDict or dict-like). If None,
+                creates an empty network. Defaults to None.
+            input_shape: Shape of the input data (excluding batch dimension).
+                If None, infers from the first Linear layer. Defaults to None.
+            device: PyTorch device to use. If None, uses the device of the first
+                parameter. Defaults to None.
+            dtype: PyTorch dtype to use. If None, uses the dtype of the first
+                parameter. Defaults to None.
+
+        Raises:
+            ValueError: If input_shape cannot be determined.
+        """
         super(NN, self).__init__()
 
         self.layers = nn.ModuleDict(layers) if layers is not None else nn.ModuleDict()
@@ -44,6 +59,17 @@ class NN(nn.Module):
         return x
 
     def get_all_layer_outputs(self, data, layers=None, verbose=False):
+        """Get outputs from specified layers.
+
+        Args:
+            data: Input tensor to the network.
+            layers: List of layer names to include. If None, includes all layers.
+                Defaults to None.
+            verbose: If True, prints layer information. Defaults to False.
+
+        Returns:
+            OrderedDict: Dictionary mapping layer names to their outputs.
+        """
         outputs = []
         x = data
         for name, layer in self.layers.items():
@@ -57,6 +83,19 @@ class NN(nn.Module):
         return OrderedDict(outputs)
 
     def get_grid(self, bounds=2, res=100):
+        """Generate a 2D grid of input points.
+
+        Creates a regular grid of points in 2D space. Only works for 2D input spaces.
+
+        Args:
+            bounds: Half-width of the grid (grid spans [-bounds, bounds]).
+                Defaults to 2.
+            res: Resolution (number of points per dimension). Defaults to 100.
+
+        Returns:
+            tuple: (x_coords, y_coords, input_points) where input_points is an
+                array of shape (res*res, 2).
+        """
         x = np.linspace(-bounds, bounds, res)
         y = np.copy(x)
 
@@ -69,6 +108,16 @@ class NN(nn.Module):
         return x, y, inputVal
 
     def output_grid(self, bounds=2, res=100):
+        """Generate a grid and compute network outputs for all points.
+
+        Args:
+            bounds: Half-width of the grid. Defaults to 2.
+            res: Resolution (number of points per dimension). Defaults to 100.
+
+        Returns:
+            tuple: (x_coords, y_coords, layer_outputs) where layer_outputs is
+                an OrderedDict mapping layer names to outputs.
+        """
         x, y, inputVal = self.get_grid(bounds, res)
 
         outs = self.get_all_layer_outputs(torch.Tensor(inputVal).to(self.device, self.dtype))
@@ -76,10 +125,20 @@ class NN(nn.Module):
         return x, y, outs
 
     def shi2weights(self, shi, return_idx=False):
-        """Given a neuron's index, return the corresponding weights from its layers
+        """Get weights corresponding to a neuron index.
 
-        shi: index of the neuron
-        return_idx: if True, return the layer name and index of the weights, otherwise return a pointer to the weights directly
+
+        Args:
+            shi: Index of the neuron (supporting hyperplane index).
+            return_idx: If True, returns (layer_name, neuron_index_in_layer).
+                If False, returns a pointer to the weight tensor. Defaults to False.
+
+        Returns:
+            If return_idx is False: torch.Tensor weight vector.
+            If return_idx is True: (layer_name, neuron_index) tuple.
+
+        Raises:
+            ValueError: If the neuron index is invalid.
         """
         remaining_rows = shi
         for name, layer in self.layers.items():
@@ -94,7 +153,21 @@ class NN(nn.Module):
 
 
 def get_mlp_model(widths, add_last_relu=False):
-    """Create an NN object for an MLP model with the given widths"""
+    """Create an NN object for a multi-layer perceptron (MLP).
+
+    Constructs a fully connected neural network with the specified layer widths.
+    Each layer (except optionally the last) is followed by a ReLU activation.
+
+    Args:
+        widths: List of integers specifying the number of neurons in each layer,
+            including the input layer. For example, [2, 10, 5, 1] creates a
+            network with input dimension 2, two hidden layers with 10 and 5 neurons,
+            and output dimension 1.
+        add_last_relu: If True, adds a ReLU after the last layer. Defaults to False.
+
+    Returns:
+        NN: A configured neural network object.
+    """
     layers = []
     for i in range(len(widths) - 1):
         layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))
