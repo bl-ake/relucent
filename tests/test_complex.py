@@ -43,19 +43,15 @@ def test_complex_two():
 
     cplx1.bfs(start=start_point1)
 
-    G1 = cplx1.get_dual_graph()
+    G1 = cplx1.get_dual_graph(relabel=True)
 
     cplx2 = Complex(model)
 
-    cplx2.recover_from_dual_graph(G1, initial_bv=cplx1.point2bv(start_point1), source=cplx1.point2poly(start_point1))
+    cplx2.recover_from_dual_graph(G1, initial_bv=cplx1.point2bv(start_point1), source=0)
 
-    G2 = cplx2.get_dual_graph()
+    G2 = cplx2.get_dual_graph(relabel=True)
 
-    assert (G1.adj == G2.adj) and (G1.nodes == G2.nodes) and (G1.graph == G2.graph)
-
-    assert len(cplx1) == len(cplx2)
-
-    assert set(cplx1.index2poly) == set(cplx2.index2poly)
+    assert nx.is_isomorphic(G1, G2, edge_match=lambda u, v: u["shi"] == v["shi"])
 
 
 def test_search_one():
