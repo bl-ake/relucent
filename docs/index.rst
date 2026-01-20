@@ -3,12 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Relucent Documentation
+Relucent
 ======================
-
-.. Add your content using ``reStructuredText`` syntax. See the
-.. `reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-.. documentation for details.
 
 
 .. autoclass:: relucent.Complex
@@ -26,6 +22,14 @@ Relucent Documentation
    :undoc-members:
    :show-inheritance:
 
+.. autofunction:: relucent.get_mlp_model
+
+.. autofunction:: relucent.convert
+
+.. autofunction:: relucent.get_env
+
+.. autofunction:: relucent.set_seeds
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -33,5 +37,5 @@ Relucent Documentation
 Indices and tables
 ==================
 * :ref:`genindex`
-* :ref:`modindex`
+.. * :ref:`modindex`
 * :ref:`search`
