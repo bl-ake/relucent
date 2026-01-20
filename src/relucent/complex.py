@@ -701,13 +701,14 @@ class Complex:
 
         return G
 
-    def plot(self, label_regions=False, color=None, highlight_regions=None, bv_name=False, **kwargs):
+    def plot(self, label_regions=False, color=None, highlight_regions=None, bv_name=False, bound=None, **kwargs):
         """Plot the complex in 2 dimensions
         label_regions: if True, label each polyhedron with it's string representation
         color: if "Wl2", color each polyhedron by it's Wl2 value
         highlight_regions: if not None, highlight the polyhedra in this list
         bv_name: if True, label each polyhedron with it's full sign seqeunce
         kwargs: passed to plot2d() of each polyhedron
+        bound: passed to plot2d() of each polyhedron
         """
         fig = go.Figure()
         polys = list(self)
@@ -734,6 +735,7 @@ class Complex:
                 fillcolor=c,
                 line_color="black",
                 mode="lines",  ## Comment out to mouse over intersections
+                bound=bound,
                 **kwargs,
             )
             if p_plot is not None:
@@ -743,7 +745,7 @@ class Complex:
                     go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
                 )
         interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
-        maxcoord = (np.max(interior_points) * 1.1) if len(interior_points) > 0 else 10
+        maxcoord = (np.max(interior_points) * 1.1) if len(interior_points) > 0 else min(10, bound)
         # maxcoord = 10
         fig.update_layout(
             showlegend=True,
