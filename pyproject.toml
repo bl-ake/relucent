@@ -4,6 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "relucent"
+description = "Explore polyhedral complexes associated with the activation states of ReLU neural networks."
 version = "0.2.0"
 requires-python = ">= 3.13, <3.14"
 
@@ -27,4 +28,5 @@ readme = "README.md"
 cli = ["torch>=2.13", "torchvision", "pyvis>=0.3", "kaleido"]
 
 [project.urls]
-Homepage = "https://github.com/bl-ake/relucent"
+Repository = "https://github.com/bl-ake/relucent"
+Documentation = "https://bl-ake.github.io/relucent/"
