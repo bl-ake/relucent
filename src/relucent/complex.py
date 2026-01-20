@@ -380,7 +380,7 @@ class Complex:
                 continue
             bv = poly.bv.clone()
             bv[0, shi] = -bv[0, shi]
-            ps.add()
+            ps.add(self.bv2poly(bv))
         return ps
 
     def parallel_add(self, points, nworkers=None, bound=1e6, **kwargs):
@@ -1060,7 +1060,7 @@ class Complex:
                     go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
                 )
         interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
-        maxcoord = (np.max(interior_points) * 1.1) if len(interior_points) > 0 else min(10, bound)
+        maxcoord = (np.max(interior_points) * 1.1) if len(interior_points) > 0 else min(10, bound if bound else 10)
         # maxcoord = 10
         fig.update_layout(
             showlegend=True,
