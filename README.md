@@ -36,7 +36,7 @@ You could also check the average number of faces of all polyhedrons with:
 ```
 sum(len(p.shis) for p in cplx) / len(cplx)
 ```
-Or, get the adjacency graph of top-dimensional cells in the complex with:
+Or, get the adjacency graph of top-dimensional cells in the complex as a [NetworkX Graph](https://networkx.org/documentation/stable/tutorial.html) with:
 ```
 print(cplx.get_dual_graph())
 ```
