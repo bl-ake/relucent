@@ -1,0 +1,61 @@
+relucent package
+================
+
+Submodules
+----------
+
+relucent.bvs module
+-------------------
+
+.. automodule:: relucent.bvs
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+relucent.complex module
+-----------------------
+
+.. automodule:: relucent.complex
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+relucent.convert\_model module
+------------------------------
+
+.. automodule:: relucent.convert_model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+relucent.model module
+---------------------
+
+.. automodule:: relucent.model
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+relucent.poly module
+--------------------
+
+.. automodule:: relucent.poly
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+relucent.utils module
+---------------------
+
+.. automodule:: relucent.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: relucent
+   :members:
+   :show-inheritance:
+   :undoc-members:

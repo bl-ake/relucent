@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Relucent Documentation &#8212; relucent v0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=fa47ad08"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="relucent-documentation">
+<h1>Relucent Documentation<a class="headerlink" href="#relucent-documentation" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.Complex">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">Complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Manages the polyhedral complex of a neural network.</p>
+<p>This class provides methods for calculating, storing, and searching the h-representations
+(halfspace representations) of polyhedra in the complex.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.add_bv">
+<span class="sig-name descname"><span class="pre">add_bv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_bv" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a sign sequence to a Polyhedron and add it to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bv</strong> – A sign sequence as a torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>check_exists</strong> – If True, return the existing polyhedron from the complex
+if it already exists. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron that was added (or already existed) in the complex.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.add_point">
+<span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_point" title="Link to this definition">¶</a></dt>
+<dd><p>Find the polyhedron containing a data point and add it to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron containing the given point, now stored in the complex.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.add_polyhedron">
+<span class="sig-name descname"><span class="pre">add_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_polyhedron" title="Link to this definition">¶</a></dt>
+<dd><p>Add a Polyhedron to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>p</strong> – The Polyhedron object to add.</p></li>
+<li><p><strong>overwrite</strong> – If True and the polyhedron already exists, replace it with
+the new one. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron that was added (or already existed) in the complex.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.adjacent_polyhedra">
+<span class="sig-name descname"><span class="pre">adjacent_polyhedra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.adjacent_polyhedra" title="Link to this definition">¶</a></dt>
+<dd><p>Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.</p>
+<p>Also works on lower-dimensional polyhedra.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.bfs">
+<span class="sig-name descname"><span class="pre">bfs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.bfs" title="Link to this definition">¶</a></dt>
+<dd><p>Perform breadth-first search of the complex.</p>
+<p>Explores the complex using a breadth-first strategy, discovering all
+polyhedra at depth d before moving to depth d+1. Uses a FIFO queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – All arguments accepted by searcher().</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Search information dictionary (see searcher() documentation).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.bv2poly">
+<span class="sig-name descname"><span class="pre">bv2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.bv2poly" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a sign sequence to a Polyhedron.</p>
+<p>Creates a Polyhedron object from the given sign sequence. Does not add
+it to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bv</strong> – A sign sequence as a torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>check_exists</strong> – If True, return the existing polyhedron from the complex
+if it already exists. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron corresponding to the given sign sequence.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.bv_iterator">
+<span class="sig-name descname"><span class="pre">bv_iterator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.bv_iterator" title="Link to this definition">¶</a></dt>
+<dd><p>Generate sign sequences for each ReLU layer from a batch of data points.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.
+Will be reshaped to match the network’s input shape.</p>
+</dd>
+<dt class="field-even">Yields<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>torch.Tensor</em> –</p>
+<dl class="simple">
+<dt>Sign sequences for each ReLU layer in</dt><dd><p>the network, indicating the activation pattern of that layer.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.clean_data">
+<span class="sig-name descname"><span class="pre">clean_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.clean_data" title="Link to this definition">¶</a></dt>
+<dd><p>Clean cached data from all polyhedra in the complex.</p>
+<p>This method calls clean_data() on each polyhedron, which removes most of their
+computed data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.dfs">
+<span class="sig-name descname"><span class="pre">dfs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.dfs" title="Link to this definition">¶</a></dt>
+<dd><p>Perform depth-first search of the complex.</p>
+<p>Explores the complex using a depth-first strategy, following paths as
+deeply as possible before backtracking. Uses a LIFO queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – All arguments accepted by searcher().</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Search information dictionary (see searcher() documentation).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_dual_graph">
+<span class="sig-name descname"><span class="pre">get_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">relabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'viridis'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_locations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_dual_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Construct the dual graph of the complex.</p>
+<p>The dual graph represents the connectivity structure of the complex,
+where nodes are polyhedra and edges connect adjacent polyhedra (those
+sharing a supporting hyperplane).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>relabel</strong> – If True, nodes are indexed by integers matching self.index2poly
+indices. If False, nodes are Polyhedron objects. Defaults to False.</p></li>
+<li><p><strong>plot</strong> – If True, prepare the graph for visualization with pyvis by
+adding layout and styling attributes. Defaults to False.</p></li>
+<li><p><strong>node_color</strong> – If “Wl2”, color nodes by their Wl2 (weight norm) value.
+If “volume”, color by volume. If None, no special coloring.
+Defaults to None.</p></li>
+<li><p><strong>node_size</strong> – If “volume”, size nodes proportionally to their volume.
+If None, use default size. Defaults to None.</p></li>
+<li><p><strong>cmap</strong> – Colormap to use when node_color is specified. Defaults to “viridis”.</p></li>
+<li><p><strong>match_locations</strong> – If True, position graph nodes at the center points
+of their polyhedra (only works for 2D complexes). Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The dual graph of the complex. Nodes are polyhedra</dt><dd><p>(or integers if relabel=True), edges connect adjacent polyhedra
+and have a “shi” attribute indicating which supporting hyperplane
+they cross.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>networkx.Graph</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If match_locations is True and the complex is not 2D.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_poly_attrs">
+<span class="sig-name descname"><span class="pre">get_poly_attrs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">attrs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_poly_attrs" title="Link to this definition">¶</a></dt>
+<dd><p>Extract specified attributes from all polyhedra in the complex.</p>
+<p>Useful for building tabular representations or dataframes of polyhedra
+properties. Attributes are returned in the same order as polyhedra were
+added to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>attrs</strong> – A list of attribute names to extract (e.g., [“finite”, “Wl2”]).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A dictionary mapping attribute names to lists of attribute</dt><dd><p>values, with one value per polyhedron in the complex based on the order
+they were added.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.greedy_path">
+<span class="sig-name descname"><span class="pre">greedy_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.greedy_path" title="Link to this definition">¶</a></dt>
+<dd><p>Greedily find a path between two data points.</p>
+<p>Attempts to find a path through adjacent polyhedra from start to end
+using a greedy strategy. This method can be slow for large complexes
+as it explores many paths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start</strong> – Starting data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>end</strong> – Ending data point as torch.Tensor or np.ndarray.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects representing the path</dt><dd><p>from start to end, or None if no path is found.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.hamming_astar">
+<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
+<dd><p>Find a path between two data points using A* search algorithm.</p>
+<p>Uses the A* pathfinding algorithm with a heuristic based on Hamming
+distance between sign sequences, plus Euclidean distance between interior
+points to break ties. The heuristic should be admissible for optimal paths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start</strong> – Starting data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>end</strong> – Ending data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes for parallel computation.
+Defaults to 1.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Important for numerical stability. Defaults to 1e5.</p></li>
+<li><p><strong>max_polys</strong> – Maximum number of polyhedra to explore during search.
+Defaults to infinity.</p></li>
+<li><p><strong>show_pbar</strong> – Whether to display a progress bar. Defaults to True.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects representing the path</dt><dd><p>from start to end, or None if no path is found.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list or None</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the start point lies exactly on a neuron’s boundary.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.parallel_add">
+<span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.parallel_add" title="Link to this definition">¶</a></dt>
+<dd><p>Add multiple polyhedra from data points using parallel processing.</p>
+<p>Processes a batch of data points in parallel, computing their corresponding
+polyhedra and adding them to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>points</strong> – A list or iterable of data points (each as torch.Tensor or np.ndarray).</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes to use. If None, uses the number
+of CPU cores. Defaults to None.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Defaults to 1e6.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to poly_calculations() and get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects (or None for failed computations)</dt><dd><p>corresponding to the input points.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.plot">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bv_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.plot" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the complex in 2D using plotly.</p>
+<p>Creates a 2D visualization of the complex, showing all polyhedra as
+regions in the input space. Only works for 2D input spaces.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>label_regions</strong> – If True, add text labels showing each polyhedron’s
+string representation at its center. Defaults to False.</p></li>
+<li><p><strong>color</strong> – If “Wl2”, color polyhedra by their Wl2 (weight norm) value.
+If None, use an equitable graph coloring. Defaults to None.</p></li>
+<li><p><strong>highlight_regions</strong> – If provided, highlight these polyhedra in red.
+Can be a list of Polyhedron objects or their string representations.
+Defaults to None.</p></li>
+<li><p><strong>bv_name</strong> – If True, use the full sign sequence as
+the legend label for each polyhedron. Defaults to False.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for plotting bounds. Passed to each
+polyhedron’s plot2d() method. Defaults to None.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to each polyhedron’s plot2d() method.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A plotly figure containing the 2D plot</dt><dd><p>of the complex.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>plotly.graph_objects.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.plot3d">
+<span class="sig-name descname"><span class="pre">plot3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.plot3d" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the complex in 3D using plotly.</p>
+<p>Creates a 3D visualization of the complex, showing all polyhedra as
+regions in the input space. Only works for 3D input spaces.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>label_regions</strong> – If True, add text labels showing each polyhedron’s
+string representation. Defaults to False.</p></li>
+<li><p><strong>color</strong> – If “Wl2”, color polyhedra by their Wl2 (weight norm) value.
+If None, use an equitable graph coloring. Defaults to None.</p></li>
+<li><p><strong>highlight_regions</strong> – If provided, highlight these polyhedra in red.
+Can be a list of Polyhedron objects or their string representations.
+Defaults to None.</p></li>
+<li><p><strong>show_axes</strong> – If True, display the coordinate axes. Defaults to False.</p></li>
+<li><p><strong>project</strong> – If True, also show a projection of the complex onto the
+xy plane. Defaults to True.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to each polyhedron’s plot3d() method.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A plotly figure containing the 3D plot</dt><dd><p>of the complex.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>plotly.graph_objects.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.point2bv">
+<span class="sig-name descname"><span class="pre">point2bv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2bv" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a batch of data points to sign sequences.</p>
+<p>Computes the combined sign sequence across all ReLU layers for the given
+data points. Does not add the resulting polyhedra to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>numpy</strong> – If True, return result as numpy array; otherwise return torch.Tensor.
+Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The sign sequences for</dt><dd><p>the input batch, with shape (batch_size, total_ReLU_neurons).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor or np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.point2poly">
+<span class="sig-name descname"><span class="pre">point2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2poly" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a data point to its corresponding Polyhedron.</p>
+<p>Finds the polyhedron that contains the given data point. Does not add
+the polyhedron to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>point</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>check_exists</strong> – If True, return the existing polyhedron from the complex
+if it already exists. Defaults to True.</p></li>
+<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron containing the given point.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.random_walk">
+<span class="sig-name descname"><span class="pre">random_walk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.random_walk" title="Link to this definition">¶</a></dt>
+<dd><p>Perform random walk search of the complex.</p>
+<p>Explores the complex by randomly selecting which polyhedron to explore
+next from the queue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – All arguments accepted by searcher().</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Search information dictionary (see searcher() documentation).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.recover_from_dual_graph">
+<span class="sig-name descname"><span class="pre">recover_from_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_bv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.recover_from_dual_graph" title="Link to this definition">¶</a></dt>
+<dd><p>Recover a complex from its connectivity graph.</p>
+<p>Reconstructs polyhedra in the complex by traversing the adjacency graph
+of top-dimensional cells, using the supporting hyperplane indices stored
+on edges to determine how to flip sign sequence elements. This is useful
+for storing large complexes efficiently, as you only need to store the
+graph structure and SHI indices on edges rather than full polyhedron data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>G</strong> – A networkx.Graph representing the dual graph. Edges must have
+a “shi” attribute indicating the supporting hyperplane index.</p></li>
+<li><p><strong>initial_bv</strong> – The sign sequence of a starting polyhedron
+as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>source</strong> – The node key in G representing the initial polyhedron.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The graph with polyhedron objects stored in node</dt><dd><p>attributes under the “poly” key.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>networkx.Graph</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.searcher">
+<span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.searcher" title="Link to this definition">¶</a></dt>
+<dd><p>Search for polyhedra in the complex by discovering neighbors.</p>
+<p>This is a generic search method that can be configured for different
+traversal strategies (BFS, DFS, random walk) by providing different
+queue types. It starts from a given point and explores the complex by
+crossing supporting hyperplanes to discover adjacent polyhedra.</p>
+<p>See bfs(), dfs(), and random_walk() for examples of how to use this
+function to define specific search strategies.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start</strong> – Starting point for the search. Can be a torch.Tensor data point
+or None (defaults to origin). Defaults to None.</p></li>
+<li><p><strong>max_depth</strong> – Maximum search depth (number of hyperplane crossings).
+Defaults to infinity.</p></li>
+<li><p><strong>max_polys</strong> – Maximum number of polyhedra to discover. Defaults to infinity.</p></li>
+<li><p><strong>queue</strong> – Queue object that defines the order in which polyhedra are
+searched. Must have push() and pop() methods. If None, uses
+BlockingQueue (FIFO). Defaults to None.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Important for numerical stability. Defaults to 1e5.</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes for parallel computation. If None,
+uses the number of CPU cores. Defaults to None.</p></li>
+<li><p><strong>get_volumes</strong> – Whether to compute volumes for polyhedra when input
+dimension &lt;= 6. Defaults to True.</p></li>
+<li><p><strong>verbose</strong> – Whether to print progress information. Defaults to 1.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to Polyhedron.get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Search information dictionary containing:</dt><dd><ul class="simple">
+<li><p>”Search Depth”: Maximum depth reached</p></li>
+<li><p>”Avg # Facets Uncorrected”: Average number of facets per polyhedron</p></li>
+<li><p>”Search Time”: Elapsed time in seconds</p></li>
+<li><p>”Bad SHI Computations”: List of failed computations</p></li>
+<li><p>”Complete”: Whether search completed (no unprocessed items)</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the start point lies on a hyperplane (has zero in BV).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Complex.dim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dim</span></span><a class="headerlink" href="#relucent.Complex.dim" title="Link to this definition">¶</a></dt>
+<dd><p>The input dimension of the network.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.Polyhedron">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">Polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspaces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Represents a polyhedron (linear region) in d-dimensional space.</p>
+<p>Several methods use Gurobi environments for optimization. If one is not
+provided, an environment will be created automatically.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.clean_data">
+<span class="sig-name descname"><span class="pre">clean_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.clean_data" title="Link to this definition">¶</a></dt>
+<dd><p>Clear cached data to reduce memory usage.</p>
+<p>Removes large cached properties like halfspaces, W matrix, center,
+and halfspace intersection data. Keeps small properties, the sign sequence,
+and the interior point.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.compute_properties">
+<span class="sig-name descname"><span class="pre">compute_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.compute_properties" title="Link to this definition">¶</a></dt>
+<dd><p>Compute additional geometric properties for low-dimensional polyhedra.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if computation succeeded.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If input dimension &gt; 6 or if computation fails.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_bounded_halfspaces">
+<span class="sig-name descname"><span class="pre">get_bounded_halfspaces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bound</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_bounded_halfspaces" title="Link to this definition">¶</a></dt>
+<dd><p>Get halfspaces after adding bounding box constraints.</p>
+<p>Adds constraints that bound the space to a hypercube of radius ‘bound’
+around the origin. Useful for plotting and visualization. Returns None
+if the polyhedron doesn’t intersect the bounded region.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bound</strong> – Radius of the bounding hypercube.</p></li>
+<li><p><strong>env</strong> – Gurobi environment for feasibility checking. If None, uses
+a cached environment. Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Halfspaces with bounding constraints added, or</dt><dd><p>None if the polyhedron doesn’t intersect the bounded region.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_bounded_vertices">
+<span class="sig-name descname"><span class="pre">get_bounded_vertices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bound</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_bounded_vertices" title="Link to this definition">¶</a></dt>
+<dd><p>Get the vertices of the polyhedron within a bounding hypercube.</p>
+<p>Computes the vertices of the polyhedron after intersecting it with a
+hypercube of radius ‘bound’. Primarily used for plotting and visualization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>bound</strong> – Radius of the bounding hypercube.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Array of vertex coordinates, or None if the</dt><dd><p>polyhedron doesn’t intersect the bounded region or computation fails.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_center_inradius">
+<span class="sig-name descname"><span class="pre">get_center_inradius</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_center_inradius" title="Link to this definition">¶</a></dt>
+<dd><p>Get the Chebyshev center and inradius of the polyhedron.</p>
+<p>Also sets self._finite to indicate if the polyhedron is finite.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>env</strong> – Gurobi environment for optimization. If None, uses a cached
+environment. Defaults to None.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(center, inradius) where center is None for unbounded polyhedra.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_hs">
+<span class="sig-name descname"><span class="pre">get_hs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_hs" title="Link to this definition">¶</a></dt>
+<dd><p>Get the halfspace representation of this polyhedron.</p>
+<p>Computes the halfspaces (inequality constraints) that define the polyhedron
+from all neurons in the network. The result includes constraints from
+every neuron, not just the supporting hyperplanes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>(halfspaces, W, b) where:</dt><dd><ul class="simple">
+<li><p>halfspaces: Array of shape (n_constraints, n_dim+1) with bias terms</p></li>
+<li><p>W: Affine transformation matrix</p></li>
+<li><p>b: Affine transformation bias vector</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_hs_numpy">
+<span class="sig-name descname"><span class="pre">get_hs_numpy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_hs_numpy" title="Link to this definition">¶</a></dt>
+<dd><p>Get halfspaces when the sign sequence is a numpy array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Optional input data to the network for verification. If provided,
+checks that computed outputs match network outputs. Defaults to None.</p></li>
+<li><p><strong>get_all_Ab</strong> – If True, returns all intermediate affine maps (A, b) for
+each layer instead of just the final halfspaces. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(halfspaces, W, b) tuple.
+If get_all_Ab is True: List of dicts with ‘A’, ‘b’, and ‘layer’ keys.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>If get_all_Ab is False</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_hs_torch">
+<span class="sig-name descname"><span class="pre">get_hs_torch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_hs_torch" title="Link to this definition">¶</a></dt>
+<dd><p>Get halfspaces when the sign sequence is a torch.Tensor.</p>
+<p>Computes the halfspace representation using PyTorch operations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Optional input data to the network for verification. If provided,
+checks that computed outputs match network outputs. Defaults to None.</p></li>
+<li><p><strong>get_all_Ab</strong> – If True, returns all intermediate affine maps (A, b) for
+each layer instead of just the final halfspaces. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>(halfspaces, W, b) tuple.
+If get_all_Ab is True: List of dicts with ‘A’, ‘b’, and ‘layer’ keys.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>If get_all_Ab is False</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_interior_point">
+<span class="sig-name descname"><span class="pre">get_interior_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_radius</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_interior_point" title="Link to this definition">¶</a></dt>
+<dd><p>Get a point inside the polyhedron.</p>
+<p>Computes an interior point of the polyhedron. If the center is already
+computed, uses that; otherwise solves for an interior point using Gurobi.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>env</strong> – Gurobi environment for optimization. If None, uses a cached
+environment. Defaults to None.</p></li>
+<li><p><strong>max_radius</strong> – Maximum radius constraint for the search. If None, uses
+self.MAX_RADIUS. Defaults to None.</p></li>
+<li><p><strong>zero_indices</strong> – Indices of sign sequence elements that are zero (for
+lower-dimensional polyhedra). Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An interior point of the polyhedron.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If no interior point can be found.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_shis">
+<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
+<dd><p>Get supporting halfspace indices (SHIs) for this polyhedron.</p>
+<p>Computes the indices of non-redundant halfspaces that form the boundary
+of this polyhedron. These correspond to neurons whose boundaries (BHs)
+are actually part of the polyhedron’s boundary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>collect_info</strong> – If True, collects additional debugging information
+about the computations. If “All”, collects even more detailed info.
+Defaults to False.</p></li>
+<li><p><strong>bound</strong> – Defines the hypercube bounding the space for numerical stability.
+Defaults to infinity.</p></li>
+<li><p><strong>subset</strong> – Indices of neurons/halfspaces to consider. If None, considers
+all halfspaces. Defaults to None.</p></li>
+<li><p><strong>tol</strong> – Inequality tolerance to improve numerical stability. Defaults to 1e-6.</p></li>
+<li><p><strong>new_method</strong> – If True, uses an extra computation that doesn’t improve
+runtime. Defaults to False.</p></li>
+<li><p><strong>env</strong> – Gurobi environment for optimization. If None, uses a cached
+environment. Defaults to None.</p></li>
+<li><p><strong>shi_pbar</strong> – If True, shows a progress bar during computation. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>If collect_info is False, returns a list of SHI indices.</dt><dd><p>If collect_info is True, returns (shis, info) where info is a list
+of dictionaries with computation details.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list or tuple</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the optimization model fails.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.is_face_of">
+<span class="sig-name descname"><span class="pre">is_face_of</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.is_face_of" title="Link to this definition">¶</a></dt>
+<dd><p>Check if this polyhedron is a face of another polyhedron.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – Another Polyhedron object to check against.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if this polyhedron is a face of the other.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.nflips">
+<span class="sig-name descname"><span class="pre">nflips</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.nflips" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the number of non-zero sign sequence elements that differ.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> – Another Polyhedron object to compare with.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The number of sign sequence elements that differ.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.plot2d">
+<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the polyhedron in 2D using plotly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fill</strong> – Fill mode passed to go.Scatter. Defaults to “toself”.</p></li>
+<li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
+<li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
+Defaults to 1000.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A plotly Scatter trace, or None</dt><dd><p>if plotting fails.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>plotly.graph_objects.Scatter or None</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.plot3d">
+<span class="sig-name descname"><span class="pre">plot3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot3d" title="Link to this definition">¶</a></dt>
+<dd><p>Plot the polyhedron in 3D using plotly.</p>
+<p>Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
+by passing the 2D vertices through the network.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fill</strong> – Fill mode (not used for 3D plots). Defaults to “toself”.</p></li>
+<li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
+<li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
+Defaults to 1000.</p></li>
+<li><p><strong>project</strong> – If a number, projects the polyhedron onto this z-value
+instead of computing it from the network. Defaults to None.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Mesh3d.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Dictionary with ‘mesh’ and ‘outline’ keys containing</dt><dd><p>plotly traces, or None if plotting fails.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict or None</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.Polyhedron.MAX_RADIUS">
+<span class="sig-name descname"><span class="pre">MAX_RADIUS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></span><a class="headerlink" href="#relucent.Polyhedron.MAX_RADIUS" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.W">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">W</span></span><a class="headerlink" href="#relucent.Polyhedron.W" title="Link to this definition">¶</a></dt>
+<dd><p>Affine transformation matrix W such that the polyhedron maps to W*x + b.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Transformation matrix.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.Tensor or np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.Wl2">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Wl2</span></span><a class="headerlink" href="#relucent.Polyhedron.Wl2" title="Link to this definition">¶</a></dt>
+<dd><p>L2 norm of the transformation matrix W.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.b">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">b</span></span><a class="headerlink" href="#relucent.Polyhedron.b" title="Link to this definition">¶</a></dt>
+<dd><p>Affine transformation bias vector such that the polyhedron maps to W*x + b.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Bias vector.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.Tensor or np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.center">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">center</span></span><a class="headerlink" href="#relucent.Polyhedron.center" title="Link to this definition">¶</a></dt>
+<dd><p>Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded polyhedra.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.ch">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ch</span></span><a class="headerlink" href="#relucent.Polyhedron.ch" title="Link to this definition">¶</a></dt>
+<dd><p>Convex hull of the polyhedron for finite polyhedra.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.finite">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">finite</span></span><a class="headerlink" href="#relucent.Polyhedron.finite" title="Link to this definition">¶</a></dt>
+<dd><p>Whether the polyhedron is bounded (finite).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.halfspaces">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces" title="Link to this definition">¶</a></dt>
+<dd><p>Halfspace representation of the polyhedron.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>Array of shape (n_constraints, n_dim+1)</dt><dd><p>where each row is [a1, a2, …, ad, b] representing the
+constraint a^T x + b &lt;= 0.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.Tensor or np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.hs">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hs</span></span><a class="headerlink" href="#relucent.Polyhedron.hs" title="Link to this definition">¶</a></dt>
+<dd><p>Halfspace intersection object from scipy.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.inradius">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inradius</span></span><a class="headerlink" href="#relucent.Polyhedron.inradius" title="Link to this definition">¶</a></dt>
+<dd><p>Inradius of the polyhedron (radius of largest inscribed ball), infinity for unbounded polyhedra.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.interior_point">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
+<dd><p>A point guaranteed to be inside the polyhedron.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.interior_point_norm">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point_norm</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point_norm" title="Link to this definition">¶</a></dt>
+<dd><p>L2 norm of the interior point.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.num_dead_relus">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_dead_relus</span></span><a class="headerlink" href="#relucent.Polyhedron.num_dead_relus" title="Link to this definition">¶</a></dt>
+<dd><p>Number of dead ReLU neurons (neurons always outputting zero).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Count of ReLU neurons that are always inactive for this polyhedron.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.num_faces">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_faces</span></span><a class="headerlink" href="#relucent.Polyhedron.num_faces" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for Polyhedron.num_shis</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.num_shis">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_shis</span></span><a class="headerlink" href="#relucent.Polyhedron.num_shis" title="Link to this definition">¶</a></dt>
+<dd><p>Number of faces.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.point">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">point</span></span><a class="headerlink" href="#relucent.Polyhedron.point" title="Link to this definition">¶</a></dt>
+<dd><p>The center if available, otherwise an interior point.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.shis">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">shis</span></span><a class="headerlink" href="#relucent.Polyhedron.shis" title="Link to this definition">¶</a></dt>
+<dd><p>Supporting halfspace indices (SHIs).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.tag">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tag</span></span><a class="headerlink" href="#relucent.Polyhedron.tag" title="Link to this definition">¶</a></dt>
+<dd><p>Unique tag for this polyhedron, computed as a hashable
+representation of the sign sequence.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.vertex_set">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertex_set</span></span><a class="headerlink" href="#relucent.Polyhedron.vertex_set" title="Link to this definition">¶</a></dt>
+<dd><p>Set of vertices of the polyhedron (not always reliable).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.vertices">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertices</span></span><a class="headerlink" href="#relucent.Polyhedron.vertices" title="Link to this definition">¶</a></dt>
+<dd><p>Vertices of the polyhedron (not always reliable).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Array of vertex coordinates.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.volume">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">volume</span></span><a class="headerlink" href="#relucent.Polyhedron.volume" title="Link to this definition">¶</a></dt>
+<dd><p>Volume of the polyhedron, infinity for unbounded polyhedra,
+or -1 if computation fails.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.NN">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">NN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
+<p>Neural network class that interfaces with the rest of the package</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Define the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.get_all_layer_outputs">
+<span class="sig-name descname"><span class="pre">get_all_layer_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_all_layer_outputs" title="Link to this definition">¶</a></dt>
+<dd><p>Get outputs from specified layers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Input tensor to the network.</p></li>
+<li><p><strong>layers</strong> – List of layer names to include. If None, includes all layers.
+Defaults to None.</p></li>
+<li><p><strong>verbose</strong> – If True, prints layer information. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary mapping layer names to their outputs.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>OrderedDict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.get_grid">
+<span class="sig-name descname"><span class="pre">get_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_grid" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a 2D grid of input points.</p>
+<p>Creates a regular grid of points in 2D space. Only works for 2D input spaces.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bounds</strong> – Half-width of the grid (grid spans [-bounds, bounds]).
+Defaults to 2.</p></li>
+<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to 100.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>(x_coords, y_coords, input_points) where input_points is an</dt><dd><p>array of shape (res*res, 2).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.output_grid">
+<span class="sig-name descname"><span class="pre">output_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.output_grid" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a grid and compute network outputs for all points.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bounds</strong> – Half-width of the grid. Defaults to 2.</p></li>
+<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to 100.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>(x_coords, y_coords, layer_outputs) where layer_outputs is</dt><dd><p>an OrderedDict mapping layer names to outputs.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.shi2weights">
+<span class="sig-name descname"><span class="pre">shi2weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.shi2weights" title="Link to this definition">¶</a></dt>
+<dd><p>Get weights corresponding to a neuron index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>shi</strong> – Index of the neuron (supporting hyperplane index).</p></li>
+<li><p><strong>return_idx</strong> – If True, returns (layer_name, neuron_index_in_layer).
+If False, returns a pointer to the weight tensor. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>torch.Tensor weight vector.
+If return_idx is True: (layer_name, neuron_index) tuple.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>If return_idx is False</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the neuron index is invalid.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.NN.device">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">device</span></span><a class="headerlink" href="#relucent.NN.device" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.NN.dtype">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dtype</span></span><a class="headerlink" href="#relucent.NN.dtype" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.NN.num_relus">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_relus</span></span><a class="headerlink" href="#relucent.NN.num_relus" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">relucent</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Blake B. Gaines.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
