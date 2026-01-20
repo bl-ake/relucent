@@ -5,8 +5,41 @@ Explore polyhedral complexes associated with the activation states of ReLU neura
 
 ## Environment Setup 
 1. Install Python 3.13
-2. Install [PyTorch 2.3.0](https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0)
-3. Install the remaining dependencies with `pip install -r requirements.txt`
+2. Install [PyTorch >= 2.3.0](https://pytorch.org/get-started/locally/)
+3. Run `pip install relucent`
+
+## Getting Started
+To see if the installation has been successful, try plotting the complex of a randomly initialized network in 2 dimensions like this:
+```
+from relucent import Complex, get_mlp_model
+
+network = get_mlp_model(widths=[2, 10, 5, 1])
+cplx = Complex(network)
+cplx.bfs()
+fig = cplx.plot(bound=10000)
+fig.show()
+```
+
+The "NN" object returned by get_mlp_model inherits from torch.nn.Module, so you can train and manipulate it just like you're used to :)
+
+Given some input point, you could get a minimal H-representation of the polyhedron containing it like this:
+```
+import numpy as np
+input_point = np.random.random(network.input_shape)
+p = cplx.point2poly(input_point)
+print(p.halfspaces[p.shis, :])
+```
+
+You could also check the average number of faces of all polyhedrons with:
+```
+sum(len(p.shis) for p in cplx) / len(cplx)
+```
+Or, get the adjacency graph of top-dimensional cells in the complex with:
+```
+print(cplx.get_dual_graph())
+```
+
+Full documentation of this library is coming soon!
 
 ## Source Code Structure
 * [model.py](src/relucent/model.py): PyTorch Module that acts as an interface between the model and the rest of the code
