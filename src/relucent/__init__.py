@@ -13,6 +13,6 @@ from .complex import Complex
 from .poly import Polyhedron
 from .model import NN, get_mlp_model
 from .convert_model import convert
-from .utils import get_env, split_sequential, data_graph, set_seeds
+from .utils import get_env, split_sequential, set_seeds
 
-__all__ = [Complex, Polyhedron, NN, get_mlp_model, BVManager, convert, get_env, split_sequential, data_graph, set_seeds]
+__all__ = [Complex, Polyhedron, NN, get_mlp_model, BVManager, convert, get_env, split_sequential, set_seeds]
