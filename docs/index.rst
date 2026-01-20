@@ -6,33 +6,67 @@
 Relucent
 ======================
 
+Welcome to the Relucent documentation!
+
+.. _complex:
+
+.. Complex
+.. -------
 
 .. autoclass:: relucent.Complex
    :members:
    :undoc-members:
    :show-inheritance:
 
+.. _polyhedron:
+
+.. Polyhedron
+.. ----------
+
 .. autoclass:: relucent.Polyhedron
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: MAX_RADIUS
+
+.. _neural-network-models:
+
+.. Neural Network Models
+.. ---------------------
+
+.. _neural-network-class:
+
+Neural Network Class
+~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: relucent.NN
    :members:
    :undoc-members:
    :show-inheritance:
 
+.. _model-functions:
+
+Model Functions
+~~~~~~~~~~~~~~~
+
 .. autofunction:: relucent.get_mlp_model
 
 .. autofunction:: relucent.convert
+
+.. _utility-functions:
+
+.. Utility Functions
+.. -----------------
 
 .. autofunction:: relucent.get_env
 
 .. autofunction:: relucent.set_seeds
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 3
+   :caption: Navigation:
+   :hidden:
+
 
 Indices and tables
 ==================
