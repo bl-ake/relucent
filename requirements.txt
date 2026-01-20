@@ -9,3 +9,4 @@ pyvis>=0.3
 scikit_learn>=1.8
 scipy>=1.17
 tqdm>=4.67
+torch>=2.5
