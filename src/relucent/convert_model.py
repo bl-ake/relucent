@@ -8,12 +8,30 @@ from tqdm.auto import tqdm
 
 from relucent.model import NN
 
-"""Tries to convert a PyTorch model to an NN object in the canonical format"""
+"""Convert PyTorch models to the canonical NN format.
+
+This module provides utilities to convert various PyTorch model architectures
+(including Conv2d, AvgPool2d, etc.) into the canonical format used by relucent,
+which consists of Linear and ReLU layers only.
+"""
 
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
 @torch.no_grad()
 def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int, int]) -> torch.nn.Linear:
+    """Convert a Conv2d layer to an equivalent Linear layer.
+
+    Args:
+        conv: The Conv2d layer to convert.
+        input_size: Input size as (channels, height, width) tuple.
+
+    Returns:
+        nn.Linear: A Linear layer that performs the equivalent operation.
+
+    Reference:
+        Based on: https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
+    """
+
     def range2d(to_a, to_b):
         for a in range(to_a):
             for b in range(to_b):
@@ -84,6 +102,21 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
 
 @torch.no_grad()
 def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: Tuple[int, int, int]) -> torch.nn.Linear:
+    """Convert an AvgPool2d layer to an equivalent Linear layer.
+
+    Converts average pooling into a fully connected layer by representing it
+    as a convolution with uniform weights, then converting that to a Linear layer.
+
+    Args:
+        avgpool: The AvgPool2d layer to convert.
+        input_size: Input size as (channels, height, width) tuple.
+
+    Returns:
+        nn.Linear: A Linear layer that performs the equivalent operation.
+
+    Reference:
+        Based on: https://www.researchgate.net/figure/The-mean-pooling-is-described-with-the-matrix-multiplication-of-the-reshaped-feature-map_fig2_357833254
+    """
     # https://www.researchgate.net/figure/The-mean-pooling-is-described-with-the-matrix-multiplication-of-the-reshaped-feature-map_fig2_357833254
     conv2d = nn.Conv2d(
         in_channels=input_size[0],
@@ -102,11 +135,30 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: Tuple[int, int,
 
 @torch.no_grad()
 def flatten_to_affine(input_size: Tuple[int, int, int]) -> torch.nn.Linear:
-    nn.Linear(in_features=np.product(input_size), out_features=np.product(input_size))
+    """Convert a Flatten operation to an identity Linear layer.
+
+    Args:
+        input_size: Input size as (channels, height, width) tuple.
+
+    Returns:
+        nn.Linear: An identity Linear layer.
+    """
+    return nn.Linear(in_features=np.product(input_size), out_features=np.product(input_size))
 
 
 def combine_linear_layers(old_layers):
-    """Given a ordered dict of layers, combine consecutive linear layers into a single one"""
+    """Combine consecutive Linear layers into a single layer.
+
+    Since the composition of two linear transformations is itself linear,
+    multiple consecutive Linear layers can be combined into one for efficiency.
+
+    Args:
+        old_layers: OrderedDict of layers to process.
+
+    Returns:
+        OrderedDict: New dictionary with consecutive Linear layers combined.
+            Layer names are concatenated with '+' for combined layers.
+    """
     new_layers = OrderedDict()
     current_linear = None
     current_name = ""
@@ -139,7 +191,29 @@ def combine_linear_layers(old_layers):
 
 @torch.no_grad()
 def convert(model: nn.Module) -> nn.Module:
-    ## TODO: Write a test
+    """Convert a PyTorch model to canonical NN format.
+
+    Converts various PyTorch layer types (Conv2d, AvgPool2d, etc.) into the
+    canonical format consisting only of Linear and ReLU layers.
+
+    Supported layer types:
+        - Linear, ReLU: Passed through unchanged
+        - Conv2d: Converted to Linear
+        - AvgPool2d: Converted to Linear (if kernel_size == stride)
+        - Flatten: Handled automatically
+        - Dropout: Removed (not needed for inference)
+        - LogSoftmax: Stops conversion (output layer)
+
+    Args:
+        model: A PyTorch nn.Module with an 'input_shape' attribute and 'layers'
+            attribute containing an OrderedDict of layers.
+
+    Returns:
+        NN: A new NN object in canonical format.
+
+    Raises:
+        ValueError: If an unsupported layer type is encountered.
+    """
     x = torch.zeros((1, *model.input_shape), dtype=next(model.parameters()).dtype, device=model.device)
     layers = OrderedDict()
     assert "Flatten Input" not in model.layers
