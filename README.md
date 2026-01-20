@@ -6,7 +6,7 @@ Explore the polyhedral complexes of ReLU neural networks
 
 ## Environment Setup 
 1. Install Python 3.13
-2. Install [PyTorch >= 2.3.0](https://pytorch.org/get-started/locally/)
+2. Install [PyTorch](https://pytorch.org/get-started/locally/)
 3. Run `pip install relucent`
 
 ## Getting Started
