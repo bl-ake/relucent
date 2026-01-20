@@ -25,6 +25,7 @@ The "NN" object returned by get_mlp_model inherits from torch.nn.Module, so you 
 Given some input point, you could get a minimal H-representation of the polyhedron containing it like this:
 ```
 import numpy as np
+
 input_point = np.random.random(network.input_shape)
 p = cplx.point2poly(input_point)
 print(p.halfspaces[p.shis, :])
