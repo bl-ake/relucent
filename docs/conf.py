@@ -60,6 +60,16 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "alabaster"
 html_static_path = ["_static"]
 
+# Configure sidebar to show local table of contents
+html_sidebars = {
+    "**": [
+        "localtoc.html",
+        "relations.html",
+        "sourcelink.html",
+        "searchbox.html",
+    ]
+}
+
 
 def process_docstring(app, what_, name, obj, options, lines):
     """
