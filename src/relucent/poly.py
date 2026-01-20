@@ -224,12 +224,18 @@ class Polyhedron:
         self._finite = self._center is not None
         return self._center, self._inradius
 
-    def get_hs(self):
+    def get_hs(self, data=None, get_all_Ab=False):
         """Get the halfspace representation of this polyhedron.
 
         Computes the halfspaces (inequality constraints) that define the polyhedron
         from all neurons in the network. The result includes constraints from
         every neuron, not just the supporting hyperplanes.
+
+        Args:
+            data: Optional input data to the network for verification. If provided,
+                checks that computed outputs match network outputs. Defaults to None.
+            get_all_Ab: If True, returns all intermediate affine maps (A, b) for
+                each layer instead of just the final halfspaces. Defaults to False.
 
         Returns:
             tuple: (halfspaces, W, b) where:
@@ -238,14 +244,14 @@ class Polyhedron:
                 - b: Affine transformation bias vector
         """
         if isinstance(self.bv, torch.Tensor):
-            return self.get_hs_torch()
+            return self._get_hs_torch(data, get_all_Ab)
         elif isinstance(self.bv, np.ndarray):
-            return self.get_hs_numpy()
+            return self._get_hs_numpy(data, get_all_Ab)
         else:
             raise NotImplementedError
 
     @torch.no_grad()
-    def get_hs_torch(self, data=None, get_all_Ab=False):
+    def _get_hs_torch(self, data=None, get_all_Ab=False):
         """Get halfspaces when the sign sequence is a torch.Tensor.
 
         Computes the halfspace representation using PyTorch operations.
@@ -315,7 +321,7 @@ class Polyhedron:
         return halfspaces, current_A, current_b
 
     @torch.no_grad()
-    def get_hs_numpy(self, data=None, get_all_Ab=False):
+    def _get_hs_numpy(self, data=None, get_all_Ab=False):
         """Get halfspaces when the sign sequence is a numpy array.
 
         Args:
