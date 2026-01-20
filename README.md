@@ -41,7 +41,7 @@ Or, get the adjacency graph of top-dimensional cells in the complex as a [Networ
 print(cplx.get_dual_graph())
 ```
 
-View the documentation for this library at (https://bl-ake.github.io/relucent/)[https://bl-ake.github.io/relucent/]
+View the documentation for this library at https://bl-ake.github.io/relucent/
 
 ## Source Code Structure
 * [model.py](src/relucent/model.py): PyTorch Module that acts as an interface between the model and the rest of the code
