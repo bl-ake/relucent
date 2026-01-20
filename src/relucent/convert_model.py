@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 
-from .model import NN
+from relucent.model import NN
 
 """Tries to convert a PyTorch model to an NN object in the canonical format"""
 

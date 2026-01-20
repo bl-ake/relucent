@@ -2,7 +2,7 @@ from heapq import heappop, heappush
 
 from torch import Tensor
 
-from .poly import encode_bv
+from relucent.poly import encode_bv
 
 
 class BVManager:
