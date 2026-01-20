@@ -25,7 +25,6 @@ autodoc_default_options = {
 project = "relucent"
 copyright = "2026, Blake B. Gaines"
 author = "Blake B. Gaines"
-release = "v0.1.0"
 
 extensions = [
     "sphinx.ext.autodoc",
