@@ -894,6 +894,11 @@ class Polyhedron:
         return len(self.shis)
 
     @property
+    def num_faces(self):
+        """Alias for Polyhedron.num_shis"""
+        return self.num_shis
+
+    @property
     def interior_point(self):
         """np.ndarray: A point guaranteed to be inside the polyhedron."""
         # if (self.bv == 0).any():
