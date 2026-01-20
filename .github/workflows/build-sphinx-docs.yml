@@ -1,0 +1,46 @@
+name: Deploy Sphinx Docs to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main # Or your primary branch name
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Fetch all history for gh-pages action
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13' # Use your preferred Python version
+
+    - name: Install dependencies
+      run: |
+        pip install sphinx sphinx-rtd-theme # Install Sphinx and a theme
+        python -m pip install torch torchvision
+        pip install . # Install your project so autodoc can import it
+
+    - name: Generate and Build Sphinx HTML documentation
+      run: |
+        # Use sphinx-apidoc to auto-generate .rst files from your code
+        sphinx-apidoc -o docs src -f 
+        # Build the HTML documentation
+        cd docs
+        make html
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      if: ${{ github.ref == 'refs/heads/main' }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/_build/html
+        publish_branch: gh-pages
+        
