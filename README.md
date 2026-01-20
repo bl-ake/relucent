@@ -2,7 +2,7 @@
 [![Latest Release](https://img.shields.io/github/v/tag/bl-ake/relucent?label=Latest%20Release)](https://github.com/bl-ake/relucent/releases)
 
 # Relucent
-Explore polyhedral complexes associated with the activation states of ReLU neural networks
+Explore the polyhedral complexes of ReLU neural networks
 
 ## Environment Setup 
 1. Install Python 3.13
