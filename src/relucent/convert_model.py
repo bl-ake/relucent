@@ -8,6 +8,8 @@ from tqdm.auto import tqdm
 
 from .model import NN
 
+"""Tries to convert a PyTorch model to an NN object in the canonical format"""
+
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
 @torch.no_grad()
@@ -104,6 +106,7 @@ def flatten_to_affine(input_size: Tuple[int, int, int]) -> torch.nn.Linear:
 
 
 def combine_linear_layers(old_layers):
+    """Given a ordered dict of layers, combine consecutive linear layers into a single one"""
     new_layers = OrderedDict()
     current_linear = None
     current_name = ""

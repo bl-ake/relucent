@@ -6,6 +6,11 @@ from .poly import encode_bv
 
 
 class BVManager:
+    """
+    A class for storing sign sequences
+    Basically just a Python set() but for ternary numpy arrays
+    """
+
     def __init__(self):
         self.index2bv = list()
         self.tag2index = dict()  ## Tags are just hashable versions of bvs, should be unique
@@ -89,6 +94,7 @@ class BVPriorityQueue:
 
 
 # class BVPriorityQueue:
+#     """Simpler, less efficient version of the one above for debugging"""
 #     def __init__(self):
 #         self.pq = []  # list of entries arranged in a heap
 
@@ -147,7 +153,6 @@ class BVPriorityQueue:
 # # Trie
 # # Each edge in the tree sets a dimension to a value
 # # Leaf nodes are just indices of bvs in index2bv
-# # TODO: Replace hashmaps in Complex class with this
 # class BVManager:
 #     def __init__(self):
 #         self.root = BVNode(0)

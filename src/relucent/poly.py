@@ -14,8 +14,14 @@ from .utils import get_env
 
 
 def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, sense=GRB.MAXIMIZE):
-    ## This returns the Chebyshev center for finite polyhedrons and an interior point for infinite polyhedrons
-    ## Only works if all the polyhedron vertices are within 2*max_radius of each other
+    """This returns the Chebyshev center for finite polyhedrons and an interior point for infinite polyhedrons
+    Only works if all the polyhedron vertices are within 2*max_radius of each other
+    env: gurobi environment
+    halfspaces: halfspaces of the polyhedron (with bias terms included)
+    max_radius: maximum radius of the polyhedron
+    zero_indices: indices of the sign sequence elements that are zero, if any
+    sense: should probably always be GRB.MAXIMIZE
+    """
 
     if isinstance(halfspaces, torch.Tensor):
         halfspaces = halfspaces.detach().cpu().numpy()
@@ -53,14 +59,33 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
 
 
 def encode_bv(bv):
+    """Create a hashable representation of a sign sequence"""
     # return tuple(bv.astype(int).flatten().tolist())  ## TODO: Test these two options and compare speeds
     return bv.flatten().tobytes()
 
 
 class Polyhedron:
+    """Represents a polyhedron in d-dimensional space.
+    Several methods use Gurobi environments. If one is not provided, one will be created automatically if it does not exist already.
+    """
+
     MAX_RADIUS = 100  ## The smaller the faster, but making this value too small can exclude some polyhedrons
 
     def __init__(self, net, bv, halfspaces=None, W=None, b=None, point=None, shis=None, bound=None, **kwargs):
+        """Create a Polyhedron object
+
+        net: instance of the NN class from the "model" module
+        bv: sign sequence
+
+        Remaining arguments can be used to avoid recomputing properties
+        halfspaces: halfspaces of the polyhedron
+        W: W matrix of the polyhedron
+        b: b vector of the polyhedron
+        point: interior point of the polyhedron
+        bound: bound on the radius of the polyhedron
+
+        kwargs can be used to set arbitrary properties
+        """
         self.net = net
         self.bv = bv
         if not isinstance(bv, torch.Tensor):
@@ -95,7 +120,8 @@ class Polyhedron:
             setattr(self, key, value)
 
     def compute_properties(self):
-        if self.net.input_shape[0] > 10:
+        """If the input dimension is low, this function can compute additional properties like volume, convex hull, etc."""
+        if self.net.input_shape[0] > 6:
             raise ValueError("Input shape too large to compute extra properties")
         try:
             # warnings.warn("Computing Additional Properties")
@@ -124,6 +150,11 @@ class Polyhedron:
         return True
 
     def get_interior_point(self, env=None, max_radius=None, zero_indices=None):
+        """Get a point inside the polyhedron
+        env: gurobi environment
+        max_radius: maximum radius of the polyhedron
+        zero_indices: indices of the polyhedron's sign sequence that are zero
+        """
         max_radius = max_radius or self.MAX_RADIUS
         if self._center is not None:
             self._interior_point = self._center.squeeze()
@@ -137,12 +168,14 @@ class Polyhedron:
         return self._interior_point
 
     def get_center_inradius(self, env=None):
+        """Get the center and inradius of the polyhedron and if it is finite"""
         env = env or get_env()
         self._center, self._inradius = solve_radius(env, self.halfspaces[:])
         self._finite = self._center is not None
         return self._center, self._inradius
 
     def get_hs(self):
+        """get the halfspaces for this polyhedron from *every* neuron in the network"""
         if isinstance(self.bv, torch.Tensor):
             return self.get_hs_torch()
         elif isinstance(self.bv, np.ndarray):
@@ -152,6 +185,10 @@ class Polyhedron:
 
     @torch.no_grad()
     def get_hs_torch(self, data=None, get_all_Ab=False):
+        """get the halfspaces for this polyhedron from *every* neuron in the network when the sign sequence is a torch tensor
+        data: input to the network
+        get_all_Ab: whether to return all affine maps for each layer
+        """
         constr_A, constr_b = None, None
         current_A, current_b = None, None
         A, b = None, None
@@ -208,6 +245,10 @@ class Polyhedron:
 
     @torch.no_grad()
     def get_hs_numpy(self, data=None, get_all_Ab=False):
+        """get the halfspaces for this polyhedron from *every* neuron in the network when the sign sequence is a numpy array
+        data: input to the network
+        get_all_Ab: whether to return all affine maps for each layer
+        """
         constr_A, constr_b = None, None
         current_A, current_b = None, None
         A, b = None, None
@@ -271,6 +312,13 @@ class Polyhedron:
         return halfspaces, current_A, current_b
 
     def get_bounded_halfspaces(self, bound, env=None):
+        """
+        Get the halfspaces for this polyhedron after bounding the space, returns None if the polyhedron is outside the bound
+        Useful for plotting
+
+        bound: defines the hypercube bounding the space
+        env: gurobi environment
+        """
         bounds_lhs = np.eye(self.halfspaces.shape[1] - 1)
         bounds_rhs = -np.ones((self.halfspaces.shape[1] - 1, 1)) * bound
         halfspaces = np.vstack(
@@ -296,21 +344,32 @@ class Polyhedron:
             self._hash = hash(self.tag)
         return self._hash
 
-    def common_vertices(self, other):
-        if not self.finite or not other.finite:
-            raise NotImplementedError
-        return self.vertex_set.intersection(other.vertex_set)
+    # def common_vertices(self, other):
+    #     if not self.finite or not other.finite:
+    #         raise NotImplementedError
+    #     return self.vertex_set.intersection(other.vertex_set)
 
     def get_shis(
         self,
         collect_info=False,
         bound=GRB.INFINITY,
         subset=None,
-        tol=1e-5,
+        tol=1e-6,
         new_method=False,
         env=None,
         shi_pbar=False,
     ):
+        """
+        Get the indices of non-redundant halfspaces bounding this polyhedron, i.e. the indices of neurons with BHs forming its boundary
+
+        collect_info: used for debugging, collects additional information about the computations
+        bound: defines the hypercube bounding the space
+        subset: indices of the neurons/halfspaces to consider (default: all)
+        tol: inequality tolerance to improve stability
+        new_method: add some complexity without improving runtime
+        env: gurobi environment
+        shi_pbar: show progress bar
+        """
         shis = []
         A = (self.halfspaces.detach().cpu().numpy() if isinstance(self.halfspaces, torch.Tensor) else self.halfspaces)[
             :, :-1
@@ -420,12 +479,19 @@ class Polyhedron:
         return shis
 
     def nflips(self, other):
+        """Calculate how many sign sequence elements differ between two Polyhedron objects"""
         return (self.bv * other.bv == -1).sum().item()
 
     def is_face_of(self, other):
+        """Check if a Polyhedron is a face of another Polyhedron"""
         return ((self * other).bv == other.bv).all()
 
     def get_bounded_vertices(self, bound):
+        """Get the vertices of a Polyhedron within a hypercube
+        Primarily for plotting
+
+        bound: defines the hypercube bounding the space
+        """
         try:
             bounded_halfspaces = self.get_bounded_halfspaces(bound)
         except ValueError as e:
@@ -444,7 +510,13 @@ class Polyhedron:
         vertices = hs.intersections
         return vertices
 
-    def plot2d(self, fill="toself", showlegend=False, debug=False, bound=1000, **kwargs):
+    def plot2d(self, fill="toself", showlegend=False, bound=1000, **kwargs):
+        """Plot a Polyhedron in 2D
+        fill: passed to go.Scatter
+        showlegend: passed to go.Scatter
+        bound: defines the hypercube bounding the space
+        **kwargs: passed to go.Scatter
+        """
         if self.W.shape[0] != 2:
             raise ValueError("Polyhedron must be 2D to plot")
         vertices = self.get_bounded_vertices(bound)
@@ -460,7 +532,14 @@ class Polyhedron:
         else:
             return None
 
-    def plot3d(self, fill="toself", showlegend=False, debug=False, bound=1000, project=None, **kwargs):
+    def plot3d(self, fill="toself", showlegend=False, bound=1000, project=None, **kwargs):
+        """Plot a Polyhedron in 3D
+        fill: passed to go.Mesh3d
+        showlegend: passed to go.Scatter
+        bound: defines the hypercube bounding the space
+        project: if a number, project the polyhedron onto this z value
+        **kwargs: passed to go.Mesh3d
+        """
         if self.W.shape[0] != 2:
             raise ValueError("Polyhedron must be 2D to plot")
         vertices = self.get_bounded_vertices(bound)
@@ -495,6 +574,7 @@ class Polyhedron:
             return None
 
     def clean_data(self):
+        """Clear cached data, leaves only small properties, the bv, and the interior point"""
         self._halfspaces = None
         self._W = None
         self._b = None
@@ -502,6 +582,10 @@ class Polyhedron:
         self._hs = None
         # self._interior_point = None ## TODO: Does this slow down things?
         self._point = None
+
+    """
+    All of the following properties are computed on the fly and cached
+    """
 
     @property
     def vertex_set(self):
@@ -651,13 +735,17 @@ class Polyhedron:
         return h.hexdigest()[:8]
 
     def __contains__(self, point):
+        """Returns True if an input point is in the polyhedron"""
         if not isinstance(point, torch.Tensor):
             point = torch.Tensor(point).to(self.net.device, self.net.dtype)
         point = point.reshape(1, -1)
         return (point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1] <= 1e-8).all()
 
     def __mul__(self, other):
+        """Returns a new Polyhedron object based on sign sequence multiplication"""
         return Polyhedron(self.net, self.bv + other.bv * (self.bv == 0))
+
+    """The following methods are used for pickling"""
 
     def __setstate__(self, state):
         self.__dict__.update(state)

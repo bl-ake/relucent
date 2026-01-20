@@ -18,6 +18,7 @@ disposeDefaultEnv()
 
 
 def set_seeds(seed):
+    """Set all random seeds to a given value"""
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -25,6 +26,7 @@ def set_seeds(seed):
 
 @cache
 def get_env():
+    """Get a gurobi environment. This value is cached to avoid starting up multiple environments, so for more control, pass in the environment directly"""
     env = Env(logfilename="", empty=True)
     env.setParam("OutputFlag", 0)
     env.setParam("LogToConsole", 0)
@@ -33,6 +35,8 @@ def get_env():
 
 
 class NonBlockingQueue:
+    """Just a normal queue"""
+
     stopFlag = "<stop>"
 
     def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
@@ -64,10 +68,19 @@ class NonBlockingQueue:
 
 
 class BlockingQueue:
-    ## Queue that patiently waits for new elements before popping
+    """Queue that patiently waits for new elements if you pop() while it's empty"""
+
     stopFlag = "<stop>"
 
     def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
+        """Create a blocking queue
+
+        queue_class: the type of queue to use (defines how elemenets are stored and popped)
+        pop: function to pop an element from the queue
+        push: function to push an element to the queue
+
+        Note: pop and push can both be functions with kwargs, the corresponding methods in this class will pass their arguments along
+        """
         self.deque = queue_class()
         self.pop_element = pop
         self.push_element = push
@@ -122,6 +135,7 @@ def split_sequential(model, split_layer):
 
 
 def get_colors(data, cmap="viridis", **kwargs):
+    """Map some numbers to some colors"""
     if not data:
         return []
     a = np.asarray(data)
@@ -131,11 +145,6 @@ def get_colors(data, cmap="viridis", **kwargs):
     a = colormaps[cmap](a)
     a = (a * 255).astype(int)
     return [f"#{x[0]:02x}{x[1]:02x}{x[2]:02x}" for x in a]
-
-
-def draw_image(data, ax):
-    img = data.view(28, 28).cpu().numpy()
-    ax.imshow(img, cmap="gray")
 
 
 def data_graph(
@@ -154,6 +163,7 @@ def data_graph(
     max_num_examples=3,
     save_file="./graph.html",
 ):
+    """Create a pyvis graph from a dataframe of nodes and edges"""
     from pyvis.network import Network
 
     if class_labels is True and dataset is not None:
@@ -174,16 +184,6 @@ def data_graph(
                 if j <= num_examples:
                     data = row["data"][j]
                     draw_function(data=data, ax=ax)
-
-            # fig, ax = draw_function(data=dataset.data[row["indices"][0][0]])
-
-            # fig, ax = plt.subplots()
-            # plt.margins(0,0)
-            # ax.pie(row["class_proportions"], labeldistance=.6, labels = list(range(dataset.num_classes)))
-            # ax.set_box_aspect(1)
-            # ax.set_axis_off()
-            # fig.tight_layout()
-            # plt.tight_layout(pad=0)
 
             if class_labels and "class_proportions" in row:
                 axs[-1].pie(row["class_proportions"], labeldistance=0.6, labels=class_labels)
@@ -213,20 +213,13 @@ def data_graph(
             label=edge_label_formatter(row),
             value=edge_value_formatter(row),
         )
-        # G.add_edge(mask_tuple, other_node, weight=bits_different)
         bar.set_postfix({"Nodes": G.number_of_nodes(), "Edges": G.number_of_edges()})
-    # G = nx.relabel_nodes(G, {node: str(node) for node in G.nodes}, copy=False)
     print(f"Number of Nodes: {G.number_of_nodes()}\nNumber of Edges: {G.number_of_edges()}")
 
     nt = Network(height="1000px", width="100%")
     nt.from_nx(G)
-    # nt.from_nx(G.subgraph(choices(list(G.nodes), k=300)))
     nt.show_buttons()
     # layout = nx.spring_layout(G)
-    # for node in nt.nodes:
-    #     node_id = node["id"]
-    #     if node_id in layout:
-    #         node["x"], node["y"] = layout[node_id][0]*1000, layout[node_id][1]*1000
     # nt.repulsion(node_distance=300, central_gravity=0.2, spring_length=200, spring_strength=0.05)
     nt.toggle_physics(False)
     nt.save_graph(save_file)

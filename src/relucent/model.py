@@ -6,6 +6,8 @@ import torch.nn as nn
 
 
 class NN(nn.Module):
+    """Neural network class that interfaces with the rest of the package"""
+
     def __init__(self, layers=None, input_shape=None, device=None, dtype=None):
         super(NN, self).__init__()
 
@@ -74,6 +76,11 @@ class NN(nn.Module):
         return x, y, outs
 
     def shi2weights(self, shi, return_idx=False):
+        """Given a neuron's index, return the corresponding weights from its layers
+
+        shi: index of the neuron
+        return_idx: if True, return the layer name and index of the weights, otherwise return a pointer to the weights directly
+        """
         remaining_rows = shi
         for name, layer in self.layers.items():
             if remaining_rows < 0:
@@ -87,6 +94,7 @@ class NN(nn.Module):
 
 
 def get_mlp_model(widths, add_last_relu=False):
+    """Create an NN object for an MLP model with the given widths"""
     layers = []
     for i in range(len(widths) - 1):
         layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))
