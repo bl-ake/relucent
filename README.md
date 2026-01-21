@@ -43,13 +43,6 @@ print(cplx.get_dual_graph())
 
 View the documentation for this library at https://bl-ake.github.io/relucent/
 
-## Source Code Structure
-* [model.py](src/relucent/model.py): PyTorch Module that acts as an interface between the model and the rest of the code
-* [poly.py](src/relucent/poly.py): Class for calculations involving individual polyhedrons (e.g. computing boundaries, neighbors, volume)
-* [complex.py](src/relucent/complex.py): Class for calculations involving the polyhedral cplx (e.g. polyhedron search, connectivity graph calculation)
-* [convert_model.py](src/relucent/convert_model.py): Utilities for converting various PyTorch.nn layers to Linear layers
-* [bvs.py](src/relucent/bvs.py): Data structures for storing large numbers of sign vectors
-
 ## Obtaining a Gurobi License
 Without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license), Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:
 1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/), for example using `pip install gurobipy`
