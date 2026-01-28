@@ -27,7 +27,7 @@ def test_complex_one():
 
     G2 = cplx2.get_dual_graph()
 
-    p1 = cplx1.point2bv(start_point1)
+    p1 = cplx1.point2ss(start_point1)
 
     assert p1 in cplx2
     assert nx.is_isomorphic(G1, G2)
@@ -49,7 +49,7 @@ def test_complex_two():
 
     cplx2 = Complex(model)
 
-    cplx2.recover_from_dual_graph(G1, initial_bv=cplx1.point2bv(start_point1), source=0)
+    cplx2.recover_from_dual_graph(G1, initial_ss=cplx1.point2ss(start_point1), source=0)
 
     G2 = cplx2.get_dual_graph(relabel=True)
 
@@ -112,7 +112,7 @@ def test_path_one():
 
     assert end_point in path[-1]
 
-    assert all([(p1.bv != p2.bv).sum().item() == 1 for p1, p2 in zip(path[:-1], path[1:])])
+    assert all([(p1.ss != p2.ss).sum().item() == 1 for p1, p2 in zip(path[:-1], path[1:])])
 
 
 def test_starter_code():

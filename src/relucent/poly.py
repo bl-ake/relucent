@@ -71,20 +71,20 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
             raise ValueError(f"Interior Point Model Status: {status}")
 
 
-def encode_bv(bv):
+def encode_ss(ss):
     """Create a hashable representation of a sign sequence.
 
     Converts a sign sequence array into a bytes object that can be used as a
     dictionary key or for hashing.
 
     Args:
-        bv: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
+        ss: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
 
     Returns:
         bytes: A hashable bytes representation of the flattened sign sequence.
     """
-    # return tuple(bv.astype(int).flatten().tolist())  ## TODO: Test these two options and compare speeds
-    return bv.flatten().tobytes()
+    # return tuple(ss.astype(int).flatten().tolist())  ## TODO: Test these two options and compare speeds
+    return ss.flatten().tobytes()
 
 
 class Polyhedron:
@@ -96,21 +96,17 @@ class Polyhedron:
 
     MAX_RADIUS = 100  ## The smaller the faster, but making this value too small can exclude some polyhedrons
 
-    def __init__(self, net, bv, halfspaces=None, W=None, b=None, point=None, shis=None, bound=None, **kwargs):
+    def __init__(self, net, ss, halfspaces=None, W=None, b=None, point=None, shis=None, bound=None, **kwargs):
         """Create a Polyhedron object.
 
         The kwargs can be used to supply precomputed values for various properties.
 
         Args:
             net: Instance of the NN class from the "model" module.
-            bv: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
+            ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
         """
         self.net = net
-        self.bv = bv
-        if not isinstance(bv, torch.Tensor):
-            bv = torch.from_numpy(bv)
-            if net is not None:
-                bv = bv.to(net.device, net.dtype)
+        self.ss = ss
         self._halfspaces = halfspaces
         self._W = W
         self._b = b
@@ -248,9 +244,9 @@ class Polyhedron:
                 - W: Affine transformation matrix
                 - b: Affine transformation bias vector
         """
-        if isinstance(self.bv, torch.Tensor):
+        if isinstance(self.ss, torch.Tensor):
             return self._get_hs_torch(data, get_all_Ab)
-        elif isinstance(self.bv, np.ndarray):
+        elif isinstance(self.ss, np.ndarray):
             return self._get_hs_numpy(data, get_all_Ab)
         else:
             raise NotImplementedError
@@ -291,7 +287,7 @@ class Polyhedron:
                 current_A = current_A @ A.T
                 current_b = current_b @ A.T + b
             elif isinstance(layer, nn.ReLU):
-                mask = self.bv[0, current_mask_index : current_mask_index + current_A.shape[1]]
+                mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
                 new_constr_A = current_A * mask
                 new_constr_b = current_b * mask
@@ -367,7 +363,7 @@ class Polyhedron:
             elif isinstance(layer, nn.ReLU):
                 if current_A is None:
                     raise ValueError("ReLU layer must follow a linear layer")
-                mask = self.bv[0, current_mask_index : current_mask_index + current_A.shape[1]]
+                mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
                 new_constr_A = current_A * mask
                 new_constr_b = current_b * mask
@@ -435,7 +431,7 @@ class Polyhedron:
 
     def __eq__(self, other):
         if isinstance(other, Polyhedron):
-            return self.tag == other.tag  # and (self.bv == other.bv).all()
+            return self.tag == other.tag  # and (self.ss == other.ss).all()
 
     def __hash__(self) -> int:
         if self._hash is None:
@@ -603,7 +599,7 @@ class Polyhedron:
         Returns:
             int: The number of sign sequence elements that differ.
         """
-        return (self.bv * other.bv == -1).sum().item()
+        return (self.ss * other.ss == -1).sum().item()
 
     def is_face_of(self, other):
         """Check if this polyhedron is a face of another polyhedron.
@@ -614,7 +610,7 @@ class Polyhedron:
         Returns:
             bool: True if this polyhedron is a face of the other.
         """
-        return ((self * other).bv == other.bv).all()
+        return ((self * other).ss == other.ss).all()
 
     def get_bounded_vertices(self, bound):
         """Get the vertices of the polyhedron within a bounding hypercube.
@@ -808,8 +804,8 @@ class Polyhedron:
         representation of the sign sequence.
         """
         if self._tag is None:
-            self._tag = encode_bv(
-                self.bv.detach().cpu().numpy().squeeze() if isinstance(self.bv, torch.Tensor) else self.bv
+            self._tag = encode_ss(
+                self.ss.detach().cpu().numpy().squeeze() if isinstance(self.ss, torch.Tensor) else self.ss
             )
         return self._tag
 
@@ -912,12 +908,12 @@ class Polyhedron:
     @property
     def interior_point(self):
         """np.ndarray: A point guaranteed to be inside the polyhedron."""
-        # if (self.bv == 0).any():
+        # if (self.ss == 0).any():
         #     raise NotImplementedError("Interior point for non-maximal cells is not implemented")
         if self._interior_point is None:
             self.get_interior_point(
                 zero_indices=np.argwhere(
-                    ((self.bv.detach().cpu().numpy() if isinstance(self.bv, torch.Tensor) else self.bv) == 0).any(
+                    ((self.ss.detach().cpu().numpy() if isinstance(self.ss, torch.Tensor) else self.ss) == 0).any(
                         axis=1
                     )
                 ).flatten()
@@ -949,7 +945,7 @@ class Polyhedron:
         return self._interior_point_norm
 
     def __getitem__(self, key):
-        return self.bv[key]
+        return self.ss[key]
 
     def __repr__(self):
         h = hashlib.blake2b(key=b"hi")
@@ -965,7 +961,7 @@ class Polyhedron:
 
     def __mul__(self, other):
         """Returns a new Polyhedron object based on sign sequence multiplication"""
-        return Polyhedron(self.net, self.bv + other.bv * (self.bv == 0))
+        return Polyhedron(self.net, self.ss + other.ss * (self.ss == 0))
 
     """The following methods are used for pickling"""
 
@@ -989,6 +985,6 @@ class Polyhedron:
     def __reduce__(self):
         return (
             Polyhedron,
-            (None, self.bv.detach().cpu().numpy() if isinstance(self.bv, torch.Tensor) else self.bv),
+            (None, self.ss.detach().cpu().numpy() if isinstance(self.ss, torch.Tensor) else self.ss),
             self.__getstate__(),
         )  # Control what gets saved, do not pickle the net

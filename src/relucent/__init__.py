@@ -8,19 +8,19 @@ except ImportError:
         "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
     )
 
-from .bvs import BVManager
 from .complex import Complex
-from .poly import Polyhedron
-from .model import NN, get_mlp_model
 from .convert_model import convert
-from .utils import get_env, split_sequential, set_seeds
+from .model import NN, get_mlp_model
+from .poly import Polyhedron
+from .ss import SSManager
+from .utils import get_env, set_seeds, split_sequential
 
 __all__ = [
     "Complex",
     "Polyhedron",
     "NN",
     "get_mlp_model",
-    "BVManager",
+    "SSManager",
     "convert",
     "get_env",
     "split_sequential",
