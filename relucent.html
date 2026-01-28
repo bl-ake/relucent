@@ -47,13 +47,13 @@
 (halfspace representations) of polyhedra in the complex.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.add_point">
-<span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.add_point" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.add_point" title="Link to this definition">¶</a></dt>
 <dd><p>Find the polyhedron containing a data point and add it to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>data</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
-<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
+<li><p><strong>data</strong> – A single data point as a torch.Tensor, np.ndarray, or array-like.</p></li>
+<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -67,7 +67,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.add_polyhedron">
-<span class="sig-name descname"><span class="pre">add_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.add_polyhedron" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.add_polyhedron" title="Link to this definition">¶</a></dt>
 <dd><p>Add a Polyhedron to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -75,6 +75,7 @@
 <li><p><strong>p</strong> – The Polyhedron object to add.</p></li>
 <li><p><strong>overwrite</strong> – If True and the polyhedron already exists, replace it with
 the new one. Defaults to False.</p></li>
+<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -256,7 +257,7 @@ as it explores many paths.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.hamming_astar">
-<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
 <dd><p>Find a path between two data points using A* search algorithm.</p>
 <p>Uses the A* pathfinding algorithm with a heuristic based on Hamming
 distance between sign sequences, plus Euclidean distance between interior
@@ -400,7 +401,7 @@ xy plane. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.point2poly">
-<span class="sig-name descname"><span class="pre">point2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.point2poly" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.point2poly" title="Link to this definition">¶</a></dt>
 <dd><p>Convert a data point to its corresponding Polyhedron.</p>
 <p>Finds the polyhedron that contains the given data point. Does not add
 the polyhedron to the complex.</p>
@@ -410,7 +411,6 @@ the polyhedron to the complex.</p>
 <li><p><strong>point</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
 <li><p><strong>check_exists</strong> – If True, return the existing polyhedron from the complex
 if it already exists. Defaults to True.</p></li>
-<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -424,17 +424,13 @@ if it already exists. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.point2ss">
-<span class="sig-name descname"><span class="pre">point2ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.point2ss" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point2ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.point2ss" title="Link to this definition">¶</a></dt>
 <dd><p>Convert a batch of data points to sign sequences.</p>
 <p>Computes the combined sign sequence across all ReLU layers for the given
 data points. Does not add the resulting polyhedra to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.</p></li>
-<li><p><strong>numpy</strong> – If True, return result as numpy array; otherwise return torch.Tensor.
-Defaults to False.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor, np.ndarray, or array-like.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
@@ -444,7 +440,7 @@ Defaults to False.</p></li>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>torch.Tensor or np.ndarray</p>
+<dd class="field-odd"><p>torch.Tensor</p>
 </dd>
 </dl>
 </dd></dl>
@@ -470,7 +466,7 @@ next from the queue.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.recover_from_dual_graph">
-<span class="sig-name descname"><span class="pre">recover_from_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_ss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.recover_from_dual_graph" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">recover_from_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_ss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.recover_from_dual_graph" title="Link to this definition">¶</a></dt>
 <dd><p>Recover a complex from its connectivity graph.</p>
 <p>Reconstructs polyhedra in the complex by traversing the adjacency graph
 of top-dimensional cells, using the supporting hyperplane indices stored
@@ -518,8 +514,8 @@ function to define specific search strategies.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>start</strong> – Starting point for the search. Can be a torch.Tensor data point
-or None (defaults to origin). Defaults to None.</p></li>
+<li><p><strong>start</strong> – Starting point (torch.Tensor / np.ndarray / array-like) or a
+Polyhedron, or None (defaults to origin). Defaults to None.</p></li>
 <li><p><strong>max_depth</strong> – Maximum search depth (number of hyperplane crossings).
 Defaults to infinity.</p></li>
 <li><p><strong>max_polys</strong> – Maximum number of polyhedra to discover. Defaults to infinity.</p></li>
@@ -587,7 +583,7 @@ if it already exists. Defaults to True.</p></li>
 <dd><p>Generate sign sequences for each ReLU layer from a batch of data points.</p>
 <dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.
+<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor, np.ndarray, or array-like.
 Will be reshaped to match the network’s input shape.</p>
 </dd>
 <dt class="field-even">Yields<span class="colon">:</span></dt>
@@ -1115,7 +1111,7 @@ environment. Defaults to None.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.get_hs">
-<span class="sig-name descname"><span class="pre">get_hs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.poly.Polyhedron.get_hs" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_hs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.poly.Polyhedron.get_hs" title="Link to this definition">¶</a></dt>
 <dd><p>Get the halfspace representation of this polyhedron.</p>
 <p>Computes the halfspaces (inequality constraints) that define the polyhedron
 from all neurons in the network. The result includes constraints from
@@ -1392,6 +1388,12 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.halfspaces_np">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces_np</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.halfspaces_np" title="Link to this definition">¶</a></dt>
+<dd><p>Cached NumPy representation of halfspaces.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.hs">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hs</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.hs" title="Link to this definition">¶</a></dt>
 <dd><p>Halfspace intersection object from scipy.</p>
@@ -1459,6 +1461,17 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.ss">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.ss" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.ss_np">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss_np</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.ss_np" title="Link to this definition">¶</a></dt>
+<dd><p>Cached NumPy representation of the sign sequence.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.tag">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tag</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.tag" title="Link to this definition">¶</a></dt>
 <dd><p>Unique tag for this polyhedron, computed as a hashable
@@ -1492,25 +1505,6 @@ representation of the sign sequence.</p>
 or -1 if computation fails.</p>
 </dd></dl>
 
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="relucent.poly.encode_ss">
-<span class="sig-prename descclassname"><span class="pre">relucent.poly.</span></span><span class="sig-name descname"><span class="pre">encode_ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ss</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.poly.encode_ss" title="Link to this definition">¶</a></dt>
-<dd><p>Create a hashable representation of a sign sequence.</p>
-<p>Converts a sign sequence array into a bytes object that can be used as a
-dictionary key or for hashing.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>ss</strong> – A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A hashable bytes representation of the flattened sign sequence.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>bytes</p>
-</dd>
-</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -1572,64 +1566,6 @@ mapping and allows efficient membership testing and retrieval.</p>
 
 </dd></dl>
 
-<dl class="py class">
-<dt class="sig sig-object py" id="relucent.ss.SSPriorityQueue">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.ss.</span></span><span class="sig-name descname"><span class="pre">SSPriorityQueue</span></span><a class="headerlink" href="#relucent.ss.SSPriorityQueue" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>Priority queue for tasks with sign sequences.</p>
-<p>A priority queue implementation that supports updating task priorities and
-removing tasks. Tasks are tuples starting with a sign sequence followed
-by additional data. Based on the heapq implementation from Python docs.</p>
-<p>Reference: <a class="reference external" href="https://docs.python.org/3/library/heapq.html">https://docs.python.org/3/library/heapq.html</a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="relucent.ss.SSPriorityQueue.pop">
-<span class="sig-name descname"><span class="pre">pop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.ss.SSPriorityQueue.pop" title="Link to this definition">¶</a></dt>
-<dd><p>Remove and return the lowest priority task.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>A tuple starting with the sign sequence followed by</dt><dd><p>the task data.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>tuple</p>
-</dd>
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>KeyError</strong> – If the queue is empty.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="relucent.ss.SSPriorityQueue.push">
-<span class="sig-name descname"><span class="pre">push</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.ss.SSPriorityQueue.push" title="Link to this definition">¶</a></dt>
-<dd><p>Add a new task or update the priority of an existing task.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>task</strong> – A tuple starting with a sign sequence followed by
-additional task data.</p></li>
-<li><p><strong>priority</strong> – The priority value (lower = higher priority). Defaults to 0.</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="relucent.ss.SSPriorityQueue.remove_task">
-<span class="sig-name descname"><span class="pre">remove_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.ss.SSPriorityQueue.remove_task" title="Link to this definition">¶</a></dt>
-<dd><p>Mark an existing task as REMOVED.  Raise KeyError if not found.</p>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="relucent.ss.SSPriorityQueue.REMOVED">
-<span class="sig-name descname"><span class="pre">REMOVED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'&lt;removed-task&gt;'</span></span><a class="headerlink" href="#relucent.ss.SSPriorityQueue.REMOVED" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
 </section>
 <section id="module-relucent.utils">
 <span id="relucent-utils-module"></span><h2>relucent.utils module<a class="headerlink" href="#module-relucent.utils" title="Link to this heading">¶</a></h2>
@@ -1687,6 +1623,66 @@ additional task data.</p></li>
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.utils.UpdatablePriorityQueue">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.utils.</span></span><span class="sig-name descname"><span class="pre">UpdatablePriorityQueue</span></span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Priority queue that supports updating task priorities and removing tasks.</p>
+<p>Tasks are tuples (head, <a href="#id9"><span class="problematic" id="id10">*</span></a>tail). The tail is used as the identity key for
+updates: pushing a task with the same tail replaces the previous entry.
+Lower priority value means higher priority.</p>
+<p>Based on the heapq implementation from Python docs.
+Reference: <a class="reference external" href="https://docs.python.org/3/library/heapq.html">https://docs.python.org/3/library/heapq.html</a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.utils.UpdatablePriorityQueue.pop">
+<span class="sig-name descname"><span class="pre">pop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue.pop" title="Link to this definition">¶</a></dt>
+<dd><p>Remove and return the lowest-priority task.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The full task (head, <a href="#id11"><span class="problematic" id="id12">*</span></a>tail).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>tuple</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>KeyError</strong> – If the queue is empty.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.utils.UpdatablePriorityQueue.push">
+<span class="sig-name descname"><span class="pre">push</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">priority</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue.push" title="Link to this definition">¶</a></dt>
+<dd><p>Add a new task or update the priority of an existing task.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> – A tuple (head, <a href="#id13"><span class="problematic" id="id14">*</span></a>tail). Tasks with the same tail are
+considered the same for updates.</p></li>
+<li><p><strong>priority</strong> – The priority value (lower = higher priority). Defaults to 0.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.utils.UpdatablePriorityQueue.remove_task">
+<span class="sig-name descname"><span class="pre">remove_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task_tail</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue.remove_task" title="Link to this definition">¶</a></dt>
+<dd><p>Mark an existing task as REMOVED. Raise KeyError if not found.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>task_tail</strong> – The tail of the task to remove (i.e. task[1:]).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.utils.UpdatablePriorityQueue.REMOVED">
+<span class="sig-name descname"><span class="pre">REMOVED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'&lt;removed-task&gt;'</span></span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue.REMOVED" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.utils.data_graph">
 <span class="sig-prename descclassname"><span class="pre">relucent.utils.</span></span><span class="sig-name descname"><span class="pre">data_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draw_function</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">class_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_title_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_label_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge_title_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge_label_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edge_value_formatter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;function</span> <span class="pre">&lt;lambda&gt;&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_images</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_num_examples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'./graph.html'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.data_graph" title="Link to this definition">¶</a></dt>
@@ -1723,6 +1719,25 @@ Defaults to using ‘value’ column or 1.</p></li>
 Defaults to 3.</p></li>
 <li><p><strong>save_file</strong> – Path to save the HTML graph file. Defaults to “./graph.html”.</p></li>
 </ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.utils.encode_ss">
+<span class="sig-prename descclassname"><span class="pre">relucent.utils.</span></span><span class="sig-name descname"><span class="pre">encode_ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ss</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.encode_ss" title="Link to this definition">¶</a></dt>
+<dd><p>Create a hashable representation of a sign sequence.</p>
+<p>Converts a sign sequence array into a bytes object that can be used as a
+dictionary key or for hashing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ss</strong> – A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A hashable bytes representation of the flattened sign sequence.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bytes</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1801,13 +1816,13 @@ the first network).</p></li>
 (halfspace representations) of polyhedra in the complex.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.add_point">
-<span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_point" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_point" title="Link to this definition">¶</a></dt>
 <dd><p>Find the polyhedron containing a data point and add it to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>data</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
-<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
+<li><p><strong>data</strong> – A single data point as a torch.Tensor, np.ndarray, or array-like.</p></li>
+<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1821,7 +1836,7 @@ the first network).</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.add_polyhedron">
-<span class="sig-name descname"><span class="pre">add_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_polyhedron" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">add_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_polyhedron" title="Link to this definition">¶</a></dt>
 <dd><p>Add a Polyhedron to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1829,6 +1844,7 @@ the first network).</p></li>
 <li><p><strong>p</strong> – The Polyhedron object to add.</p></li>
 <li><p><strong>overwrite</strong> – If True and the polyhedron already exists, replace it with
 the new one. Defaults to False.</p></li>
+<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -2010,7 +2026,7 @@ as it explores many paths.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.hamming_astar">
-<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
 <dd><p>Find a path between two data points using A* search algorithm.</p>
 <p>Uses the A* pathfinding algorithm with a heuristic based on Hamming
 distance between sign sequences, plus Euclidean distance between interior
@@ -2154,7 +2170,7 @@ xy plane. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.point2poly">
-<span class="sig-name descname"><span class="pre">point2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2poly" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point2poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2poly" title="Link to this definition">¶</a></dt>
 <dd><p>Convert a data point to its corresponding Polyhedron.</p>
 <p>Finds the polyhedron that contains the given data point. Does not add
 the polyhedron to the complex.</p>
@@ -2164,7 +2180,6 @@ the polyhedron to the complex.</p>
 <li><p><strong>point</strong> – A single data point as a torch.Tensor or np.ndarray.</p></li>
 <li><p><strong>check_exists</strong> – If True, return the existing polyhedron from the complex
 if it already exists. Defaults to True.</p></li>
-<li><p><strong>numpy</strong> – If True, treat input as numpy array. Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -2178,17 +2193,13 @@ if it already exists. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.point2ss">
-<span class="sig-name descname"><span class="pre">point2ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2ss" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point2ss</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.point2ss" title="Link to this definition">¶</a></dt>
 <dd><p>Convert a batch of data points to sign sequences.</p>
 <p>Computes the combined sign sequence across all ReLU layers for the given
 data points. Does not add the resulting polyhedra to the complex.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.</p></li>
-<li><p><strong>numpy</strong> – If True, return result as numpy array; otherwise return torch.Tensor.
-Defaults to False.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor, np.ndarray, or array-like.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
@@ -2198,7 +2209,7 @@ Defaults to False.</p></li>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>torch.Tensor or np.ndarray</p>
+<dd class="field-odd"><p>torch.Tensor</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2224,7 +2235,7 @@ next from the queue.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.recover_from_dual_graph">
-<span class="sig-name descname"><span class="pre">recover_from_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_ss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.recover_from_dual_graph" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">recover_from_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">G</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">initial_ss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.recover_from_dual_graph" title="Link to this definition">¶</a></dt>
 <dd><p>Recover a complex from its connectivity graph.</p>
 <p>Reconstructs polyhedra in the complex by traversing the adjacency graph
 of top-dimensional cells, using the supporting hyperplane indices stored
@@ -2272,8 +2283,8 @@ function to define specific search strategies.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>start</strong> – Starting point for the search. Can be a torch.Tensor data point
-or None (defaults to origin). Defaults to None.</p></li>
+<li><p><strong>start</strong> – Starting point (torch.Tensor / np.ndarray / array-like) or a
+Polyhedron, or None (defaults to origin). Defaults to None.</p></li>
 <li><p><strong>max_depth</strong> – Maximum search depth (number of hyperplane crossings).
 Defaults to infinity.</p></li>
 <li><p><strong>max_polys</strong> – Maximum number of polyhedra to discover. Defaults to infinity.</p></li>
@@ -2341,7 +2352,7 @@ if it already exists. Defaults to True.</p></li>
 <dd><p>Generate sign sequences for each ReLU layer from a batch of data points.</p>
 <dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor or np.ndarray.
+<dd class="field-odd"><p><strong>batch</strong> – A batch of input data points as a torch.Tensor, np.ndarray, or array-like.
 Will be reshaped to match the network’s input shape.</p>
 </dd>
 <dt class="field-even">Yields<span class="colon">:</span></dt>
@@ -2600,7 +2611,7 @@ environment. Defaults to None.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.get_hs">
-<span class="sig-name descname"><span class="pre">get_hs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_hs" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_hs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_all_Ab</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_numpy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_hs" title="Link to this definition">¶</a></dt>
 <dd><p>Get the halfspace representation of this polyhedron.</p>
 <p>Computes the halfspaces (inequality constraints) that define the polyhedron
 from all neurons in the network. The result includes constraints from
@@ -2877,6 +2888,12 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.halfspaces_np">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces_np</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces_np" title="Link to this definition">¶</a></dt>
+<dd><p>Cached NumPy representation of halfspaces.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.hs">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hs</span></span><a class="headerlink" href="#relucent.Polyhedron.hs" title="Link to this definition">¶</a></dt>
 <dd><p>Halfspace intersection object from scipy.</p>
@@ -2941,6 +2958,17 @@ constraint a^T x + b &lt;= 0.</p>
 <dt class="sig sig-object py" id="relucent.Polyhedron.shis">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">shis</span></span><a class="headerlink" href="#relucent.Polyhedron.shis" title="Link to this definition">¶</a></dt>
 <dd><p>Supporting halfspace indices (SHIs).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.ss">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss</span></span><a class="headerlink" href="#relucent.Polyhedron.ss" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.ss_np">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss_np</span></span><a class="headerlink" href="#relucent.Polyhedron.ss_np" title="Link to this definition">¶</a></dt>
+<dd><p>Cached NumPy representation of the sign sequence.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3210,6 +3238,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hs</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
@@ -3219,26 +3248,20 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.point</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.vertex_set"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertex_set</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#relucent.poly.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.solve_radius"><code class="docutils literal notranslate"><span class="pre">solve_radius()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-relucent.ss">relucent.ss module</a><ul>
 <li><a class="reference internal" href="#relucent.ss.SSManager"><code class="docutils literal notranslate"><span class="pre">SSManager</span></code></a><ul>
 <li><a class="reference internal" href="#relucent.ss.SSManager.add"><code class="docutils literal notranslate"><span class="pre">SSManager.add()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#relucent.ss.SSPriorityQueue"><code class="docutils literal notranslate"><span class="pre">SSPriorityQueue</span></code></a><ul>
-<li><a class="reference internal" href="#relucent.ss.SSPriorityQueue.pop"><code class="docutils literal notranslate"><span class="pre">SSPriorityQueue.pop()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.ss.SSPriorityQueue.push"><code class="docutils literal notranslate"><span class="pre">SSPriorityQueue.push()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.ss.SSPriorityQueue.remove_task"><code class="docutils literal notranslate"><span class="pre">SSPriorityQueue.remove_task()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.ss.SSPriorityQueue.REMOVED"><code class="docutils literal notranslate"><span class="pre">SSPriorityQueue.REMOVED</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -3258,7 +3281,15 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.utils.NonBlockingQueue.stopFlag"><code class="docutils literal notranslate"><span class="pre">NonBlockingQueue.stopFlag</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue</span></code></a><ul>
+<li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue.pop"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue.pop()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue.push"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue.push()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue.remove_task"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue.remove_task()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue.REMOVED"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue.REMOVED</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#relucent.utils.data_graph"><code class="docutils literal notranslate"><span class="pre">data_graph()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.utils.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.get_colors"><code class="docutils literal notranslate"><span class="pre">get_colors()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
@@ -3325,6 +3356,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hs</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
@@ -3334,6 +3366,8 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.point</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.vertex_set"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertex_set</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
