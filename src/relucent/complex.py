@@ -314,8 +314,7 @@ class Complex:
         Returns:
             Polyhedron: The polyhedron containing the given point.
         """
-        ss = self.point2ss(point)
-        return self.ss2poly(ss, check_exists=check_exists)
+        return self.ss2poly(self.point2ss(point), check_exists=check_exists)
 
     def ss2poly(self, ss, check_exists=True):
         """Convert a sign sequence to a Polyhedron.
@@ -347,10 +346,7 @@ class Complex:
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
         """
-        if check_exists and ss in self:
-            return self[ss]
-        p = Polyhedron(self.net, ss)
-        return self.add_polyhedron(p)
+        return self.add_polyhedron(Polyhedron(self.net, ss), check_exists=check_exists)
 
     def add_polyhedron(self, p, overwrite=False, check_exists=True):
         """Add a Polyhedron to the complex.
@@ -359,34 +355,41 @@ class Complex:
             p: The Polyhedron object to add.
             overwrite: If True and the polyhedron already exists, replace it with
                 the new one. Defaults to False.
+            check_exists: Set to true if you know the polyhedron is not in the complex.
 
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
         """
-        if check_exists and p in self:
+
+        assert check_exists or not overwrite, "Cannot overwrite polyhedron if check_exists is False"
+
+        if not check_exists:
+            self.index2poly.append(p)
+            self.ssm.add(p.ss_np)
             return p
-        if overwrite:
+
+        p_exists = p in self
+
+        if p_exists and overwrite:
             self.index2poly[self.ssm[p.ss_np]] = p
             return p
-        self.index2poly.append(p)
-        self.ssm.add(p.ss_np)
-        return self[p]
+        elif p_exists:
+            return self[p]
+        else:
+            self.index2poly.append(p)
+            self.ssm.add(p.ss_np)
+            return p
 
-    def add_point(self, data):
+    def add_point(self, data, check_exists=True):
         """Find the polyhedron containing a data point and add it to the complex.
 
         Args:
             data: A single data point as a torch.Tensor, np.ndarray, or array-like.
-
+            check_exists: Set to true if you know the polyhedron is not in the complex.
         Returns:
             Polyhedron: The polyhedron containing the given point, now stored in the complex.
         """
-        # Compute SS once, then avoid redundant lookups/adds when possible.
-        ss = self.point2ss(data)
-        if ss in self:
-            return self[ss]
-        p = Polyhedron(self.net, ss)
-        return self.add_polyhedron(p, check_exists=False)
+        return self.add_ss(self.point2ss(data), check_exists=check_exists)
 
     def clean_data(self):
         """Clean cached data from all polyhedra in the complex.
@@ -1000,7 +1003,7 @@ class Complex:
             G = nx.relabel_nodes(G, {poly: i for i, poly in enumerate(self)})
         return G
 
-    def recover_from_dual_graph(self, G, initial_ss, source):
+    def recover_from_dual_graph(self, G, initial_ss, source, copy=False):
         """Recover a complex from its connectivity graph.
 
         Reconstructs polyhedra in the complex by traversing the adjacency graph
@@ -1020,15 +1023,16 @@ class Complex:
             networkx.Graph: The graph with polyhedron objects stored in node
                 attributes under the "poly" key.
         """
-        G = G.copy()
+        if copy:
+            G = G.copy()
         initial_p = self.add_ss(initial_ss)
         G.nodes[source]["poly"] = initial_p
-        for edge in tqdm(nx.edge_bfs(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
+        for edge in tqdm(nx.bfs_edges(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
             poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
             poly2_ss = poly1.ss_np.copy()
             assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
-            poly2 = self.add_ss(poly2_ss)
+            poly2 = self.add_ss(poly2_ss, check_exists=False)
 
             G.nodes[edge[1]]["poly"] = poly2
 
