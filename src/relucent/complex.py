@@ -105,7 +105,7 @@ def get_ip(p, shi):
             occurs, returns (error, None).
     """
     try:
-        ss = p.ss.copy()
+        ss = p.ss_np.copy()
         ss[0, shi] = -ss[0, shi]
         n = Polyhedron(net, ss)
         for max_radius in [0.01, 0.1, 1, 10, 100]:
@@ -179,14 +179,13 @@ class Complex:
             if isinstance(next_layer, nn.ReLU)
         ]
 
-        x = torch.zeros((1,) + net.input_shape, device=net.device, dtype=net.dtype)
+        # Build mapping from global sign-sequence indices to (layer_index, neuron_index)
+        # using layer shapes only (no tensor→NumPy conversion or scalar iteration).
         self.ssi2maski = []
         for i, layer in enumerate(self.net.layers.values()):
-            x = layer(x)
-            if i in self.ss_layers:
-                it = np.nditer(x.detach().cpu().numpy(), flags=["multi_index"])
-                for _ in it:
-                    self.ssi2maski.append((i, it.multi_index))
+            if i in self.ss_layers and isinstance(layer, nn.Linear):
+                for neuron_idx in range(layer.out_features):
+                    self.ssi2maski.append((i, (0, neuron_idx)))
 
     def __getitem__(self, key):
         """Retrieve a Polyhedron from the complex by its key.
@@ -203,7 +202,7 @@ class Complex:
             KeyError: If the polyhedron with the given key is not in the complex.
         """
         if isinstance(key, Polyhedron):
-            return self.index2poly[self.ssm[key.ss]]
+            return self.index2poly[self.ssm[key.ss_np]]
         elif isinstance(key, (np.ndarray, torch.Tensor)):
             return self.index2poly[self.ssm[key]]
         else:
@@ -255,7 +254,7 @@ class Complex:
             self.ssm = state["ssm"]
         else:
             for p in self.index2poly:
-                self.ssm.add(p.ss)
+                self.ssm.add(p.ss_np)
         for p in self.index2poly:
             p.net = self.net
 
@@ -269,18 +268,15 @@ class Complex:
         """Generate sign sequences for each ReLU layer from a batch of data points.
 
         Args:
-            batch: A batch of input data points as a torch.Tensor or np.ndarray.
+            batch: A batch of input data points as a torch.Tensor, np.ndarray, or array-like.
                 Will be reshaped to match the network's input shape.
 
         Yields:
             torch.Tensor: Sign sequences for each ReLU layer in
                 the network, indicating the activation pattern of that layer.
         """
-        x = (
-            torch.tensor(batch, device=self.net.device, dtype=self.net.dtype)
-            if isinstance(batch, np.ndarray)
-            else batch
-        ).reshape((-1, *self.net.input_shape))
+        x = batch if isinstance(batch, torch.Tensor) else torch.as_tensor(batch)
+        x = x.to(device=self.net.device, dtype=self.net.dtype).reshape((-1, *self.net.input_shape))
         for i, layer in enumerate(self.net.layers.values()):
             x = layer(x)
             if i in self.ss_layers:
@@ -288,25 +284,23 @@ class Complex:
                 if i == self.ss_layers[-1]:
                     break
 
-    def point2ss(self, batch, numpy=False):
+    def point2ss(self, batch):
         """Convert a batch of data points to sign sequences.
 
         Computes the combined sign sequence across all ReLU layers for the given
         data points. Does not add the resulting polyhedra to the complex.
 
         Args:
-            batch: A batch of input data points as a torch.Tensor or np.ndarray.
-            numpy: If True, return result as numpy array; otherwise return torch.Tensor.
-                Defaults to False.
+            batch: A batch of input data points as a torch.Tensor, np.ndarray, or array-like.
 
         Returns:
-            torch.Tensor or np.ndarray: The sign sequences for
+            torch.Tensor: The sign sequences for
                 the input batch, with shape (batch_size, total_ReLU_neurons).
         """
         result = torch.hstack(list(self.ss_iterator(batch)))
-        return result.detach().cpu().numpy() if numpy else result
+        return result
 
-    def point2poly(self, point, check_exists=True, numpy=False):
+    def point2poly(self, point, check_exists=True):
         """Convert a data point to its corresponding Polyhedron.
 
         Finds the polyhedron that contains the given data point. Does not add
@@ -316,12 +310,11 @@ class Complex:
             point: A single data point as a torch.Tensor or np.ndarray.
             check_exists: If True, return the existing polyhedron from the complex
                 if it already exists. Defaults to True.
-            numpy: If True, treat input as numpy array. Defaults to False.
 
         Returns:
             Polyhedron: The polyhedron containing the given point.
         """
-        ss = self.point2ss(point, numpy=numpy)
+        ss = self.point2ss(point)
         return self.ss2poly(ss, check_exists=check_exists)
 
     def ss2poly(self, ss, check_exists=True):
@@ -354,11 +347,12 @@ class Complex:
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
         """
-        p = self.ss2poly(ss, check_exists=check_exists)
-        p = self.add_polyhedron(p)
-        return p
+        if check_exists and ss in self:
+            return self[ss]
+        p = Polyhedron(self.net, ss)
+        return self.add_polyhedron(p)
 
-    def add_polyhedron(self, p, overwrite=False):
+    def add_polyhedron(self, p, overwrite=False, check_exists=True):
         """Add a Polyhedron to the complex.
 
         Args:
@@ -369,26 +363,30 @@ class Complex:
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
         """
-        if p not in self:
-            self.index2poly.append(p)
-            self.ssm.add(p.ss)
-        elif p in self and overwrite:
-            self.index2poly[self.ssm[p.ss]] = p
+        if check_exists and p in self:
+            return p
+        if overwrite:
+            self.index2poly[self.ssm[p.ss_np]] = p
+            return p
+        self.index2poly.append(p)
+        self.ssm.add(p.ss_np)
         return self[p]
 
-    def add_point(self, data, numpy=False):
+    def add_point(self, data):
         """Find the polyhedron containing a data point and add it to the complex.
 
         Args:
-            data: A single data point as a torch.Tensor or np.ndarray.
-            numpy: If True, treat input as numpy array. Defaults to False.
+            data: A single data point as a torch.Tensor, np.ndarray, or array-like.
 
         Returns:
             Polyhedron: The polyhedron containing the given point, now stored in the complex.
         """
-        p = self.point2poly(data, numpy=numpy)
-        p = self.add_polyhedron(p)
-        return p
+        # Compute SS once, then avoid redundant lookups/adds when possible.
+        ss = self.point2ss(data)
+        if ss in self:
+            return self[ss]
+        p = Polyhedron(self.net, ss)
+        return self.add_polyhedron(p, check_exists=False)
 
     def clean_data(self):
         """Clean cached data from all polyhedra in the complex.
@@ -408,9 +406,9 @@ class Complex:
         ps = set()
         shis = poly.shis
         for shi in shis:
-            if poly.ss[0, shi] == 0:
+            if poly.ss_np[0, shi] == 0:
                 continue
-            ss = poly.ss.clone()
+            ss = poly.ss_np.copy()
             ss[0, shi] = -ss[0, shi]
             ps.add(self.ss2poly(ss))
         return ps
@@ -437,7 +435,8 @@ class Complex:
         print(f"Running on {nworkers} workers")
 
         with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
-            sss = list(map(partial(self.point2ss, numpy=True), tqdm(points, desc="Getting SSs", mininterval=5)))
+            # Compute SS once per point; convert to NumPy for multiprocessing payloads.
+            sss = [self.point2ss(p).detach().cpu().numpy() for p in tqdm(points, desc="Getting SSs", mininterval=5)]
             ps = pool.map(
                 partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5)
             )
@@ -470,8 +469,8 @@ class Complex:
         function to define specific search strategies.
 
         Args:
-            start: Starting point for the search. Can be a torch.Tensor data point
-                or None (defaults to origin). Defaults to None.
+            start: Starting point (torch.Tensor / np.ndarray / array-like) or a
+                Polyhedron, or None (defaults to origin). Defaults to None.
             max_depth: Maximum search depth (number of hyperplane crossings).
                 Defaults to infinity.
             max_polys: Maximum number of polyhedra to discover. Defaults to infinity.
@@ -507,21 +506,22 @@ class Complex:
             queue = BlockingQueue()
         if start is None:
             start = self.add_point(torch.zeros(self.net.input_shape, device=self.net.device, dtype=self.net.dtype))
-        elif isinstance(start, torch.Tensor):
+        elif isinstance(start, Polyhedron):
+            start = self.add_polyhedron(start)
+        else:
+            # Treat as a point.
             start = self.add_point(start)
-        start.ss = start.ss.detach().cpu().numpy()
-        self.add_ss(start.ss)
-        found_sss.add(start.ss)
-        if (start.ss == 0).any():
+        found_sss.add(start.ss_np)
+        if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
         start._shis = start.get_shis(bound=bound, **kwargs)
         ##TODO:
-        ## replace with something like queue.push((start.ss, None, 0, self.ssm[start.ss]))
+        ## replace with something like queue.push((start.ss_np, None, 0, self.ssm[start.ss_np]))
         for shi in start.shis:
-            new_ss = start.ss.copy()
+            new_ss = start.ss_np.copy()
             new_ss[0, shi] *= -1
             found_sss.add(new_ss)
-            queue.push((new_ss, shi, 1, self.ssm[start.ss]))
+            queue.push((new_ss, shi, 1, self.ssm[start.ss_np]))
             assert new_ss in found_sss
 
         rolling_average = len(start.shis)
@@ -557,10 +557,10 @@ class Complex:
                     if depth < max_depth:
                         for new_shi in p.shis:
                             if new_shi != shi and len(self) < max_polys:
-                                ss = p.ss.copy()
+                                ss = p.ss_np.copy()
                                 ss[0, new_shi] *= -1
                                 if ss not in found_sss:
-                                    queue.push((ss, new_shi, depth + 1, self.ssm[p.ss]))
+                                    queue.push((ss, new_shi, depth + 1, self.ssm[p.ss_np]))
                                     found_sss.add(ss)
                                     unprocessed += 1
 
@@ -640,10 +640,10 @@ class Complex:
             # print("Start and end points are the same")
             return [start]
 
-        if (start.ss == 0).any():
+        if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
 
-        diffs = diffs or set(np.argwhere((start.ss != end.ss).flatten()).flatten().tolist())
+        diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).flatten()).flatten().tolist())
 
         print("Diffs:", diffs)
 
@@ -656,7 +656,7 @@ class Complex:
         groupb = set(start.shis) - diffs
         for shi in list(groupa):
             print("Crossing", shi)
-            new_ss = start.ss.copy()
+            new_ss = start.ss_np.copy()
             new_ss[0, shi] *= -1
             next_poly = self.ss2poly(new_ss)
             rest = self._greedy_path_helper(next_poly, end, diffs - {shi})
@@ -664,7 +664,7 @@ class Complex:
                 return [start] + rest
         for shi in list(groupb):
             print("Crossing", shi)
-            new_ss = start.ss.copy()
+            new_ss = start.ss_np.copy()
             new_ss[0, shi] *= -1
             next_poly = self.ss2poly(new_ss)
             rest = self._greedy_path_helper(next_poly, end, diffs + {shi})
@@ -687,8 +687,8 @@ class Complex:
             list or None: A list of Polyhedron objects representing the path
                 from start to end, or None if no path is found.
         """
-        start = self.add_point(start, numpy=True)
-        end = self.add_point(end, numpy=True)
+        start = self.add_point(start)
+        end = self.add_point(end)
         return self._greedy_path_helper(start, end)
 
     def hamming_astar(self, start, end, nworkers=None, bound=1e5, max_polys=float("inf"), show_pbar=True, **kwargs):
@@ -718,8 +718,8 @@ class Complex:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
 
-        start = self.add_point(start, numpy=True)
-        end = self.add_point(end, numpy=True)
+        start = self.add_point(start)
+        end = self.add_point(end)
         if start == end:
             print("Start and end points are in the same region")
             start.get_center_inradius()
@@ -727,7 +727,7 @@ class Complex:
             start.get_shis(bound=bound)
             return [start]
 
-        if (start.ss == 0).any():
+        if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
 
         nhs = len(start.halfspaces)
@@ -747,7 +747,7 @@ class Complex:
         # nworkers = nworkers or os.process_cpu_count()
 
         gScore[start] = 0
-        fScore[start] = (start.ss != end.ss).sum()
+        fScore[start] = (start.ss_np != end.ss_np).sum()
         # found_sss.add(start.ss)
         # found = set(start)
 
@@ -772,7 +772,7 @@ class Complex:
         min_p = None
 
         def heuristic(p, depth, shi):
-            hamming = (p.ss != end.ss).sum()
+            hamming = (p.ss_np != end.ss_np).sum()
             dist = np.linalg.norm(p.interior_point - end.interior_point).item()
             # bias = -1 / ((1 + dist) ** 0.1)  ## TODO: Test if this is faster
             # bias = -1 / (1 + np.log(dist + 10))
@@ -856,7 +856,7 @@ class Complex:
 
                 if min_dist < 1:
                     if 0 < min_dist:
-                        last_shi = np.argwhere((min_p.ss != end.ss).flatten()).item()
+                        last_shi = np.argwhere((min_p.ss_np != end.ss_np).flatten()).item()
                         if last_shi in min_p.shis:
                             cameFrom[end] = min_p
                             neighbor = end
@@ -949,7 +949,7 @@ class Complex:
         for poly in self:
             G.add_node(poly, label=str(poly))
         for poly in tqdm(self, desc="Creating Dual Graph", leave=False):
-            ss = poly.ss
+            ss = poly.ss_np.copy()
             for shi in poly.shis:
                 ss[0, shi] *= -1
                 if ss in self:
@@ -1025,7 +1025,7 @@ class Complex:
         G.nodes[source]["poly"] = initial_p
         for edge in tqdm(nx.edge_bfs(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
             poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
-            poly2_ss = poly1.ss.clone()
+            poly2_ss = poly1.ss_np.copy()
             assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
             poly2 = self.add_ss(poly2_ss)
@@ -1082,11 +1082,7 @@ class Complex:
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
             if ss_name:
-                name = (
-                    f"{poly.ss.detach().cpu().numpy().flatten().astype(int).tolist()}"
-                    if isinstance(poly.ss, torch.Tensor)
-                    else poly.ss.flatten().astype(int).tolist()
-                )
+                name = f"{poly.ss_np.flatten().astype(int).tolist()}"
             else:
                 name = f"{poly}"
             p_plot = poly.plot2d(

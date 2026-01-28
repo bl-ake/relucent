@@ -112,7 +112,9 @@ def test_path_one():
 
     assert end_point in path[-1]
 
-    assert all([(p1.ss != p2.ss).sum().item() == 1 for p1, p2 in zip(path[:-1], path[1:])])
+    assert all([(p1.ss_np != p2.ss_np).sum().item() == 1 for p1, p2 in zip(path[:-1], path[1:])])
+
+    print("Path:", path)
 
 
 def test_starter_code():

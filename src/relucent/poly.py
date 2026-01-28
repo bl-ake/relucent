@@ -92,6 +92,7 @@ class Polyhedron:
         self.net = net
         self.ss = ss
         self._halfspaces = halfspaces
+        self._halfspaces_np = None
         self._W = W
         self._b = b
         self._Wl2 = None
@@ -115,8 +116,34 @@ class Polyhedron:
         self._hash = None
         self._tag = None
 
+        # Cached NumPy representation of the sign sequence (if/when needed).
+        self._ss_np = None
+
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    @property
+    def ss(self):
+        return self._ss
+
+    @ss.setter
+    def ss(self, value):
+        self._ss = value
+        # Invalidate cached NumPy representation of the sign sequence.
+        self._ss_np = None
+
+    @property
+    def ss_np(self):
+        """Cached NumPy representation of the sign sequence."""
+        if self._ss_np is None:
+            # Check NumPy first as it's the common case after our optimizations
+            if isinstance(self._ss, np.ndarray):
+                self._ss_np = self._ss
+            elif isinstance(self._ss, torch.Tensor):
+                self._ss_np = self._ss.detach().cpu().numpy()
+            else:
+                raise TypeError(f"Unsupported ss type: {type(self._ss)}")
+        return self._ss_np
 
     def compute_properties(self):
         """Compute additional geometric properties for low-dimensional polyhedra.
@@ -131,9 +158,7 @@ class Polyhedron:
             raise ValueError("Input shape too large to compute extra properties")
         try:
             # warnings.warn("Computing Additional Properties")
-            halfspaces = (
-                self.halfspaces.detach().cpu().numpy() if isinstance(self.halfspaces, torch.Tensor) else self.halfspaces
-            )
+            halfspaces = self.halfspaces_np
             hs = HalfspaceIntersection(
                 halfspaces,
                 self.interior_point,
@@ -182,9 +207,7 @@ class Polyhedron:
             env = env or get_env()
             self._interior_point = solve_radius(
                 env,
-                self.halfspaces.detach().cpu().numpy()
-                if isinstance(self.halfspaces, torch.Tensor)
-                else self.halfspaces,
+                self.halfspaces_np,
                 max_radius=max_radius,
                 zero_indices=zero_indices,
             )[0].squeeze()
@@ -209,7 +232,7 @@ class Polyhedron:
         self._finite = self._center is not None
         return self._center, self._inradius
 
-    def get_hs(self, data=None, get_all_Ab=False):
+    def get_hs(self, data=None, get_all_Ab=False, force_numpy=False):
         """Get the halfspace representation of this polyhedron.
 
         Computes the halfspaces (inequality constraints) that define the polyhedron
@@ -228,12 +251,11 @@ class Polyhedron:
                 - W: Affine transformation matrix
                 - b: Affine transformation bias vector
         """
-        if isinstance(self.ss, torch.Tensor):
+        # Check underlying attribute directly to avoid property access overhead
+        if isinstance(self._ss, torch.Tensor) and not force_numpy:
             return self._get_hs_torch(data, get_all_Ab)
-        elif isinstance(self.ss, np.ndarray):
-            return self._get_hs_numpy(data, get_all_Ab)
         else:
-            raise NotImplementedError
+            return self._get_hs_numpy(data, get_all_Ab)
 
     @torch.no_grad()
     def _get_hs_torch(self, data=None, get_all_Ab=False):
@@ -341,7 +363,7 @@ class Polyhedron:
             elif isinstance(layer, nn.ReLU):
                 if current_A is None:
                     raise ValueError("ReLU layer must follow a linear layer")
-                mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
+                mask = self.ss_np[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
                 new_constr_A = current_A * mask
                 new_constr_b = current_b * mask
@@ -391,11 +413,11 @@ class Polyhedron:
             np.ndarray or None: Halfspaces with bounding constraints added, or
                 None if the polyhedron doesn't intersect the bounded region.
         """
-        bounds_lhs = np.eye(self.halfspaces.shape[1] - 1)
-        bounds_rhs = -np.ones((self.halfspaces.shape[1] - 1, 1)) * bound
+        bounds_lhs = np.eye(self.halfspaces_np.shape[1] - 1)
+        bounds_rhs = -np.ones((self.halfspaces_np.shape[1] - 1, 1)) * bound
         halfspaces = np.vstack(
             (
-                self.halfspaces if isinstance(self.halfspaces, np.ndarray) else self.halfspaces.detach().cpu().numpy(),
+                self.halfspaces_np,
                 np.hstack((bounds_lhs, bounds_rhs)),
                 np.hstack((-bounds_lhs, bounds_rhs)),
             )
@@ -461,12 +483,8 @@ class Polyhedron:
             ValueError: If the optimization model fails.
         """
         shis = []
-        A = (self.halfspaces.detach().cpu().numpy() if isinstance(self.halfspaces, torch.Tensor) else self.halfspaces)[
-            :, :-1
-        ]
-        b = (self.halfspaces.detach().cpu().numpy() if isinstance(self.halfspaces, torch.Tensor) else self.halfspaces)[
-            :, -1:
-        ]
+        A = self.halfspaces_np[:, :-1]
+        b = self.halfspaces_np[:, -1:]
         env = env or get_env()
         model = Model("SHIS", env)
         x = model.addMVar((self.halfspaces.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
@@ -722,6 +740,7 @@ class Polyhedron:
         self._hs = None
         # self._interior_point = None ## TODO: Does this slow down things?
         self._point = None
+        self._halfspaces_np = None
 
     """
     All of the following properties are computed on the fly and cached
@@ -782,7 +801,7 @@ class Polyhedron:
         representation of the sign sequence.
         """
         if self._tag is None:
-            self._tag = encode_ss(self.ss)
+            self._tag = encode_ss(self.ss_np)
         return self._tag
 
     @property
@@ -796,7 +815,23 @@ class Polyhedron:
         """
         if self._halfspaces is None:
             self._halfspaces, self._W, self._b = self.get_hs()
+            # Invalidate cached NumPy view when halfspaces are recomputed.
+            self._halfspaces_np = None
         return self._halfspaces
+
+    @property
+    def halfspaces_np(self):
+        """Cached NumPy representation of halfspaces."""
+        if self._halfspaces_np is None:
+            hs = self.halfspaces
+            # Check NumPy first as it's the common case after our optimizations
+            if isinstance(hs, np.ndarray):
+                self._halfspaces_np = hs
+            elif isinstance(hs, torch.Tensor):
+                self._halfspaces_np = hs.detach().cpu().numpy()
+            else:
+                raise TypeError(f"Unsupported halfspaces type: {type(hs)}")
+        return self._halfspaces_np
 
     @property
     def W(self):
@@ -807,6 +842,7 @@ class Polyhedron:
         """
         if self._W is None:
             self._halfspaces, self._W, self._b = self.get_hs()
+            self._halfspaces_np = None
         return self._W
 
     @property
@@ -818,6 +854,7 @@ class Polyhedron:
         """
         if self._b is None:
             self._halfspaces, self._W, self._b = self.get_hs()
+            self._halfspaces_np = None
         return self._b
 
     @property
@@ -829,6 +866,7 @@ class Polyhedron:
         """
         if self._num_dead_relus is None:
             self._halfspaces, self._W, self._b = self.get_hs()
+            self._halfspaces_np = None
         return self._num_dead_relus
 
     @property
@@ -887,13 +925,8 @@ class Polyhedron:
         # if (self.ss == 0).any():
         #     raise NotImplementedError("Interior point for non-maximal cells is not implemented")
         if self._interior_point is None:
-            self.get_interior_point(
-                zero_indices=np.argwhere(
-                    ((self.ss.detach().cpu().numpy() if isinstance(self.ss, torch.Tensor) else self.ss) == 0).any(
-                        axis=1
-                    )
-                ).flatten()
-            )
+            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten()
+            self.get_interior_point(zero_indices=zero_indices)
         return self._interior_point
 
     @property
@@ -961,6 +994,6 @@ class Polyhedron:
     def __reduce__(self):
         return (
             Polyhedron,
-            (None, self.ss.detach().cpu().numpy() if isinstance(self.ss, torch.Tensor) else self.ss),
+            (None, self.ss_np),
             self.__getstate__(),
         )  # Control what gets saved, do not pickle the net
