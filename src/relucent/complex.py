@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import os
+import pickle
 import random
 from collections import defaultdict
 from functools import partial
@@ -226,6 +227,37 @@ class Complex:
 
     def __len__(self):
         return len(self.index2poly)
+
+    def save(self, filename, save_bvm=True):
+        state = self.__getstate__()
+        if save_bvm:
+            state["bvm"] = self.bvm
+        with open(filename, "wb") as f:
+            pickle.dump(state, f)
+
+    def load(filename):
+        with open(filename, "rb") as f:
+            state = pickle.load(f)
+        cplx = Complex(state["net"])
+        cplx.__setstate__(state)
+        return cplx
+
+    def __getstate__(self):
+        return {
+            "index2poly": self.index2poly,
+            "net": self.net,
+        }
+
+    def __setstate__(self, state):
+        self.__init__(state["net"])
+        self.index2poly = state["index2poly"]
+        if "bvm" in state:
+            self.bvm = state["bvm"]
+        else:
+            for p in self.index2poly:
+                self.bvm.add(p.bv)
+        for p in self.index2poly:
+            p.net = self.net
 
     @property
     def dim(self):
@@ -1001,7 +1033,7 @@ class Complex:
 
         return G
 
-    def plot(self, label_regions=False, color=None, highlight_regions=None, bv_name=False, bound=None, **kwargs):
+    def plot(self, label_regions=False, color=None, highlight_regions=None, bv_name=False, bound=10000, **kwargs):
         """Plot the complex in 2D using plotly.
 
         Creates a 2D visualization of the complex, showing all polyhedra as
@@ -1045,8 +1077,16 @@ class Complex:
         for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys)):
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
+            if bv_name:
+                name = (
+                    f"{poly.bv.detach().cpu().numpy().flatten().astype(int).tolist()}"
+                    if isinstance(poly.bv, torch.Tensor)
+                    else poly.bv.flatten().astype(int).tolist()
+                )
+            else:
+                name = f"{poly}"
             p_plot = poly.plot2d(
-                name=f"{poly.bv.flatten().astype(int).tolist()}" if bv_name else f"{poly}",
+                name=name,
                 fillcolor=c,
                 line_color="black",
                 mode="lines",  ## Comment out to mouse over intersections
