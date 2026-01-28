@@ -1,5 +1,7 @@
+import random
 from collections import OrderedDict, deque
 from functools import cache
+from heapq import heappop, heappush
 from threading import Condition
 
 import matplotlib.pyplot as plt
@@ -12,7 +14,6 @@ from PIL import Image
 from tqdm.auto import tqdm
 
 from relucent.model import NN
-import random
 
 disposeDefaultEnv()
 
@@ -26,6 +27,23 @@ def set_seeds(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
+def encode_ss(ss):
+    """Create a hashable representation of a sign sequence.
+
+    Converts a sign sequence array into a bytes object that can be used as a
+    dictionary key or for hashing.
+
+    Args:
+        ss: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
+
+    Returns:
+        bytes: A hashable bytes representation of the flattened sign sequence.
+    """
+    if isinstance(ss, torch.Tensor):
+        ss = ss.detach().cpu().numpy()
+    return ss.flatten().tobytes()
 
 
 @cache
@@ -139,6 +157,70 @@ class BlockingQueue:
     def __len__(self):
         with self.lock:
             return -1 if self.closed else len(self.deque)
+
+
+class UpdatablePriorityQueue:
+    """Priority queue that supports updating task priorities and removing tasks.
+
+    Tasks are tuples (head, *tail). The tail is used as the identity key for
+    updates: pushing a task with the same tail replaces the previous entry.
+    Lower priority value means higher priority.
+
+    Based on the heapq implementation from Python docs.
+    Reference: https://docs.python.org/3/library/heapq.html
+    """
+
+    REMOVED = "<removed-task>"  # placeholder for a removed task
+
+    def __init__(self):
+        self.pq = []  # list of entries arranged in a heap
+        self.entry_finder = {}  # mapping of tail -> entry
+        self.counter = 0
+
+    def push(self, task, priority=0):
+        """Add a new task or update the priority of an existing task.
+
+        Args:
+            task: A tuple (head, *tail). Tasks with the same tail are
+                considered the same for updates.
+            priority: The priority value (lower = higher priority). Defaults to 0.
+        """
+        head, *tail = task
+        tail = tuple(tail)
+        if tail in self.entry_finder:
+            self.remove_task(tail)
+        entry = [priority, self.counter, head, tail]
+        self.entry_finder[tail] = entry
+        heappush(self.pq, entry)
+        self.counter += 1
+
+    def remove_task(self, task_tail):
+        """Mark an existing task as REMOVED. Raise KeyError if not found.
+
+        Args:
+            task_tail: The tail of the task to remove (i.e. task[1:]).
+        """
+        entry = self.entry_finder.pop(task_tail)
+        entry[-1] = self.REMOVED
+
+    def pop(self):
+        """Remove and return the lowest-priority task.
+
+        Returns:
+            tuple: The full task (head, *tail).
+
+        Raises:
+            KeyError: If the queue is empty.
+        """
+        while self.pq:
+            _, _, head, tail = heappop(self.pq)
+            if tail is not self.REMOVED:
+                del self.entry_finder[tail]
+                return (head, *tail)
+        raise KeyError("pop from an empty priority queue")
+
+    def __len__(self):
+        return len(self.entry_finder)
 
 
 def split_sequential(model, split_layer):

@@ -1,8 +1,4 @@
-from heapq import heappop, heappush
-
-from torch import Tensor
-
-from relucent.poly import encode_ss
+from relucent.utils import encode_ss
 
 
 class SSManager:
@@ -21,8 +17,6 @@ class SSManager:
         self._len = 0
 
     def _get_tag(self, ss):
-        if isinstance(ss, Tensor):
-            ss = ss.detach().cpu().numpy()
         return encode_ss(ss)
 
     def add(self, ss):
@@ -61,64 +55,3 @@ class SSManager:
 
     def __len__(self):
         return self._len
-
-
-# TODO: Move to utils as general priority queue
-class SSPriorityQueue:
-    """Priority queue for tasks with sign sequences.
-
-    A priority queue implementation that supports updating task priorities and
-    removing tasks. Tasks are tuples starting with a sign sequence followed
-    by additional data. Based on the heapq implementation from Python docs.
-
-    Reference: https://docs.python.org/3/library/heapq.html
-    """
-
-    REMOVED = "<removed-task>"  # placeholder for a removed task
-
-    def __init__(self):
-        self.pq = []  # list of entries arranged in a heap
-        self.entry_finder = {}  # mapping of tasks to entries
-        self.counter = 0  # unique sequence count
-
-    def push(self, task, priority=0):
-        """Add a new task or update the priority of an existing task.
-
-        Args:
-            task: A tuple starting with a sign sequence followed by
-                additional task data.
-            priority: The priority value (lower = higher priority). Defaults to 0.
-        """
-        ss, *task = task
-        task = tuple(task)
-        if task in self.entry_finder:
-            self.remove_task(task)
-        entry = [priority, self.counter, ss, task]
-        self.entry_finder[task] = entry
-        heappush(self.pq, entry)
-        self.counter += 1
-
-    def remove_task(self, task):
-        "Mark an existing task as REMOVED.  Raise KeyError if not found."
-        entry = self.entry_finder.pop(task)
-        entry[-1] = self.REMOVED
-
-    def pop(self):
-        """Remove and return the lowest priority task.
-
-        Returns:
-            tuple: A tuple starting with the sign sequence followed by
-                the task data.
-
-        Raises:
-            KeyError: If the queue is empty.
-        """
-        while self.pq:
-            _, _, ss, task = heappop(self.pq)
-            if task is not self.REMOVED:
-                del self.entry_finder[task]
-                return ss, *task
-        raise KeyError("pop from an empty priority queue")
-
-    def __len__(self):
-        return len(self.entry_finder)

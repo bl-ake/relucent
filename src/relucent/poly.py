@@ -10,7 +10,7 @@ from gurobipy import GRB, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
-from relucent.utils import get_env
+from relucent.utils import encode_ss, get_env
 
 
 def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, sense=GRB.MAXIMIZE):
@@ -69,22 +69,6 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
             #     breakpoint()
             model.close()
             raise ValueError(f"Interior Point Model Status: {status}")
-
-
-def encode_ss(ss):
-    """Create a hashable representation of a sign sequence.
-
-    Converts a sign sequence array into a bytes object that can be used as a
-    dictionary key or for hashing.
-
-    Args:
-        ss: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
-
-    Returns:
-        bytes: A hashable bytes representation of the flattened sign sequence.
-    """
-    # return tuple(ss.astype(int).flatten().tolist())  ## TODO: Test these two options and compare speeds
-    return ss.flatten().tobytes()
 
 
 class Polyhedron:
@@ -804,9 +788,7 @@ class Polyhedron:
         representation of the sign sequence.
         """
         if self._tag is None:
-            self._tag = encode_ss(
-                self.ss.detach().cpu().numpy().squeeze() if isinstance(self.ss, torch.Tensor) else self.ss
-            )
+            self._tag = encode_ss(self.ss)
         return self._tag
 
     @property
