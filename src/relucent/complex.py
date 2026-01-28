@@ -14,8 +14,8 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 from relucent.poly import Polyhedron
-from relucent.ss import SSManager, SSPriorityQueue
-from relucent.utils import BlockingQueue, NonBlockingQueue, get_colors, get_env
+from relucent.ss import SSManager
+from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, get_colors, get_env
 
 
 def set_globals(get_net, get_volumes=True):
@@ -735,7 +735,7 @@ class Complex:
         fScore = defaultdict(lambda: float("inf"))
 
         openSet = NonBlockingQueue(
-            queue_class=SSPriorityQueue,
+            queue_class=UpdatablePriorityQueue,
             push=lambda pq, task, priority: pq.push(task, priority=priority),
             pop=lambda pq: pq.pop(),
         )
