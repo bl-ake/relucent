@@ -201,7 +201,12 @@ class Polyhedron:
         else:
             env = env or get_env()
             self._interior_point = solve_radius(
-                env, self.halfspaces[:], max_radius=max_radius, zero_indices=zero_indices
+                env,
+                self.halfspaces.detach().cpu().numpy()
+                if isinstance(self.halfspaces, torch.Tensor)
+                else self.halfspaces,
+                max_radius=max_radius,
+                zero_indices=zero_indices,
             )[0].squeeze()
         if self._interior_point is None:
             raise ValueError("Interior point not found")
@@ -910,7 +915,13 @@ class Polyhedron:
         # if (self.bv == 0).any():
         #     raise NotImplementedError("Interior point for non-maximal cells is not implemented")
         if self._interior_point is None:
-            self.get_interior_point(zero_indices=np.argwhere((self.bv == 0).any(axis=1)).flatten())
+            self.get_interior_point(
+                zero_indices=np.argwhere(
+                    ((self.bv.detach().cpu().numpy() if isinstance(self.bv, torch.Tensor) else self.bv) == 0).any(
+                        axis=1
+                    )
+                ).flatten()
+            )
         return self._interior_point
 
     @property
