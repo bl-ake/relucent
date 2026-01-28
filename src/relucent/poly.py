@@ -328,14 +328,8 @@ class Polyhedron:
         current_mask_index = 0
         for name, layer in self.net.layers.items():
             if isinstance(layer, nn.Linear):
-                if hasattr(layer, "weight_cpu"):
-                    A = layer.weight_cpu
-                    b = layer.bias_cpu
-                else:
-                    A = layer.weight.detach().cpu().numpy()
-                    b = layer.bias[None, :].detach().cpu().numpy()
-                    layer.weight_cpu = A
-                    layer.bias_cpu = b
+                A = layer.weight_cpu
+                b = layer.bias_cpu
                 if current_A is None:
                     constr_A = np.empty((A.shape[1], 0))
                     constr_b = np.empty((1, 0))

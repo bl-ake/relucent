@@ -38,6 +38,15 @@ class NN(nn.Module):
 
         self.to(device or self.device, dtype or self.dtype)
 
+        # Precompute NumPy copies of all Linear layer weights and biases.
+        # These are used throughout the library (e.g. in polyhedra construction)
+        # to avoid repeated `.detach().cpu().numpy()` calls.
+        for layer in self.layers.values():
+            if isinstance(layer, nn.Linear):
+                layer.weight_cpu = layer.weight.detach().cpu().numpy()
+                # Store bias as a row vector to match existing expectations.
+                layer.bias_cpu = layer.bias.detach().cpu().numpy().reshape(1, -1)
+
         self.trained_on = None
 
     @property
