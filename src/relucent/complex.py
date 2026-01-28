@@ -691,7 +691,7 @@ class Complex:
         end = self.add_point(end, numpy=True)
         return self._greedy_path_helper(start, end)
 
-    def hamming_astar(self, start, end, nworkers=1, bound=1e5, max_polys=float("inf"), show_pbar=True, **kwargs):
+    def hamming_astar(self, start, end, nworkers=None, bound=1e5, max_polys=float("inf"), show_pbar=True, **kwargs):
         """Find a path between two data points using A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -729,6 +729,10 @@ class Complex:
 
         if (start.ss == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
+
+        nhs = len(start.halfspaces)
+        nworkers = min(nworkers or os.process_cpu_count(), nhs)
+        print(f"Using {nworkers} workers")
 
         cameFrom = dict()
         gScore = defaultdict(lambda: float("inf"))
@@ -797,7 +801,7 @@ class Complex:
                 p, shi, depth = item
 
                 for neighbor, neighbor_shi in pool.imap_unordered(
-                    partial(get_ip, p), (i for i in p.shis if isinstance != shi), chunksize=32
+                    partial(get_ip, p), (i for i in p.shis if i != shi), chunksize=max(nhs // nworkers, 1)
                 ):
                     # for neighbor, neighbor_shi in map(
                     #     partial(get_ip, p),
