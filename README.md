@@ -48,3 +48,5 @@ Without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-
 1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/), for example using `pip install gurobipy`
 2. [Obtain a Gurobi license](https://support.gurobi.com/hc/en-us/articles/360040541251-How-do-I-obtain-a-free-academic-license) (Note: a WLS license will limit the number of concurrent sessions across multiple devices, which can result in slowdowns when using this library on different machines simultaneously.)
 3. In your Conda environment, run `grbgetkey` followed by your license key
+
+If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent/issues).
