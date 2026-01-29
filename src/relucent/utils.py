@@ -115,7 +115,7 @@ class NonBlockingQueue:
         self.pop = lambda q: self.stopFlag
 
     def __len__(self):
-        return -1 if self.closed else len(self.deque)
+        return len(self.deque)
 
 
 class BlockingQueue:
@@ -169,7 +169,7 @@ class BlockingQueue:
 
     def __len__(self):
         with self.lock:
-            return -1 if self.closed else len(self.deque)
+            return len(self.deque)
 
 
 class UpdatablePriorityQueue:
