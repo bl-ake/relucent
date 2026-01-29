@@ -60,6 +60,9 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
         if objVal <= 0:
             raise ValueError(f"Something has gone horribly wrong: objVal={objVal}")
         return x, y
+    elif status == GRB.INTERRUPTED:
+        model.close()
+        raise KeyboardInterrupt
     else:
         if max_radius == GRB.INFINITY:
             model.close()
@@ -499,7 +502,10 @@ class Polyhedron:
         x = model.addMVar((self.halfspaces.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
         constrs = model.addConstr(A @ x == -b - tol, name="hyperplanes")
         model.optimize()
-        if model.status == GRB.OPTIMAL:
+        if model.status == GRB.INTERRUPTED:
+            model.close()
+            raise KeyboardInterrupt
+        elif model.status == GRB.OPTIMAL:
             # print("All Hyperplanes Intersect")
             shis = list(range(A.shape[0]))
             if collect_info:
@@ -531,6 +537,9 @@ class Polyhedron:
             model.update()
             model.optimize()
 
+            if model.status == GRB.INTERRUPTED:
+                model.close()
+                raise KeyboardInterrupt
             if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
                 if model.objVal >= 0:
                     dists = A @ x.X + b
