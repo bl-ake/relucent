@@ -45,6 +45,8 @@ def test_complex_two():
 
     cplx1.bfs(start=start_point1)
 
+    assert len(cplx1) == 382
+
     G1 = cplx1.get_dual_graph(relabel=True)
 
     cplx2 = Complex(model)
