@@ -10,9 +10,6 @@ import torch
 from relucent import Complex, get_mlp_model
 
 
-# ----- Original tests (reorganized and renamed) -----
-
-
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
     """BFS/DFS equivalence, conversion to dual graph."""
     model = get_mlp_model(widths=[4, 8], add_last_relu=True)
@@ -103,9 +100,6 @@ def test_plot_and_dual_graph_smoke(seeded):
         _ = p.halfspaces[p.shis, :]
         G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
-
-
-# ----- Additional Complex API tests -----
 
 
 class TestComplexCreationAndIndexing:
