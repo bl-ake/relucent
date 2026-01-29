@@ -637,6 +637,12 @@ Will be reshaped to match the network’s input shape.</p>
 <dd><p>The number of bent hyperplanes/neurons in the network.</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.complex.Complex.net">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><a class="headerlink" href="#relucent.complex.Complex.net" title="Link to this definition">¶</a></dt>
+<dd><p>The neural network. May only be set once.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py function">
@@ -1467,6 +1473,12 @@ constraint a^T x + b &lt;= 0.</p>
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.interior_point_norm">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point_norm</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.interior_point_norm" title="Link to this definition">¶</a></dt>
 <dd><p>L2 norm of the interior point.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.net">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.net" title="Link to this definition">¶</a></dt>
+<dd><p>The neural network I belong to</p>
 </dd></dl>
 
 <dl class="py property">
@@ -2459,6 +2471,12 @@ Will be reshaped to match the network’s input shape.</p>
 <dd><p>The number of bent hyperplanes/neurons in the network.</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Complex.net">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><a class="headerlink" href="#relucent.Complex.net" title="Link to this definition">¶</a></dt>
+<dd><p>The neural network. May only be set once.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -3023,6 +3041,12 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.net">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><a class="headerlink" href="#relucent.Polyhedron.net" title="Link to this definition">¶</a></dt>
+<dd><p>The neural network I belong to</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.num_dead_relus">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_dead_relus</span></span><a class="headerlink" href="#relucent.Polyhedron.num_dead_relus" title="Link to this definition">¶</a></dt>
 <dd><p>Number of dead ReLU neurons (neurons always outputting zero).</p>
@@ -3286,6 +3310,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#relucent.complex.astar_calculations"><code class="docutils literal notranslate"><span class="pre">astar_calculations()</span></code></a></li>
@@ -3345,6 +3370,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.num_dead_relus"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_dead_relus</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.num_faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_faces</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
@@ -3426,6 +3452,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
@@ -3466,6 +3493,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.num_dead_relus"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_dead_relus</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.num_faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_faces</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
