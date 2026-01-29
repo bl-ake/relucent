@@ -694,8 +694,11 @@ class Complex:
             dict: Search information dictionary (see searcher() documentation).
         """
         return self.searcher(
-            queue=list(),
-            pop=lambda x: x.pop(random.randrange(0, len(x) - 1)),
+            queue=BlockingQueue(
+                queue_class=list,
+                pop=lambda x: x.pop(random.randrange(0, len(x))),
+                push=lambda x, y: x.append(y),
+            ),
             **kwargs,
         )
 
