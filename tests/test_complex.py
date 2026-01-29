@@ -128,7 +128,9 @@ def test_starter_code():
 
     cplx.bfs()
 
-    cplx.plot(bound=10000)
+    fig = cplx.plot(bound=10000)
+
+    fig.show()
 
     sum(len(p.shis) for p in cplx) / len(cplx)
 
