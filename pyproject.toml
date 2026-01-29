@@ -30,3 +30,11 @@ cli = ["torch>=2.13", "torchvision", "pyvis>=0.3", "kaleido"]
 [project.urls]
 Repository = "https://github.com/bl-ake/relucent"
 Documentation = "https://bl-ake.github.io/relucent/"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::UserWarning",
+    "error::",
+    "ignore:.*U.*mode is deprecated:DeprecationWarning",
+    "ignore:This process .* is multi-threaded, use of fork\\(\\).*:DeprecationWarning",
+]
