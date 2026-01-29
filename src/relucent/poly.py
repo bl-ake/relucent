@@ -169,7 +169,12 @@ class Polyhedron:
         self._hs = hs
         self._shis = hs.dual_vertices.flatten().tolist()
         vertices = hs.intersections
-        trust_vertices = (halfspaces[self.shis, :-1] @ vertices.T + halfspaces[self.shis, -1, None]).sum(axis=0) < 0.01
+        trust_vertices = vertices.isinf().any(axis=1)
+        if not (
+            (halfspaces[self.shis, :-1] @ vertices[trust_vertices].T + halfspaces[self.shis, -1, None]).sum(axis=0)
+            < 0.01
+        ).all():
+            raise ValueError("Vertex computation failed")
         self._vertices = vertices[trust_vertices]
         self._vertex_set = set(tuple(x) for x in self.vertices)
         if self.finite:
