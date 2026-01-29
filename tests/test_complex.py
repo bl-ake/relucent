@@ -68,6 +68,10 @@ def test_search_one():
 
     p = cplx.point2poly(start_point)
 
+    assert len(p.halfspaces) == cplx.n
+
+    assert p.ss_np.size == cplx.n
+
     assert torch.allclose(start_point @ p.W + p.b, model(start_point))
 
     cplx.bfs(max_polys=100, start=start_point)
@@ -124,9 +128,7 @@ def test_starter_code():
 
     cplx.bfs()
 
-    fig = cplx.plot(bound=10000)
-
-    fig.show()
+    cplx.plot(bound=10000)
 
     sum(len(p.shis) for p in cplx) / len(cplx)
 
