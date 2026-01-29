@@ -46,6 +46,25 @@
 <p>This class provides methods for calculating, storing, and searching the h-representations
 (halfspace representations) of polyhedra in the complex.</p>
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.complex.Complex.load">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a Complex from a pickle file.</p>
+<p>Intended to be called as Complex.load(filename). The file must have been
+created by save().</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> – Path to the pickle file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The restored complex.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.complex.Complex" title="relucent.complex.Complex">Complex</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.add_point">
 <span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.add_point" title="Link to this definition">¶</a></dt>
 <dd><p>Find the polyhedron containing a data point and add it to the complex.</p>
@@ -53,7 +72,9 @@
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>data</strong> – A single data point as a torch.Tensor, np.ndarray, or array-like.</p></li>
-<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
+<li><p><strong>check_exists</strong> – If True, check whether the polyhedron already exists in
+the complex and return it if so. Only set to false if you know it does not.
+Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -75,7 +96,9 @@
 <li><p><strong>p</strong> – The Polyhedron object to add.</p></li>
 <li><p><strong>overwrite</strong> – If True and the polyhedron already exists, replace it with
 the new one. Defaults to False.</p></li>
-<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
+<li><p><strong>check_exists</strong> – If True, check whether the polyhedron already exists in
+the complex and return the existing one if so. If False, assume
+the polyhedron is new (skip the check). Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -294,11 +317,6 @@ Defaults to infinity.</p></li>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="relucent.complex.Complex.load">
-<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.load" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.parallel_add">
 <span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.parallel_add" title="Link to this definition">¶</a></dt>
 <dd><p>Add multiple polyhedra from data points using parallel processing.</p>
@@ -434,13 +452,14 @@ data points. Does not add the resulting polyhedra to the complex.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
-<dt>The sign sequences for</dt><dd><p>the input batch, with shape (batch_size, total_ReLU_neurons).</p>
+<dt>The sign sequences for the input batch, with shape</dt><dd><p>(batch_size, total_ReLU_neurons). Returns a torch.Tensor if batch is a
+torch.Tensor, otherwise a np.ndarray.</p>
 </dd>
 </dl>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>torch.Tensor</p>
+<dd class="field-odd"><p>torch.Tensor or np.ndarray</p>
 </dd>
 </dl>
 </dd></dl>
@@ -499,7 +518,17 @@ as torch.Tensor or np.ndarray.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.save">
 <span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_ssm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.save" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Save the complex to a pickle file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> – Path to the output file.</p></li>
+<li><p><strong>save_ssm</strong> – If True, include the SSManager in the saved state so that
+sign-sequence lookups are preserved. Defaults to True.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.searcher">
@@ -600,6 +629,12 @@ Will be reshaped to match the network’s input shape.</p>
 <dt class="sig sig-object py" id="relucent.complex.Complex.dim">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dim</span></span><a class="headerlink" href="#relucent.complex.Complex.dim" title="Link to this definition">¶</a></dt>
 <dd><p>The input dimension of the network.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.complex.Complex.n">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">n</span></span><a class="headerlink" href="#relucent.complex.Complex.n" title="Link to this definition">¶</a></dt>
+<dd><p>The number of bent hyperplanes/neurons in the network.</p>
 </dd></dl>
 
 </dd></dl>
@@ -937,6 +972,14 @@ Defaults to 2.</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.model.NN.save_numpy_weights">
+<span class="sig-name descname"><span class="pre">save_numpy_weights</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.model.NN.save_numpy_weights" title="Link to this definition">¶</a></dt>
+<dd><p>Save NumPy weights and biases for all Linear layers.</p>
+<p>This method saves the weights and biases of all Linear layers to the
+<cite>weight_cpu</cite> and <cite>bias_cpu</cite> attributes of their respective layer objects.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.model.NN.shi2weights">
 <span class="sig-name descname"><span class="pre">shi2weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.model.NN.shi2weights" title="Link to this definition">¶</a></dt>
 <dd><p>Get weights corresponding to a neuron index.</p>
@@ -1123,21 +1166,18 @@ every neuron, not just the supporting hyperplanes.</p>
 checks that computed outputs match network outputs. Defaults to None.</p></li>
 <li><p><strong>get_all_Ab</strong> – If True, returns all intermediate affine maps (A, b) for
 each layer instead of just the final halfspaces. Defaults to False.</p></li>
+<li><p><strong>force_numpy</strong> – If True, use NumPy backend even when ss is a torch.Tensor.
+Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>(halfspaces, W, b) where:</dt><dd><ul class="simple">
-<li><p>halfspaces: Array of shape (n_constraints, n_dim+1) with bias terms</p></li>
-<li><p>W: Affine transformation matrix</p></li>
-<li><p>b: Affine transformation bias vector</p></li>
-</ul>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>tuple (halfspaces, W, b) where halfspaces has
+shape (n_constraints, n_dim+1), W is the affine matrix, and b is the
+affine bias. If get_all_Ab is True: list of dicts with ‘A’, ‘b’, and
+‘layer’ keys for each layer.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>tuple</p>
+<dd class="field-odd"><p>If get_all_Ab is False</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1249,7 +1289,7 @@ of dictionaries with computation details.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.plot2d">
-<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.poly.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_halfspaces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspace_shade</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.poly.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
 <dd><p>Plot the polyhedron in 2D using plotly.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1258,18 +1298,25 @@ of dictionaries with computation details.</p>
 <li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
 <li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
 Defaults to 1000.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter.</p></li>
+<li><p><strong>plot_halfspaces</strong> – If True, add one Scatter trace per halfspace (inequality)
+as line or shaded region. Defaults to False.</p></li>
+<li><p><strong>halfspace_shade</strong> – When plot_halfspaces is True, shade the feasible side
+of each halfspace. Defaults to True.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter (polyhedron outline).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
-<dt>A plotly Scatter trace, or None</dt><dd><p>if plotting fails.</p>
+<dt>A list of plotly Scatter traces: [outline_trace] when</dt><dd><p>plot_halfspaces is False, or [outline_trace, <a href="#id9"><span class="problematic" id="id10">*</span></a>halfspace_traces] when
+True. If the main outline fails (e.g. vertex computation or
+ConvexHull raises), returns [] when plot_halfspaces is False, or
+only the halfspace traces when plot_halfspaces is True.</p>
 </dd>
 </dl>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>plotly.graph_objects.Scatter or None</p>
+<dd class="field-odd"><p>list</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
@@ -1628,7 +1675,7 @@ mapping and allows efficient membership testing and retrieval.</p>
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.utils.</span></span><span class="sig-name descname"><span class="pre">UpdatablePriorityQueue</span></span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Priority queue that supports updating task priorities and removing tasks.</p>
-<p>Tasks are tuples (head, <a href="#id9"><span class="problematic" id="id10">*</span></a>tail). The tail is used as the identity key for
+<p>Tasks are tuples (head, <a href="#id11"><span class="problematic" id="id12">*</span></a>tail). The tail is used as the identity key for
 updates: pushing a task with the same tail replaces the previous entry.
 Lower priority value means higher priority.</p>
 <p>Based on the heapq implementation from Python docs.
@@ -1639,7 +1686,7 @@ Reference: <a class="reference external" href="https://docs.python.org/3/library
 <dd><p>Remove and return the lowest-priority task.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The full task (head, <a href="#id11"><span class="problematic" id="id12">*</span></a>tail).</p>
+<dd class="field-odd"><p>The full task (head, <a href="#id13"><span class="problematic" id="id14">*</span></a>tail).</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>tuple</p>
@@ -1657,7 +1704,7 @@ Reference: <a class="reference external" href="https://docs.python.org/3/library
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>task</strong> – A tuple (head, <a href="#id13"><span class="problematic" id="id14">*</span></a>tail). Tasks with the same tail are
+<li><p><strong>task</strong> – A tuple (head, <a href="#id15"><span class="problematic" id="id16">*</span></a>tail). Tasks with the same tail are
 considered the same for updates.</p></li>
 <li><p><strong>priority</strong> – The priority value (lower = higher priority). Defaults to 0.</p></li>
 </ul>
@@ -1681,6 +1728,12 @@ considered the same for updates.</p></li>
 <span class="sig-name descname"><span class="pre">REMOVED</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'&lt;removed-task&gt;'</span></span><a class="headerlink" href="#relucent.utils.UpdatablePriorityQueue.REMOVED" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.utils.close_env">
+<span class="sig-prename descclassname"><span class="pre">relucent.utils.</span></span><span class="sig-name descname"><span class="pre">close_env</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.utils.close_env" title="Link to this definition">¶</a></dt>
+<dd><p>Close the cached Gurobi environment.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1815,6 +1868,25 @@ the first network).</p></li>
 <p>This class provides methods for calculating, storing, and searching the h-representations
 (halfspace representations) of polyhedra in the complex.</p>
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.load">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a Complex from a pickle file.</p>
+<p>Intended to be called as Complex.load(filename). The file must have been
+created by save().</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> – Path to the pickle file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The restored complex.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Complex" title="relucent.Complex">Complex</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.add_point">
 <span class="sig-name descname"><span class="pre">add_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_exists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.add_point" title="Link to this definition">¶</a></dt>
 <dd><p>Find the polyhedron containing a data point and add it to the complex.</p>
@@ -1822,7 +1894,9 @@ the first network).</p></li>
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>data</strong> – A single data point as a torch.Tensor, np.ndarray, or array-like.</p></li>
-<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
+<li><p><strong>check_exists</strong> – If True, check whether the polyhedron already exists in
+the complex and return it if so. Only set to false if you know it does not.
+Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1844,7 +1918,9 @@ the first network).</p></li>
 <li><p><strong>p</strong> – The Polyhedron object to add.</p></li>
 <li><p><strong>overwrite</strong> – If True and the polyhedron already exists, replace it with
 the new one. Defaults to False.</p></li>
-<li><p><strong>check_exists</strong> – Set to true if you know the polyhedron is not in the complex.</p></li>
+<li><p><strong>check_exists</strong> – If True, check whether the polyhedron already exists in
+the complex and return the existing one if so. If False, assume
+the polyhedron is new (skip the check). Defaults to True.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -2063,11 +2139,6 @@ Defaults to infinity.</p></li>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="relucent.Complex.load">
-<span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.load" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.parallel_add">
 <span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.parallel_add" title="Link to this definition">¶</a></dt>
 <dd><p>Add multiple polyhedra from data points using parallel processing.</p>
@@ -2203,13 +2274,14 @@ data points. Does not add the resulting polyhedra to the complex.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
-<dt>The sign sequences for</dt><dd><p>the input batch, with shape (batch_size, total_ReLU_neurons).</p>
+<dt>The sign sequences for the input batch, with shape</dt><dd><p>(batch_size, total_ReLU_neurons). Returns a torch.Tensor if batch is a
+torch.Tensor, otherwise a np.ndarray.</p>
 </dd>
 </dl>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>torch.Tensor</p>
+<dd class="field-odd"><p>torch.Tensor or np.ndarray</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2268,7 +2340,17 @@ as torch.Tensor or np.ndarray.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.save">
 <span class="sig-name descname"><span class="pre">save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_ssm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.save" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Save the complex to a pickle file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> – Path to the output file.</p></li>
+<li><p><strong>save_ssm</strong> – If True, include the SSManager in the saved state so that
+sign-sequence lookups are preserved. Defaults to True.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.searcher">
@@ -2371,6 +2453,12 @@ Will be reshaped to match the network’s input shape.</p>
 <dd><p>The input dimension of the network.</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Complex.n">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">n</span></span><a class="headerlink" href="#relucent.Complex.n" title="Link to this definition">¶</a></dt>
+<dd><p>The number of bent hyperplanes/neurons in the network.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -2462,6 +2550,14 @@ Defaults to 2.</p></li>
 <dd class="field-odd"><p>tuple</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.NN.save_numpy_weights">
+<span class="sig-name descname"><span class="pre">save_numpy_weights</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.save_numpy_weights" title="Link to this definition">¶</a></dt>
+<dd><p>Save NumPy weights and biases for all Linear layers.</p>
+<p>This method saves the weights and biases of all Linear layers to the
+<cite>weight_cpu</cite> and <cite>bias_cpu</cite> attributes of their respective layer objects.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -2623,21 +2719,18 @@ every neuron, not just the supporting hyperplanes.</p>
 checks that computed outputs match network outputs. Defaults to None.</p></li>
 <li><p><strong>get_all_Ab</strong> – If True, returns all intermediate affine maps (A, b) for
 each layer instead of just the final halfspaces. Defaults to False.</p></li>
+<li><p><strong>force_numpy</strong> – If True, use NumPy backend even when ss is a torch.Tensor.
+Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>(halfspaces, W, b) where:</dt><dd><ul class="simple">
-<li><p>halfspaces: Array of shape (n_constraints, n_dim+1) with bias terms</p></li>
-<li><p>W: Affine transformation matrix</p></li>
-<li><p>b: Affine transformation bias vector</p></li>
-</ul>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>tuple (halfspaces, W, b) where halfspaces has
+shape (n_constraints, n_dim+1), W is the affine matrix, and b is the
+affine bias. If get_all_Ab is True: list of dicts with ‘A’, ‘b’, and
+‘layer’ keys for each layer.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>tuple</p>
+<dd class="field-odd"><p>If get_all_Ab is False</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2749,7 +2842,7 @@ of dictionaries with computation details.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot2d">
-<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_halfspaces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspace_shade</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
 <dd><p>Plot the polyhedron in 2D using plotly.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -2758,18 +2851,25 @@ of dictionaries with computation details.</p>
 <li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
 <li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
 Defaults to 1000.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter.</p></li>
+<li><p><strong>plot_halfspaces</strong> – If True, add one Scatter trace per halfspace (inequality)
+as line or shaded region. Defaults to False.</p></li>
+<li><p><strong>halfspace_shade</strong> – When plot_halfspaces is True, shade the feasible side
+of each halfspace. Defaults to True.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter (polyhedron outline).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p><dl class="simple">
-<dt>A plotly Scatter trace, or None</dt><dd><p>if plotting fails.</p>
+<dt>A list of plotly Scatter traces: [outline_trace] when</dt><dd><p>plot_halfspaces is False, or [outline_trace, <a href="#id17"><span class="problematic" id="id18">*</span></a>halfspace_traces] when
+True. If the main outline fails (e.g. vertex computation or
+ConvexHull raises), returns [] when plot_halfspaces is False, or
+only the halfspace traces when plot_halfspaces is True.</p>
 </dd>
 </dl>
 </p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>plotly.graph_objects.Scatter or None</p>
+<dd class="field-odd"><p>list</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
@@ -3161,6 +3261,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#submodules">Submodules</a></li>
 <li><a class="reference internal" href="#module-relucent.complex">relucent.complex module</a><ul>
 <li><a class="reference internal" href="#relucent.complex.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li><a class="reference internal" href="#relucent.complex.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
@@ -3172,7 +3273,6 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.complex.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.plot3d"><code class="docutils literal notranslate"><span class="pre">Complex.plot3d()</span></code></a></li>
@@ -3185,6 +3285,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#relucent.complex.astar_calculations"><code class="docutils literal notranslate"><span class="pre">astar_calculations()</span></code></a></li>
@@ -3207,6 +3308,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.model.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.model.NN.get_grid"><code class="docutils literal notranslate"><span class="pre">NN.get_grid()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.model.NN.output_grid"><code class="docutils literal notranslate"><span class="pre">NN.output_grid()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.model.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.model.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.model.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
 <li><a class="reference internal" href="#relucent.model.NN.dtype"><code class="docutils literal notranslate"><span class="pre">NN.dtype</span></code></a></li>
@@ -3288,6 +3390,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.utils.UpdatablePriorityQueue.REMOVED"><code class="docutils literal notranslate"><span class="pre">UpdatablePriorityQueue.REMOVED</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#relucent.utils.close_env"><code class="docutils literal notranslate"><span class="pre">close_env()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.data_graph"><code class="docutils literal notranslate"><span class="pre">data_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.utils.get_colors"><code class="docutils literal notranslate"><span class="pre">get_colors()</span></code></a></li>
@@ -3298,6 +3401,7 @@ the first network).</p></li>
 </li>
 <li><a class="reference internal" href="#module-relucent">Module contents</a><ul>
 <li><a class="reference internal" href="#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li><a class="reference internal" href="#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
@@ -3309,7 +3413,6 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.plot3d"><code class="docutils literal notranslate"><span class="pre">Complex.plot3d()</span></code></a></li>
@@ -3322,6 +3425,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
@@ -3329,6 +3433,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.NN.get_grid"><code class="docutils literal notranslate"><span class="pre">NN.get_grid()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.NN.output_grid"><code class="docutils literal notranslate"><span class="pre">NN.output_grid()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
 <li><a class="reference internal" href="#relucent.NN.dtype"><code class="docutils literal notranslate"><span class="pre">NN.dtype</span></code></a></li>
