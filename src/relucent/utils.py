@@ -75,7 +75,6 @@ def close_env():
         return
     _env.close()
     _env = None
-    disposeDefaultEnv()
 
 
 class NonBlockingQueue:
