@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
-from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, get_colors, get_env
+from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, get_colors, get_env, close_env
 
 
 def set_globals(get_net, get_volumes=True):
@@ -186,6 +186,9 @@ class Complex:
             if i in self.ss_layers and isinstance(layer, nn.Linear):
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
+
+    def __del__(self):
+        close_env()
 
     def __getitem__(self, key):
         """Retrieve a Polyhedron from the complex by its key.
@@ -859,6 +862,7 @@ class Complex:
 
                 if min_dist < 1:
                     if 0 < min_dist:
+                        ## TODO: What if there are no/multiple differences?
                         last_shi = np.argwhere((min_p.ss_np != end.ss_np).flatten()).item()
                         if last_shi in min_p.shis:
                             cameFrom[end] = min_p
@@ -964,7 +968,6 @@ class Complex:
                     raise ValueError("Polyhedra must be 2D to match locations")
 
                 nx.set_node_attributes(G, False, "physics")
-                assert poly.interior_point is not None
                 nx.set_node_attributes(
                     G,
                     {poly: poly.interior_point[0].item() * 10 for poly in G.nodes},

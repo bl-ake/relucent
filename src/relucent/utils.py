@@ -1,6 +1,5 @@
 import random
 from collections import OrderedDict, deque
-from functools import cache
 from heapq import heappop, heappush
 from threading import Condition
 
@@ -46,7 +45,9 @@ def encode_ss(ss):
     return ss.flatten().tobytes()
 
 
-@cache
+_env = None
+
+
 def get_env():
     """Get a cached Gurobi environment.
 
@@ -57,11 +58,24 @@ def get_env():
     Returns:
         gurobipy.Env: A Gurobi environment with logging disabled.
     """
-    env = Env(logfilename="", empty=True)
-    env.setParam("OutputFlag", 0)
-    env.setParam("LogToConsole", 0)
-    env.start()
-    return env
+    global _env
+    if _env is not None:
+        return _env
+    _env = Env(logfilename="", empty=True)
+    _env.setParam("OutputFlag", 0)
+    _env.setParam("LogToConsole", 0)
+    _env.start()
+    return _env
+
+
+def close_env():
+    """Close the cached Gurobi environment."""
+    global _env
+    if _env is None:
+        return
+    _env.close()
+    _env = None
+    disposeDefaultEnv()
 
 
 class NonBlockingQueue:
