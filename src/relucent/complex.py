@@ -628,6 +628,7 @@ class Complex:
                 pool.close()
                 pool.terminate()
                 pool.join()
+                pool.close()
 
         search_info = {
             "Search Depth": depth,
@@ -923,8 +924,10 @@ class Complex:
             raise
         finally:
             # print(f"Closing out after {pbar.n} iterations")
-            pool.close()
+
             pool.terminate()
+            pool.join()
+            pool.close()
 
             openSet.close()
             tqdm.get_lock().locks = []
