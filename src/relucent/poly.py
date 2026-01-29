@@ -244,12 +244,14 @@ class Polyhedron:
                 checks that computed outputs match network outputs. Defaults to None.
             get_all_Ab: If True, returns all intermediate affine maps (A, b) for
                 each layer instead of just the final halfspaces. Defaults to False.
+            force_numpy: If True, use NumPy backend even when ss is a torch.Tensor.
+                Defaults to False.
 
         Returns:
-            tuple: (halfspaces, W, b) where:
-                - halfspaces: Array of shape (n_constraints, n_dim+1) with bias terms
-                - W: Affine transformation matrix
-                - b: Affine transformation bias vector
+            If get_all_Ab is False: tuple (halfspaces, W, b) where halfspaces has
+            shape (n_constraints, n_dim+1), W is the affine matrix, and b is the
+            affine bias. If get_all_Ab is True: list of dicts with 'A', 'b', and
+            'layer' keys for each layer.
         """
         # Check underlying attribute directly to avoid property access overhead
         if isinstance(self._ss, torch.Tensor) and not force_numpy:
@@ -641,7 +643,15 @@ class Polyhedron:
         vertices = hs.intersections
         return vertices
 
-    def plot2d(self, fill="toself", showlegend=False, bound=1000, **kwargs):
+    def plot2d(
+        self,
+        fill="toself",
+        showlegend=False,
+        bound=1000,
+        plot_halfspaces=False,
+        halfspace_shade=True,
+        **kwargs,
+    ):
         """Plot the polyhedron in 2D using plotly.
 
         Args:
@@ -649,29 +659,69 @@ class Polyhedron:
             showlegend: Whether to show in legend. Defaults to False.
             bound: Radius of the bounding hypercube for vertex computation.
                 Defaults to 1000.
-            **kwargs: Additional arguments passed to go.Scatter.
+            plot_halfspaces: If True, add one Scatter trace per halfspace (inequality)
+                as line or shaded region. Defaults to False.
+            halfspace_shade: When plot_halfspaces is True, shade the feasible side
+                of each halfspace. Defaults to True.
+            **kwargs: Additional arguments passed to go.Scatter (polyhedron outline).
 
         Returns:
-            plotly.graph_objects.Scatter or None: A plotly Scatter trace, or None
-                if plotting fails.
+            list: A list of plotly Scatter traces: [outline_trace] when
+                plot_halfspaces is False, or [outline_trace, *halfspace_traces] when
+                True. If the main outline fails (e.g. vertex computation or
+                ConvexHull raises), returns [] when plot_halfspaces is False, or
+                only the halfspace traces when plot_halfspaces is True.
 
         Raises:
             ValueError: If the polyhedron is not 2D.
         """
         if self.W.shape[0] != 2:
             raise ValueError("Polyhedron must be 2D to plot")
-        vertices = self.get_bounded_vertices(bound)
-        if vertices is not None:
-            try:
+        traces = []
+        try:
+            vertices = self.get_bounded_vertices(bound)
+            if vertices is not None:
                 hull = ConvexHull(vertices)
                 x = vertices[hull.vertices, 0].tolist() + [vertices[hull.vertices, 0][0]]
                 y = vertices[hull.vertices, 1].tolist() + [vertices[hull.vertices, 1][0]]
-                return go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs)
-            except Exception as e:
-                print(self, e)
-                return None
-        else:
-            return None
+                traces.append(go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs))
+        except Exception as e:
+            print(self, e)
+
+        if plot_halfspaces:
+            W = self.halfspaces_np[:, :-1]
+            b = self.halfspaces_np[:, -1]
+            bounds = (-bound, bound)
+            for i in range(W.shape[0]):
+                w = W[i]
+                if np.abs(w[1]) < 1e-10:
+                    # Nearly vertical line: x = -b / w[0]
+                    x_line = -b[i] / w[0] if np.abs(w[0]) >= 1e-10 else 0.0
+                    xs = [x_line, x_line]
+                    ys = [bounds[0], bounds[1]]
+                    halfspace_shade_this = False
+                else:
+                    halfspace_shade_this = halfspace_shade
+                    y0 = (-b[i] - w[0] * bounds[0]) / w[1]
+                    y1 = (-b[i] - w[0] * bounds[1]) / w[1]
+                    if halfspace_shade_this:
+                        outer = max(bounds[1], y0, y1) if w[1] < 0 else min(bounds[0], y0, y1)
+                        xs = [bounds[0], bounds[0], bounds[1], bounds[1], bounds[0]]
+                        ys = [outer, y0, y1, outer, outer]
+                    else:
+                        xs = [bounds[0], bounds[1]]
+                        ys = [y0, y1]
+                traces.append(
+                    go.Scatter(
+                        x=xs,
+                        y=ys,
+                        name=f"Halfspace {i}",
+                        fill="toself" if halfspace_shade_this else None,
+                        visible="legendonly",
+                        showlegend=True,
+                    )
+                )
+        return traces
 
     def plot3d(self, fill="toself", showlegend=False, bound=1000, project=None, **kwargs):
         """Plot the polyhedron in 3D using plotly.
@@ -817,7 +867,6 @@ class Polyhedron:
         """
         if self._halfspaces is None:
             self._halfspaces, self._W, self._b = self.get_hs()
-            # Invalidate cached NumPy view when halfspaces are recomputed.
             self._halfspaces_np = None
         return self._halfspaces
 
@@ -826,7 +875,6 @@ class Polyhedron:
         """Cached NumPy representation of halfspaces."""
         if self._halfspaces_np is None:
             hs = self.halfspaces
-            # Check NumPy first as it's the common case after our optimizations
             if isinstance(hs, np.ndarray):
                 self._halfspaces_np = hs
             elif isinstance(hs, torch.Tensor):
