@@ -138,7 +138,8 @@ def astar_calculations(task, **kwargs):
     """
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
-    p.net = net
+    if p.net is None:
+        p.net = net
 
     if p._inradius is None:
         p.get_center_inradius(env=env)
@@ -167,7 +168,7 @@ class Complex:
     """
 
     def __init__(self, net):
-        self.net = net
+        self._net = net
         self.net.save_numpy_weights()
 
         ## TODO: Try replacing with just a dictionary that incremements by 1
@@ -281,6 +282,17 @@ class Complex:
                 self.ssm.add(p.ss_np)
         for p in self.index2poly:
             p.net = self.net
+
+    @property
+    def net(self):
+        """The neural network. May only be set once."""
+        return self._net
+
+    @net.setter
+    def net(self, value):
+        if self._net is not None:
+            raise ValueError("The net attribute cannot be set when it already has a non-None value")
+        self._net = value
 
     @property
     def dim(self):
@@ -596,6 +608,7 @@ class Complex:
                             break
                         continue
 
+                    ## If not using multiprocessing, you would need to check if the polyhedron's net is None first
                     p.net = self.net
 
                     p = self.add_polyhedron(p)
@@ -862,6 +875,7 @@ class Complex:
                         p._shis.remove(neighbor)
 
                     tentative_gScore = gScore[p] + d(p, neighbor)
+                    ## If not using multiprocessing, you would need to check if the neighbor's net is None first
                     neighbor.net = self.net
                     if tentative_gScore < gScore[neighbor]:  ## Only needed with an inconsistent heuristic
                         cameFrom[neighbor] = p

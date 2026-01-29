@@ -92,8 +92,8 @@ class Polyhedron:
             net: Instance of the NN class from the "model" module.
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
         """
-        self.net = net
-        self.ss = ss
+        self._net = net
+        self._ss = ss
         self._halfspaces = halfspaces
         self._halfspaces_np = None
         self._W = W
@@ -124,6 +124,28 @@ class Polyhedron:
 
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    @property
+    def net(self):
+        """The neural network I belong to"""
+        return self._net
+
+    @net.setter
+    def net(self, value):
+        if self._net is not None:
+            raise ValueError("net cannot be changed after it has been set")
+        self._net = value
+
+    @property
+    def ss(self):
+        """My sign sequence"""
+        return self._bv
+
+    @ss.setter
+    def ss(self, value):
+        if self._bv is not None:
+            raise ValueError("ss cannot be changed after it has been set")
+        self._bv = value
 
     @property
     def ss(self):
