@@ -169,8 +169,8 @@ class Polyhedron:
         self._hs = hs
         self._shis = hs.dual_vertices.flatten().tolist()
         vertices = hs.intersections
-        trust_verticies = (halfspaces[self.shis, :-1] @ vertices.T + halfspaces[self.shis, -1, None]).sum(axis=0) < 0.01
-        self._vertices = vertices[trust_verticies]
+        trust_vertices = (halfspaces[self.shis, :-1] @ vertices.T + halfspaces[self.shis, -1, None]).sum(axis=0) < 0.01
+        self._vertices = vertices[trust_vertices]
         self._vertex_set = set(tuple(x) for x in self.vertices)
         if self.finite:
             try:
@@ -432,6 +432,8 @@ class Polyhedron:
     def __eq__(self, other):
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
+        else:
+            raise ValueError(f"Cannot compare Polyhedron with {type(other)}")
 
     def __hash__(self) -> int:
         if self._hash is None:
@@ -572,7 +574,7 @@ class Polyhedron:
                 if hasattr(model, "objBound"):
                     poly_info[-1]["Objective Bound"] = model.objBound
                 if hasattr(x, "X"):
-                    poly_info[-1]["x Norm"] = (np.linalg.norm(x.X),)
+                    poly_info[-1]["x Norm"] = np.linalg.norm(x.X)
                 if collect_info == "All":
                     poly_info[-1] |= {"Slacks": constrs.Slack, "-b[i]": -b[i], "Status": model.status}
 
@@ -970,6 +972,8 @@ class Polyhedron:
 
     def __mul__(self, other):
         """Returns a new Polyhedron object based on sign sequence multiplication"""
+        if not isinstance(other, Polyhedron):
+            raise ValueError(f"Cannot multiply Polyhedron with {type(other)}")
         return Polyhedron(self.net, self.ss + other.ss * (self.ss == 0))
 
     """The following methods are used for pickling"""
