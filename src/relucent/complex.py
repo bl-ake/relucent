@@ -2,6 +2,7 @@ import multiprocessing as mp
 import os
 import pickle
 import random
+import warnings
 from collections import defaultdict
 from functools import partial
 
@@ -15,7 +16,7 @@ from tqdm.auto import tqdm
 
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
-from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, get_colors, get_env, close_env
+from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, close_env, get_colors, get_env
 
 
 def set_globals(get_net, get_volumes=True):
@@ -167,6 +168,7 @@ class Complex:
 
     def __init__(self, net):
         self.net = net
+        self.net.save_numpy_weights()
 
         ## TODO: Try replacing with just a dictionary that incremements by 1
         self.ssm = SSManager()
@@ -180,10 +182,10 @@ class Complex:
         ]
 
         # Build mapping from global sign-sequence indices to (layer_index, neuron_index)
-        # using layer shapes only (no tensor→NumPy conversion or scalar iteration).
         self.ssi2maski = []
         for i, layer in enumerate(self.net.layers.values()):
-            if i in self.ss_layers and isinstance(layer, nn.Linear):
+            if i in self.ss_layers:
+                assert isinstance(layer, nn.Linear), "Only linear layers should be before ReLU layers"
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
@@ -231,13 +233,32 @@ class Complex:
         return len(self.index2poly)
 
     def save(self, filename, save_ssm=True):
+        """Save the complex to a pickle file.
+
+        Args:
+            filename: Path to the output file.
+            save_ssm: If True, include the SSManager in the saved state so that
+                sign-sequence lookups are preserved. Defaults to True.
+        """
         state = self.__getstate__()
         if save_ssm:
             state["ssm"] = self.ssm
         with open(filename, "wb") as f:
             pickle.dump(state, f)
 
+    @staticmethod
     def load(filename):
+        """Load a Complex from a pickle file.
+
+        Intended to be called as Complex.load(filename). The file must have been
+        created by save().
+
+        Args:
+            filename: Path to the pickle file.
+
+        Returns:
+            Complex: The restored complex.
+        """
         with open(filename, "rb") as f:
             state = pickle.load(f)
         cplx = Complex(state["net"])
@@ -265,6 +286,11 @@ class Complex:
     def dim(self):
         """The input dimension of the network."""
         return np.prod(self.net.input_shape)
+
+    @property
+    def n(self):
+        """The number of bent hyperplanes/neurons in the network."""
+        return len(self.ssi2maski)
 
     @torch.no_grad()
     def ss_iterator(self, batch):
@@ -297,11 +323,15 @@ class Complex:
             batch: A batch of input data points as a torch.Tensor, np.ndarray, or array-like.
 
         Returns:
-            torch.Tensor: The sign sequences for
-                the input batch, with shape (batch_size, total_ReLU_neurons).
+            torch.Tensor or np.ndarray: The sign sequences for the input batch, with shape
+                (batch_size, total_ReLU_neurons). Returns a torch.Tensor if batch is a
+                torch.Tensor, otherwise a np.ndarray.
         """
+        is_tensor = isinstance(batch, torch.Tensor)
         result = torch.hstack(list(self.ss_iterator(batch)))
-        return result
+        if is_tensor:
+            return result
+        return result.detach().cpu().numpy()
 
     def point2poly(self, point, check_exists=True):
         """Convert a data point to its corresponding Polyhedron.
@@ -358,7 +388,9 @@ class Complex:
             p: The Polyhedron object to add.
             overwrite: If True and the polyhedron already exists, replace it with
                 the new one. Defaults to False.
-            check_exists: Set to true if you know the polyhedron is not in the complex.
+            check_exists: If True, check whether the polyhedron already exists in
+                the complex and return the existing one if so. If False, assume
+                the polyhedron is new (skip the check). Defaults to True.
 
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
@@ -388,7 +420,10 @@ class Complex:
 
         Args:
             data: A single data point as a torch.Tensor, np.ndarray, or array-like.
-            check_exists: Set to true if you know the polyhedron is not in the complex.
+            check_exists: If True, check whether the polyhedron already exists in
+                the complex and return it if so. Only set to false if you know it does not.
+                Defaults to True.
+
         Returns:
             Polyhedron: The polyhedron containing the given point, now stored in the complex.
         """
@@ -439,10 +474,12 @@ class Complex:
         """
         nworkers = nworkers or os.process_cpu_count()
         print(f"Running on {nworkers} workers")
+        sss = []
+        for p in tqdm(points, desc="Getting SSs", mininterval=5):
+            s = self.point2ss(p)
+            sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
         with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
-            # Compute SS once per point; convert to NumPy for multiprocessing payloads.
-            sss = [self.point2ss(p).detach().cpu().numpy() for p in tqdm(points, desc="Getting SSs", mininterval=5)]
             ps = pool.map(
                 partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5)
             )
@@ -521,8 +558,7 @@ class Complex:
         if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
         start._shis = start.get_shis(bound=bound, **kwargs)
-        ##TODO:
-        ## replace with something like queue.push((start.ss_np, None, 0, self.ssm[start.ss_np]))
+        ##TODO: replace with something like queue.push((start.ss_np, None, 0, self.ssm[start.ss_np]))
         for shi in start.shis:
             new_ss = start.ss_np.copy()
             new_ss[0, shi] *= -1
@@ -554,6 +590,10 @@ class Complex:
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
                         node._shis.remove(shi)
+                        if len(node._shis) < min(self.dim, self.n):
+                            warnings.warn(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
+                        if unprocessed == 0 or len(self) >= max_polys:
+                            break
                         continue
 
                     p.net = self.net
@@ -584,6 +624,10 @@ class Complex:
             finally:
                 queue.close()
                 pbar.close()
+
+                pool.close()
+                pool.terminate()
+                pool.join()
 
         search_info = {
             "Search Depth": depth,
@@ -1075,7 +1119,9 @@ class Complex:
         else:
             color_scheme = px.colors.qualitative.Plotly
             try:
-                coloring = nx.algorithms.coloring.equitable_color(self.get_dual_graph(), len(color_scheme))
+                coloring = nx.algorithms.coloring.equitable_color(
+                    self.get_dual_graph(), min(len(color_scheme), len(polys))
+                )
                 remap, idx = dict(), 0
                 for p in polys:
                     if coloring[p] not in remap:
@@ -1100,8 +1146,8 @@ class Complex:
                 bound=bound,
                 **kwargs,
             )
-            if p_plot is not None:
-                fig.add_trace(p_plot)
+            for trace in p_plot:
+                fig.add_trace(trace)
             if label_regions and poly.center is not None:
                 fig.add_trace(
                     go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
@@ -1115,6 +1161,7 @@ class Complex:
             # yaxis = dict(visible=False),
             plot_bgcolor="white",
             xaxis=dict(range=(-maxcoord, maxcoord)),
+            yaxis_scaleanchor="x",
             yaxis=dict(range=(-maxcoord, maxcoord)),
         )
         return fig
@@ -1157,7 +1204,9 @@ class Complex:
         else:
             color_scheme = px.colors.qualitative.Plotly
             try:
-                coloring = nx.algorithms.coloring.equitable_color(self.get_dual_graph(), len(color_scheme))
+                coloring = nx.algorithms.coloring.equitable_color(
+                    self.get_dual_graph(), min(len(color_scheme), len(polys))
+                )
                 colors = [color_scheme[coloring[i]] for i in polys]
             except Exception:
                 print("Could not find equitable coloring, using random colors")
