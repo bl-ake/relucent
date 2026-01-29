@@ -66,7 +66,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
 
-    fc = nn.Linear(in_features=np.product(in_shape), out_features=np.product(out_shape), device=conv.weight.device)
+    fc = nn.Linear(in_features=np.prod(in_shape), out_features=np.prod(out_shape), device=conv.weight.device)
     fc.weight.data.fill_(0.0)
 
     # Output coordinates
@@ -143,7 +143,7 @@ def flatten_to_affine(input_size: Tuple[int, int, int]) -> torch.nn.Linear:
     Returns:
         nn.Linear: An identity Linear layer.
     """
-    return nn.Linear(in_features=np.product(input_size), out_features=np.product(input_size))
+    return nn.Linear(in_features=np.prod(input_size), out_features=np.prod(input_size))
 
 
 def combine_linear_layers(old_layers):
