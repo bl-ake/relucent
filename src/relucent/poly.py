@@ -41,6 +41,7 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
     A = halfspaces[:, :-1]
     b = halfspaces[:, -1:]
     norm_vector = np.reshape(np.linalg.norm(A, axis=1), (A.shape[0], 1))
+
     if zero_indices is not None and len(zero_indices) > 0:
         warnings.warn("Working with k<d polyhedron.")
         norm_vector[zero_indices] = 0
@@ -48,8 +49,11 @@ def solve_radius(env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, se
     model = Model("Interior Point", env)
     x = model.addMVar((halfspaces.shape[1] - 1, 1), lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="x")
     y = model.addMVar((1,), ub=max_radius, vtype=GRB.CONTINUOUS, name="y")
-    model.addConstr(A @ x + norm_vector * y <= -b)
-    model.setObjective(y, sense)
+    try:
+        model.addConstr(A @ x + norm_vector * y <= -b)
+        model.setObjective(y, sense)
+    except Exception as e:
+        raise ValueError(f"GB Error Building Model: {e}")
     model.optimize()
     status = model.status
 
@@ -194,7 +198,7 @@ class Polyhedron:
         self._hs = hs
         self._shis = hs.dual_vertices.flatten().tolist()
         vertices = hs.intersections
-        trust_vertices = vertices.isinf().any(axis=1)
+        trust_vertices = np.isinf(vertices).any(axis=1)
         if not (
             (halfspaces[self.shis, :-1] @ vertices[trust_vertices].T + halfspaces[self.shis, -1, None]).sum(axis=0)
             < 0.01
@@ -464,6 +468,8 @@ class Polyhedron:
     def __eq__(self, other):
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
+        elif isinstance(other, str):
+            return str(self) == other
         else:
             raise ValueError(f"Cannot compare Polyhedron with {type(other)}")
 
@@ -522,7 +528,7 @@ class Polyhedron:
         env = env or get_env()
         model = Model("SHIS", env)
         x = model.addMVar((self.halfspaces.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
-        constrs = model.addConstr(A @ x == -b - tol, name="hyperplanes")
+        constrs = model.addConstr(A @ x == -b - tol, name="hyperplanes") ## TODO: Check effect of tol
         model.optimize()
         if model.status == GRB.INTERRUPTED:
             model.close()
