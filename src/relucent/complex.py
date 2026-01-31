@@ -40,6 +40,7 @@ def set_globals(get_net, get_volumes=True):
     env = get_env()
     global net
     net = get_net
+    net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
     global dim
     dim = np.prod(net.input_shape)
     global get_vol_calc
