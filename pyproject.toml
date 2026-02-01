@@ -25,7 +25,7 @@ license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 [project.optional-dependencies]
-cli = ["torch>=2.13", "torchvision", "pyvis>=0.3", "kaleido"]
+cli = ["torch>=2.3", "torchvision", "pyvis>=0.3", "kaleido", "pytest", "flake8"]
 
 [project.urls]
 Repository = "https://github.com/bl-ake/relucent"
