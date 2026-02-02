@@ -14,6 +14,15 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 
+from relucent.config import (
+    ASTAR_BIAS_WEIGHT,
+    DEFAULT_COMPLEX_PLOT_BOUND,
+    DEFAULT_PARALLEL_ADD_BOUND,
+    DEFAULT_SEARCH_BOUND,
+    INTERIOR_POINT_RADIUS_SEQUENCE,
+    PLOT_DEFAULT_MAXCOORD,
+    PLOT_MARGIN_FACTOR,
+)
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
 from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, close_env, get_colors, get_env
@@ -71,6 +80,7 @@ def poly_calculations(task, **kwargs):
 
     try:
         p._halfspaces, p._W, p._b = p.get_hs()
+
         p.get_center_inradius(env=env)
         p.get_interior_point(env=env)
         p._interior_point_norm = np.linalg.norm(p.interior_point).item()
@@ -110,7 +120,7 @@ def get_ip(p, shi):
         ss = p.ss_np.copy()
         ss[0, shi] = -ss[0, shi]
         n = Polyhedron(net, ss)
-        for max_radius in [0.01, 0.1, 1, 10, 100]:
+        for max_radius in INTERIOR_POINT_RADIUS_SEQUENCE:
             try:
                 n.get_interior_point(env=env, max_radius=max_radius)
             except ValueError:
@@ -467,7 +477,7 @@ class Complex:
             ps.add(self.ss2poly(ss))
         return ps
 
-    def parallel_add(self, points, nworkers=None, bound=1e6, **kwargs):
+    def parallel_add(self, points, nworkers=None, bound=DEFAULT_PARALLEL_ADD_BOUND, **kwargs):
         """Add multiple polyhedra from data points using parallel processing.
 
         Processes a batch of data points in parallel, computing their corresponding
@@ -478,7 +488,7 @@ class Complex:
             nworkers: Number of worker processes to use. If None, uses the number
                 of CPU cores. Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
-                Defaults to 1e6.
+                Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
             **kwargs: Additional arguments passed to poly_calculations() and get_shis().
 
         Returns:
@@ -508,7 +518,7 @@ class Complex:
         max_depth=float("inf"),
         max_polys=float("inf"),
         queue=None,
-        bound=1e5,
+        bound=DEFAULT_SEARCH_BOUND,
         nworkers=None,
         get_volumes=True,
         verbose=1,
@@ -534,7 +544,7 @@ class Complex:
                 searched. Must have push() and pop() methods. If None, uses
                 BlockingQueue (FIFO). Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
-                Important for numerical stability. Defaults to 1e5.
+                Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
             get_volumes: Whether to compute volumes for polyhedra when input
@@ -553,6 +563,7 @@ class Complex:
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
         """
+
         found_sss = SSManager()
         nworkers = nworkers or os.process_cpu_count()
         ## NOTE: If nworkers>1, the traversal order may not be correct
@@ -759,7 +770,7 @@ class Complex:
         end = self.add_point(end)
         return self._greedy_path_helper(start, end)
 
-    def hamming_astar(self, start, end, nworkers=None, bound=1e5, max_polys=float("inf"), show_pbar=True, **kwargs):
+    def hamming_astar(self, start, end, nworkers=None, bound=DEFAULT_SEARCH_BOUND, max_polys=float("inf"), show_pbar=True, **kwargs):
         """Find a path between two data points using A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -772,7 +783,7 @@ class Complex:
             nworkers: Number of worker processes for parallel computation.
                 Defaults to 1.
             bound: Constraint radius for numerical stability when computing halfspaces.
-                Important for numerical stability. Defaults to 1e5.
+                Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             max_polys: Maximum number of polyhedra to explore during search.
                 Defaults to infinity.
             show_pbar: Whether to display a progress bar. Defaults to True.
@@ -847,7 +858,7 @@ class Complex:
             bias = -1 / (1 + dist)
             # bias = 0
             # bias = 1 / (1 + depth) - 1
-            return hamming + 0.9 * bias
+            return hamming + ASTAR_BIAS_WEIGHT * bias
 
         def d(p1, p2):
             return 1
@@ -1109,7 +1120,7 @@ class Complex:
 
         return G
 
-    def plot(self, label_regions=False, color=None, highlight_regions=None, ss_name=False, bound=10000, **kwargs):
+    def plot(self, label_regions=False, color=None, highlight_regions=None, ss_name=False, bound=DEFAULT_COMPLEX_PLOT_BOUND, **kwargs):
         """Plot the complex in 2D using plotly.
 
         Creates a 2D visualization of the complex, showing all polyhedra as
@@ -1174,7 +1185,7 @@ class Complex:
                     go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
                 )
         interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
-        maxcoord = (np.max(interior_points) * 1.1) if len(interior_points) > 0 else min(10, bound if bound else 10)
+        maxcoord = (np.max(interior_points) * PLOT_MARGIN_FACTOR) if len(interior_points) > 0 else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
         # maxcoord = 10
         fig.update_layout(
             showlegend=True,
@@ -1287,7 +1298,7 @@ class Complex:
             fig.add_trace(outline)
         for mesh in meshes:
             fig.add_trace(mesh)
-        maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in self if p.finite]) * 1.1
+        maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in self if p.finite]) * PLOT_MARGIN_FACTOR
         fig.update_layout(
             scene=dict(
                 xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),

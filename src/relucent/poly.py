@@ -10,6 +10,18 @@ from gurobipy import GRB, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
+from relucent.config import (
+    DEFAULT_PLOT_BOUND,
+    GUROBI_SHI_BEST_BD_STOP,
+    GUROBI_SHI_BEST_OBJ_STOP,
+    MAX_RADIUS,
+    TOL_DEAD_RELU,
+    TOL_HALFSPACE_CONTAINMENT,
+    TOL_NEARLY_VERTICAL,
+    TOL_SHI_HYPERPLANE,
+    TOL_VERIFY_AB_ATOL,
+    VERTEX_TRUST_THRESHOLD,
+)
 from relucent.utils import encode_ss, get_env
 
 
@@ -85,7 +97,7 @@ class Polyhedron:
     provided, an environment will be created automatically.
     """
 
-    MAX_RADIUS = 100  ## The smaller the faster, but making this value too small can exclude some polyhedrons
+    MAX_RADIUS = MAX_RADIUS  # from config; smaller is faster but may exclude polyhedra
 
     def __init__(self, net, ss, halfspaces=None, W=None, b=None, point=None, shis=None, bound=None, **kwargs):
         """Create a Polyhedron object.
@@ -201,7 +213,7 @@ class Polyhedron:
         trust_vertices = np.isinf(vertices).any(axis=1)
         if not (
             (halfspaces[self.shis, :-1] @ vertices[trust_vertices].T + halfspaces[self.shis, -1, None]).sum(axis=0)
-            < 0.01
+            < VERTEX_TRUST_THRESHOLD
         ).all():
             raise ValueError("Vertex computation failed")
         self._vertices = vertices[trust_vertices]
@@ -354,10 +366,10 @@ class Polyhedron:
                     f"Error while processing layer {name} - Unsupported layer type: {type(layer)} ({layer})"
                 )
             if data is not None:
-                assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=1e-5)
+                assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
             if get_all_Ab:
                 all_Ab.append({"A": current_A.clone(), "b": current_b.clone(), "layer": layer})
-        self._num_dead_relus = (torch.abs(constr_A) < 1e-8).all(dim=0).sum().item()
+        self._num_dead_relus = (torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item()
         halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
         if get_all_Ab:
             return all_Ab
@@ -424,10 +436,10 @@ class Polyhedron:
                     f"Error while processing layer {name} - Unsupported layer type: {type(layer)} ({layer})"
                 )
             if data is not None:
-                assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=1e-5)
+                assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
             if get_all_Ab:
                 all_Ab.append({"A": current_A.copy(), "b": current_b.copy(), "layer": layer})
-        self._num_dead_relus = (np.abs(constr_A) < 1e-8).all(axis=0).sum().item()
+        self._num_dead_relus = (np.abs(constr_A) < TOL_DEAD_RELU).all(axis=0).sum().item()
         halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
         if get_all_Ab:
             return all_Ab
@@ -488,7 +500,7 @@ class Polyhedron:
         collect_info=False,
         bound=GRB.INFINITY,
         subset=None,
-        tol=1e-6,
+        tol=TOL_SHI_HYPERPLANE,
         new_method=False,
         env=None,
         shi_pbar=False,
@@ -507,7 +519,7 @@ class Polyhedron:
                 Defaults to infinity.
             subset: Indices of neurons/halfspaces to consider. If None, considers
                 all halfspaces. Defaults to None.
-            tol: Inequality tolerance to improve numerical stability. Defaults to 1e-6.
+            tol: Inequality tolerance to improve numerical stability. Defaults to config.TOL_SHI_HYPERPLANE.
             new_method: If True, uses an extra computation that doesn't improve
                 runtime. Defaults to False.
             env: Gurobi environment for optimization. If None, uses a cached
@@ -528,8 +540,7 @@ class Polyhedron:
         env = env or get_env()
         model = Model("SHIS", env)
         x = model.addMVar((self.halfspaces.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
-        constrs = model.addConstr(A @ x == -b - tol, name="hyperplanes") ## TODO: Check effect of tol
-        model.optimize()
+        constrs = model.addConstr(A @ x == -b, name="hyperplanes")
         if model.status == GRB.INTERRUPTED:
             model.close()
             raise KeyboardInterrupt
@@ -547,6 +558,7 @@ class Polyhedron:
 
         subset = subset or range(A.shape[0])
         subset = set(subset)
+
         pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
         if collect_info:
             poly_info = []
@@ -554,15 +566,16 @@ class Polyhedron:
             i = subset.pop()
             if (A[i] == 0).all():
                 continue
-            model.update()
+            # model.update()
             pbar.set_postfix_str(f"#shis: {len(shis)}")
-            constrs[i].setAttr("RHS", constrs[i].getAttr("RHS") + 1)
-            # breakpoint()
+
+            ## Relax halspace i
+            constrs[i].setAttr("RHS", -b[i, 0] + 1)
+
             model.setObjective((A[i] @ x).item() + b[i, 0], GRB.MAXIMIZE)
-            # model.setObjective(gp.quicksum([(A[i] @ x).item(), b[i]]), GRB.MAXIMIZE)
-            model.params.BestObjStop = 1e-5
-            model.params.BestBdStop = -1e-5
-            model.update()
+            model.params.BestObjStop = GUROBI_SHI_BEST_OBJ_STOP
+            model.params.BestBdStop = GUROBI_SHI_BEST_BD_STOP
+            # model.update()
             model.optimize()
 
             if model.status == GRB.INTERRUPTED:
@@ -571,7 +584,7 @@ class Polyhedron:
             if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
                 if model.objVal >= 0:
                     dists = A @ x.X + b
-                    if (dists > 0).sum() != 1:
+                    if dists[(dists > 0)].sum() >= 1 + tol:
                         warnings.warn(
                             f"Invalid Proof for SHI {i}! Violation Sizes: {np.argwhere(dists.flatten() > 0), dists[np.argwhere(dists.flatten() > 0)]}"
                         )
@@ -625,7 +638,9 @@ class Polyhedron:
                     if hasattr(x, "X"):
                         poly_info[-1]["Proof"] = x.X
 
-            constrs[i].setAttr("RHS", -b[i] - tol)
+            ## Restore halfspace i
+            constrs[i].setAttr("RHS", -b[i, 0])
+
             pbar.update(A.shape[0] - len(subset) - pbar.n)
         model.close()
         if collect_info:
@@ -674,7 +689,7 @@ class Polyhedron:
             print(e)
             return None
         # int_point, _ = solve_radius(get_env(), bounded_halfspaces, max_radius=1000)
-        if not (self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= 1e-8).all():
+        if not (self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT).all():
             warnings.warn(f"Interior point ({self.interior_point}) out of bounds ({bound}):")
             return None
         hs = HalfspaceIntersection(
@@ -689,7 +704,7 @@ class Polyhedron:
         self,
         fill="toself",
         showlegend=False,
-        bound=1000,
+        bound=DEFAULT_PLOT_BOUND,
         plot_halfspaces=False,
         halfspace_shade=True,
         **kwargs,
@@ -700,7 +715,7 @@ class Polyhedron:
             fill: Fill mode passed to go.Scatter. Defaults to "toself".
             showlegend: Whether to show in legend. Defaults to False.
             bound: Radius of the bounding hypercube for vertex computation.
-                Defaults to 1000.
+                Defaults to config.DEFAULT_PLOT_BOUND.
             plot_halfspaces: If True, add one Scatter trace per halfspace (inequality)
                 as line or shaded region. Defaults to False.
             halfspace_shade: When plot_halfspaces is True, shade the feasible side
@@ -736,9 +751,9 @@ class Polyhedron:
             bounds = (-bound, bound)
             for i in range(W.shape[0]):
                 w = W[i]
-                if np.abs(w[1]) < 1e-10:
+                if np.abs(w[1]) < TOL_NEARLY_VERTICAL:
                     # Nearly vertical line: x = -b / w[0]
-                    x_line = -b[i] / w[0] if np.abs(w[0]) >= 1e-10 else 0.0
+                    x_line = -b[i] / w[0] if np.abs(w[0]) >= TOL_NEARLY_VERTICAL else 0.0
                     xs = [x_line, x_line]
                     ys = [bounds[0], bounds[1]]
                     halfspace_shade_this = False
@@ -765,7 +780,7 @@ class Polyhedron:
                 )
         return traces
 
-    def plot3d(self, fill="toself", showlegend=False, bound=1000, project=None, **kwargs):
+    def plot3d(self, fill="toself", showlegend=False, bound=DEFAULT_PLOT_BOUND, project=None, **kwargs):
         """Plot the polyhedron in 3D using plotly.
 
         Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
@@ -775,7 +790,7 @@ class Polyhedron:
             fill: Fill mode (not used for 3D plots). Defaults to "toself".
             showlegend: Whether to show in legend. Defaults to False.
             bound: Radius of the bounding hypercube for vertex computation.
-                Defaults to 1000.
+                Defaults to config.DEFAULT_PLOT_BOUND.
             project: If a number, projects the polyhedron onto this z-value
                 instead of computing it from the network. Defaults to None.
             **kwargs: Additional arguments passed to go.Mesh3d.
@@ -1058,7 +1073,7 @@ class Polyhedron:
         if not isinstance(point, torch.Tensor):
             point = torch.Tensor(point).to(self.net.device, self.net.dtype)
         point = point.reshape(1, -1)
-        return (point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1] <= 1e-8).all()
+        return (point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT).all()
 
     def __mul__(self, other):
         """Returns a new Polyhedron object based on sign sequence multiplication"""

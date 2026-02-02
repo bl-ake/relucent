@@ -12,6 +12,13 @@ from matplotlib import colormaps
 from PIL import Image
 from tqdm.auto import tqdm
 
+from relucent.config import (
+    BLOCKING_QUEUE_WAIT_TIMEOUT,
+    DEFAULT_PYVIS_SAVE_FILE,
+    MAX_IMAGES_PYVIS,
+    MAX_NUM_EXAMPLES_PYVIS,
+    PIE_LABEL_DISTANCE,
+)
 from relucent.model import NN
 
 disposeDefaultEnv()
@@ -153,7 +160,7 @@ class BlockingQueue:
     def pop(self, *args, **kwargs):
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
-                self.lock.wait(timeout=0.5)
+                self.lock.wait(timeout=BLOCKING_QUEUE_WAIT_TIMEOUT)
             return self.pop_element(self.deque, *args, **kwargs)
 
     def push(self, element, *args, **kwargs):
@@ -293,9 +300,9 @@ def data_graph(
     edge_title_formatter=lambda row: row["title"] if "title" in row else "",
     edge_label_formatter=lambda row: row["label"] if "label" in row else "",
     edge_value_formatter=lambda row: row["value"] if "value" in row else 1,
-    max_images=3000,
-    max_num_examples=3,
-    save_file="./graph.html",
+    max_images=MAX_IMAGES_PYVIS,
+    max_num_examples=MAX_NUM_EXAMPLES_PYVIS,
+    save_file=DEFAULT_PYVIS_SAVE_FILE,
 ):
     """Create an interactive pyvis graph from dataframes of nodes and edges.
 
@@ -352,7 +359,7 @@ def data_graph(
                     draw_function(data=data, ax=ax)
 
             if class_labels and "class_proportions" in row:
-                axs[-1].pie(row["class_proportions"], labeldistance=0.6, labels=class_labels)
+                axs[-1].pie(row["class_proportions"], labeldistance=PIE_LABEL_DISTANCE, labels=class_labels)
             axs[-1].axis("equal")
             axs[-1].set_axis_off()
 

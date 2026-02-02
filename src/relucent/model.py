@@ -1,6 +1,8 @@
 from collections import OrderedDict
 
 import numpy as np
+
+from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
 import torch
 import torch.nn as nn
 
@@ -93,20 +95,22 @@ class NN(nn.Module):
                 outputs.append((name, x))
         return OrderedDict(outputs)
 
-    def get_grid(self, bounds=2, res=100):
+    def get_grid(self, bounds=None, res=None):
         """Generate a 2D grid of input points.
 
         Creates a regular grid of points in 2D space. Only works for 2D input spaces.
 
         Args:
             bounds: Half-width of the grid (grid spans [-bounds, bounds]).
-                Defaults to 2.
-            res: Resolution (number of points per dimension). Defaults to 100.
+                Defaults to config.DEFAULT_GRID_BOUNDS.
+            res: Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.
 
         Returns:
             tuple: (x_coords, y_coords, input_points) where input_points is an
                 array of shape (res*res, 2).
         """
+        bounds = bounds if bounds is not None else DEFAULT_GRID_BOUNDS
+        res = res if res is not None else DEFAULT_GRID_RES
         x = np.linspace(-bounds, bounds, res)
         y = np.copy(x)
 
@@ -118,12 +122,12 @@ class NN(nn.Module):
         inputVal = np.vstack((X, Y)).T
         return x, y, inputVal
 
-    def output_grid(self, bounds=2, res=100):
+    def output_grid(self, bounds=None, res=None):
         """Generate a grid and compute network outputs for all points.
 
         Args:
-            bounds: Half-width of the grid. Defaults to 2.
-            res: Resolution (number of points per dimension). Defaults to 100.
+            bounds: Half-width of the grid. Defaults to config.DEFAULT_GRID_BOUNDS.
+            res: Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.
 
         Returns:
             tuple: (x_coords, y_coords, layer_outputs) where layer_outputs is

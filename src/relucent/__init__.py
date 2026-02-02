@@ -9,6 +9,7 @@ except ImportError:
     )
 
 from .complex import Complex
+from . import config
 from .convert_model import convert
 from .model import NN, get_mlp_model
 from .poly import Polyhedron
@@ -19,6 +20,7 @@ __all__ = [
     "Complex",
     "Polyhedron",
     "NN",
+    "config",
     "get_mlp_model",
     "SSManager",
     "convert",
