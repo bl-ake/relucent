@@ -5,6 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
+version = "0.4.1"
 requires-python = ">= 3.13, <3.14"
 
 dependencies = [
