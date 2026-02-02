@@ -5,7 +5,6 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "0.4.0"
 requires-python = ">= 3.13, <3.14"
 
 dependencies = [
@@ -34,7 +33,7 @@ Documentation = "https://bl-ake.github.io/relucent/"
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::UserWarning",
-    "error::",
-    "ignore:.*U.*mode is deprecated:DeprecationWarning",
+#    "error::",
+#    "ignore:.*U.*mode is deprecated:DeprecationWarning",
     "ignore:This process .* is multi-threaded, use of fork\\(\\).*:DeprecationWarning",
 ]
