@@ -12,6 +12,14 @@ relucent.complex module
    :show-inheritance:
    :undoc-members:
 
+relucent.config module
+----------------------
+
+.. automodule:: relucent.config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 relucent.convert\_model module
 ------------------------------
 

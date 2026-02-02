@@ -276,7 +276,7 @@ as it explores many paths.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.hamming_astar">
-<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.hamming_astar" title="Link to this definition">¶</a></dt>
 <dd><p>Find a path between two data points using A* search algorithm.</p>
 <p>Uses the A* pathfinding algorithm with a heuristic based on Hamming
 distance between sign sequences, plus Euclidean distance between interior
@@ -289,7 +289,7 @@ points to break ties. The heuristic should be admissible for optimal paths.</p>
 <li><p><strong>nworkers</strong> – Number of worker processes for parallel computation.
 Defaults to 1.</p></li>
 <li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
-Important for numerical stability. Defaults to 1e5.</p></li>
+Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.</p></li>
 <li><p><strong>max_polys</strong> – Maximum number of polyhedra to explore during search.
 Defaults to infinity.</p></li>
 <li><p><strong>show_pbar</strong> – Whether to display a progress bar. Defaults to True.</p></li>
@@ -314,7 +314,7 @@ Defaults to infinity.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.parallel_add">
-<span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.parallel_add" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.parallel_add" title="Link to this definition">¶</a></dt>
 <dd><p>Add multiple polyhedra from data points using parallel processing.</p>
 <p>Processes a batch of data points in parallel, computing their corresponding
 polyhedra and adding them to the complex.</p>
@@ -325,7 +325,7 @@ polyhedra and adding them to the complex.</p>
 <li><p><strong>nworkers</strong> – Number of worker processes to use. If None, uses the number
 of CPU cores. Defaults to None.</p></li>
 <li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
-Defaults to 1e6.</p></li>
+Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.</p></li>
 <li><p><strong>**kwargs</strong> – Additional arguments passed to poly_calculations() and get_shis().</p></li>
 </ul>
 </dd>
@@ -528,7 +528,7 @@ sign-sequence lookups are preserved. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.searcher">
-<span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.searcher" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.searcher" title="Link to this definition">¶</a></dt>
 <dd><p>Search for polyhedra in the complex by discovering neighbors.</p>
 <p>This is a generic search method that can be configured for different
 traversal strategies (BFS, DFS, random walk) by providing different
@@ -548,7 +548,7 @@ Defaults to infinity.</p></li>
 searched. Must have push() and pop() methods. If None, uses
 BlockingQueue (FIFO). Defaults to None.</p></li>
 <li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
-Important for numerical stability. Defaults to 1e5.</p></li>
+Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.</p></li>
 <li><p><strong>nworkers</strong> – Number of worker processes for parallel computation. If None,
 uses the number of CPU cores. Defaults to None.</p></li>
 <li><p><strong>get_volumes</strong> – Whether to compute volumes for polyhedra when input
@@ -820,7 +820,7 @@ Defaults to False.</p></li>
 Defaults to infinity.</p></li>
 <li><p><strong>subset</strong> – Indices of neurons/halfspaces to consider. If None, considers
 all halfspaces. Defaults to None.</p></li>
-<li><p><strong>tol</strong> – Inequality tolerance to improve numerical stability. Defaults to 1e-6.</p></li>
+<li><p><strong>tol</strong> – Inequality tolerance to improve numerical stability. Defaults to config.TOL_SHI_HYPERPLANE.</p></li>
 <li><p><strong>new_method</strong> – If True, uses an extra computation that doesn’t improve
 runtime. Defaults to False.</p></li>
 <li><p><strong>env</strong> – Gurobi environment for optimization. If None, uses a cached
@@ -881,7 +881,7 @@ of dictionaries with computation details.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot2d">
-<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_halfspaces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspace_shade</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">plot2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_halfspaces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspace_shade</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot2d" title="Link to this definition">¶</a></dt>
 <dd><p>Plot the polyhedron in 2D using plotly.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -889,7 +889,7 @@ of dictionaries with computation details.</p>
 <li><p><strong>fill</strong> – Fill mode passed to go.Scatter. Defaults to “toself”.</p></li>
 <li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
 <li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
-Defaults to 1000.</p></li>
+Defaults to config.DEFAULT_PLOT_BOUND.</p></li>
 <li><p><strong>plot_halfspaces</strong> – If True, add one Scatter trace per halfspace (inequality)
 as line or shaded region. Defaults to False.</p></li>
 <li><p><strong>halfspace_shade</strong> – When plot_halfspaces is True, shade the feasible side
@@ -918,7 +918,7 @@ only the halfspace traces when plot_halfspaces is True.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot3d">
-<span class="sig-name descname"><span class="pre">plot3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot3d" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">plot3d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.plot3d" title="Link to this definition">¶</a></dt>
 <dd><p>Plot the polyhedron in 3D using plotly.</p>
 <p>Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
 by passing the 2D vertices through the network.</p>
@@ -928,7 +928,7 @@ by passing the 2D vertices through the network.</p>
 <li><p><strong>fill</strong> – Fill mode (not used for 3D plots). Defaults to “toself”.</p></li>
 <li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
 <li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
-Defaults to 1000.</p></li>
+Defaults to config.DEFAULT_PLOT_BOUND.</p></li>
 <li><p><strong>project</strong> – If a number, projects the polyhedron onto this z-value
 instead of computing it from the network. Defaults to None.</p></li>
 <li><p><strong>**kwargs</strong> – Additional arguments passed to go.Mesh3d.</p></li>
@@ -1192,15 +1192,15 @@ Defaults to None.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.get_grid">
-<span class="sig-name descname"><span class="pre">get_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_grid" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_grid" title="Link to this definition">¶</a></dt>
 <dd><p>Generate a 2D grid of input points.</p>
 <p>Creates a regular grid of points in 2D space. Only works for 2D input spaces.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>bounds</strong> – Half-width of the grid (grid spans [-bounds, bounds]).
-Defaults to 2.</p></li>
-<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to 100.</p></li>
+Defaults to config.DEFAULT_GRID_BOUNDS.</p></li>
+<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1218,13 +1218,13 @@ Defaults to 2.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.output_grid">
-<span class="sig-name descname"><span class="pre">output_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.output_grid" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">output_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.output_grid" title="Link to this definition">¶</a></dt>
 <dd><p>Generate a grid and compute network outputs for all points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>bounds</strong> – Half-width of the grid. Defaults to 2.</p></li>
-<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to 100.</p></li>
+<li><p><strong>bounds</strong> – Half-width of the grid. Defaults to config.DEFAULT_GRID_BOUNDS.</p></li>
+<li><p><strong>res</strong> – Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
