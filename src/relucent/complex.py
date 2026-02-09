@@ -770,7 +770,9 @@ class Complex:
         end = self.add_point(end)
         return self._greedy_path_helper(start, end)
 
-    def hamming_astar(self, start, end, nworkers=None, bound=DEFAULT_SEARCH_BOUND, max_polys=float("inf"), show_pbar=True, **kwargs):
+    def hamming_astar(
+        self, start, end, nworkers=None, bound=DEFAULT_SEARCH_BOUND, max_polys=float("inf"), show_pbar=True, **kwargs
+    ):
         """Find a path between two data points using A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -997,7 +999,15 @@ class Complex:
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
     def get_dual_graph(
-        self, relabel=False, plot=False, node_color=None, node_size=None, cmap="viridis", match_locations=False
+        self,
+        relabel=False,
+        plot=False,
+        node_color=None,
+        node_size=None,
+        cmap="viridis",
+        match_locations=False,
+        show_node_labels=False,
+        show_edge_labels=False,
     ):
         """Construct the dual graph of the complex.
 
@@ -1073,10 +1083,10 @@ class Complex:
                 nx.set_node_attributes(G, 4, "size")
 
             for node in G.nodes:
-                G.nodes[node]["label"] = " "
+                G.nodes[node]["label"] = str(node) if show_node_labels else ""
                 G.nodes[node]["title"] = str(node)
             for edge in G.edges:
-                G.edges[edge]["label"] = " "
+                G.edges[edge]["label"] = str(G.edges[edge]["shi"]) if show_edge_labels else ""
                 G.edges[edge]["title"] = str(G.edges[edge]["shi"])
         if plot or relabel:
             G = nx.relabel_nodes(G, {poly: i for i, poly in enumerate(self)})
@@ -1120,7 +1130,15 @@ class Complex:
 
         return G
 
-    def plot(self, label_regions=False, color=None, highlight_regions=None, ss_name=False, bound=DEFAULT_COMPLEX_PLOT_BOUND, **kwargs):
+    def plot(
+        self,
+        label_regions=False,
+        color=None,
+        highlight_regions=None,
+        ss_name=False,
+        bound=DEFAULT_COMPLEX_PLOT_BOUND,
+        **kwargs,
+    ):
         """Plot the complex in 2D using plotly.
 
         Creates a 2D visualization of the complex, showing all polyhedra as
@@ -1163,7 +1181,7 @@ class Complex:
             except Exception:
                 print("Could not find equitable coloring, using random colors")
                 colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
-        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys)):
+        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
             if ss_name:
@@ -1185,7 +1203,11 @@ class Complex:
                     go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
                 )
         interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
-        maxcoord = (np.max(interior_points) * PLOT_MARGIN_FACTOR) if len(interior_points) > 0 else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
+        maxcoord = (
+            (np.max(interior_points) * PLOT_MARGIN_FACTOR)
+            if len(interior_points) > 0
+            else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
+        )
         # maxcoord = 10
         fig.update_layout(
             showlegend=True,
@@ -1244,7 +1266,7 @@ class Complex:
                 print("Could not find equitable coloring, using random colors")
                 colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
         outlines, meshes = [], []
-        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys)):
+        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
             p_plot = poly.plot3d(
