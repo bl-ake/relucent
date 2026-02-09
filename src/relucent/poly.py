@@ -436,7 +436,9 @@ class Polyhedron:
                     f"Error while processing layer {name} - Unsupported layer type: {type(layer)} ({layer})"
                 )
             if data is not None:
-                assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
+                assert np.allclose(
+                    outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL
+                )
             if get_all_Ab:
                 all_Ab.append({"A": current_A.copy(), "b": current_b.copy(), "layer": layer})
         self._num_dead_relus = (np.abs(constr_A) < TOL_DEAD_RELU).all(axis=0).sum().item()
@@ -481,7 +483,10 @@ class Polyhedron:
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
         elif isinstance(other, str):
+            warnings.warn("Comparing Polyhedron with string is deprecated and will be removed in a future version")
             return str(self) == other
+        elif other is None:
+            return False
         else:
             raise ValueError(f"Cannot compare Polyhedron with {type(other)}")
 
@@ -689,7 +694,9 @@ class Polyhedron:
             print(e)
             return None
         # int_point, _ = solve_radius(get_env(), bounded_halfspaces, max_radius=1000)
-        if not (self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT).all():
+        if not (
+            self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT
+        ).all():
             warnings.warn(f"Interior point ({self.interior_point}) out of bounds ({bound}):")
             return None
         hs = HalfspaceIntersection(
