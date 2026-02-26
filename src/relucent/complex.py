@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import torch
 import torch.nn as nn
+from gurobipy import Env
 from tqdm.auto import tqdm
 
 from relucent.config import (
@@ -24,8 +25,6 @@ from relucent.config import (
     PLOT_DEFAULT_MAXCOORD,
     PLOT_MARGIN_FACTOR,
 )
-from gurobipy import Env
-
 from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
