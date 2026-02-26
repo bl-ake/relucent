@@ -38,3 +38,6 @@ filterwarnings = [
 #    "ignore:.*U.*mode is deprecated:DeprecationWarning",
     "ignore:This process .* is multi-threaded, use of fork\\(\\).*:DeprecationWarning",
 ]
+
+[tool.pyright]
+typeCheckingMode = "basic"
