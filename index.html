@@ -202,6 +202,8 @@ If None, use default size. Defaults to None.</p></li>
 <li><p><strong>cmap</strong> – Colormap to use when node_color is specified. Defaults to “viridis”.</p></li>
 <li><p><strong>match_locations</strong> – If True, position graph nodes at the center points
 of their polyhedra (only works for 2D complexes). Defaults to False.</p></li>
+<li><p><strong>show_node_labels</strong> – If True, show node labels in the graph. Defaults to False.</p></li>
+<li><p><strong>show_edge_labels</strong> – If True, show edge labels (SHI) in the graph. Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -361,7 +363,7 @@ Defaults to None.</p></li>
 <li><p><strong>ss_name</strong> – If True, use the full sign sequence as
 the legend label for each polyhedron. Defaults to False.</p></li>
 <li><p><strong>bound</strong> – Constraint radius for plotting bounds. Passed to each
-polyhedron’s plot2d() method. Defaults to None.</p></li>
+polyhedron’s plot2d() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.</p></li>
 <li><p><strong>**kwargs</strong> – Additional arguments passed to each polyhedron’s plot2d() method.</p></li>
 </ul>
 </dd>
@@ -493,9 +495,11 @@ graph structure and SHI indices on edges rather than full polyhedron data.</p>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>G</strong> – A networkx.Graph representing the dual graph. Edges must have
 a “shi” attribute indicating the supporting hyperplane index.</p></li>
-<li><p><strong>initial_ss</strong> – The sign sequence of a starting polyhedron
-as torch.Tensor or np.ndarray.</p></li>
-<li><p><strong>source</strong> – The node key in G representing the initial polyhedron.</p></li>
+<li><p><strong>initial_ss</strong> – The sign sequence of the starting polyhedron as
+torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>source</strong> – The node key in G for the polyhedron with sign sequence initial_ss.</p></li>
+<li><p><strong>copy</strong> – If True, operate on a copy of G; otherwise modify G in place.
+Defaults to False.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -676,11 +680,10 @@ and the interior point.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.get_bounded_halfspaces">
-<span class="sig-name descname"><span class="pre">get_bounded_halfspaces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bound</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_bounded_halfspaces" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_bounded_halfspaces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bound</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#relucent.Polyhedron.get_bounded_halfspaces" title="Link to this definition">¶</a></dt>
 <dd><p>Get halfspaces after adding bounding box constraints.</p>
-<p>Adds constraints that bound the space to a hypercube of radius ‘bound’
-around the origin. Useful for plotting and visualization. Returns None
-if the polyhedron doesn’t intersect the bounded region.</p>
+<p>Adds constraints that bound the space to a hypercube of radius <code class="docutils literal notranslate"><span class="pre">bound</span></code>
+around the origin. Useful for plotting and visualization.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -690,14 +693,13 @@ a cached environment. Defaults to None.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>Halfspaces with bounding constraints added, or</dt><dd><p>None if the polyhedron doesn’t intersect the bounded region.</p>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>Halfspaces with bounding constraints added.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray or None</p>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron does not intersect the bounded region.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -805,7 +807,7 @@ lower-dimensional polyhedra). Defaults to None.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.get_shis">
-<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
 <dd><p>Get supporting halfspace indices (SHIs) for this polyhedron.</p>
 <p>Computes the indices of non-redundant halfspaces that form the boundary
 of this polyhedron. These correspond to neurons whose boundaries (BHs)
@@ -952,7 +954,7 @@ instead of computing it from the network. Defaults to None.</p></li>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.W">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">W</span></span><a class="headerlink" href="#relucent.Polyhedron.W" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">W</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.W" title="Link to this definition">¶</a></dt>
 <dd><p>Affine transformation matrix W such that the polyhedron maps to W*x + b.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -972,7 +974,7 @@ instead of computing it from the network. Defaults to None.</p></li>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.b">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">b</span></span><a class="headerlink" href="#relucent.Polyhedron.b" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">b</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.b" title="Link to this definition">¶</a></dt>
 <dd><p>Affine transformation bias vector such that the polyhedron maps to W*x + b.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -986,25 +988,25 @@ instead of computing it from the network. Defaults to None.</p></li>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.center">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">center</span></span><a class="headerlink" href="#relucent.Polyhedron.center" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">center</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.Polyhedron.center" title="Link to this definition">¶</a></dt>
 <dd><p>Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded polyhedra.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.ch">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ch</span></span><a class="headerlink" href="#relucent.Polyhedron.ch" title="Link to this definition">¶</a></dt>
-<dd><p>Convex hull of the polyhedron for finite polyhedra.</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ch</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ConvexHull</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.Polyhedron.ch" title="Link to this definition">¶</a></dt>
+<dd><p>Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.finite">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">finite</span></span><a class="headerlink" href="#relucent.Polyhedron.finite" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">finite</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#relucent.Polyhedron.finite" title="Link to this definition">¶</a></dt>
 <dd><p>Whether the polyhedron is bounded (finite).</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.halfspaces">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces" title="Link to this definition">¶</a></dt>
 <dd><p>Halfspace representation of the polyhedron.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -1023,42 +1025,37 @@ constraint a^T x + b &lt;= 0.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.halfspaces_np">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces_np</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces_np" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">halfspaces_np</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.halfspaces_np" title="Link to this definition">¶</a></dt>
 <dd><p>Cached NumPy representation of halfspaces.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.hs">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hs</span></span><a class="headerlink" href="#relucent.Polyhedron.hs" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">hs</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">HalfspaceIntersection</span></span><a class="headerlink" href="#relucent.Polyhedron.hs" title="Link to this definition">¶</a></dt>
 <dd><p>Halfspace intersection object from scipy.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.inradius">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inradius</span></span><a class="headerlink" href="#relucent.Polyhedron.inradius" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inradius</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><a class="headerlink" href="#relucent.Polyhedron.inradius" title="Link to this definition">¶</a></dt>
 <dd><p>Inradius of the polyhedron (radius of largest inscribed ball), infinity for unbounded polyhedra.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.interior_point">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
-<dd><p>A point guaranteed to be inside the polyhedron.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray</p>
-</dd>
-</dl>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
+<dd><p>A point guaranteed to be inside the polyhedron. Never None once computed (get_interior_point raises if not found).</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.interior_point_norm">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point_norm</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point_norm" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point_norm</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point_norm" title="Link to this definition">¶</a></dt>
 <dd><p>L2 norm of the interior point.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.net">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><a class="headerlink" href="#relucent.Polyhedron.net" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">net</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span><a class="headerlink" href="#relucent.Polyhedron.net" title="Link to this definition">¶</a></dt>
 <dd><p>The neural network I belong to</p>
 </dd></dl>
 
@@ -1078,71 +1075,62 @@ constraint a^T x + b &lt;= 0.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.num_faces">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_faces</span></span><a class="headerlink" href="#relucent.Polyhedron.num_faces" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_faces</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Polyhedron.num_faces" title="Link to this definition">¶</a></dt>
 <dd><p>Alias for Polyhedron.num_shis</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.num_shis">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_shis</span></span><a class="headerlink" href="#relucent.Polyhedron.num_shis" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_shis</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Polyhedron.num_shis" title="Link to this definition">¶</a></dt>
 <dd><p>Number of faces.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.point">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">point</span></span><a class="headerlink" href="#relucent.Polyhedron.point" title="Link to this definition">¶</a></dt>
-<dd><p>The center if available, otherwise an interior point.</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.Polyhedron.point" title="Link to this definition">¶</a></dt>
+<dd><p>The center if available, otherwise an interior point. May be None if set explicitly via the setter.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.shis">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">shis</span></span><a class="headerlink" href="#relucent.Polyhedron.shis" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">shis</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.Polyhedron.shis" title="Link to this definition">¶</a></dt>
 <dd><p>Supporting halfspace indices (SHIs).</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.ss">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss</span></span><a class="headerlink" href="#relucent.Polyhedron.ss" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>My sign sequence.</p>
+</dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.ss_np">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss_np</span></span><a class="headerlink" href="#relucent.Polyhedron.ss_np" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ss_np</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.ss_np" title="Link to this definition">¶</a></dt>
 <dd><p>Cached NumPy representation of the sign sequence.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.tag">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tag</span></span><a class="headerlink" href="#relucent.Polyhedron.tag" title="Link to this definition">¶</a></dt>
-<dd><p>Unique tag for this polyhedron, computed as a hashable
-representation of the sign sequence.</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tag</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bytes</span></span><a class="headerlink" href="#relucent.Polyhedron.tag" title="Link to this definition">¶</a></dt>
+<dd><p>Unique tag for this polyhedron, computed as a hashable representation of the sign sequence.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.vertex_set">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertex_set</span></span><a class="headerlink" href="#relucent.Polyhedron.vertex_set" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertex_set</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.Polyhedron.vertex_set" title="Link to this definition">¶</a></dt>
 <dd><p>Set of vertices of the polyhedron (not always reliable).</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.vertices">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertices</span></span><a class="headerlink" href="#relucent.Polyhedron.vertices" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">vertices</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.vertices" title="Link to this definition">¶</a></dt>
 <dd><p>Vertices of the polyhedron (not always reliable).</p>
-<dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Array of vertex coordinates.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>np.ndarray</p>
-</dd>
-</dl>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.volume">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">volume</span></span><a class="headerlink" href="#relucent.Polyhedron.volume" title="Link to this definition">¶</a></dt>
-<dd><p>Volume of the polyhedron, infinity for unbounded polyhedra,
-or -1 if computation fails.</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">volume</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><a class="headerlink" href="#relucent.Polyhedron.volume" title="Link to this definition">¶</a></dt>
+<dd><p>Volume of the polyhedron, infinity for unbounded polyhedra, or -1 if computation fails.</p>
 </dd></dl>
 
 </dd></dl>
@@ -1151,12 +1139,12 @@ or -1 if computation fails.</p>
 <span id="id3"></span><h2>Neural Network Class<a class="headerlink" href="#neural-network-class" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="relucent.NN">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">NN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_shape</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">NN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
 <p>Neural network class that interfaces with the rest of the package</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.forward" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span></span></span><a class="headerlink" href="#relucent.NN.forward" title="Link to this definition">¶</a></dt>
 <dd><p>Define the computation performed at every call.</p>
 <p>Should be overridden by all subclasses.</p>
 <div class="admonition note">
@@ -1170,7 +1158,7 @@ registered hooks while the latter silently ignores them.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.get_all_layer_outputs">
-<span class="sig-name descname"><span class="pre">get_all_layer_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_all_layer_outputs" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_all_layer_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.NN.get_all_layer_outputs" title="Link to this definition">¶</a></dt>
 <dd><p>Get outputs from specified layers.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1192,7 +1180,7 @@ Defaults to None.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.get_grid">
-<span class="sig-name descname"><span class="pre">get_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.get_grid" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.NN.get_grid" title="Link to this definition">¶</a></dt>
 <dd><p>Generate a 2D grid of input points.</p>
 <p>Creates a regular grid of points in 2D space. Only works for 2D input spaces.</p>
 <dl class="field-list simple">
@@ -1218,7 +1206,7 @@ Defaults to config.DEFAULT_GRID_BOUNDS.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.output_grid">
-<span class="sig-name descname"><span class="pre">output_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.output_grid" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">output_grid</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bounds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">res</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.NN.output_grid" title="Link to this definition">¶</a></dt>
 <dd><p>Generate a grid and compute network outputs for all points.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1242,7 +1230,7 @@ Defaults to config.DEFAULT_GRID_BOUNDS.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.save_numpy_weights">
-<span class="sig-name descname"><span class="pre">save_numpy_weights</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.save_numpy_weights" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">save_numpy_weights</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.NN.save_numpy_weights" title="Link to this definition">¶</a></dt>
 <dd><p>Save NumPy weights and biases for all Linear layers.</p>
 <p>This method saves the weights and biases of all Linear layers to the
 <cite>weight_cpu</cite> and <cite>bias_cpu</cite> attributes of their respective layer objects.</p>
@@ -1250,7 +1238,7 @@ Defaults to config.DEFAULT_GRID_BOUNDS.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.NN.shi2weights">
-<span class="sig-name descname"><span class="pre">shi2weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN.shi2weights" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">shi2weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.NN.shi2weights" title="Link to this definition">¶</a></dt>
 <dd><p>Get weights corresponding to a neuron index.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1275,17 +1263,17 @@ If return_idx is True: (layer_name, neuron_index) tuple.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.NN.device">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">device</span></span><a class="headerlink" href="#relucent.NN.device" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">device</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">device</span></span><a class="headerlink" href="#relucent.NN.device" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.NN.dtype">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dtype</span></span><a class="headerlink" href="#relucent.NN.dtype" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dtype</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dtype</span></span><a class="headerlink" href="#relucent.NN.dtype" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.NN.num_relus">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_relus</span></span><a class="headerlink" href="#relucent.NN.num_relus" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">num_relus</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.NN.num_relus" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -1295,7 +1283,7 @@ If return_idx is True: (layer_name, neuron_index) tuple.</p>
 <span id="id4"></span><h2>Model Functions<a class="headerlink" href="#model-functions" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.get_mlp_model">
-<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_mlp_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widths</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_last_relu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.get_mlp_model" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_mlp_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_last_relu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></span><a class="headerlink" href="#relucent.get_mlp_model" title="Link to this definition">¶</a></dt>
 <dd><p>Create an NN object for a multi-layer perceptron (MLP).</p>
 <p>Constructs a fully connected neural network with the specified layer widths.
 Each layer (except optionally the last) is followed by a ReLU activation.</p>
@@ -1320,7 +1308,7 @@ and output dimension 1.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.convert">
-<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Module</span></span></span><a class="headerlink" href="#relucent.convert" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">convert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></span><a class="headerlink" href="#relucent.convert" title="Link to this definition">¶</a></dt>
 <dd><p>Convert a PyTorch model to canonical NN format.</p>
 <p>Converts various PyTorch layer types (Conv2d, AvgPool2d, etc.) into the
 canonical format consisting only of Linear and ReLU layers.</p>
@@ -1337,8 +1325,8 @@ canonical format consisting only of Linear and ReLU layers.</p>
 </dl>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>model</strong> – A PyTorch nn.Module with an ‘input_shape’ attribute and ‘layers’
-attribute containing an OrderedDict of layers.</p>
+<dd class="field-odd"><p><strong>model</strong> – An NN (or compatible) object with an <code class="docutils literal notranslate"><span class="pre">input_shape</span></code> attribute
+and a <code class="docutils literal notranslate"><span class="pre">layers</span></code> attribute containing an OrderedDict of layers.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A new NN object in canonical format.</p>
@@ -1347,14 +1335,17 @@ attribute containing an OrderedDict of layers.</p>
 <dd class="field-odd"><p><a class="reference internal" href="relucent.html#relucent.NN" title="relucent.NN">NN</a></p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>ValueError</strong> – If an unsupported layer type is encountered.</p>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If an unsupported layer type is encountered or the model</p></li>
+<li><p><strong>does not define an input_shape attribute.</strong> – </p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
 
 <span class="target" id="utility-functions"></span><dl class="py function">
 <dt class="sig sig-object py" id="relucent.get_env">
-<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_env</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#relucent.get_env" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_env</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Env</span></span></span><a class="headerlink" href="#relucent.get_env" title="Link to this definition">¶</a></dt>
 <dd><p>Get a cached Gurobi environment.</p>
 <p>Creates and caches a Gurobi environment with logging disabled. This avoids
 the overhead of creating multiple environments. For more control over the
@@ -1371,7 +1362,7 @@ environment, create and pass one directly to functions that need it.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.set_seeds">
-<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">set_seeds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.set_seeds" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">set_seeds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.set_seeds" title="Link to this definition">¶</a></dt>
 <dd><p>Set all RNG seeds to a given value.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
