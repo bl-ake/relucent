@@ -1,5 +1,7 @@
 """Tests for relucent.utils."""
 
+import copy
+
 import numpy as np
 import pytest
 import torch
@@ -11,6 +13,7 @@ from relucent.utils import (
     encode_ss,
     get_colors,
     get_env,
+    normalize_weights,
     set_seeds,
     split_sequential,
 )
@@ -158,3 +161,18 @@ class TestSplitSequential:
         nn1, nn2 = split_sequential(net, "fc0")
         assert "fc0" in nn1.layers
         assert "fc1" in nn2.layers or "relu0" in nn2.layers
+
+
+class TestNormalizeWeights:
+    @pytest.mark.parametrize("widths", ([2, 4, 2], [4, 8, 6, 2]))
+    def test_function_invariant(self, seeded, widths):
+        net = get_mlp_model(widths=widths)
+        original = copy.deepcopy(net)
+
+        x = torch.randn(32, widths[0], device=net.device, dtype=net.dtype)
+        y_before = original(x)
+
+        normalize_weights(net)
+        y_after = net(x)
+
+        assert torch.allclose(y_before, y_after, atol=1e-5, rtol=1e-5)

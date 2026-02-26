@@ -275,6 +275,55 @@ def split_sequential(model, split_layer):
     return nn1, nn2
 
 
+def normalize_weights(model: NN) -> NN:
+    """Normalize hidden neuron weights to unit norm without changing the network function.
+
+    The incoming weights (and biases) of each Linear layer except the last one are rescaled so that each
+    neuron's weight vector has unit ℓ2 norm.
+
+    Args:
+        model: The NN object whose weights should be normalized in-place.
+
+    Returns:
+        The same NN object with normalized hidden-layer weights.
+
+    Raises:
+        ValueError: If the network contains layers other than Linear or ReLU.
+    """
+    layers = list(model.layers.values())
+
+    # Ensure only supported layer types are present.
+    for layer in layers:
+        if not isinstance(layer, (torch.nn.Linear, torch.nn.ReLU)):
+            raise ValueError(f"Unsupported layer type: {type(layer)}")
+
+    # Indices of all Linear layers in order.
+    linear_indices = [i for i, layer in enumerate(layers) if isinstance(layer, torch.nn.Linear)]
+
+    for idx, lin_idx in enumerate(linear_indices):
+        layer = layers[lin_idx]
+
+        # Do not modify the final Linear layer
+        is_last_linear = idx == len(linear_indices) - 1
+        if is_last_linear:
+            continue
+
+        w = layer.weight.data
+        norms = w.norm(dim=1, keepdim=True)
+        safe_norms = torch.where(norms > 0, norms, torch.ones_like(norms))
+
+        layer.weight.data = w / safe_norms
+        if layer.bias is not None:
+            layer.bias.data = layer.bias.data / safe_norms.squeeze(1)
+
+        next_linear = layers[linear_indices[idx + 1]]
+        next_w = next_linear.weight.data  # shape (out_next, out_current)
+        scale = safe_norms.squeeze(1)  # shape (out_current,)
+        next_linear.weight.data = next_w * scale
+
+    return model
+
+
 def get_colors(data, cmap="viridis", **kwargs):
     """Map some numbers to some colors"""
     if not data:
