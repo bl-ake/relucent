@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from collections.abc import Container
 from typing import Iterable, Tuple
 
 import numpy as np
@@ -81,7 +82,7 @@ class NN(nn.Module):
         return x
 
     def get_all_layer_outputs(
-        self, data: torch.Tensor, layers: list[str] | None = None, verbose: bool = False
+        self, data: torch.Tensor, layers: Container[str] | None = None, verbose: bool = False
     ) -> OrderedDict[str, torch.Tensor]:
         """Get outputs from specified layers.
 
