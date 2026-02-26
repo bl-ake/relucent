@@ -7,7 +7,6 @@ import pytest
 import torch
 
 from relucent import Complex, Polyhedron, get_mlp_model
-
 from tests.helpers import ss_to_numpy
 
 
@@ -29,6 +28,8 @@ class TestPolyhedronBasics:
         x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
         p = Polyhedron(net, ss)
+        assert isinstance(p.W, torch.Tensor)
+        assert isinstance(p.b, torch.Tensor)
         y_affine = x @ p.W + p.b
         y_net = net(x)
         assert torch.allclose(y_affine, y_net, atol=1e-5)
@@ -135,6 +136,8 @@ class TestPolyhedronPickle:
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
         p = Polyhedron(net, ss)
+        assert isinstance(p.W, torch.Tensor)
+        assert isinstance(p.b, torch.Tensor)
         y1 = x @ p.W + p.b
         assert torch.allclose(y1, net(x))
 
