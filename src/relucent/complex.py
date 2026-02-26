@@ -5,7 +5,7 @@ import random
 import warnings
 from collections import defaultdict
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 import networkx as nx
 import numpy as np
@@ -24,12 +24,21 @@ from relucent.config import (
     PLOT_DEFAULT_MAXCOORD,
     PLOT_MARGIN_FACTOR,
 )
+from gurobipy import Env
+
+from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
 from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, close_env, get_colors, get_env
 
+# Worker process state (set by set_globals when used as pool initializer).
+env: Env | None = None
+net: NN | None = None
+dim: int = 0
+get_vol_calc: bool = True
 
-def set_globals(get_net, get_volumes=True):
+
+def set_globals(get_net: NN, get_volumes: bool = True) -> None:
     """Initialize global variables for worker processes in multiprocessing.
 
     This function should only be used as an initializer for multiprocessing pools,
@@ -52,12 +61,15 @@ def set_globals(get_net, get_volumes=True):
     net = get_net
     net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
     global dim
-    dim = np.prod(net.input_shape)
+    dim = int(np.prod(net.input_shape))
     global get_vol_calc
     get_vol_calc = get_volumes
 
 
-def poly_calculations(task, **kwargs):
+def poly_calculations(
+    task: np.ndarray | torch.Tensor | tuple[Any, ...],
+    **kwargs: Any,
+) -> tuple[Any, ...]:
     """Worker function for computing polyhedron properties in parallel.
 
     This function is used by parallel_add() and all search methods to compute
@@ -109,7 +121,10 @@ def poly_calculations(task, **kwargs):
     return (p, *rest)
 
 
-def get_ip(p, shi):
+def get_ip(
+    p: Polyhedron,
+    shi: int,
+) -> tuple[Polyhedron, int] | tuple[ValueError, int]:
     """Get an interior point for a neighbor polyhedron across a supporting hyperplane.
 
     This function is used by the A* search algorithm to find interior points for
@@ -139,7 +154,10 @@ def get_ip(p, shi):
         return e, shi
 
 
-def astar_calculations(task, **kwargs):
+def astar_calculations(
+    task: Polyhedron | tuple[Any, ...],
+    **kwargs: Any,
+) -> tuple[Any, ...]:
     """Worker function for computing polyhedron properties in A* search.
 
     Similar to poly_calculations, but specifically designed for A* search algorithm.
@@ -159,6 +177,7 @@ def astar_calculations(task, **kwargs):
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     if p.net is None:
+        assert net is not None, "set_globals must be used as pool initializer"
         p.net = net
 
     if p._inradius is None:
@@ -175,6 +194,7 @@ def astar_calculations(task, **kwargs):
     except Exception as error:
         return p, error, *rest
     p.clean_data()
+    assert isinstance(p._shis, list), "get_shis returns a list"
     random.shuffle(p._shis)
     # p, neighbors = get_neighbors(p, (shi for shi in p._shis if shi != task[1]))
     return p, *rest
@@ -256,10 +276,10 @@ class Complex:
         for p in self.index2poly:
             yield p
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.index2poly)
 
-    def save(self, filename, save_ssm=True):
+    def save(self, filename: str | os.PathLike[str], save_ssm: bool = True) -> None:
         """Save the complex to a pickle file.
 
         Args:
@@ -274,7 +294,7 @@ class Complex:
             pickle.dump(state, f)
 
     @staticmethod
-    def load(filename):
+    def load(filename: str | os.PathLike[str]) -> "Complex":
         """Load a Complex from a pickle file.
 
         Intended to be called as Complex.load(filename). The file must have been

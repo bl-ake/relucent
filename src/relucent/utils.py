@@ -128,7 +128,7 @@ class NonBlockingQueue:
         self.closed = True
         self.pop = lambda q: self.stopFlag
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.deque)
 
 
