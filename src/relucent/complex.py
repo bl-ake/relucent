@@ -5,6 +5,7 @@ import random
 import warnings
 from collections import defaultdict
 from functools import partial
+from typing import cast
 
 import networkx as nx
 import numpy as np
@@ -83,8 +84,14 @@ def poly_calculations(task, **kwargs):
 
         p.get_center_inradius(env=env)
         p.get_interior_point(env=env)
-        p._interior_point_norm = np.linalg.norm(p.interior_point).item()
-        p._Wl2 = np.linalg.norm(p.W).item()
+        if p.interior_point is not None:
+            p._interior_point_norm = np.linalg.norm(p.interior_point).item()
+        else:
+            p._interior_point_norm = float("inf")
+        if isinstance(p.W, torch.Tensor):
+            p._Wl2 = torch.linalg.norm(p.W).item()
+        else:
+            p._Wl2 = np.linalg.norm(p.W).item()
 
         if dim <= 6 and get_vol_calc:
             p.volume
@@ -96,7 +103,9 @@ def poly_calculations(task, **kwargs):
     except ValueError as error:
         return error, *rest
     p.clean_data()
-    random.shuffle(p._shis)
+
+    if isinstance(p._shis, list):
+        random.shuffle(p._shis)
     return (p, *rest)
 
 
@@ -127,7 +136,7 @@ def get_ip(p, shi):
                 print("Increasing max radius to find interior point")
         return n, shi
     except ValueError as e:
-        return e, None
+        return e, shi
 
 
 def astar_calculations(task, **kwargs):
@@ -637,6 +646,8 @@ class Complex:
 
                     pbar.update(n=len(self) - pbar.n)
                     rolling_average = (rolling_average * (len(self) - 1) + len(p.shis)) / len(self)
+
+                    assert isinstance(p._shis, list)
                     pbar.set_postfix_str(
                         f"Depth: {depth}  Unprocessed: {unprocessed}  Faces: {len(p._shis)}  Avg: {rolling_average:.2f} IP Norm: {p._interior_point_norm or -1:.2f}  Finite: {p._finite} Mistakes: {len(bad_shi_computations)}",
                         refresh=False,
@@ -714,7 +725,9 @@ class Complex:
             **kwargs,
         )
 
-    def _greedy_path_helper(self, start, end, diffs=None):
+    def _greedy_path_helper(
+        self, start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None
+    ) -> list[Polyhedron]:
         if start == end:
             # print("Start and end points are the same")
             return [start]
@@ -727,12 +740,10 @@ class Complex:
         print("Diffs:", diffs)
 
         if not start._shis:
-            try:
-                start.get_shis()
-            except ValueError:
-                return None
-        groupa = set(start.shis) & diffs
-        groupb = set(start.shis) - diffs
+            start.get_shis()
+        shis_set = set(start.shis)
+        groupa = shis_set & diffs
+        groupb = shis_set - diffs
         for shi in list(groupa):
             print("Crossing", shi)
             new_ss = start.ss_np.copy()
@@ -746,10 +757,10 @@ class Complex:
             new_ss = start.ss_np.copy()
             new_ss[0, shi] *= -1
             next_poly = self.ss2poly(new_ss)
-            rest = self._greedy_path_helper(next_poly, end, diffs + {shi})
+            rest = self._greedy_path_helper(next_poly, end, diffs | {shi})
             if rest is not None:
                 return [start] + rest
-        return None
+        return []
 
     def greedy_path(self, start, end):
         """Greedily find a path between two data points.
@@ -812,7 +823,7 @@ class Complex:
             raise ValueError("Start point must not be on a hyperplane")
 
         nhs = len(start.halfspaces)
-        nworkers = min(nworkers or os.process_cpu_count(), nhs)
+        nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (os.process_cpu_count() or 1)), nhs)
         print(f"Using {nworkers} workers")
 
         cameFrom = dict()
@@ -850,7 +861,7 @@ class Complex:
         depth = 0
         neighbor = None
         min_dist = float("inf")
-        min_p = None
+        min_p = start
 
         def heuristic(p, depth, shi):
             hamming = (p.ss_np != end.ss_np).sum()
@@ -889,31 +900,31 @@ class Complex:
                     #     (i for i in p.shis if i != shi),
                     # ):
                     if not isinstance(neighbor, Polyhedron):
-                        p._shis.remove(neighbor)
-
-                    tentative_gScore = gScore[p] + d(p, neighbor)
-                    ## If not using multiprocessing, you would need to check if the neighbor's net is None first
-                    neighbor.net = self.net
-                    if tentative_gScore < gScore[neighbor]:  ## Only needed with an inconsistent heuristic
-                        cameFrom[neighbor] = p
-                        gScore[neighbor] = tentative_gScore
-                        dist = heuristic(neighbor, depth, shi)
-                        fScore[neighbor] = tentative_gScore + dist
-                        # options.append(
-                        #     {
-                        #         "neighbor": neighbor,
-                        #         "neighbor_shi": neighbor_shi,
-                        #         "fScore": fScore[neighbor],
-                        #         "improvement": neighbor.ss[0, neighbor_shi] == end.ss[0, neighbor_shi],
-                        #     }
-                        # )
-                        if dist < min_dist:
-                            min_dist = dist
-                            min_p = neighbor
-                        openSet.push((neighbor, neighbor_shi, depth + 1), fScore[neighbor])
-                        unprocessed += 1
-                        if neighbor == end:
-                            break
+                        p._shis.remove(neighbor_shi)
+                    else:
+                        tentative_gScore = gScore[p] + d(p, neighbor)
+                        ## If not using multiprocessing, you would need to check if the neighbor's net is None first
+                        neighbor.net = self.net
+                        if tentative_gScore < gScore[neighbor]:  ## Only needed with an inconsistent heuristic
+                            cameFrom[neighbor] = p
+                            gScore[neighbor] = tentative_gScore
+                            dist = heuristic(neighbor, depth, shi)
+                            fScore[neighbor] = tentative_gScore + dist
+                            # options.append(
+                            #     {
+                            #         "neighbor": neighbor,
+                            #         "neighbor_shi": neighbor_shi,
+                            #         "fScore": fScore[neighbor],
+                            #         "improvement": neighbor.ss[0, neighbor_shi] == end.ss[0, neighbor_shi],
+                            #     }
+                            # )
+                            if dist < min_dist:
+                                min_dist = dist
+                                min_p = neighbor
+                            openSet.push((neighbor, neighbor_shi, depth + 1), fScore[neighbor])
+                            unprocessed += 1
+                            if neighbor == end:
+                                break
                     if neighbor == end:
                         break
 
@@ -1053,7 +1064,7 @@ class Complex:
                 if self.dim != 2:
                     raise ValueError("Polyhedra must be 2D to match locations")
 
-                nx.set_node_attributes(G, False, "physics")
+                nx.set_node_attributes(G, values=False, name="physics")  # type: ignore
                 nx.set_node_attributes(
                     G,
                     {poly: poly.interior_point[0].item() * 10 for poly in G.nodes},
@@ -1080,7 +1091,7 @@ class Complex:
                 for size, poly in zip(sizes, G.nodes):
                     G.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
             else:
-                nx.set_node_attributes(G, 4, "size")
+                nx.set_node_attributes(G, values=4, name="size")  # type: ignore
 
             for node in G.nodes:
                 G.nodes[node]["label"] = str(node) if show_node_labels else ""
