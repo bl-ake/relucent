@@ -2,6 +2,7 @@ import random
 from collections import OrderedDict, deque
 from heapq import heappop, heappush
 from threading import Condition
+from typing import Any, Callable
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -9,6 +10,7 @@ import numpy as np
 import torch
 from gurobipy import Env, disposeDefaultEnv
 from matplotlib import colormaps
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from PIL import Image
 from tqdm.auto import tqdm
 
@@ -89,7 +91,12 @@ class NonBlockingQueue:
 
     stopFlag = "<stop>"
 
-    def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
+    def __init__(
+        self,
+        queue_class: Callable[[], Any] = deque,
+        pop: Callable[..., Any] = lambda q: q.pop(),
+        push: Callable[..., Any] = lambda q, x: q.append(x),
+    ):
         """Initialize a non-blocking queue.
 
         Args:
@@ -98,7 +105,7 @@ class NonBlockingQueue:
             pop: Function to pop an element from the queue. Defaults to deque.pop().
             push: Function to push an element to the queue. Defaults to deque.append().
         """
-        self.deque = queue_class()
+        self.deque: Any = queue_class()
         self.pop_element = pop
         self.push_element = push
 
@@ -130,7 +137,12 @@ class BlockingQueue:
 
     stopFlag = "<stop>"
 
-    def __init__(self, queue_class=deque, pop=lambda q: q.pop(), push=lambda q, x: q.append(x)):
+    def __init__(
+        self,
+        queue_class: Callable[[], Any] = deque,
+        pop: Callable[..., Any] = lambda q: q.pop(),
+        push: Callable[..., Any] = lambda q, x: q.append(x),
+    ):
         """Create a blocking queue.
 
         Args:
@@ -143,7 +155,7 @@ class BlockingQueue:
             pop and push can both be functions with kwargs; the corresponding
             methods in this class will pass their arguments along.
         """
-        self.deque = queue_class()
+        self.deque: Any = queue_class()
         self.pop_element = pop
         self.push_element = push
 
@@ -308,6 +320,9 @@ def normalize_weights(model: NN) -> NN:
         if is_last_linear:
             continue
 
+        assert isinstance(layer.weight.data, torch.Tensor)
+        assert isinstance(layer.bias.data, torch.Tensor)
+
         w = layer.weight.data
         norms = w.norm(dim=1, keepdim=True)
         safe_norms = torch.where(norms > 0, norms, torch.ones_like(norms))
@@ -317,6 +332,8 @@ def normalize_weights(model: NN) -> NN:
             layer.bias.data = layer.bias.data / safe_norms.squeeze(1)
 
         next_linear = layers[linear_indices[idx + 1]]
+        assert isinstance(next_linear.weight.data, torch.Tensor)
+
         next_w = next_linear.weight.data  # shape (out_next, out_current)
         scale = safe_norms.squeeze(1)  # shape (out_current,)
         next_linear.weight.data = next_w * scale
@@ -341,7 +358,7 @@ def data_graph(
     node_df,
     edge_df,
     dataset=None,
-    draw_function=None,
+    draw_function=lambda x: x,
     class_labels=True,
     node_title_formatter=lambda i, row: row["title"] if "title" in row else str(row),
     node_label_formatter=lambda i, row: row["label"] if "label" in row else str(i),
@@ -389,7 +406,7 @@ def data_graph(
     from pyvis.network import Network
 
     if class_labels is True and dataset is not None:
-        class_labels = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
+        class_labels_list = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
 
     G = nx.Graph()
     bar = tqdm(node_df.iterrows(), total=len(node_df), desc="Adding Nodes")
@@ -399,7 +416,7 @@ def data_graph(
             num_rows = np.ceil(np.sqrt(num_examples)).astype(int)
             num_cols = num_examples // num_rows
             fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 10))
-            axs = axs.flatten() if num_rows > 1 else [axs]
+            axs = axs.flatten() if isinstance(axs, np.ndarray) and num_rows > 1 else [axs]
             for j, ax in enumerate(axs[:-1]):
                 ax.axis("equal")
                 ax.set_axis_off()
@@ -408,12 +425,17 @@ def data_graph(
                     draw_function(data=data, ax=ax)
 
             if class_labels and "class_proportions" in row:
-                axs[-1].pie(row["class_proportions"], labeldistance=PIE_LABEL_DISTANCE, labels=class_labels)
+                axs[-1].pie(
+                    row["class_proportions"],
+                    labeldistance=PIE_LABEL_DISTANCE,
+                    labels=class_labels_list,
+                )
             axs[-1].axis("equal")
             axs[-1].set_axis_off()
 
-            fig.canvas.draw()
-            img = Image.frombytes("RGBa", fig.canvas.get_width_height(), fig.canvas.buffer_rgba())
+            canvas = FigureCanvasAgg(fig)
+            canvas.draw()
+            img = Image.frombytes("RGBA", canvas.get_width_height(), bytes(canvas.buffer_rgba()))
             plt.close(fig)
             img.convert("RGB").save(f"images/{i}.png")
 

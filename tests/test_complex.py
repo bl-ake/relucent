@@ -51,6 +51,8 @@ def test_bfs_polyhedron_affine_and_membership(seeded):
     p = cplx.point2poly(start)
     assert len(p.halfspaces) == cplx.n
     assert p.ss_np.size == cplx.n
+    assert isinstance(p.W, torch.Tensor)
+    assert isinstance(p.b, torch.Tensor)
     assert torch.allclose(start @ p.W + p.b, model(start))
 
     cplx.bfs(max_polys=100, start=start)

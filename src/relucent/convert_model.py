@@ -60,13 +60,17 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
     # Formula from the Torch docs:
     # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
     output_size = [
-        (input_size[i + 1] + 2 * conv.padding[i] - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]
+        (input_size[i + 1] + 2 * int(conv.padding[i]) - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]
     ]
 
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
 
-    fc = nn.Linear(in_features=np.prod(in_shape), out_features=np.prod(out_shape), device=conv.weight.device)
+    conv.bias = conv.bias or torch.zeros(conv.out_channels, device=conv.weight.device)
+
+    fc = nn.Linear(
+        in_features=np.prod(in_shape).item(), out_features=np.prod(out_shape).item(), device=conv.weight.device
+    )
     fc.weight.data.fill_(0.0)
 
     # Output coordinates
@@ -77,8 +81,8 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
         leave=False,
     ):
         # The upper-left corner of the filter in the input tensor
-        xi0 = -conv.padding[0] + conv.stride[0] * xo
-        yi0 = -conv.padding[1] + conv.stride[1] * yo
+        xi0 = -int(conv.padding[0]) + int(conv.stride[0]) * xo
+        yi0 = -int(conv.padding[1]) + int(conv.stride[1]) * yo
 
         # Position within the filter
         for xd, yd in range2d(conv.kernel_size[0], conv.kernel_size[1]):
@@ -127,8 +131,15 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: Tuple[int, int,
         bias=True,
     )
     conv2d.weight.data.fill_(0.0)
+    kernel_size = avgpool.kernel_size
+    if isinstance(kernel_size, tuple):
+        kernel_area = int(kernel_size[0]) * int(kernel_size[1])
+    else:
+        kernel_area = int(kernel_size) * int(kernel_size)
+    scale = 1.0 / float(kernel_area)
     for i in range(input_size[0]):
-        conv2d.weight.data[i, i, :, :].fill_(1.0 / (avgpool.kernel_size**2))
+        conv2d.weight.data[i, i, :, :].fill_(scale)
+    conv2d.bias = conv2d.bias or torch.zeros(input_size[0], device=conv2d.weight.device)
     conv2d.bias.data.fill_(0.0)
     return torch_conv_layer_to_affine(conv2d, input_size)
 
@@ -143,7 +154,7 @@ def flatten_to_affine(input_size: Tuple[int, int, int]) -> torch.nn.Linear:
     Returns:
         nn.Linear: An identity Linear layer.
     """
-    return nn.Linear(in_features=np.prod(input_size), out_features=np.prod(input_size))
+    return nn.Linear(in_features=np.prod(input_size).item(), out_features=np.prod(input_size).item())
 
 
 def combine_linear_layers(old_layers):
@@ -190,7 +201,7 @@ def combine_linear_layers(old_layers):
 
 
 @torch.no_grad()
-def convert(model: nn.Module) -> nn.Module:
+def convert(model: NN) -> NN:
     """Convert a PyTorch model to canonical NN format.
 
     Converts various PyTorch layer types (Conv2d, AvgPool2d, etc.) into the
@@ -212,9 +223,14 @@ def convert(model: nn.Module) -> nn.Module:
         NN: A new NN object in canonical format.
 
     Raises:
-        ValueError: If an unsupported layer type is encountered.
+        ValueError: If an unsupported layer type is encountered or the model
+        does not define an input_shape attribute.
     """
-    x = torch.zeros((1, *model.input_shape), dtype=next(model.parameters()).dtype, device=model.device)
+    params = next(model.parameters())
+    input_shape = getattr(model, "input_shape", None)
+    if input_shape is None:
+        raise ValueError("Model must define input_shape for conversion.")
+    x = torch.zeros(input_shape, dtype=params.dtype, device=params.device)
     layers = OrderedDict()
     assert "Flatten Input" not in model.layers
     layers["Flatten Input"] = nn.Flatten()
@@ -230,10 +246,14 @@ def convert(model: nn.Module) -> nn.Module:
         elif isinstance(module, nn.LogSoftmax):
             break
         elif isinstance(module, nn.Conv2d):
-            new_layer = torch_conv_layer_to_affine(module, x.shape[1:]).to(model.device, model.dtype)
+            shape = tuple(int(dim) for dim in x.shape[1:])
+            assert isinstance(shape, tuple) and len(shape) == 3
+            new_layer = torch_conv_layer_to_affine(module, shape).to(model.device, model.dtype)
             layers[name] = new_layer
         elif isinstance(module, nn.AvgPool2d) and module.kernel_size == module.stride:
-            new_layer = avgpool2d_to_affine(module, x.shape[1:]).to(model.device, model.dtype)
+            shape = tuple(int(dim) for dim in x.shape[1:])
+            assert isinstance(shape, tuple) and len(shape) == 3
+            new_layer = avgpool2d_to_affine(module, shape).to(model.device, model.dtype)
             layers[name] = new_layer
         else:
             raise ValueError(f"Module {name} is not supported: {module}")

@@ -1,10 +1,11 @@
 from collections import OrderedDict
+from typing import Tuple
 
 import numpy as np
-
-from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
 import torch
 import torch.nn as nn
+
+from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
 
 
 class NN(nn.Module):
@@ -32,9 +33,9 @@ class NN(nn.Module):
 
         self.to(device or self.device, dtype or self.dtype)
         if input_shape is not None:
-            self.input_shape = input_shape
+            self.input_shape: Tuple[int, ...] = input_shape
         elif isinstance(fl := next(iter(self.layers.values())), nn.Linear):
-            self.input_shape = (fl.in_features,)
+            self.input_shape: Tuple[int, ...] = (fl.in_features,)
         else:
             raise ValueError("Input shape must be provided")
 
@@ -42,7 +43,7 @@ class NN(nn.Module):
 
         self.trained_on = None
 
-    def save_numpy_weights(self):
+    def save_numpy_weights(self) -> None:
         """Save NumPy weights and biases for all Linear layers.
 
         This method saves the weights and biases of all Linear layers to the
@@ -54,24 +55,26 @@ class NN(nn.Module):
                 layer.bias_cpu = layer.bias.detach().cpu().numpy().reshape(1, -1)
 
     @property
-    def device(self):
+    def device(self) -> torch.device:
         return next(self.parameters()).device
 
     @property
-    def dtype(self):
+    def dtype(self) -> torch.dtype:
         return next(self.parameters()).dtype
 
     @property
     def num_relus(self):
         return len([layer for layer in self.layers.values() if isinstance(layer, nn.ReLU)])
 
-    def forward(self, data):
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
         x = data.reshape((-1,) + self.input_shape)
         for layer in self.layers.values():
             x = layer(x)
         return x
 
-    def get_all_layer_outputs(self, data, layers=None, verbose=False):
+    def get_all_layer_outputs(
+        self, data: torch.Tensor, layers: list[str] | None = None, verbose: bool = False
+    ) -> OrderedDict[str, torch.Tensor]:
         """Get outputs from specified layers.
 
         Args:
