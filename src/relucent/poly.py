@@ -477,9 +477,8 @@ class Polyhedron:
     def get_bounded_halfspaces(self, bound, env=None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
 
-        Adds constraints that bound the space to a hypercube of radius 'bound'
-        around the origin. Useful for plotting and visualization. Returns None
-        if the polyhedron doesn't intersect the bounded region.
+        Adds constraints that bound the space to a hypercube of radius ``bound``
+        around the origin. Useful for plotting and visualization.
 
         Args:
             bound: Radius of the bounding hypercube.
@@ -487,8 +486,10 @@ class Polyhedron:
                 a cached environment. Defaults to None.
 
         Returns:
-            np.ndarray or None: Halfspaces with bounding constraints added, or
-                None if the polyhedron doesn't intersect the bounded region.
+            np.ndarray: Halfspaces with bounding constraints added.
+
+        Raises:
+            ValueError: If the polyhedron does not intersect the bounded region.
         """
         bounds_lhs = np.eye(self.halfspaces_np.shape[1] - 1)
         bounds_rhs = -np.ones((self.halfspaces_np.shape[1] - 1, 1)) * bound

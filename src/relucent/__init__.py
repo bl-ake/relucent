@@ -8,8 +8,8 @@ except ImportError:
         "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
     )
 
-from .complex import Complex
 from . import config
+from .complex import Complex
 from .convert_model import convert
 from .model import NN, get_mlp_model
 from .poly import Polyhedron

@@ -188,6 +188,12 @@ class Complex:
     """
 
     def __init__(self, net):
+        """Initialize the complex for a given network.
+
+        Args:
+            net: The NN (neural network) instance whose polyhedral complex
+                is to be built and queried.
+        """
         self._net = net
         self.net.save_numpy_weights()
 
@@ -1039,6 +1045,8 @@ class Complex:
             cmap: Colormap to use when node_color is specified. Defaults to "viridis".
             match_locations: If True, position graph nodes at the center points
                 of their polyhedra (only works for 2D complexes). Defaults to False.
+            show_node_labels: If True, show node labels in the graph. Defaults to False.
+            show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
 
         Returns:
             networkx.Graph: The dual graph of the complex. Nodes are polyhedra
@@ -1115,9 +1123,11 @@ class Complex:
         Args:
             G: A networkx.Graph representing the dual graph. Edges must have
                 a "shi" attribute indicating the supporting hyperplane index.
-            initial_ss: The sign sequence of a starting polyhedron
-                as torch.Tensor or np.ndarray.
-            source: The node key in G representing the initial polyhedron.
+            initial_ss: The sign sequence of the starting polyhedron as
+                torch.Tensor or np.ndarray.
+            source: The node key in G for the polyhedron with sign sequence initial_ss.
+            copy: If True, operate on a copy of G; otherwise modify G in place.
+                Defaults to False.
 
         Returns:
             networkx.Graph: The graph with polyhedron objects stored in node
@@ -1138,8 +1148,6 @@ class Complex:
 
         for node in G:
             self[G.nodes[node]["poly"]]._shis = [G.edges[edge]["shi"] for edge in G.edges(node)]
-
-        return G
 
     def plot(
         self,
@@ -1166,7 +1174,7 @@ class Complex:
             ss_name: If True, use the full sign sequence as
                 the legend label for each polyhedron. Defaults to False.
             bound: Constraint radius for plotting bounds. Passed to each
-                polyhedron's plot2d() method. Defaults to None.
+                polyhedron's plot2d() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.
             **kwargs: Additional arguments passed to each polyhedron's plot2d() method.
 
         Returns:
