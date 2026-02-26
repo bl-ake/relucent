@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Tuple
+from typing import Iterable, Tuple
 
 import numpy as np
 import torch
@@ -11,7 +11,13 @@ from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
 class NN(nn.Module):
     """Neural network class that interfaces with the rest of the package"""
 
-    def __init__(self, layers=None, input_shape=None, device=None, dtype=None):
+    def __init__(
+        self,
+        layers: OrderedDict[str, nn.Module] | None = None,
+        input_shape: Tuple[int, ...] | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ) -> None:
         """Initialize a neural network.
 
         Args:
@@ -63,7 +69,7 @@ class NN(nn.Module):
         return next(self.parameters()).dtype
 
     @property
-    def num_relus(self):
+    def num_relus(self) -> int:
         return len([layer for layer in self.layers.values() if isinstance(layer, nn.ReLU)])
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
@@ -98,7 +104,9 @@ class NN(nn.Module):
                 outputs.append((name, x))
         return OrderedDict(outputs)
 
-    def get_grid(self, bounds=None, res=None):
+    def get_grid(
+        self, bounds: float | None = None, res: int | None = None
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Generate a 2D grid of input points.
 
         Creates a regular grid of points in 2D space. Only works for 2D input spaces.
@@ -125,7 +133,9 @@ class NN(nn.Module):
         inputVal = np.vstack((X, Y)).T
         return x, y, inputVal
 
-    def output_grid(self, bounds=None, res=None):
+    def output_grid(
+        self, bounds: float | None = None, res: int | None = None
+    ) -> Tuple[np.ndarray, np.ndarray, OrderedDict[str, torch.Tensor]]:
         """Generate a grid and compute network outputs for all points.
 
         Args:
@@ -142,7 +152,7 @@ class NN(nn.Module):
 
         return x, y, outs
 
-    def shi2weights(self, shi, return_idx=False):
+    def shi2weights(self, shi: int, return_idx: bool = False) -> torch.Tensor | tuple[str, int]:
         """Get weights corresponding to a neuron index.
 
 
@@ -170,7 +180,7 @@ class NN(nn.Module):
         raise ValueError("Invalid Neuron Index")
 
 
-def get_mlp_model(widths, add_last_relu=False):
+def get_mlp_model(widths: Iterable[int], add_last_relu: bool = False) -> NN:
     """Create an NN object for a multi-layer perceptron (MLP).
 
     Constructs a fully connected neural network with the specified layer widths.
@@ -186,6 +196,7 @@ def get_mlp_model(widths, add_last_relu=False):
     Returns:
         NN: A configured neural network object.
     """
+    widths = list(widths)
     layers = []
     for i in range(len(widths) - 1):
         layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))

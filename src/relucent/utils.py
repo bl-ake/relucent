@@ -2,7 +2,7 @@ import random
 from collections import OrderedDict, deque
 from heapq import heappop, heappush
 from threading import Condition
-from typing import Any, Callable
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -26,7 +26,7 @@ from relucent.model import NN
 disposeDefaultEnv()
 
 
-def set_seeds(seed):
+def set_seeds(seed: int) -> None:
     """Set all RNG seeds to a given value.
 
     Args:
@@ -37,7 +37,7 @@ def set_seeds(seed):
     random.seed(seed)
 
 
-def encode_ss(ss):
+def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     """Create a hashable representation of a sign sequence.
 
     Converts a sign sequence array into a bytes object that can be used as a
@@ -54,10 +54,10 @@ def encode_ss(ss):
     return ss.flatten().tobytes()
 
 
-_env = None
+_env: Env | None = None
 
 
-def get_env():
+def get_env() -> Env:
     """Get a cached Gurobi environment.
 
     Creates and caches a Gurobi environment with logging disabled. This avoids
@@ -77,7 +77,7 @@ def get_env():
     return _env
 
 
-def close_env():
+def close_env() -> None:
     """Close the cached Gurobi environment."""
     global _env
     if _env is None:
@@ -96,7 +96,7 @@ class NonBlockingQueue:
         queue_class: Callable[[], Any] = deque,
         pop: Callable[..., Any] = lambda q: q.pop(),
         push: Callable[..., Any] = lambda q, x: q.append(x),
-    ):
+    ) -> None:
         """Initialize a non-blocking queue.
 
         Args:
@@ -106,25 +106,25 @@ class NonBlockingQueue:
             push: Function to push an element to the queue. Defaults to deque.append().
         """
         self.deque: Any = queue_class()
-        self.pop_element = pop
-        self.push_element = push
+        self.pop_element: Callable[..., Any] = pop
+        self.push_element: Callable[..., Any] = push
 
-        self.closed = False
+        self.closed: bool = False
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         while True:
             task = self.pop()
             if task == self.stopFlag:
                 return
             yield task
 
-    def pop(self, *args, **kwargs):
+    def pop(self, *args: Any, **kwargs: Any) -> Any:
         return self.pop_element(self.deque, *args, **kwargs)
 
-    def push(self, element, *args, **kwargs):
+    def push(self, element: Any, *args: Any, **kwargs: Any) -> None:
         self.push_element(self.deque, element, *args, **kwargs)
 
-    def close(self):
+    def close(self) -> None:
         self.closed = True
         self.pop = lambda q: self.stopFlag
 
@@ -142,7 +142,7 @@ class BlockingQueue:
         queue_class: Callable[[], Any] = deque,
         pop: Callable[..., Any] = lambda q: q.pop(),
         push: Callable[..., Any] = lambda q, x: q.append(x),
-    ):
+    ) -> None:
         """Create a blocking queue.
 
         Args:
@@ -156,37 +156,37 @@ class BlockingQueue:
             methods in this class will pass their arguments along.
         """
         self.deque: Any = queue_class()
-        self.pop_element = pop
-        self.push_element = push
+        self.pop_element: Callable[..., Any] = pop
+        self.push_element: Callable[..., Any] = push
 
-        self.lock = Condition()
-        self.closed = False
+        self.lock: Condition = Condition()
+        self.closed: bool = False
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         while True:
             task = self.pop()
             if task == self.stopFlag:
                 return
             yield task
 
-    def pop(self, *args, **kwargs):
+    def pop(self, *args: Any, **kwargs: Any) -> Any:
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
                 self.lock.wait(timeout=BLOCKING_QUEUE_WAIT_TIMEOUT)
             return self.pop_element(self.deque, *args, **kwargs)
 
-    def push(self, element, *args, **kwargs):
+    def push(self, element: Any, *args: Any, **kwargs: Any) -> None:
         with self.lock:
             self.push_element(self.deque, element, *args, **kwargs)
             self.lock.notify()
 
-    def close(self):
+    def close(self) -> None:
         self.closed = True
         with self.lock:
             self.pop = lambda q: self.stopFlag
             self.lock.notify()
 
-    def __len__(self):
+    def __len__(self) -> int:
         with self.lock:
             return len(self.deque)
 
@@ -204,12 +204,12 @@ class UpdatablePriorityQueue:
 
     REMOVED = "<removed-task>"  # placeholder for a removed task
 
-    def __init__(self):
-        self.pq = []  # list of entries arranged in a heap
-        self.entry_finder = {}  # mapping of tail -> entry
-        self.counter = 0
+    def __init__(self) -> None:
+        self.pq: list[list[Any]] = []  # list of entries arranged in a heap
+        self.entry_finder: dict[tuple[Any, ...], list[Any]] = {}  # mapping of tail -> entry
+        self.counter: int = 0
 
-    def push(self, task, priority=0):
+    def push(self, task: tuple[Any, ...], priority: float = 0) -> None:
         """Add a new task or update the priority of an existing task.
 
         Args:
@@ -226,7 +226,7 @@ class UpdatablePriorityQueue:
         heappush(self.pq, entry)
         self.counter += 1
 
-    def remove_task(self, task_tail):
+    def remove_task(self, task_tail: tuple[Any, ...]) -> None:
         """Mark an existing task as REMOVED. Raise KeyError if not found.
 
         Args:
@@ -235,7 +235,7 @@ class UpdatablePriorityQueue:
         entry = self.entry_finder.pop(task_tail)
         entry[-1] = self.REMOVED
 
-    def pop(self):
+    def pop(self) -> tuple[Any, ...]:
         """Remove and return the lowest-priority task.
 
         Returns:
@@ -251,11 +251,11 @@ class UpdatablePriorityQueue:
                 return (head, *tail)
         raise KeyError("pop from an empty priority queue")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entry_finder)
 
 
-def split_sequential(model, split_layer):
+def split_sequential(model: NN, split_layer: str) -> tuple[NN, NN]:
     """Split a neural network into two sequential parts.
 
     Creates two separate NN objects by splitting the model at a specified layer.
@@ -341,8 +341,20 @@ def normalize_weights(model: NN) -> NN:
     return model
 
 
-def get_colors(data, cmap="viridis", **kwargs):
-    """Map some numbers to some colors"""
+def get_colors(data: Sequence[float], cmap: str = "viridis", **kwargs: Any) -> list[str]:
+    """Map numeric values to hex color strings via a colormap.
+
+    Values are normalized to [0, 1] over the input range, then mapped through
+    the given colormap.
+
+    Args:
+        data: Sequence of numeric values.
+        cmap: Matplotlib colormap name. Defaults to "viridis".
+        **kwargs: Passed to the colormap callable.
+
+    Returns:
+        list[str]: Hex color strings (e.g. "#rrggbb") in the same order as data.
+    """
     if not data:
         return []
     a = np.asarray(data)
@@ -355,21 +367,27 @@ def get_colors(data, cmap="viridis", **kwargs):
 
 
 def data_graph(
-    node_df,
-    edge_df,
-    dataset=None,
-    draw_function=lambda x: x,
-    class_labels=True,
-    node_title_formatter=lambda i, row: row["title"] if "title" in row else str(row),
-    node_label_formatter=lambda i, row: row["label"] if "label" in row else str(i),
-    node_size_formatter=lambda row: row["size"] if "size" in row else 10,
-    edge_title_formatter=lambda row: row["title"] if "title" in row else "",
-    edge_label_formatter=lambda row: row["label"] if "label" in row else "",
-    edge_value_formatter=lambda row: row["value"] if "value" in row else 1,
-    max_images=MAX_IMAGES_PYVIS,
-    max_num_examples=MAX_NUM_EXAMPLES_PYVIS,
-    save_file=DEFAULT_PYVIS_SAVE_FILE,
-):
+    node_df: Any,
+    edge_df: Any,
+    dataset: Any | None = None,
+    draw_function: Callable[..., Any] = lambda x, **__: x,
+    class_labels: bool | None = True,
+    node_title_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
+        row["title"] if "title" in row else str(row)
+    ),
+    node_label_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
+        row["label"] if "label" in row else str(i)
+    ),
+    node_size_formatter: Callable[[Mapping[str, Any]], int] = lambda row: row["size"] if "size" in row else 10,
+    edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row["title"] if "title" in row else "",
+    edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row["label"] if "label" in row else "",
+    edge_value_formatter: Callable[[Mapping[str, Any]], float | int] = lambda row: (
+        row["value"] if "value" in row else 1
+    ),
+    max_images: int = MAX_IMAGES_PYVIS,
+    max_num_examples: int = MAX_NUM_EXAMPLES_PYVIS,
+    save_file: str = DEFAULT_PYVIS_SAVE_FILE,
+) -> None:
     """Create an interactive pyvis graph from dataframes of nodes and edges.
 
     Creates a visual graph representation where nodes can contain images of
@@ -383,7 +401,7 @@ def data_graph(
             tuples, and rows can have 'title', 'label', 'value', etc.
         dataset: Optional dataset object for extracting class labels. Defaults to None.
         draw_function: Function to draw individual data examples. Should accept
-            'data' and 'ax' parameters. Defaults to None.
+            ``data`` and ``ax``. Defaults to identity (pass-through).
         class_labels: If True and dataset is provided, shows class proportions
             as pie charts. Defaults to True.
         node_title_formatter: Function to format node titles. Defaults to using

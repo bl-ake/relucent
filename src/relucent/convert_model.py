@@ -1,5 +1,12 @@
+"""Convert PyTorch models to the canonical NN format.
+
+This module provides utilities to convert various PyTorch model architectures
+(including Conv2d, AvgPool2d, etc.) into the canonical format used by relucent,
+which consists of Linear and ReLU layers only.
+"""
+
 from collections import OrderedDict
-from typing import Tuple
+from typing import Iterable, Tuple
 
 import numpy as np
 import torch
@@ -7,13 +14,6 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 
 from relucent.model import NN
-
-"""Convert PyTorch models to the canonical NN format.
-
-This module provides utilities to convert various PyTorch model architectures
-(including Conv2d, AvgPool2d, etc.) into the canonical format used by relucent,
-which consists of Linear and ReLU layers only.
-"""
 
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
@@ -32,12 +32,12 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
         Based on: https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
     """
 
-    def range2d(to_a, to_b):
+    def range2d(to_a: int, to_b: int) -> Iterable[tuple[int, int]]:
         for a in range(to_a):
             for b in range(to_b):
                 yield a, b
 
-    def enc_tuple(tup: Tuple, shape: Tuple) -> int:
+    def enc_tuple(tup: Tuple[int, int, int], shape: Tuple[int, int, int]) -> int:
         res = 0
         coef = 1
         for i in reversed(range(len(shape))):
@@ -47,13 +47,14 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
 
         return res
 
-    def dec_tuple(x: int, shape: Tuple) -> Tuple:
-        res = []
+    def dec_tuple(x: int, shape: Tuple[int, int, int]) -> Tuple[int, int, int]:
+        res: list[int] = []
         for i in reversed(range(len(shape))):
             res.append(x % shape[i])
             x //= shape[i]
 
-        return tuple(reversed(res))
+        # We know shape has length 3, so this cast is safe.
+        return tuple(reversed(res))  # type: ignore[return-value]
 
     nfeatures, w, h = input_size
 
@@ -144,20 +145,7 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: Tuple[int, int,
     return torch_conv_layer_to_affine(conv2d, input_size)
 
 
-@torch.no_grad()
-def flatten_to_affine(input_size: Tuple[int, int, int]) -> torch.nn.Linear:
-    """Convert a Flatten operation to an identity Linear layer.
-
-    Args:
-        input_size: Input size as (channels, height, width) tuple.
-
-    Returns:
-        nn.Linear: An identity Linear layer.
-    """
-    return nn.Linear(in_features=np.prod(input_size).item(), out_features=np.prod(input_size).item())
-
-
-def combine_linear_layers(old_layers):
+def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDict[str, nn.Module]:
     """Combine consecutive Linear layers into a single layer.
 
     Since the composition of two linear transformations is itself linear,
@@ -170,9 +158,9 @@ def combine_linear_layers(old_layers):
         OrderedDict: New dictionary with consecutive Linear layers combined.
             Layer names are concatenated with '+' for combined layers.
     """
-    new_layers = OrderedDict()
-    current_linear = None
-    current_name = ""
+    new_layers: OrderedDict[str, nn.Module] = OrderedDict()
+    current_linear: nn.Linear | None = None
+    current_name: str = ""
     for name, layer in old_layers.items():
         if isinstance(layer, nn.Linear):
             if current_linear is None:
@@ -216,8 +204,8 @@ def convert(model: NN) -> NN:
         - LogSoftmax: Stops conversion (output layer)
 
     Args:
-        model: A PyTorch nn.Module with an 'input_shape' attribute and 'layers'
-            attribute containing an OrderedDict of layers.
+        model: An NN (or compatible) object with an ``input_shape`` attribute
+            and a ``layers`` attribute containing an OrderedDict of layers.
 
     Returns:
         NN: A new NN object in canonical format.
