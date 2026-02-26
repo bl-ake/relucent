@@ -39,11 +39,13 @@ class NN(nn.Module):
 
         self.to(device or self.device, dtype or self.dtype)
         if input_shape is not None:
-            self.input_shape: Tuple[int, ...] = input_shape
+            resolved_shape: Tuple[int, ...] = input_shape
         elif isinstance(fl := next(iter(self.layers.values())), nn.Linear):
-            self.input_shape: Tuple[int, ...] = (fl.in_features,)
+            resolved_shape = (fl.in_features,)
         else:
             raise ValueError("Input shape must be provided")
+
+        self.input_shape: Tuple[int, ...] = resolved_shape
 
         self.to(device or self.device, dtype or self.dtype)
 
@@ -57,8 +59,8 @@ class NN(nn.Module):
         """
         for layer in self.layers.values():
             if isinstance(layer, nn.Linear):
-                layer.weight_cpu = layer.weight.detach().cpu().numpy()
-                layer.bias_cpu = layer.bias.detach().cpu().numpy().reshape(1, -1)
+                object.__setattr__(layer, "weight_cpu", layer.weight.detach().cpu().numpy())
+                object.__setattr__(layer, "bias_cpu", layer.bias.detach().cpu().numpy().reshape(1, -1))
 
     @property
     def device(self) -> torch.device:
@@ -203,5 +205,5 @@ def get_mlp_model(widths: Iterable[int], add_last_relu: bool = False) -> NN:
         if i < len(widths) - 2 or add_last_relu:
             layers.append((f"relu{i}", nn.ReLU()))
     net = NN(layers=OrderedDict(layers))
-    net.widths = widths
+    object.__setattr__(net, "widths", widths)
     return net
