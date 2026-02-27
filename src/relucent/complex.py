@@ -5,7 +5,7 @@ import random
 import warnings
 from collections import defaultdict
 from functools import partial
-from typing import Any, cast
+from typing import Any, Generator, Iterable, Iterator, cast
 
 import networkx as nx
 import numpy as np
@@ -86,12 +86,19 @@ def poly_calculations(
             any additional data from the input task. If a ValueError occurs
             during computation, returns (error, *rest).
     """
+    assert net is not None, "set_globals must be used as pool initializer"
     ss = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(net, ss)
 
     try:
-        p._halfspaces, p._W, p._b = p.get_hs()
+        halfspaces, W, b = p.get_hs()
+        assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
+        assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
+        assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+        p._halfspaces = halfspaces
+        p._W = W
+        p._b = b
 
         p.get_center_inradius(env=env)
         p.get_interior_point(env=env)
@@ -108,9 +115,12 @@ def poly_calculations(
             p.volume
         if p._shis is None:
             if "collect_info" in kwargs:
-                p._shis, shi_info = p.get_shis(env=env, **kwargs)
+                shis, shi_info = p.get_shis(env=env, **kwargs)
+                assert isinstance(shis, list)
+                p._shis = shis
             else:
-                p._shis = p.get_shis(env=env, **kwargs)
+                result = p.get_shis(env=env, **kwargs)
+                p._shis = result[0] if isinstance(result, tuple) else result
     except ValueError as error:
         return error, *rest
     p.clean_data()
@@ -142,6 +152,7 @@ def get_ip(
     try:
         ss = p.ss_np.copy()
         ss[0, shi] = -ss[0, shi]
+        assert net is not None, "set_globals must be used as pool initializer"
         n = Polyhedron(net, ss)
         for max_radius in INTERIOR_POINT_RADIUS_SEQUENCE:
             try:
@@ -187,9 +198,12 @@ def astar_calculations(
     try:
         if p._shis is None:
             if "collect_info" in kwargs:
-                p._shis, shi_info = p.get_shis(env=env, **kwargs)
+                shis, shi_info = p.get_shis(env=env, **kwargs)
+                assert isinstance(shis, list)
+                p._shis = shis
             else:
-                p._shis = p.get_shis(env=env, **kwargs)
+                result = p.get_shis(env=env, **kwargs)
+                p._shis = result[0] if isinstance(result, tuple) else result
     except Exception as error:
         return p, error, *rest
     p.clean_data()
@@ -206,7 +220,7 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
-    def __init__(self, net):
+    def __init__(self, net: NN) -> None:
         """Initialize the complex for a given network.
 
         Args:
@@ -235,10 +249,10 @@ class Complex:
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
-    def __del__(self):
+    def __del__(self) -> None:
         close_env()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> Polyhedron:
         """Retrieve a Polyhedron from the complex by its key.
 
         Args:
@@ -259,14 +273,14 @@ class Complex:
         else:
             raise KeyError(f"Polyhedron with key {key} not in Complex")
 
-    def __contains__(self, key):
+    def __contains__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> bool:
         try:
             self[key]
             return True
         except KeyError:
             return False
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Polyhedron]:
         """Iterate over all Polyhedra in the complex.
 
         Yields:
@@ -311,13 +325,13 @@ class Complex:
         cplx.__setstate__(state)
         return cplx
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         return {
             "index2poly": self.index2poly,
             "net": self.net,
         }
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__init__(state["net"])
         self.index2poly = state["index2poly"]
         if "ssm" in state:
@@ -329,28 +343,28 @@ class Complex:
             p.net = self.net
 
     @property
-    def net(self):
+    def net(self) -> NN:
         """The neural network. May only be set once."""
         return self._net
 
     @net.setter
-    def net(self, value):
+    def net(self, value: NN) -> None:
         if self._net is not None:
             raise ValueError("The net attribute cannot be set when it already has a non-None value")
         self._net = value
 
     @property
-    def dim(self):
+    def dim(self) -> int:
         """The input dimension of the network."""
-        return np.prod(self.net.input_shape)
+        return int(np.prod(self.net.input_shape))
 
     @property
-    def n(self):
+    def n(self) -> int:
         """The number of bent hyperplanes/neurons in the network."""
         return len(self.ssi2maski)
 
     @torch.no_grad()
-    def ss_iterator(self, batch):
+    def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor, None, None]:
         """Generate sign sequences for each ReLU layer from a batch of data points.
 
         Args:
@@ -370,7 +384,7 @@ class Complex:
                 if i == self.ss_layers[-1]:
                     break
 
-    def point2ss(self, batch):
+    def point2ss(self, batch: torch.Tensor | np.ndarray) -> np.ndarray | torch.Tensor:
         """Convert a batch of data points to sign sequences.
 
         Computes the combined sign sequence across all ReLU layers for the given
@@ -425,7 +439,11 @@ class Complex:
         else:
             return Polyhedron(self.net, ss)
 
-    def add_ss(self, ss, check_exists=True):
+    def add_ss(
+        self,
+        ss: np.ndarray | torch.Tensor,
+        check_exists: bool = True,
+    ) -> Polyhedron:
         """Convert a sign sequence to a Polyhedron and add it to the complex.
 
         Args:
@@ -438,7 +456,12 @@ class Complex:
         """
         return self.add_polyhedron(Polyhedron(self.net, ss), check_exists=check_exists)
 
-    def add_polyhedron(self, p, overwrite=False, check_exists=True):
+    def add_polyhedron(
+        self,
+        p: Polyhedron,
+        overwrite: bool = False,
+        check_exists: bool = True,
+    ) -> Polyhedron:
         """Add a Polyhedron to the complex.
 
         Args:
@@ -472,7 +495,11 @@ class Complex:
             self.ssm.add(p.ss_np)
             return p
 
-    def add_point(self, data, check_exists=True):
+    def add_point(
+        self,
+        data: torch.Tensor | np.ndarray,
+        check_exists: bool = True,
+    ) -> Polyhedron:
         """Find the polyhedron containing a data point and add it to the complex.
 
         Args:
@@ -486,7 +513,7 @@ class Complex:
         """
         return self.add_ss(self.point2ss(data), check_exists=check_exists)
 
-    def clean_data(self):
+    def clean_data(self) -> None:
         """Clean cached data from all polyhedra in the complex.
 
         This method calls clean_data() on each polyhedron, which removes most of their
@@ -496,7 +523,7 @@ class Complex:
             poly.clean_data()
 
     @torch.no_grad()
-    def adjacent_polyhedra(self, poly):
+    def adjacent_polyhedra(self, poly: Polyhedron) -> set[Polyhedron]:
         """Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.
 
         Also works on lower-dimensional polyhedra.
@@ -511,7 +538,13 @@ class Complex:
             ps.add(self.ss2poly(ss))
         return ps
 
-    def parallel_add(self, points, nworkers=None, bound=DEFAULT_PARALLEL_ADD_BOUND, **kwargs):
+    def parallel_add(
+        self,
+        points: Iterable[torch.Tensor | np.ndarray],
+        nworkers: int | None = None,
+        bound: float = DEFAULT_PARALLEL_ADD_BOUND,
+        **kwargs: Any,
+    ) -> list[Polyhedron | None]:
         """Add multiple polyhedra from data points using parallel processing.
 
         Processes a batch of data points in parallel, computing their corresponding
@@ -615,7 +648,9 @@ class Complex:
         found_sss.add(start.ss_np)
         if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
-        start._shis = start.get_shis(bound=bound, **kwargs)
+        result = start.get_shis(bound=bound, **kwargs)
+        assert isinstance(result, list)
+        start._shis = result
         ##TODO: replace with something like queue.push((start.ss_np, None, 0, self.ssm[start.ss_np]))
         for shi in start.shis:
             new_ss = start.ss_np.copy()
@@ -787,7 +822,11 @@ class Complex:
                 return [start] + rest
         return []
 
-    def greedy_path(self, start, end):
+    def greedy_path(
+        self,
+        start: torch.Tensor | np.ndarray | Polyhedron,
+        end: torch.Tensor | np.ndarray | Polyhedron,
+    ) -> list[Polyhedron] | None:
         """Greedily find a path between two data points.
 
         Attempts to find a path through adjacent polyhedra from start to end
@@ -802,13 +841,20 @@ class Complex:
             list or None: A list of Polyhedron objects representing the path
                 from start to end, or None if no path is found.
         """
-        start = self.add_point(start)
-        end = self.add_point(end)
-        return self._greedy_path_helper(start, end)
+        start_poly = self.add_polyhedron(start) if isinstance(start, Polyhedron) else self.add_point(start)
+        end_poly = self.add_polyhedron(end) if isinstance(end, Polyhedron) else self.add_point(end)
+        return self._greedy_path_helper(start_poly, end_poly)
 
     def hamming_astar(
-        self, start, end, nworkers=None, bound=DEFAULT_SEARCH_BOUND, max_polys=float("inf"), show_pbar=True, **kwargs
-    ):
+        self,
+        start: torch.Tensor | np.ndarray | Polyhedron,
+        end: torch.Tensor | np.ndarray | Polyhedron,
+        nworkers: int | None = None,
+        bound: float = DEFAULT_SEARCH_BOUND,
+        max_polys: float = float("inf"),
+        show_pbar: bool = True,
+        **kwargs: Any,
+    ) -> list[Polyhedron] | None:
         """Find a path between two data points using A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -834,24 +880,23 @@ class Complex:
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
-
-        start = self.add_point(start)
-        end = self.add_point(end)
-        if start == end:
+        start_poly = self.add_polyhedron(start) if isinstance(start, Polyhedron) else self.add_point(start)
+        end_poly = self.add_polyhedron(end) if isinstance(end, Polyhedron) else self.add_point(end)
+        if start_poly == end_poly:
             print("Start and end points are in the same region")
-            start.get_center_inradius()
-            start.get_interior_point()
-            start.get_shis(bound=bound)
-            return [start]
+            start_poly.get_center_inradius()
+            start_poly.get_interior_point()
+            start_poly.get_shis(bound=bound)
+            return [start_poly]
 
-        if (start.ss_np == 0).any():
+        if (start_poly.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
 
-        nhs = len(start.halfspaces)
+        nhs = len(start_poly.halfspaces)
         nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (os.process_cpu_count() or 1)), nhs)
         print(f"Using {nworkers} workers")
 
-        cameFrom = dict()
+        cameFrom: dict[Polyhedron, Polyhedron] = {}
         gScore = defaultdict(lambda: float("inf"))
         fScore = defaultdict(lambda: float("inf"))
 
@@ -863,14 +908,16 @@ class Complex:
         # found_sss = SSManager()
         # nworkers = nworkers or os.process_cpu_count()
 
-        gScore[start] = 0
-        fScore[start] = (start.ss_np != end.ss_np).sum()
-        # found_sss.add(start.ss)
-        # found = set(start)
+        gScore[start_poly] = 0
+        fScore[start_poly] = (start_poly.ss_np != end_poly.ss_np).sum()
+        # found_sss.add(start_poly.ss)
+        # found = set(start_poly)
 
-        start._shis = start.get_shis(bound=bound, **kwargs)
+        result = start_poly.get_shis(bound=bound, **kwargs)
+        assert isinstance(result, list)
+        start_poly._shis = result
 
-        openSet.push((start, None, 0), 0)
+        openSet.push((start_poly, None, 0), 0)
 
         bad_shi_computations = []
         pbar = tqdm(
@@ -884,13 +931,13 @@ class Complex:
 
         unprocessed = len(openSet)
         depth = 0
-        neighbor = None
+        neighbor: Polyhedron | ValueError | None = None
         min_dist = float("inf")
-        min_p = start
+        min_p = start_poly
 
-        def heuristic(p, depth, shi):
-            hamming = (p.ss_np != end.ss_np).sum()
-            dist = np.linalg.norm(p.interior_point - end.interior_point).item()
+        def heuristic(p: Polyhedron, depth: int, shi: int) -> float:
+            hamming = (p.ss_np != end_poly.ss_np).sum()
+            dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
             # bias = -1 / ((1 + dist) ** 0.1)  ## TODO: Test if this is faster
             # bias = -1 / (1 + np.log(dist + 10))
             bias = -1 / (1 + dist)
@@ -898,7 +945,7 @@ class Complex:
             # bias = 1 / (1 + depth) - 1
             return hamming + ASTAR_BIAS_WEIGHT * bias
 
-        def d(p1, p2):
+        def d(p1: Polyhedron, p2: Polyhedron) -> int:
             return 1
 
         # with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
@@ -948,9 +995,9 @@ class Complex:
                                 min_p = neighbor
                             openSet.push((neighbor, neighbor_shi, depth + 1), fScore[neighbor])
                             unprocessed += 1
-                            if neighbor == end:
+                            if neighbor == end_poly:
                                 break
-                    if neighbor == end:
+                    if neighbor == end_poly:
                         break
 
                 # next_one = openSet.deque.pq[0][2]
@@ -975,14 +1022,14 @@ class Complex:
                 if min_dist < 1:
                     if 0 < min_dist:
                         ## TODO: What if there are no/multiple differences?
-                        last_shi = np.argwhere((min_p.ss_np != end.ss_np).flatten()).item()
+                        last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).flatten()).item()
                         if last_shi in min_p.shis:
-                            cameFrom[end] = min_p
-                            neighbor = end
+                            cameFrom[end_poly] = min_p
+                            neighbor = end_poly
                             break
                     else:
                         # raise ValueError("what in tarnation???")
-                        neighbor = end
+                        neighbor = end_poly
                         break
 
                 if unprocessed == 0 or len(cameFrom) >= max_polys:
@@ -1001,9 +1048,9 @@ class Complex:
             pbar.close()
         #     print("Closed out")
         # print("Finished A* Search")
-        if neighbor == end:
-            path = [end]
-            while path[-1] != start:
+        if neighbor == end_poly:
+            path = [end_poly]
+            while path[-1] != start_poly:
                 assert cameFrom[path[-1]] not in path, path
                 path.append(cameFrom[path[-1]])
             path.reverse()
@@ -1017,7 +1064,7 @@ class Complex:
             # print(f"No Path Found - Final Distance: {min_dist - 1}")
             return None
 
-    def get_poly_attrs(self, attrs):
+    def get_poly_attrs(self, attrs: Iterable[str]) -> dict[str, list[Any]]:
         """Extract specified attributes from all polyhedra in the complex.
 
         Useful for building tabular representations or dataframes of polyhedra
@@ -1130,7 +1177,13 @@ class Complex:
             G = nx.relabel_nodes(G, {poly: i for i, poly in enumerate(self)})
         return G
 
-    def recover_from_dual_graph(self, G, initial_ss, source, copy=False):
+    def recover_from_dual_graph(
+        self,
+        G: nx.Graph,
+        initial_ss: np.ndarray | torch.Tensor,
+        source: int,
+        copy: bool = False,
+    ) -> None:
         """Recover a complex from its connectivity graph.
 
         Reconstructs polyhedra in the complex by traversing the adjacency graph
