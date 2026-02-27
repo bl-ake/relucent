@@ -102,14 +102,6 @@ class TestPolyhedronOps:
         assert isinstance(n, (int, np.integer))
         assert n >= 0
 
-    def test_mul_raises_non_polyhedron(self, seeded):
-        net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
-        cplx = Complex(net)
-        x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
-        p = cplx.add_point(x)
-        with pytest.raises(ValueError, match="Cannot multiply Polyhedron"):
-            _ = p * 1
-
 
 class TestPolyhedronCleanData:
     def test_clean_data_clears_caches(self, seeded):

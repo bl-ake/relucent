@@ -77,6 +77,7 @@ def test_hamming_astar_path(seeded):
     start = torch.rand(16, device=model.device, dtype=model.dtype)
     end = torch.rand(16, device=model.device, dtype=model.dtype)
     path = cplx.hamming_astar(start=start, end=end)
+    assert path is not None
     assert start in path[0]
     assert end in path[-1]
     for p1, p2 in zip(path[:-1], path[1:]):

@@ -1,6 +1,7 @@
 import hashlib
 import warnings
 from functools import cached_property
+from typing import Any, Iterable, MutableSequence, cast
 
 import numpy as np
 import plotly.graph_objects as go
@@ -27,8 +28,12 @@ from relucent.utils import encode_ss, get_env
 
 
 def solve_radius(
-    env, halfspaces, max_radius=GRB.INFINITY, zero_indices=None, sense=GRB.MAXIMIZE
-) -> tuple[np.ndarray | None, float | None]:
+    env: Any,
+    halfspaces: np.ndarray | torch.Tensor,  ## TODO: Remove redundant check for this
+    max_radius: float = GRB.INFINITY,
+    zero_indices: MutableSequence[int] | None = None,
+    sense: int = GRB.MAXIMIZE,
+) -> tuple[np.ndarray | None, float]:
     """Solve for the Chebyshev center or interior point of a polyhedron.
 
     Only works if all polyhedron vertices are within 2*max_radius of each other.
@@ -44,8 +49,8 @@ def solve_radius(
 
     Returns:
         tuple: (center_point, radius) where center_point is the center/interior
-            point and radius is the inradius. Returns (None, None) if the polyhedron
-            is unbounded and max_radius is infinity.
+            point and radius is the inradius. Returns (None, float('inf')) if the
+            polyhedron is unbounded and max_radius is infinity.
 
     Raises:
         ValueError: If the optimization fails or produces invalid results.
@@ -86,7 +91,7 @@ def solve_radius(
     else:
         if max_radius == GRB.INFINITY:
             model.close()
-            return None, None
+            return None, float("inf")
         else:
             # if status == GRB.INFEASIBLE:
             #     breakpoint()
@@ -103,7 +108,18 @@ class Polyhedron:
 
     MAX_RADIUS = MAX_RADIUS  # from config; smaller is faster but may exclude polyhedra
 
-    def __init__(self, net, ss, halfspaces=None, W=None, b=None, point=None, shis=None, bound=None, **kwargs):
+    def __init__(
+        self,
+        net: NN,
+        ss: np.ndarray | torch.Tensor,
+        halfspaces: np.ndarray | torch.Tensor | None = None,
+        W: np.ndarray | torch.Tensor | None = None,
+        b: np.ndarray | torch.Tensor | None = None,
+        point: np.ndarray | torch.Tensor | None = None,
+        shis: list[int] | None = None,
+        bound: float | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Create a Polyhedron object.
 
         The kwargs can be used to supply precomputed values for various properties.
@@ -114,33 +130,33 @@ class Polyhedron:
         """
         self._net = net
         self._ss = ss
-        self._halfspaces = halfspaces
-        self._halfspaces_np = None
-        self._W = W
-        self._b = b
-        self._Wl2 = None
+        self._halfspaces: torch.Tensor | np.ndarray | None = halfspaces
+        self._halfspaces_np: np.ndarray | None = None
+        self._W: torch.Tensor | np.ndarray | None = W
+        self._b: torch.Tensor | np.ndarray | None = b
+        self._Wl2: float | None = None
         if isinstance(point, torch.Tensor):
             point = point.detach().cpu().numpy()
         self._point = point
-        self._interior_point = None
-        self._interior_point_norm = None
-        self._center = None
-        self._inradius = None
-        self._num_dead_relus = None
+        self._interior_point: np.ndarray | None = None
+        self._interior_point_norm: float | None = None
+        self._center: np.ndarray | None = None
+        self._inradius: float | None = None
+        self._num_dead_relus: int | None = None
         self.bound = bound
 
-        self._shis = shis
+        self._shis: list[int] | None = shis
         self._hs = None
-        self._ch = None
-        self._finite = None
-        self._vertices = None
-        self._volume = None
+        self._ch: ConvexHull | None = None
+        self._finite: bool | None = None
+        self._vertices: np.ndarray | None = None
+        self._volume: float | None = None
 
-        self._hash = None
-        self._tag = None
+        self._hash: int | None = None
+        self._tag: bytes | None = None
 
         # Cached NumPy representation of the sign sequence (if/when needed).
-        self._ss_np = None
+        self._ss_np: np.ndarray | None = None
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -157,12 +173,12 @@ class Polyhedron:
         self._net = value
 
     @property
-    def ss(self):
+    def ss(self) -> np.ndarray | torch.Tensor:
         """My sign sequence."""
         return self._ss
 
     @ss.setter
-    def ss(self, value):
+    def ss(self, value: np.ndarray | torch.Tensor) -> None:
         self._ss = value
         # Invalidate cached NumPy representation of the sign sequence.
         self._ss_np = None
@@ -181,7 +197,7 @@ class Polyhedron:
         assert self._ss_np is not None
         return self._ss_np
 
-    def compute_properties(self):
+    def compute_properties(self) -> bool:
         """Compute additional geometric properties for low-dimensional polyhedra.
 
         Returns:
@@ -221,7 +237,12 @@ class Polyhedron:
                 self._ch = None
         return True
 
-    def get_interior_point(self, env=None, max_radius=None, zero_indices=None):
+    def get_interior_point(
+        self,
+        env: Any = None,
+        max_radius: float | None = None,
+        zero_indices: MutableSequence[int] | None = None,
+    ) -> np.ndarray:
         """Get a point inside the polyhedron.
 
         Computes an interior point of the polyhedron. If the center is already
@@ -258,7 +279,7 @@ class Polyhedron:
             raise ValueError("Interior point not found")
         return self._interior_point
 
-    def get_center_inradius(self, env=None):
+    def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float]:
         """Get the Chebyshev center and inradius of the polyhedron.
 
         Also sets self._finite to indicate if the polyhedron is finite.
@@ -275,7 +296,16 @@ class Polyhedron:
         self._finite = self._center is not None
         return self._center, self._inradius
 
-    def get_hs(self, data=None, get_all_Ab=False, force_numpy=False):
+    def get_hs(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: bool = False,
+        force_numpy: bool = False,
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        | tuple[np.ndarray, np.ndarray, np.ndarray]
+        | list[dict[str, Any]]
+    ):
         """Get the halfspace representation of this polyhedron.
 
         Computes the halfspaces (inequality constraints) that define the polyhedron
@@ -303,7 +333,11 @@ class Polyhedron:
             return self._get_hs_numpy(data, get_all_Ab)
 
     @torch.no_grad()
-    def _get_hs_torch(self, data=None, get_all_Ab=False):
+    def _get_hs_torch(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | list[dict[str, Any]]:
         """Get halfspaces when the sign sequence is a torch.Tensor.
 
         Computes the halfspace representation using PyTorch operations.
@@ -338,22 +372,24 @@ class Polyhedron:
                 current_A = current_A @ A.T
                 current_b = current_b @ A.T + b
             elif isinstance(layer, nn.ReLU):
+                assert current_A is not None
+                assert current_b is not None
+
                 mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
                 new_constr_A = current_A * mask
                 new_constr_b = current_b * mask
 
-                assert constr_A is not None
-                assert constr_b is not None
-                assert current_A is not None
-                assert current_b is not None
+                assert isinstance(constr_A, torch.Tensor)
+                assert isinstance(constr_b, torch.Tensor)
+                assert isinstance(current_A, torch.Tensor)
+                assert isinstance(current_b, torch.Tensor)
+                assert isinstance(mask, torch.Tensor)
 
-                constr_A = torch.concatenate(
-                    (constr_A, new_constr_A[:, mask != 0], current_A[:, mask == 0], -current_A[:, mask == 0]), dim=1
-                )
-                constr_b = torch.concatenate(
-                    (constr_b, new_constr_b[:, mask != 0], current_b[:, mask == 0], -current_b[:, mask == 0]), dim=1
-                )
+                parts_A = (constr_A, new_constr_A[:, mask != 0], current_A[:, mask == 0], -current_A[:, mask == 0])
+                constr_A = torch.cat(parts_A, dim=1)
+                parts_b = (constr_b, new_constr_b[:, mask != 0], current_b[:, mask == 0], -current_b[:, mask == 0])
+                constr_b = torch.cat(parts_b, dim=1)
 
                 current_A = current_A * (mask == 1)
                 current_b = current_b * (mask == 1)
@@ -368,6 +404,8 @@ class Polyhedron:
                     f"Error while processing layer {name} - Unsupported layer type: {type(layer)} ({layer})"
                 )
             if data is not None:
+                assert isinstance(current_A, torch.Tensor)
+                assert isinstance(current_b, torch.Tensor)
                 assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
             if get_all_Ab:
                 assert current_A is not None
@@ -378,16 +416,23 @@ class Polyhedron:
         assert constr_A is not None
         assert constr_b is not None
 
-        self._num_dead_relus = (torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item()
+        self._num_dead_relus = int((torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item())
         halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
 
         if get_all_Ab:
             return all_Ab
 
+        assert isinstance(halfspaces, torch.Tensor)
+        assert isinstance(current_A, torch.Tensor)
+        assert isinstance(current_b, torch.Tensor)
         return halfspaces, current_A, current_b
 
     @torch.no_grad()
-    def _get_hs_numpy(self, data=None, get_all_Ab=False):
+    def _get_hs_numpy(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, Any]]:
         """Get halfspaces when the sign sequence is a numpy array.
 
         Args:
@@ -456,6 +501,8 @@ class Polyhedron:
                     f"Error while processing layer {name} - Unsupported layer type: {type(layer)} ({layer})"
                 )
             if data is not None:
+                assert isinstance(current_A, np.ndarray)
+                assert isinstance(current_b, np.ndarray)
                 assert np.allclose(
                     outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL
                 )
@@ -472,9 +519,12 @@ class Polyhedron:
         halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
         if get_all_Ab:
             return all_Ab
+        assert isinstance(halfspaces, np.ndarray)
+        assert isinstance(current_A, np.ndarray)
+        assert isinstance(current_b, np.ndarray)
         return halfspaces, current_A, current_b
 
-    def get_bounded_halfspaces(self, bound, env=None) -> np.ndarray:
+    def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
 
         Adds constraints that bound the space to a hypercube of radius ``bound``
@@ -507,7 +557,7 @@ class Polyhedron:
         else:
             raise ValueError("Bounding box constraints are not feasible")
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
         elif isinstance(other, str):
@@ -530,13 +580,13 @@ class Polyhedron:
 
     def get_shis(
         self,
-        collect_info=False,
-        bound=GRB.INFINITY,
-        subset=None,
-        tol=TOL_SHI_HYPERPLANE,
-        new_method=False,
-        env=None,
-        shi_pbar=False,
+        collect_info: bool | str = False,
+        bound: float = GRB.INFINITY,
+        subset: Iterable[int] | None = None,
+        tol: float = TOL_SHI_HYPERPLANE,
+        new_method: bool = False,
+        env: Any = None,
+        shi_pbar: bool = False,
     ) -> list[int] | tuple[list[int], list]:
         """Get supporting halfspace indices (SHIs) for this polyhedron.
 
@@ -680,7 +730,7 @@ class Polyhedron:
             return shis, poly_info
         return shis
 
-    def nflips(self, other):
+    def nflips(self, other: "Polyhedron") -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
 
         Args:
@@ -689,9 +739,9 @@ class Polyhedron:
         Returns:
             int: The number of sign sequence elements that differ.
         """
-        return (self.ss * other.ss == -1).sum().item()
+        return int((self.ss * other.ss == -1).sum().item())
 
-    def is_face_of(self, other):
+    def is_face_of(self, other: "Polyhedron") -> bool:
         """Check if this polyhedron is a face of another polyhedron.
 
         Args:
@@ -700,9 +750,10 @@ class Polyhedron:
         Returns:
             bool: True if this polyhedron is a face of the other.
         """
-        return ((self * other).ss == other.ss).all()
+        eq = (self * other).ss == other.ss
+        return bool(cast(torch.Tensor, eq).all())
 
-    def get_bounded_vertices(self, bound):
+    def get_bounded_vertices(self, bound: float) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
 
         Computes the vertices of the polyhedron after intersecting it with a
@@ -737,13 +788,13 @@ class Polyhedron:
 
     def plot2d(
         self,
-        fill="toself",
-        showlegend=False,
-        bound=DEFAULT_PLOT_BOUND,
-        plot_halfspaces=False,
-        halfspace_shade=True,
-        **kwargs,
-    ):
+        fill: str = "toself",
+        showlegend: bool = False,
+        bound: float = DEFAULT_PLOT_BOUND,
+        plot_halfspaces: bool = False,
+        halfspace_shade: bool = True,
+        **kwargs: Any,
+    ) -> list[go.Scatter]:
         """Plot the polyhedron in 2D using plotly.
 
         Args:
@@ -815,7 +866,14 @@ class Polyhedron:
                 )
         return traces
 
-    def plot3d(self, fill="toself", showlegend=False, bound=DEFAULT_PLOT_BOUND, project=None, **kwargs):
+    def plot3d(
+        self,
+        fill: str = "toself",
+        showlegend: bool = False,
+        bound: float = DEFAULT_PLOT_BOUND,
+        project: float | None = None,
+        **kwargs: Any,
+    ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
         """Plot the polyhedron in 3D using plotly.
 
         Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
@@ -870,7 +928,7 @@ class Polyhedron:
         else:
             return None
 
-    def clean_data(self):
+    def clean_data(self) -> None:
         """Clear cached data to reduce memory usage.
 
         Removes large cached properties like halfspaces, W matrix, center,
@@ -955,10 +1013,18 @@ class Polyhedron:
                 constraint a^T x + b <= 0.
         """
         if self._halfspaces is None:
-            self._halfspaces, self._W, self._b = self.get_hs()
+            halfspaces, W, b = self.get_hs()
+            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
+            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
+            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            self._halfspaces = halfspaces
+            self._W = W
+            self._b = b
             self._halfspaces_np = None
-        assert self._halfspaces is not None  # get_hs() always returns non-None halfspaces
-        return self._halfspaces
+            assert isinstance(self._halfspaces, torch.Tensor) or isinstance(self._halfspaces, np.ndarray)
+            return self._halfspaces
+        else:
+            return self._halfspaces
 
     @property
     def halfspaces_np(self) -> np.ndarray:
@@ -971,8 +1037,9 @@ class Polyhedron:
                 self._halfspaces_np = hs.detach().cpu().numpy()
             else:
                 raise TypeError(f"Unsupported halfspaces type: {type(hs)}")
-        assert self._halfspaces_np is not None
-        return self._halfspaces_np
+            return self._halfspaces_np
+        else:
+            return self._halfspaces_np
 
     @property
     def W(self) -> torch.Tensor | np.ndarray:
@@ -982,10 +1049,18 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Transformation matrix.
         """
         if self._W is None:
-            self._halfspaces, self._W, self._b = self.get_hs()
+            halfspaces, W, b = self.get_hs()
+            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
+            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
+            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            self._halfspaces = halfspaces
+            self._W = W
+            self._b = b
             self._halfspaces_np = None
-        assert self._W is not None  # get_hs() always returns non-None W
-        return self._W
+            assert isinstance(self._W, torch.Tensor) or isinstance(self._W, np.ndarray)
+            return self._W
+        else:
+            return self._W
 
     @property
     def b(self) -> torch.Tensor | np.ndarray:
@@ -995,34 +1070,49 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Bias vector.
         """
         if self._b is None:
-            self._halfspaces, self._W, self._b = self.get_hs()
+            halfspaces, W, b = self.get_hs()
+            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
+            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
+            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            self._halfspaces = halfspaces
+            self._W = W
+            self._b = b
             self._halfspaces_np = None
-        assert self._b is not None  # get_hs() always returns non-None b
+        assert isinstance(self._b, torch.Tensor) or isinstance(self._b, np.ndarray)
         return self._b
 
     @property
-    def num_dead_relus(self):
+    def num_dead_relus(self) -> int:
         """Number of dead ReLU neurons (neurons always outputting zero).
 
         Returns:
             int: Count of ReLU neurons that are always inactive for this polyhedron.
         """
         if self._num_dead_relus is None:
-            self._halfspaces, self._W, self._b = self.get_hs()
+            halfspaces, W, b = self.get_hs()
+            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
+            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
+            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            self._halfspaces = halfspaces
+            self._W = W
+            self._b = b
             self._halfspaces_np = None
+        assert isinstance(self._num_dead_relus, int)
         return self._num_dead_relus
 
     @property
-    def Wl2(self):
+    def Wl2(self) -> float:
         """L2 norm of the transformation matrix W."""
         if self._Wl2 is None:
             if isinstance(self.W, torch.Tensor):
-                self._Wl2 = torch.linalg.norm(self.W).item()
+                self._Wl2 = float(torch.linalg.norm(self.W).item())
             elif isinstance(self.W, np.ndarray):
-                self._Wl2 = np.linalg.norm(self.W)
+                self._Wl2 = float(np.linalg.norm(self.W))
             else:
                 raise NotImplementedError
-        return self._Wl2
+            return self._Wl2
+        else:
+            return self._Wl2
 
     @property
     def center(self) -> np.ndarray | None:
@@ -1049,7 +1139,8 @@ class Polyhedron:
     def shis(self) -> list[int]:
         """Supporting halfspace indices (SHIs)."""
         if self._shis is None:
-            self._shis = self.get_shis()
+            result = self.get_shis()
+            self._shis = result[0] if isinstance(result, tuple) else result
         assert isinstance(self._shis, list)
         return self._shis
 
@@ -1067,7 +1158,7 @@ class Polyhedron:
     def interior_point(self) -> np.ndarray:
         """A point guaranteed to be inside the polyhedron. Never None once computed (get_interior_point raises if not found)."""
         if self._interior_point is None:
-            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten()
+            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten().tolist()
             self.get_interior_point(zero_indices=zero_indices)
         assert self._interior_point is not None
         return self._interior_point
@@ -1085,7 +1176,7 @@ class Polyhedron:
         return self._point
 
     @point.setter
-    def point(self, value):
+    def point(self, value: np.ndarray | None) -> None:
         """Set the representative point manually."""
         self._point = value
 
@@ -1097,22 +1188,20 @@ class Polyhedron:
         assert self._interior_point_norm is not None
         return self._interior_point_norm
 
-    def __getitem__(self, key):
-        return self.ss[key]
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         h = hashlib.blake2b(key=b"hi")
         h.update(self.tag)
         return h.hexdigest()[:8]
 
-    def __contains__(self, point):
+    def __contains__(self, point: np.ndarray | torch.Tensor) -> bool:
         """Check if a point (ndarray or Tensor) is contained in the polyhedron."""
         if not isinstance(point, torch.Tensor):
             point = torch.Tensor(point).to(self.net.device, self.net.dtype)
         point = point.reshape(1, -1)
-        return (point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT).all()
+        dists = point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1]
+        return bool((dists <= TOL_HALFSPACE_CONTAINMENT).all())
 
-    def __mul__(self, other):
+    def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
         if not isinstance(other, Polyhedron):
             raise ValueError(f"Cannot multiply Polyhedron with {type(other)}")
@@ -1120,10 +1209,10 @@ class Polyhedron:
 
     """The following methods are used for pickling"""
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         return {
             "_tag": self.tag,
             "_hash": self._hash,
@@ -1137,7 +1226,7 @@ class Polyhedron:
             "_interior_point": self._interior_point,  ## TODO: Does this slow down things?
         }
 
-    def __reduce__(self):
+    def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
         return (
             Polyhedron,
             (None, self.ss_np),
