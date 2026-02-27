@@ -6,7 +6,8 @@ Explore the polyhedral complexes of ReLU neural networks
 
 This package differs from existing software (for example, check out the amazing [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient, in particular speeding up local search of the complex in higher dimensions.
 
-If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent/issues).
+If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent/issues). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
+
 
 ## Environment Setup 
 1. Install Python 3.13
