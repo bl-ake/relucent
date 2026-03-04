@@ -665,7 +665,7 @@ class Polyhedron:
                 model.close()
                 raise KeyboardInterrupt
             if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
-                if model.objVal >= 0:
+                if model.objVal > 0:
                     dists = A @ x.X + b
                     if dists[(dists > 0)].sum() >= 1 + tol:
                         warnings.warn(
