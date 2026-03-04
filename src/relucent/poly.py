@@ -277,6 +277,8 @@ class Polyhedron:
             self._interior_point = self._interior_point.squeeze()
         if self._interior_point is None:
             raise ValueError("Interior point not found")
+        if self._interior_point not in self:
+            raise ValueError("Interior point invalid")
         return self._interior_point
 
     def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float]:
