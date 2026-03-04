@@ -81,8 +81,10 @@ def solve_radius(
         objVal = model.objVal
         x, y = x.X, float(np.squeeze(y.X))
         model.close()
-        if objVal <= 0:
-            raise ValueError(f"Something has gone horribly wrong: objVal={objVal}")
+        if objVal <= 0 and objVal > -1e-6:
+            raise ValueError(f"Inradius {objVal:.4e}")
+        if objVal < -1e-6:
+            raise ValueError(f"Something has gone horribly wrong: objVal={objVal:.4e}")
         assert isinstance(x, np.ndarray)
         return x, y
     elif status == GRB.INTERRUPTED:
@@ -132,6 +134,7 @@ class Polyhedron:
         self._ss = ss
         self._halfspaces: torch.Tensor | np.ndarray | None = halfspaces
         self._halfspaces_np: np.ndarray | None = None
+        self._nonzero_halfspaces_np: np.ndarray | None = None
         self._W: torch.Tensor | np.ndarray | None = W
         self._b: torch.Tensor | np.ndarray | None = b
         self._Wl2: float | None = None
@@ -208,20 +211,33 @@ class Polyhedron:
         """
         if self.net.input_shape[0] > 6:
             raise ValueError("Input shape too large to compute extra properties")
+        if np.isnan(self.halfspaces_np).any():
+            raise ValueError("Halfspaces contain NaNs")
+        if np.isinf(self.halfspaces_np).any():
+            raise ValueError("Halfspaces contain infinities")
         try:
             # warnings.warn("Computing Additional Properties")
-            halfspaces = self.halfspaces_np
+            halfspaces = self.nonzero_halfspaces_np
+            if np.isnan(halfspaces).any():
+                raise ValueError("Halfspaces contain NaNs")
+            if np.isinf(halfspaces).any():
+                raise ValueError("Halfspaces contain infinities")
+            if np.isnan(self.interior_point).any():
+                raise ValueError("Interior point contains NaNs")
+            if np.isinf(self.interior_point).any():
+                raise ValueError("Interior point contains infinities")
             hs = HalfspaceIntersection(
                 halfspaces,
                 self.interior_point,
                 # qhull_options="Qx",
             )  ## http://www.qhull.org/html/qh-optq.htm
-        except Exception:
-            raise ValueError("Error while computing halfspace intersection")
+        except Exception as e:
+            raise ValueError(f"Error while computing halfspace intersection: {e}")
+            # raise ValueError("Error while computing halfspace intersection")
         self._hs = hs
         self._shis = hs.dual_vertices.flatten().tolist()
         vertices = hs.intersections
-        trust_vertices = np.isinf(vertices).any(axis=1)
+        trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
         if not (
             (halfspaces[self.shis, :-1] @ vertices[trust_vertices].T + halfspaces[self.shis, -1, None]).sum(axis=0)
             < VERTEX_TRUST_THRESHOLD
@@ -269,7 +285,7 @@ class Polyhedron:
             env = env or get_env()
             self._interior_point = solve_radius(
                 env,
-                self.halfspaces_np,
+                self.nonzero_halfspaces_np,
                 max_radius=max_radius,
                 zero_indices=zero_indices,
             )[0]
@@ -294,7 +310,7 @@ class Polyhedron:
             tuple: (center, inradius) where center is None for unbounded polyhedra.
         """
         env = env or get_env()
-        self._center, self._inradius = solve_radius(env, self.halfspaces[:])
+        self._center, self._inradius = solve_radius(env, self.nonzero_halfspaces_np[:])
         self._finite = self._center is not None
         return self._center, self._inradius
 
@@ -547,7 +563,7 @@ class Polyhedron:
         bounds_rhs = -np.ones((self.halfspaces_np.shape[1] - 1, 1)) * bound
         halfspaces = np.vstack(
             (
-                self.halfspaces_np,
+                self.nonzero_halfspaces_np,
                 np.hstack((bounds_lhs, bounds_rhs)),
                 np.hstack((-bounds_lhs, bounds_rhs)),
             )
@@ -1042,6 +1058,14 @@ class Polyhedron:
             return self._halfspaces_np
         else:
             return self._halfspaces_np
+
+    @property
+    def nonzero_halfspaces_np(self) -> np.ndarray:
+        """Cached NumPy representation of nonzero halfspaces."""
+        if self._nonzero_halfspaces_np is None:
+            # remove all 0 rows from the halfspaces_np
+            self._nonzero_halfspaces_np = self.halfspaces_np[~np.all(self.halfspaces_np == 0, axis=1)]
+        return self._nonzero_halfspaces_np
 
     @property
     def W(self) -> torch.Tensor | np.ndarray:
