@@ -71,6 +71,17 @@ class TestPolyhedronBasics:
         with pytest.raises(ValueError, match="Cannot compare Polyhedron"):
             _ = p == 1
 
+    def test_volume(self):
+        W = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]])
+        b = torch.tensor([1, 1, 1, 1])
+        net = get_mlp_model(widths=[2, 4], add_last_relu=True)
+        net.layers["fc0"].weight.data = W.to(net.device, net.dtype)
+        net.layers["fc0"].bias.data = b.to(net.device, net.dtype)
+        cplx = Complex(net)
+        p = cplx.add_point(torch.zeros((1, 2), device=net.device, dtype=net.dtype))
+        assert p.volume is not None
+        assert p.volume == 4
+
 
 class TestPolyhedronContainment:
     def test_interior_point_in_polyhedron(self, seeded):
