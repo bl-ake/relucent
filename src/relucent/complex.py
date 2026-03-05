@@ -684,7 +684,7 @@ class Complex:
                         bad_shi_computations.append((node, shi, depth, str(p)))
                         node._shis.remove(shi)
                         if len(node._shis) < min(self.dim, self.n):
-                            warnings.warn(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
+                            raise ValueError(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
                         if unprocessed == 0 or len(self) >= max_polys:
                             break
                         continue
@@ -693,6 +693,11 @@ class Complex:
                     p.net = self.net
 
                     p = self.add_polyhedron(p)
+
+                    if p.jittered:
+                        warnings.warn(
+                            "Polyhedron was jittered when calculating vertices and volumes to avoid numerical issues"
+                        )
 
                     if depth < max_depth:
                         for new_shi in p.shis:
