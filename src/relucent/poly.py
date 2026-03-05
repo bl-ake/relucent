@@ -201,7 +201,7 @@ class Polyhedron:
         assert self._ss_np is not None
         return self._ss_np
 
-    def compute_properties(self) -> bool:
+    def compute_properties(self) -> None:
         """Compute additional geometric properties for low-dimensional polyhedra.
 
         Returns:
@@ -251,14 +251,18 @@ class Polyhedron:
             raise ValueError("Vertex computation failed")
         self._vertices = vertices[trust_vertices]
         self._vertex_set = set(tuple(x) for x in self.vertices)
-        ## TODO: Move volume computation here?
         if self.finite:
             try:
                 self._ch = ConvexHull(vertices)
             except Exception:
                 # warnings.warn("Error while computing convex hull:", e)
                 self._ch = None
-        return True
+            try:
+                self._volume = self._ch.volume
+            except Exception as e:
+                raise ValueError(f"Error while computing convex hull volume: {e}")
+        else:
+            self._volume = -1
 
     def get_interior_point(
         self,
@@ -1012,13 +1016,7 @@ class Polyhedron:
         if not self.finite:
             self._volume = float("inf")
         elif self._volume is None:
-            try:
-                if self.ch is None:
-                    self._volume = -1
-                else:
-                    self._volume = self.ch.volume
-            except Exception:
-                self._volume = -1
+            self.compute_properties()
         assert self._volume is not None
         return self._volume if self._volume != -1 else None
 
