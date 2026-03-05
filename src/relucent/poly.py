@@ -15,6 +15,7 @@ from relucent.config import (
     DEFAULT_PLOT_BOUND,
     GUROBI_SHI_BEST_BD_STOP,
     GUROBI_SHI_BEST_OBJ_STOP,
+    HIGH_PRECISION,
     MAX_RADIUS,
     TOL_DEAD_RELU,
     TOL_HALFSPACE_CONTAINMENT,
@@ -158,6 +159,8 @@ class Polyhedron:
         self._hash: int | None = None
         self._tag: bytes | None = None
 
+        self.jittered = None
+
         # Cached NumPy representation of the sign sequence (if/when needed).
         self._ss_np: np.ndarray | None = None
 
@@ -183,14 +186,12 @@ class Polyhedron:
     @ss.setter
     def ss(self, value: np.ndarray | torch.Tensor) -> None:
         self._ss = value
-        # Invalidate cached NumPy representation of the sign sequence.
         self._ss_np = None
 
     @property
     def ss_np(self) -> np.ndarray:
         """Cached NumPy representation of the sign sequence."""
         if self._ss_np is None:
-            # Check NumPy first as it's the common case after our optimizations
             if isinstance(self._ss, np.ndarray):
                 self._ss_np = self._ss
             elif isinstance(self._ss, torch.Tensor):
@@ -216,21 +217,26 @@ class Polyhedron:
         if np.isinf(self.halfspaces_np).any():
             raise ValueError("Halfspaces contain infinities")
         try:
-            # warnings.warn("Computing Additional Properties")
             halfspaces = self.nonzero_halfspaces_np
-            if np.isnan(halfspaces).any():
-                raise ValueError("Halfspaces contain NaNs")
-            if np.isinf(halfspaces).any():
-                raise ValueError("Halfspaces contain infinities")
-            if np.isnan(self.interior_point).any():
-                raise ValueError("Interior point contains NaNs")
-            if np.isinf(self.interior_point).any():
-                raise ValueError("Interior point contains infinities")
-            hs = HalfspaceIntersection(
-                halfspaces,
-                self.interior_point,
-                # qhull_options="Qx",
-            )  ## http://www.qhull.org/html/qh-optq.htm
+            with warnings.catch_warnings(record=True) as w:
+                hs = HalfspaceIntersection(
+                    halfspaces,
+                    self.interior_point,
+                    qhull_options=None,
+                )  # http://www.qhull.org/html/qh-optq.htm
+            if w:
+                msgs = "; ".join(str(wi.message) for wi in w)
+                if HIGH_PRECISION:
+                    raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
+                else:
+                    self.jittered = True
+                    hs = HalfspaceIntersection(
+                        halfspaces,
+                        self.interior_point,
+                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                    )  # http://www.qhull.org/html/qh-optq.htm
+            else:
+                self.jittered = False
         except Exception as e:
             raise ValueError(f"Error while computing halfspace intersection: {e}")
             # raise ValueError("Error while computing halfspace intersection")
@@ -245,6 +251,7 @@ class Polyhedron:
             raise ValueError("Vertex computation failed")
         self._vertices = vertices[trust_vertices]
         self._vertex_set = set(tuple(x) for x in self.vertices)
+        ## TODO: Move volume computation here?
         if self.finite:
             try:
                 self._ch = ConvexHull(vertices)
@@ -285,7 +292,9 @@ class Polyhedron:
             env = env or get_env()
             self._interior_point = solve_radius(
                 env,
-                self.nonzero_halfspaces_np,
+                self.nonzero_halfspaces_np
+                if self._shis is None and zero_indices is None
+                else self.halfspaces_np[self.shis],
                 max_radius=max_radius,
                 zero_indices=zero_indices,
             )[0]
@@ -1011,7 +1020,7 @@ class Polyhedron:
             except Exception:
                 self._volume = -1
         assert self._volume is not None
-        return self._volume
+        return self._volume if self._volume != -1 else None
 
     @cached_property  ## !! See if this works
     def tag(self) -> bytes:
@@ -1221,11 +1230,12 @@ class Polyhedron:
 
     def __contains__(self, point: np.ndarray | torch.Tensor) -> bool:
         """Check if a point (ndarray or Tensor) is contained in the polyhedron."""
-        if not isinstance(point, torch.Tensor):
-            point = torch.Tensor(point).to(self.net.device, self.net.dtype)
+        halfspaces = self.halfspaces_np if isinstance(point, np.ndarray) else self.halfspaces
+        if isinstance(point, torch.Tensor) and isinstance(halfspaces, np.ndarray):
+            point = point.detach().cpu().numpy().astype(halfspaces.dtype)
         point = point.reshape(1, -1)
-        dists = point @ self.halfspaces[:, :-1].T + self.halfspaces[:, -1]
-        return bool((dists <= TOL_HALFSPACE_CONTAINMENT).all())
+        dists = point @ halfspaces[:, :-1].T + halfspaces[:, -1]
+        return (dists <= TOL_HALFSPACE_CONTAINMENT).all().item()
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
@@ -1250,6 +1260,7 @@ class Polyhedron:
             "_volume": self._volume,
             "_num_dead_relus": self._num_dead_relus,
             "_interior_point": self._interior_point,  ## TODO: Does this slow down things?
+            "jittered": self.jittered,
         }
 
     def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
