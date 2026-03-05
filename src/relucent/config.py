@@ -12,9 +12,15 @@ e.g. ``relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7``.
 # Polyhedron & halfspace geometry
 # -----------------------------------------------------------------------------
 
-# Maximum radius when solving for Chebyshev center / interior point.
-# Smaller values speed up Gurobi but exclude any polyhedra for which no point
-# is within MAX_RADIUS of every face.
+# When True, use high-precision geometry settings that avoid Qhull jittering
+# options and instead treat any numerical warnings from HalfspaceIntersection
+# as hard errors. When False, if Qhull emits a warning, enable Qhull's "Qj"
+# option and try again.
+HIGH_PRECISION: bool = False
+
+# Maximum radius when solving for Chebyshev center / interior point. Smaller
+# values speed up Gurobi but exclude any polyhedra for which no point is
+# within MAX_RADIUS of every face.
 MAX_RADIUS: float = 100
 
 # Threshold for trusting vertex positions from HalfspaceIntersection.
