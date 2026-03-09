@@ -342,7 +342,7 @@ class Polyhedron:
                 # else self.halfspaces_np[self.shis],
                 self.halfspaces_np,
                 max_radius=max_radius,
-                zero_indices=np.argwhere(self.ss_np.flatten() == 0).tolist()
+                zero_indices=np.argwhere(self.ss_np.flatten() == 0).flatten().tolist()
                 + list(range(self.ss_np.shape[1], self.halfspaces.shape[0])),
             )[0]
             assert isinstance(self._interior_point, np.ndarray)
@@ -730,7 +730,7 @@ class Polyhedron:
             poly_info = []
         while subset:
             i = subset.pop()
-            if self.ss_np[0, i] == 0:
+            if i >= self.ss_np.shape[1] or self.ss_np[0, i] == 0:
                 continue
             if (A[i] == 0).all():
                 continue
