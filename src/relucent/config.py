@@ -12,11 +12,13 @@ e.g. ``relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7``.
 # Polyhedron & halfspace geometry
 # -----------------------------------------------------------------------------
 
-# When True, use high-precision geometry settings that avoid Qhull jittering
-# options and instead treat any numerical warnings from HalfspaceIntersection
-# as hard errors. When False, if Qhull emits a warning, enable Qhull's "Qj"
-# option and try again.
-HIGH_PRECISION: bool = False
+# QHULL_MODE controls how Qhull numerical warnings from HalfspaceIntersection
+# are handled:
+#   - "IGNORE" (default): proceed with the original call even if Qhull warns.
+#   - "WARN_ALL": warn about all warnings.
+#   - "HIGH_PRECISION": treat any warning as a hard error.
+#   - "JITTERED": retry with Qhull's "QJ" (joggled) option on warning.
+QHULL_MODE: str = "IGNORE"
 
 # Maximum radius when solving for Chebyshev center / interior point. Smaller
 # values speed up Gurobi but exclude any polyhedra for which no point is
