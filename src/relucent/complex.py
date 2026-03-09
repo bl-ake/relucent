@@ -1122,18 +1122,18 @@ class Complex:
         return {edge for edge in self.G.edges() if self.G.edges[edge]["shi"] == i}
 
     def get_boundary_graph(self, i):
+        """Get the induced subgraph of neuron i's BH."""
         return self.G.subgraph(
             [edge[0] for edge in self.get_boundary_edges(i)] + [edge[1] for edge in self.get_boundary_edges(i)]
         )
 
-    def get_boundary_faces(self, i):
-        """Get all (d-1)-cells that form the boundary of neuron i."""
+    def get_boundary_cells(self, i):
+        """Get all (d-1)-cells in neuron i's BH."""
         faces = set()
         for edge in self.get_boundary_edges(i):
             ss = edge[0].ss_np.copy()
-            ss[0, edge["shi"]] *= 0
-            if ss in self:
-                faces.add(self[ss])
+            ss[0, self.G.edges[edge]["shi"]] *= 0
+            faces.add(self.ss2poly(ss))
         return faces
 
     @property
