@@ -249,6 +249,8 @@ class Complex:
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
+        self._G = None
+
     def __del__(self) -> None:
         close_env()
 
@@ -271,7 +273,29 @@ class Complex:
         elif isinstance(key, (np.ndarray, torch.Tensor)):
             return self.index2poly[self.ssm[key]]
         else:
-            raise KeyError(f"Polyhedron with key {key} not in Complex")
+            raise KeyError("Complex can only be indexed by Polyhedra, arrays, or tensors")
+
+    def str_to_poly(self, name: str, ensure_unique: bool = True) -> Polyhedron:
+        """Convert a string to the first Polyhedron with that __repr__. These values may not be unique.
+
+        Args:
+            name: The string name.
+
+        Returns:
+            Polyhedron: The polyhedron associated with the given name.
+        """
+        match = None
+        for p in self:
+            if p.__repr__() == name:
+                if match is not None:
+                    raise ValueError(f"Multiple Polyhedra with name {name} in Complex")
+                if ensure_unique:
+                    match = p
+                else:
+                    return p
+        if match is not None:
+            return match
+        raise KeyError(f"Polyhedron with name {name} not in Complex")
 
     def __contains__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> bool:
         try:
@@ -682,9 +706,13 @@ class Complex:
                     node = self.index2poly[node_index]
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
+                        ## TODO: Should this be double checked?
                         node._shis.remove(shi)
                         if len(node._shis) < min(self.dim, self.n):
-                            raise ValueError(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
+                            # raise ValueError(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
+                            warnings.warn(
+                                RuntimeWarning(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
+                            )
                         if unprocessed == 0 or len(self) >= max_polys:
                             break
                         continue
@@ -694,10 +722,12 @@ class Complex:
 
                     p = self.add_polyhedron(p)
 
-                    if p.jittered:
-                        warnings.warn(
-                            "Polyhedron was jittered when calculating vertices and volumes to avoid numerical issues"
-                        )
+                    if getattr(p, "warnings", None):
+                        for warning in p.warnings:
+                            try:
+                                warnings.warn(warning)
+                            except Exception as e:
+                                print(warning, type(warning), e, end="\n\n")
 
                     if depth < max_depth:
                         for new_shi in p.shis:
@@ -977,6 +1007,7 @@ class Complex:
                     #     (i for i in p.shis if i != shi),
                     # ):
                     if not isinstance(neighbor, Polyhedron):
+                        ## TODO: Should this be double checked?
                         p._shis.remove(neighbor_shi)
                     else:
                         tentative_gScore = gScore[p] + d(p, neighbor)
@@ -1085,6 +1116,31 @@ class Complex:
                 they were added.
         """
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
+
+    def get_boundary_edges(self, i):
+        """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
+        return {edge for edge in self.G.edges() if self.G.edges[edge]["shi"] == i}
+
+    def get_boundary_graph(self, i):
+        return self.G.subgraph(
+            [edge[0] for edge in self.get_boundary_edges(i)] + [edge[1] for edge in self.get_boundary_edges(i)]
+        )
+
+    def get_boundary_faces(self, i):
+        """Get all (d-1)-cells that form the boundary of neuron i."""
+        faces = set()
+        for edge in self.get_boundary_edges(i):
+            ss = edge[0].ss_np.copy()
+            ss[0, edge["shi"]] *= 0
+            if ss in self:
+                faces.add(self[ss])
+        return faces
+
+    @property
+    def G(self) -> nx.Graph:
+        if self._G is None:
+            self._G = self.get_dual_graph()
+        return self._G
 
     def get_dual_graph(
         self,
