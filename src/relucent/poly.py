@@ -15,7 +15,7 @@ from relucent.config import (
     DEFAULT_PLOT_BOUND,
     GUROBI_SHI_BEST_BD_STOP,
     GUROBI_SHI_BEST_OBJ_STOP,
-    HIGH_PRECISION,
+    QHULL_MODE,
     MAX_RADIUS,
     TOL_DEAD_RELU,
     TOL_HALFSPACE_CONTAINMENT,
@@ -159,10 +159,12 @@ class Polyhedron:
         self._hash: int | None = None
         self._tag: bytes | None = None
 
-        self.jittered = None
+        self.warnings: list[Warning] = []
 
         # Cached NumPy representation of the sign sequence (if/when needed).
         self._ss_np: np.ndarray | None = None
+
+        self._attempted_compute_properties: bool = False
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -210,6 +212,10 @@ class Polyhedron:
         Raises:
             ValueError: If input dimension > 6 or if computation fails.
         """
+        if self._attempted_compute_properties:
+            return
+        self._attempted_compute_properties = True
+
         if self.net.input_shape[0] > 6:
             raise ValueError("Input shape too large to compute extra properties")
         if np.isnan(self.halfspaces_np).any():
@@ -225,44 +231,71 @@ class Polyhedron:
                     qhull_options=None,
                 )  # http://www.qhull.org/html/qh-optq.htm
             if w:
+                self.warnings.extend([RuntimeWarning(wi) for wi in w])
                 msgs = "; ".join(str(wi.message) for wi in w)
-                if HIGH_PRECISION:
+                if QHULL_MODE == "IGNORE":
+                    pass
+                if QHULL_MODE == "WARN_ALL":
+                    warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
+                elif QHULL_MODE == "HIGH_PRECISION":
                     raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
-                else:
-                    self.jittered = True
+                elif QHULL_MODE == "JITTERED":
+                    self.warnings.append(
+                        RuntimeWarning(
+                            "Recomputing HalfspaceIntersection with jitter option 'QJ' due to previous warnings"
+                        )
+                    )
                     hs = HalfspaceIntersection(
                         halfspaces,
                         self.interior_point,
                         qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
                     )  # http://www.qhull.org/html/qh-optq.htm
-            else:
-                self.jittered = False
         except Exception as e:
-            raise ValueError(f"Error while computing halfspace intersection: {e}")
+            raise ValueError(f"Error while computing halfspace intersection: {e}\n{self.hs.dual_facets}")
             # raise ValueError("Error while computing halfspace intersection")
         self._hs = hs
-        self._shis = hs.dual_vertices.flatten().tolist()
+        try:
+            hs_shis = hs.dual_vertices.flatten().tolist()
+            if set(hs_shis) != set(self.shis):
+                #     raise ValueError(
+                #         f"HalfspaceIntersection SHIs do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
+                #     )
+                w = RuntimeWarning(
+                    f"HalfspaceIntersection SHIs on {self} do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
+                )
+                self.warnings.append(w)
+        except Exception as e:
+            w = RuntimeWarning(f"Error while getting dual vertices: {e}")
+            # warnings.warn(w)
+            self.warnings.append(w)
         vertices = hs.intersections
         trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
         if not (
-            (halfspaces[self.shis, :-1] @ vertices[trust_vertices].T + halfspaces[self.shis, -1, None]).sum(axis=0)
+            (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(axis=0)
             < VERTEX_TRUST_THRESHOLD
         ).all():
-            raise ValueError("Vertex computation failed")
+            w = RuntimeWarning(
+                f"Vertex computation failed - Maximum Violation: {(halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).max()}"
+            )
+            # warnings.warn(w)
+            self.warnings.append(w)
+            self._volume = -1
+            return
         self._vertices = vertices[trust_vertices]
         self._vertex_set = set(tuple(x) for x in self.vertices)
         if self.finite:
             try:
                 self._ch = ConvexHull(vertices)
+                try:
+                    self._volume = self._ch.volume
+                except Exception as e:
+                    raise ValueError(f"Error while computing convex hull volume: {e}")
             except Exception:
                 # warnings.warn("Error while computing convex hull:", e)
                 self._ch = None
-            try:
-                self._volume = self._ch.volume
-            except Exception as e:
-                raise ValueError(f"Error while computing convex hull volume: {e}")
+                self._volume = -1
         else:
-            self._volume = -1
+            self._volume = float("inf")
 
     def get_interior_point(
         self,
@@ -296,9 +329,10 @@ class Polyhedron:
             env = env or get_env()
             self._interior_point = solve_radius(
                 env,
-                self.nonzero_halfspaces_np
-                if self._shis is None and zero_indices is None
-                else self.halfspaces_np[self.shis],
+                # self.nonzero_halfspaces_np
+                # if self._shis is None and zero_indices is None
+                # else self.halfspaces_np[self.shis],
+                self.halfspaces_np,
                 max_radius=max_radius,
                 zero_indices=zero_indices,
             )[0]
@@ -306,8 +340,12 @@ class Polyhedron:
             self._interior_point = self._interior_point.squeeze()
         if self._interior_point is None:
             raise ValueError("Interior point not found")
-        if self._interior_point not in self:
-            raise ValueError("Interior point invalid")
+        # if (
+        #     maximum_violation := (self.halfspaces[:, :-1] @ self._interior_point + self.halfspaces[:-1, None]).max()
+        # ) > TOL_HALFSPACE_CONTAINMENT:
+        #     raise ValueError(f"Interior point invalid - Maximum Violation: {maximum_violation}")
+        if self._interior_point is not None and self._interior_point not in self:
+            raise ValueError(f"Interior point invalid - {self._interior_point} not in {self}")
         return self._interior_point
 
     def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float]:
@@ -618,6 +656,7 @@ class Polyhedron:
         new_method: bool = False,
         env: Any = None,
         shi_pbar: bool = False,
+        push_size: float = 1.0,
     ) -> list[int] | tuple[list[int], list]:
         """Get supporting halfspace indices (SHIs) for this polyhedron.
 
@@ -684,7 +723,7 @@ class Polyhedron:
             pbar.set_postfix_str(f"#shis: {len(shis)}")
 
             ## Relax halspace i
-            constrs[i].setAttr("RHS", -b[i, 0] + 1)
+            constrs[i].setAttr("RHS", -b[i, 0] + push_size)
 
             model.setObjective((A[i] @ x).item() + b[i, 0], GRB.MAXIMIZE)
             model.params.BestObjStop = GUROBI_SHI_BEST_OBJ_STOP
@@ -699,9 +738,13 @@ class Polyhedron:
                 if model.objVal > 0:
                     dists = A @ x.X + b
                     if dists[(dists > 0)].sum() >= 1 + tol:
-                        warnings.warn(
-                            f"Invalid Proof for SHI {i}! Violation Sizes: {np.argwhere(dists.flatten() > 0), dists[np.argwhere(dists.flatten() > 0)]}"
+                        msg = (
+                            f"Invalid Proof for SHI {i}! Violation Sizes: "
+                            f"{np.argwhere(dists.flatten() > 0), dists[np.argwhere(dists.flatten() > 0)]}"
                         )
+                        w = RuntimeWarning(msg)
+                        self.warnings.append(w)
+                        warnings.warn(w)
                     else:
                         shis.append(i)
 
@@ -760,6 +803,21 @@ class Polyhedron:
         if collect_info:
             return shis, poly_info
         return shis
+
+    def get_neighbor(self, shi: int) -> "Polyhedron":
+        """Get the neighbor polyhedron across the supporting hyperplane at index shi.
+
+        Args:
+            shi: Index of the supporting hyperplane to cross.
+
+        Returns:
+            Polyhedron: The neighbor polyhedron.
+        """
+        ss = self.ss_np.copy()
+        if ss[0, shi] == 0:
+            raise ValueError(f"SHI {shi} contains the polyhedron, cannot get neighbor")
+        ss[0, shi] = -ss[0, shi]
+        return Polyhedron(self.net, ss)
 
     def nflips(self, other: "Polyhedron") -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
@@ -1221,6 +1279,16 @@ class Polyhedron:
         assert self._interior_point_norm is not None
         return self._interior_point_norm
 
+    @property
+    def codim(self) -> int:
+        """Codimension of the polyhedron, equal to the number of zero sign sequence elements."""
+        return np.sum(self.ss_np == 0)
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the polyhedron, equal to the dimension of the ambient space minus the number of zero sign sequence elements."""
+        return self.halfspaces.shape[1] - np.sum(self.ss_np == 0)
+
     def __repr__(self) -> str:
         h = hashlib.blake2b(key=b"hi")
         h.update(self.tag)
@@ -1258,7 +1326,8 @@ class Polyhedron:
             "_volume": self._volume,
             "_num_dead_relus": self._num_dead_relus,
             "_interior_point": self._interior_point,  ## TODO: Does this slow down things?
-            "jittered": self.jittered,
+            "_attempted_compute_properties": self._attempted_compute_properties,
+            "warnings": self.warnings,
         }
 
     def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
