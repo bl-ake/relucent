@@ -245,16 +245,23 @@ class Polyhedron:
                             "Recomputing HalfspaceIntersection with jitter option 'QJ' due to previous warnings"
                         )
                     )
-                    hs = HalfspaceIntersection(
-                        halfspaces,
-                        self.interior_point,
-                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
-                    )  # http://www.qhull.org/html/qh-optq.htm
+                    with warnings.catch_warnings(record=True) as w:
+                        new_hs = HalfspaceIntersection(
+                            halfspaces,
+                            self.interior_point,
+                            qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        )  # http://www.qhull.org/html/qh-optq.htm
+                    if w:
+                        self.warnings.extend([RuntimeWarning(wi) for wi in w])
+                        msgs = "; ".join(str(wi.message) for wi in w)
+                    else:
+                        ## Jittering solved the numerical problems
+                        hs = new_hs
         except Exception as e:
             raise ValueError(f"Error while computing halfspace intersection: {e}")
             # raise ValueError("Error while computing halfspace intersection")
         self._hs = hs
-        # It appears that the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
+        # It seems like the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
         # try:
         #     hs_shis = np.unique([shi for shis in hs.dual_facets for shi in shis]).tolist()
         #     # hs_shis = hs.dual_vertices.flatten().tolist()
@@ -265,7 +272,6 @@ class Polyhedron:
         #         self.warnings.append(w)
         # except Exception as e:
         #     w = RuntimeWarning(f"Error while getting dual vertices: {e}")
-        #     # warnings.warn(w)
         #     self.warnings.append(w)
         #     raise ValueError(f"Error while getting dual vertices: {e}")
         vertices = hs.intersections
