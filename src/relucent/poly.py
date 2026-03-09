@@ -231,28 +231,27 @@ class Polyhedron:
                     qhull_options=None,
                 )  # http://www.qhull.org/html/qh-optq.htm
             if w:
-                self.warnings.extend([RuntimeWarning(wi) for wi in w])
                 msgs = "; ".join(str(wi.message) for wi in w)
                 if QHULL_MODE == "IGNORE":
-                    pass
+                    self.warnings.extend([RuntimeWarning(wi) for wi in w])
                 if QHULL_MODE == "WARN_ALL":
                     warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
                 elif QHULL_MODE == "HIGH_PRECISION":
                     raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
                 elif QHULL_MODE == "JITTERED":
-                    self.warnings.append(
-                        RuntimeWarning(
-                            "Recomputing HalfspaceIntersection with jitter option 'QJ' due to previous warnings"
-                        )
-                    )
-                    with warnings.catch_warnings(record=True) as w:
+                    with warnings.catch_warnings(record=True) as w2:
                         new_hs = HalfspaceIntersection(
                             halfspaces,
                             self.interior_point,
                             qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
                         )  # http://www.qhull.org/html/qh-optq.htm
-                    if w:
-                        self.warnings.extend([RuntimeWarning(wi) for wi in w])
+                    if w2:
+                        self.warnings.append(
+                            RuntimeWarning(
+                                "Recomputing HalfspaceIntersection with jitter option 'QJ' still had numerical problems"
+                            )
+                        )
+                        self.warnings.extend([RuntimeWarning(wi) for wi in w2])
                         msgs = "; ".join(str(wi.message) for wi in w)
                     else:
                         ## Jittering solved the numerical problems
