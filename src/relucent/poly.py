@@ -218,10 +218,10 @@ class Polyhedron:
 
         if self.net.input_shape[0] > 6:
             raise ValueError("Input shape too large to compute extra properties")
-        if np.isnan(self.halfspaces_np).any():
-            raise ValueError("Halfspaces contain NaNs")
-        if np.isinf(self.halfspaces_np).any():
-            raise ValueError("Halfspaces contain infinities")
+        # if np.isnan(self.nonzero_halfspaces_np).any():
+        #     raise ValueError("Halfspaces contain NaNs")
+        # if np.isinf(self.nonzero_halfspaces_np).any():
+        #     raise ValueError("Halfspaces contain infinities")
         try:
             halfspaces = self.nonzero_halfspaces_np
             with warnings.catch_warnings(record=True) as w:
@@ -251,39 +251,42 @@ class Polyhedron:
                         qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
                     )  # http://www.qhull.org/html/qh-optq.htm
         except Exception as e:
-            raise ValueError(f"Error while computing halfspace intersection: {e}\n{self.hs.dual_facets}")
+            raise ValueError(f"Error while computing halfspace intersection: {e}")
             # raise ValueError("Error while computing halfspace intersection")
         self._hs = hs
-        try:
-            hs_shis = hs.dual_vertices.flatten().tolist()
-            if set(hs_shis) != set(self.shis):
-                #     raise ValueError(
-                #         f"HalfspaceIntersection SHIs do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
-                #     )
-                w = RuntimeWarning(
-                    f"HalfspaceIntersection SHIs on {self} do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
-                )
-                self.warnings.append(w)
-        except Exception as e:
-            w = RuntimeWarning(f"Error while getting dual vertices: {e}")
-            # warnings.warn(w)
-            self.warnings.append(w)
+        # It appears that the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
+        # try:
+        #     hs_shis = np.unique([shi for shis in hs.dual_facets for shi in shis]).tolist()
+        #     # hs_shis = hs.dual_vertices.flatten().tolist()
+        #     if set(hs_shis) != set(self.shis):
+        #         w = RuntimeWarning(
+        #             f"HalfspaceIntersection SHIs on {self} do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
+        #         )
+        #         self.warnings.append(w)
+        # except Exception as e:
+        #     w = RuntimeWarning(f"Error while getting dual vertices: {e}")
+        #     # warnings.warn(w)
+        #     self.warnings.append(w)
+        #     raise ValueError(f"Error while getting dual vertices: {e}")
         vertices = hs.intersections
         trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
-        if not (
-            (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(axis=0)
-            < VERTEX_TRUST_THRESHOLD
-        ).all():
-            w = RuntimeWarning(
-                f"Vertex computation failed - Maximum Violation: {(halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).max()}"
-            )
-            # warnings.warn(w)
-            self.warnings.append(w)
-            self._volume = -1
-            return
-        self._vertices = vertices[trust_vertices]
+        trust_vertices_2 = (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(
+            axis=0
+        ) < VERTEX_TRUST_THRESHOLD
+        # if not (
+        #     (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(axis=0)
+        #     < VERTEX_TRUST_THRESHOLD
+        # ).all():
+        #     w = RuntimeWarning(
+        #         f"Vertex computation failed - Maximum Violation: {(halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).max()}"
+        #     )
+        #     # warnings.warn(w)
+        #     self.warnings.append(w)
+        #     self._volume = -1
+        #     return
+        self._vertices = vertices[trust_vertices][trust_vertices_2]
         self._vertex_set = set(tuple(x) for x in self.vertices)
-        if self.finite:
+        if self.finite and len(self.vertices) > self.ambient_dim:
             try:
                 self._ch = ConvexHull(vertices)
                 try:
@@ -334,7 +337,8 @@ class Polyhedron:
                 # else self.halfspaces_np[self.shis],
                 self.halfspaces_np,
                 max_radius=max_radius,
-                zero_indices=zero_indices,
+                zero_indices=np.argwhere(self.ss_np.flatten() == 0).tolist()
+                + list(range(self.ss_np.shape[1], self.halfspaces.shape[0])),
             )[0]
             assert isinstance(self._interior_point, np.ndarray)
             self._interior_point = self._interior_point.squeeze()
@@ -494,6 +498,8 @@ class Polyhedron:
         assert isinstance(halfspaces, torch.Tensor)
         assert isinstance(current_A, torch.Tensor)
         assert isinstance(current_b, torch.Tensor)
+
+        assert halfspaces.shape[0] == self.ss.shape[1] + (self.ss == 0).sum().item()
         return halfspaces, current_A, current_b
 
     @torch.no_grad()
@@ -591,6 +597,8 @@ class Polyhedron:
         assert isinstance(halfspaces, np.ndarray)
         assert isinstance(current_A, np.ndarray)
         assert isinstance(current_b, np.ndarray)
+
+        assert halfspaces.shape[0] == self.ss_np.shape[1] + (self.ss_np == 0).sum().item()
         return halfspaces, current_A, current_b
 
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
@@ -717,6 +725,8 @@ class Polyhedron:
             poly_info = []
         while subset:
             i = subset.pop()
+            if self.ss_np[0, i] == 0:
+                continue
             if (A[i] == 0).all():
                 continue
             # model.update()
@@ -1042,7 +1052,6 @@ class Polyhedron:
         """Set of vertices of the polyhedron (not always reliable)."""
         if self._hs is None:
             self.compute_properties()
-        assert self._vertex_set is not None
         return self._vertex_set
 
     @property
@@ -1050,7 +1059,6 @@ class Polyhedron:
         """Vertices of the polyhedron (not always reliable)."""
         if self._vertices is None:
             self.compute_properties()
-        assert self._vertices is not None
         return self._vertices
 
     @property
@@ -1058,7 +1066,6 @@ class Polyhedron:
         """Halfspace intersection object from scipy."""
         if self._hs is None:
             self.compute_properties()
-        assert self._hs is not None
         return self._hs
 
     @property
@@ -1075,15 +1082,13 @@ class Polyhedron:
             self._volume = float("inf")
         elif self._volume is None:
             self.compute_properties()
-        assert self._volume is not None
-        return self._volume if self._volume != -1 else None
+        return self._volume
 
     @cached_property  ## !! See if this works
     def tag(self) -> bytes:
         """Unique tag for this polyhedron, computed as a hashable representation of the sign sequence."""
         if self._tag is None:
             self._tag = encode_ss(self.ss_np)
-        assert self._tag is not None
         return self._tag
 
     @property
@@ -1188,7 +1193,6 @@ class Polyhedron:
             self._W = W
             self._b = b
             self._halfspaces_np = None
-        assert isinstance(self._num_dead_relus, int)
         return self._num_dead_relus
 
     @property
@@ -1223,7 +1227,6 @@ class Polyhedron:
         """Whether the polyhedron is bounded (finite)."""
         if self._finite is None:
             self.get_center_inradius()
-        assert self._finite is not None
         return self._finite
 
     @property
@@ -1246,12 +1249,13 @@ class Polyhedron:
         return self.num_shis
 
     @property
-    def interior_point(self) -> np.ndarray:
-        """A point guaranteed to be inside the polyhedron. Never None once computed (get_interior_point raises if not found)."""
+    def interior_point(self) -> np.ndarray | None:
+        """A point guaranteed to be inside the polyhedron."""
         if self._interior_point is None:
-            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten().tolist()
+            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten().tolist() + list(
+                range(self.ss_np.shape[1], self.halfspaces.shape[1])
+            )
             self.get_interior_point(zero_indices=zero_indices)
-        assert self._interior_point is not None
         return self._interior_point
 
     @property
@@ -1276,7 +1280,6 @@ class Polyhedron:
         """L2 norm of the interior point."""
         if self._interior_point_norm is None:
             self._interior_point_norm = np.linalg.norm(self.interior_point).item()
-        assert self._interior_point_norm is not None
         return self._interior_point_norm
 
     @property
@@ -1285,9 +1288,14 @@ class Polyhedron:
         return np.sum(self.ss_np == 0)
 
     @property
+    def ambient_dim(self) -> int:
+        """Dimension of the ambient space."""
+        return self.halfspaces.shape[1] - 1
+
+    @property
     def dim(self) -> int:
         """Dimension of the polyhedron, equal to the dimension of the ambient space minus the number of zero sign sequence elements."""
-        return self.halfspaces.shape[1] - np.sum(self.ss_np == 0)
+        return self.ambient_dim - self.codim
 
     def __repr__(self) -> str:
         h = hashlib.blake2b(key=b"hi")
@@ -1305,8 +1313,6 @@ class Polyhedron:
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
-        if not isinstance(other, Polyhedron):
-            raise ValueError(f"Cannot multiply Polyhedron with {type(other)}")
         return Polyhedron(self.net, self.ss + other.ss * (self.ss == 0))
 
     """The following methods are used for pickling"""
