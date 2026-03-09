@@ -185,6 +185,23 @@ deeply as possible before backtracking. Uses a LIFO queue.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.complex.Complex.get_boundary_edges">
+<span class="sig-name descname"><span class="pre">get_boundary_edges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.get_boundary_edges" title="Link to this definition">¶</a></dt>
+<dd><p>Get the boundary of neuron i by returning the set of edges in the dual graph with label i.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.complex.Complex.get_boundary_faces">
+<span class="sig-name descname"><span class="pre">get_boundary_faces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.get_boundary_faces" title="Link to this definition">¶</a></dt>
+<dd><p>Get all (d-1)-cells that form the boundary of neuron i.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.complex.Complex.get_boundary_graph">
+<span class="sig-name descname"><span class="pre">get_boundary_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.get_boundary_graph" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.get_dual_graph">
 <span class="sig-name descname"><span class="pre">get_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">relabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'viridis'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_locations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_node_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_edge_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.get_dual_graph" title="Link to this definition">¶</a></dt>
 <dd><p>Construct the dual graph of the complex.</p>
@@ -628,6 +645,28 @@ Will be reshaped to match the network’s input shape.</p>
 </dd>
 </dl>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.complex.Complex.str_to_poly">
+<span class="sig-name descname"><span class="pre">str_to_poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ensure_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></span><a class="headerlink" href="#relucent.complex.Complex.str_to_poly" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a string to the first Polyhedron with that __repr__. These values may not be unique.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The string name.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron associated with the given name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.complex.Complex.G">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">G</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Graph</span></span><a class="headerlink" href="#relucent.complex.Complex.G" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.complex.Complex.dim">
@@ -1076,7 +1115,7 @@ and the interior point.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.compute_properties">
-<span class="sig-name descname"><span class="pre">compute_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#relucent.poly.Polyhedron.compute_properties" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">compute_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.poly.Polyhedron.compute_properties" title="Link to this definition">¶</a></dt>
 <dd><p>Compute additional geometric properties for low-dimensional polyhedra.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -1219,8 +1258,25 @@ lower-dimensional polyhedra). Defaults to None.</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.get_neighbor">
+<span class="sig-name descname"><span class="pre">get_neighbor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></span><a class="headerlink" href="#relucent.poly.Polyhedron.get_neighbor" title="Link to this definition">¶</a></dt>
+<dd><p>Get the neighbor polyhedron across the supporting hyperplane at index shi.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shi</strong> – Index of the supporting hyperplane to cross.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The neighbor polyhedron.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.get_shis">
-<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.poly.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">push_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.poly.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
 <dd><p>Get supporting halfspace indices (SHIs) for this polyhedron.</p>
 <p>Computes the indices of non-redundant halfspaces that form the boundary
 of this polyhedron. These correspond to neurons whose boundaries (BHs)
@@ -1391,6 +1447,12 @@ instead of computing it from the network. Defaults to None.</p></li>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.ambient_dim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ambient_dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.ambient_dim" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension of the ambient space.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.b">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">b</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.b" title="Link to this definition">¶</a></dt>
 <dd><p>Affine transformation bias vector such that the polyhedron maps to W*x + b.</p>
@@ -1414,6 +1476,18 @@ instead of computing it from the network. Defaults to None.</p></li>
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.ch">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ch</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ConvexHull</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.ch" title="Link to this definition">¶</a></dt>
 <dd><p>Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.codim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">codim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.codim" title="Link to this definition">¶</a></dt>
+<dd><p>Codimension of the polyhedron, equal to the number of zero sign sequence elements.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.poly.Polyhedron.dim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.dim" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension of the polyhedron, equal to the dimension of the ambient space minus the number of zero sign sequence elements.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -1461,8 +1535,8 @@ constraint a^T x + b &lt;= 0.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.poly.Polyhedron.interior_point">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
-<dd><p>A point guaranteed to be inside the polyhedron. Never None once computed (get_interior_point raises if not found).</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.poly.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
+<dd><p>A point guaranteed to be inside the polyhedron.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -2083,6 +2157,23 @@ deeply as possible before backtracking. Uses a LIFO queue.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_boundary_edges">
+<span class="sig-name descname"><span class="pre">get_boundary_edges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_edges" title="Link to this definition">¶</a></dt>
+<dd><p>Get the boundary of neuron i by returning the set of edges in the dual graph with label i.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_boundary_faces">
+<span class="sig-name descname"><span class="pre">get_boundary_faces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_faces" title="Link to this definition">¶</a></dt>
+<dd><p>Get all (d-1)-cells that form the boundary of neuron i.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_boundary_graph">
+<span class="sig-name descname"><span class="pre">get_boundary_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_graph" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.get_dual_graph">
 <span class="sig-name descname"><span class="pre">get_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">relabel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'viridis'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_locations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_node_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_edge_labels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_dual_graph" title="Link to this definition">¶</a></dt>
 <dd><p>Construct the dual graph of the complex.</p>
@@ -2527,6 +2618,28 @@ Will be reshaped to match the network’s input shape.</p>
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.str_to_poly">
+<span class="sig-name descname"><span class="pre">str_to_poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ensure_unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></span><a class="headerlink" href="#relucent.Complex.str_to_poly" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a string to the first Polyhedron with that __repr__. These values may not be unique.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The string name.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The polyhedron associated with the given name.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Complex.G">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">G</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Graph</span></span><a class="headerlink" href="#relucent.Complex.G" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Complex.dim">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Complex.dim" title="Link to this definition">¶</a></dt>
@@ -2706,7 +2819,7 @@ and the interior point.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.compute_properties">
-<span class="sig-name descname"><span class="pre">compute_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#relucent.Polyhedron.compute_properties" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">compute_properties</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.Polyhedron.compute_properties" title="Link to this definition">¶</a></dt>
 <dd><p>Compute additional geometric properties for low-dimensional polyhedra.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -2849,8 +2962,25 @@ lower-dimensional polyhedra). Defaults to None.</p></li>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.Polyhedron.get_neighbor">
+<span class="sig-name descname"><span class="pre">get_neighbor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></span><a class="headerlink" href="#relucent.Polyhedron.get_neighbor" title="Link to this definition">¶</a></dt>
+<dd><p>Get the neighbor polyhedron across the supporting hyperplane at index shi.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shi</strong> – Index of the supporting hyperplane to cross.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The neighbor polyhedron.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.get_shis">
-<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">get_shis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collect_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi_pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">push_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Polyhedron.get_shis" title="Link to this definition">¶</a></dt>
 <dd><p>Get supporting halfspace indices (SHIs) for this polyhedron.</p>
 <p>Computes the indices of non-redundant halfspaces that form the boundary
 of this polyhedron. These correspond to neurons whose boundaries (BHs)
@@ -3021,6 +3151,12 @@ instead of computing it from the network. Defaults to None.</p></li>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.ambient_dim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ambient_dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Polyhedron.ambient_dim" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension of the ambient space.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.b">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">b</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.b" title="Link to this definition">¶</a></dt>
 <dd><p>Affine transformation bias vector such that the polyhedron maps to W*x + b.</p>
@@ -3044,6 +3180,18 @@ instead of computing it from the network. Defaults to None.</p></li>
 <dt class="sig sig-object py" id="relucent.Polyhedron.ch">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ch</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ConvexHull</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.Polyhedron.ch" title="Link to this definition">¶</a></dt>
 <dd><p>Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.codim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">codim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Polyhedron.codim" title="Link to this definition">¶</a></dt>
+<dd><p>Codimension of the polyhedron, equal to the number of zero sign sequence elements.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.Polyhedron.dim">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dim</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#relucent.Polyhedron.dim" title="Link to this definition">¶</a></dt>
+<dd><p>Dimension of the polyhedron, equal to the dimension of the ambient space minus the number of zero sign sequence elements.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3091,8 +3239,8 @@ constraint a^T x + b &lt;= 0.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.interior_point">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
-<dd><p>A point guaranteed to be inside the polyhedron. Never None once computed (get_interior_point raises if not found).</p>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">interior_point</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.Polyhedron.interior_point" title="Link to this definition">¶</a></dt>
+<dd><p>A point guaranteed to be inside the polyhedron.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3186,6 +3334,11 @@ constraint a^T x + b &lt;= 0.</p>
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">volume</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><a class="headerlink" href="#relucent.Polyhedron.volume" title="Link to this definition">¶</a></dt>
 <dd><p>Volume of the polyhedron, infinity for unbounded polyhedra, or -1 if computation fails.</p>
 </dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.Polyhedron.warnings">
+<span class="sig-name descname"><span class="pre">warnings</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Warning</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.Polyhedron.warnings" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </dd></dl>
 
@@ -3354,6 +3507,9 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.get_boundary_faces"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_faces()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.get_boundary_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
@@ -3369,6 +3525,8 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.complex.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
@@ -3413,6 +3571,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.get_hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_hs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.get_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_shis()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
@@ -3421,9 +3580,12 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.MAX_RADIUS"><code class="docutils literal notranslate"><span class="pre">Polyhedron.MAX_RADIUS</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li><a class="reference internal" href="#relucent.poly.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
@@ -3505,6 +3667,9 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.get_boundary_faces"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_faces()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.get_boundary_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
@@ -3520,6 +3685,8 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
@@ -3545,6 +3712,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.get_hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_hs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.get_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_shis()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
@@ -3553,9 +3721,12 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.MAX_RADIUS"><code class="docutils literal notranslate"><span class="pre">Polyhedron.MAX_RADIUS</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
@@ -3576,6 +3747,7 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.vertex_set"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertex_set</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Polyhedron.warnings"><code class="docutils literal notranslate"><span class="pre">Polyhedron.warnings</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#relucent.SSManager"><code class="docutils literal notranslate"><span class="pre">SSManager</span></code></a><ul>
