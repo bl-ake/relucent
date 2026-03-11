@@ -613,6 +613,8 @@ class Complex:
         nworkers=None,
         get_volumes=True,
         verbose=1,
+        cube_radius: float | None = None,
+        cube_mode: str = "unrestricted",
         **kwargs,
     ):
         """Search for polyhedra in the complex by discovering neighbors.
@@ -655,6 +657,56 @@ class Complex:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
         """
 
+        if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
+            raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
+        elif cube_mode != "unrestricted":
+            assert cube_radius is not None, "cube_radius must be provided when cube_mode is not 'unrestricted'"
+            if verbose:
+                print(f"Applying cube filter with mode '{cube_mode}' and radius {cube_radius}")
+        elif cube_radius is not None:
+            warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.")
+            cube_radius = None
+
+        ## TODO: Move intersection computations to the workers
+        def _poly_intersects_cube(p: Polyhedron) -> bool:
+            try:
+                # get_bounded_halfspaces raises ValueError when the intersection is empty
+                p.get_bounded_halfspaces(cast(float, cube_radius))
+                return True
+            except ValueError:
+                return False
+
+        def _apply_cube_filter(p: Polyhedron) -> bool:
+            """Apply the cube filter to a polyhedron.
+
+            Returns True if the polyhedron should be kept (and possibly clipped),
+            or False if it should be discarded from the search.
+            """
+            intersects = _poly_intersects_cube(p)
+
+            if cube_mode == "intersect":
+                # Keep only polyhedra that intersect the cube, but leave them unchanged.
+                return intersects
+            if cube_mode == "exclude":
+                # Exclude polyhedra that intersect the cube; keep only those completely outside.
+                return not intersects
+
+            # cube_mode == "clipped": intersect the polyhedron with the cube and
+            # replace its halfspaces with the bounded version.
+            if not intersects:
+                return False
+            bounded_halfspaces = p.get_bounded_halfspaces(cast(float, cube_radius))
+            p._halfspaces = bounded_halfspaces  # type: ignore[assignment]
+            p._halfspaces_np = bounded_halfspaces
+            p._nonzero_halfspaces_np = None
+            p._center = None
+            p._inradius = None
+            p._finite = True
+            p._vertices = None
+            p._volume = None
+            p._hs = None
+            return True
+
         found_sss = SSManager()
         nworkers = nworkers or os.process_cpu_count()
         ## NOTE: If nworkers>1, the traversal order may not be correct
@@ -669,6 +721,15 @@ class Complex:
         else:
             # Treat as a point.
             start = self.add_point(start)
+        if cube_mode != "unrestricted" and not _apply_cube_filter(start):
+            queue.close()
+            return {
+                "Search Depth": 0,
+                "Avg # Facets Uncorrected": 0.0,
+                "Search Time": 0.0,
+                "Bad SHI Computations": [],
+                "Complete": True,
+            }
         found_sss.add(start.ss_np)
         if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
@@ -719,6 +780,11 @@ class Complex:
 
                     ## If not using multiprocessing, you would need to check if the polyhedron's net is None first
                     p.net = self.net
+
+                    if cube_mode != "unrestricted" and not _apply_cube_filter(p):
+                        if unprocessed == 0 or len(self) >= max_polys:
+                            break
+                        continue
 
                     p = self.add_polyhedron(p)
 
