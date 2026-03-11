@@ -95,7 +95,7 @@ def test_plot_and_dual_graph_smoke(seeded):
         model = get_mlp_model(widths=[2, 10, 5, 1])
         cplx = Complex(model)
         cplx.bfs()
-        fig = cplx.plot(bound=10000)
+        fig = cplx.plot_2d_complex(bound=10000)
         assert fig is not None
         _ = sum(len(p.shis) for p in cplx) / len(cplx)
         x = np.random.random(model.input_shape).astype(np.float32)

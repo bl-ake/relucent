@@ -890,7 +890,7 @@ class Polyhedron:
         vertices = hs.intersections
         return vertices
 
-    def plot2d(
+    def plot_2d_complex(
         self,
         fill: str = "toself",
         showlegend: bool = False,
@@ -970,7 +970,7 @@ class Polyhedron:
                 )
         return traces
 
-    def plot3d(
+    def plot_2d_graph(
         self,
         fill: str = "toself",
         showlegend: bool = False,

@@ -22,7 +22,7 @@ from relucent import Complex, get_mlp_model
 network = get_mlp_model(widths=[2, 10, 5, 1])
 cplx = Complex(network)
 cplx.bfs()
-fig = cplx.plot(bound=10000)
+fig = cplx.plot_2d_complex(bound=10000)
 fig.show()
 ```
 

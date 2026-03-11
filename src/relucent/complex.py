@@ -1348,7 +1348,7 @@ class Complex:
         for node in G:
             self[G.nodes[node]["poly"]]._shis = [G.edges[edge]["shi"] for edge in G.edges(node)]
 
-    def plot(
+    def plot_2d_complex(
         self,
         label_regions=False,
         color=None,
@@ -1373,8 +1373,8 @@ class Complex:
             ss_name: If True, use the full sign sequence as
                 the legend label for each polyhedron. Defaults to False.
             bound: Constraint radius for plotting bounds. Passed to each
-                polyhedron's plot2d() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.
-            **kwargs: Additional arguments passed to each polyhedron's plot2d() method.
+                polyhedron's plot_2d_complex() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.
+            **kwargs: Additional arguments passed to each polyhedron's plot_2d_complex() method.
 
         Returns:
             plotly.graph_objects.Figure: A plotly figure containing the 2D plot
@@ -1406,7 +1406,7 @@ class Complex:
                 name = f"{poly.ss_np.flatten().astype(int).tolist()}"
             else:
                 name = f"{poly}"
-            p_plot = poly.plot2d(
+            p_plot = poly.plot_2d_complex(
                 name=name,
                 fillcolor=c,
                 line_color="black",
@@ -1438,7 +1438,7 @@ class Complex:
         )
         return fig
 
-    def plot3d(
+    def plot_2d_graph(
         self,
         label_regions=False,
         color=None,
@@ -1463,7 +1463,7 @@ class Complex:
             show_axes: If True, display the coordinate axes. Defaults to False.
             project: If True, also show a projection of the complex onto the
                 xy plane. Defaults to True.
-            **kwargs: Additional arguments passed to each polyhedron's plot3d() method.
+            **kwargs: Additional arguments passed to each polyhedron's plot_2d_graph() method.
 
         Returns:
             plotly.graph_objects.Figure: A plotly figure containing the 3D plot
@@ -1487,7 +1487,7 @@ class Complex:
         for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
-            p_plot = poly.plot3d(
+            p_plot = poly.plot_2d_graph(
                 name=f"{poly}",
                 color=c,
                 # outlinecolor="black",
@@ -1502,7 +1502,7 @@ class Complex:
                 else:
                     fig.add_trace(p_plot)
             if project is not None:
-                p_plot = poly.plot3d(
+                p_plot = poly.plot_2d_graph(
                     name=f"{poly}",
                     color=c,
                     project=project,
