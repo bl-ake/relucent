@@ -4,3 +4,4 @@
 * [complex.py](src/relucent/complex.py): Class for calculations involving the polyhedral cplx (e.g. polyhedron search, connectivity graph calculation)
 * [convert_model.py](src/relucent/convert_model.py): Utilities for converting various PyTorch.nn layers to Linear layers
 * [ss.py](src/relucent/ss.py): Data structures for storing large numbers of sign sequence vectors
+* [config.py](src/relucent/config.py): Global variables controlling numerics and default values
