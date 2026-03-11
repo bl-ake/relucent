@@ -181,21 +181,22 @@ deeply as possible before backtracking. Uses a LIFO queue.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_boundary_cells">
+<span class="sig-name descname"><span class="pre">get_boundary_cells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_cells" title="Link to this definition">¶</a></dt>
+<dd><p>Get all (d-1)-cells in neuron i’s BH.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.get_boundary_edges">
 <span class="sig-name descname"><span class="pre">get_boundary_edges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_edges" title="Link to this definition">¶</a></dt>
 <dd><p>Get the boundary of neuron i by returning the set of edges in the dual graph with label i.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="relucent.Complex.get_boundary_faces">
-<span class="sig-name descname"><span class="pre">get_boundary_faces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_faces" title="Link to this definition">¶</a></dt>
-<dd><p>Get all (d-1)-cells that form the boundary of neuron i.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.get_boundary_graph">
 <span class="sig-name descname"><span class="pre">get_boundary_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.get_boundary_graph" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Get the induced subgraph of neuron i’s BH.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.get_dual_graph">
@@ -549,7 +550,7 @@ sign-sequence lookups are preserved. Defaults to True.</p></li>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.searcher">
-<span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.searcher" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'unrestricted'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.searcher" title="Link to this definition">¶</a></dt>
 <dd><p>Search for polyhedra in the complex by discovering neighbors.</p>
 <p>This is a generic search method that can be configured for different
 traversal strategies (BFS, DFS, random walk) by providing different
@@ -1485,8 +1486,8 @@ environment, create and pass one directly to functions that need it.</p>
 <li><a class="reference internal" href="#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.Complex.get_boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_cells()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.Complex.get_boundary_faces"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_faces()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_boundary_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
