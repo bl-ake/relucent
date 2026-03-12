@@ -57,12 +57,20 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
 _env: Env | None = None
 
 
-def get_env() -> Env:
+def get_env(num_threads: int | None = None) -> Env:
     """Get a cached Gurobi environment.
 
     Creates and caches a Gurobi environment with logging disabled. This avoids
     the overhead of creating multiple environments. For more control over the
     environment, create and pass one directly to functions that need it.
+
+    If ``num_threads`` is provided, the environment's ``Threads`` parameter is
+    set accordingly on first creation. Subsequent calls ignore ``num_threads``
+    and return the cached environment.
+
+    Args:
+        num_threads: Optional limit on the number of threads Gurobi may use.
+            If None, Gurobi uses its default threading behavior.
 
     Returns:
         gurobipy.Env: A Gurobi environment with logging disabled.
@@ -71,6 +79,8 @@ def get_env() -> Env:
     if _env is not None:
         return _env
     _env = Env(logfilename="", empty=True)
+    if num_threads is not None:
+        _env.setParam("Threads", num_threads)
     _env.setParam("OutputFlag", 0)
     _env.setParam("LogToConsole", 0)
     _env.start()
