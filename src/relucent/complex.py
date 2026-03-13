@@ -37,7 +37,7 @@ dim: int = 0
 get_vol_calc: bool = True
 
 
-def set_globals(get_net: NN, get_volumes: bool = True) -> None:
+def set_globals(get_net: NN, get_volumes: bool = True, num_threads: int | None = None) -> None:
     """Initialize global variables for worker processes in multiprocessing.
 
     This function should only be used as an initializer for multiprocessing pools,
@@ -55,7 +55,7 @@ def set_globals(get_net: NN, get_volumes: bool = True) -> None:
         ...     pass
     """
     global env
-    env = get_env()
+    env = get_env(num_threads=num_threads)
     global net
     net = get_net
     net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
@@ -778,8 +778,8 @@ class Complex:
                             break
                         continue
 
-                    ## If not using multiprocessing, you would need to check if the polyhedron's net is None first
-                    p.net = self.net
+                    if p.net is None:
+                        p.net = self.net
 
                     if cube_mode != "unrestricted" and not _apply_cube_filter(p):
                         if unprocessed == 0 or len(self) >= max_polys:
@@ -896,7 +896,7 @@ class Complex:
         if (start.ss_np == 0).any():
             raise ValueError("Start point must not be on a hyperplane")
 
-        diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).flatten()).flatten().tolist())
+        diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).ravel()).ravel().tolist())
 
         print("Diffs:", diffs)
 
@@ -954,9 +954,10 @@ class Complex:
         bound: float = DEFAULT_SEARCH_BOUND,
         max_polys: float = float("inf"),
         show_pbar: bool = True,
+        num_threads: int = 1,
         **kwargs: Any,
     ) -> list[Polyhedron] | None:
-        """Find a path between two data points using A* search algorithm.
+        """Find a path between two data polyhedra using the A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
         distance between sign sequences, plus Euclidean distance between interior
@@ -1050,7 +1051,11 @@ class Complex:
             return 1
 
         # with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
-        pool = mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,))
+        pool = (
+            mp.Pool(nworkers, initializer=set_globals, initargs=(self.net, False, num_threads))
+            if nworkers > 1
+            else None
+        )
         try:
             # for p, neighbors, shi, depth, node_index in pool.imap(
             #     partial(astar_calculations, bound=bound, **kwargs), openSet
@@ -1065,20 +1070,23 @@ class Complex:
 
                 p, shi, depth = item
 
-                for neighbor, neighbor_shi in pool.imap_unordered(
-                    partial(get_ip, p), (i for i in p.shis if i != shi), chunksize=max(nhs // nworkers, 1)
-                ):
-                    # for neighbor, neighbor_shi in map(
-                    #     partial(get_ip, p),
-                    #     (i for i in p.shis if i != shi),
-                    # ):
+                if nworkers == 1:
+                    neighbor_iter = map(partial(get_ip, p), (i for i in p.shis if i != shi))
+                else:
+                    neighbor_iter = pool.imap_unordered(
+                        partial(get_ip, p),
+                        (i for i in p.shis if i != shi),
+                        chunksize=max(nhs // nworkers, 1),
+                    )
+
+                for neighbor, neighbor_shi in neighbor_iter:
                     if not isinstance(neighbor, Polyhedron):
                         ## TODO: Should this be double checked?
                         p._shis.remove(neighbor_shi)
                     else:
                         tentative_gScore = gScore[p] + d(p, neighbor)
-                        ## If not using multiprocessing, you would need to check if the neighbor's net is None first
-                        neighbor.net = self.net
+                        if neighbor.net is None:
+                            neighbor.net = self.net
                         if tentative_gScore < gScore[neighbor]:  ## Only needed with an inconsistent heuristic
                             cameFrom[neighbor] = p
                             gScore[neighbor] = tentative_gScore
@@ -1102,19 +1110,6 @@ class Complex:
                     if neighbor == end_poly:
                         break
 
-                # next_one = openSet.deque.pq[0][2]
-                # new_hamming = (next_one.ss != end.ss).sum()
-                # if new_hamming >= (p.ss != end.ss).sum():
-                #     p2 = next_one
-                #     p1 = pd.DataFrame(options).sort_values("fScore", ascending=True).iloc[0]["neighbor"]
-
-                #     print(
-                #         f"The next polyhedron to be searched is {p2}: fScore: {fScore[p2]} gScore: {gScore[p2]} Hamming: {(p2.ss != end.ss).sum()} Heuristic: {heuristic(p2, 0, 0)} | Distance: {np.linalg.norm(p2.interior_point - end.interior_point).item()}"
-                #     )
-                #     print(
-                #         f"A better option could be: {p1}: fScore: {fScore[p1]} gScore: {gScore[p1]} Hamming: {(p1.ss != end.ss).sum()} Heuristic: {heuristic(p1, 0, 0)} | Distance: {np.linalg.norm(p1.interior_point - end.interior_point).item()}"
-                #     )
-
                 pbar.update(n=len(cameFrom) - pbar.n)
                 pbar.set_postfix_str(
                     f"Min Distance: {min_dist:.3f} Depth: {depth} Open Set: {unprocessed} Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
@@ -1124,7 +1119,7 @@ class Complex:
                 if min_dist < 1:
                     if 0 < min_dist:
                         ## TODO: What if there are no/multiple differences?
-                        last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).flatten()).item()
+                        last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).ravel()).item()
                         if last_shi in min_p.shis:
                             cameFrom[end_poly] = min_p
                             neighbor = end_poly
@@ -1141,9 +1136,10 @@ class Complex:
         finally:
             # print(f"Closing out after {pbar.n} iterations")
 
-            pool.terminate()
-            pool.join()
-            pool.close()
+            if pool is not None:
+                pool.terminate()
+                pool.join()
+                pool.close()
 
             openSet.close()
             tqdm.get_lock().locks = []
@@ -1160,7 +1156,7 @@ class Complex:
             # print(f"Path found with length {len(path) - 1}:")
             # if len(path) < 100:
             #     for p1, p2 in zip(path[:-1], path[1:]):
-            #         print(f"    {p1} - {np.argwhere((p1.ss != p2.ss).flatten()).item()} -> {p2}")
+            #         print(f"    {p1} - {np.argwhere((p1.ss != p2.ss).ravel()).item()} -> {p2}")
             return path
         else:
             # print(f"No Path Found - Final Distance: {min_dist - 1}")
@@ -1201,6 +1197,13 @@ class Complex:
             ss[0, self.G.edges[edge]["shi"]] *= 0
             faces.add(self.ss2poly(ss))
         return faces
+
+    def get_boundary_complex(self, i):
+        """Get the boundary complex of neuron i."""
+        cplx = Complex(self.net)
+        for poly in self.get_boundary_cells(i):
+            cplx.add_polyhedron(poly)
+        return cplx
 
     @property
     def G(self) -> nx.Graph:
@@ -1403,7 +1406,7 @@ class Complex:
             if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
                 c = "red"
             if ss_name:
-                name = f"{poly.ss_np.flatten().astype(int).tolist()}"
+                name = f"{poly.ss_np.ravel().astype(int).tolist()}"
             else:
                 name = f"{poly}"
             p_plot = poly.plot_2d_complex(
@@ -1422,7 +1425,7 @@ class Complex:
                 )
         interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
         maxcoord = (
-            (np.max(interior_points) * PLOT_MARGIN_FACTOR)
+            (np.mean(interior_points) * PLOT_MARGIN_FACTOR)
             if len(interior_points) > 0
             else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
         )
@@ -1435,6 +1438,95 @@ class Complex:
             xaxis=dict(range=(-maxcoord, maxcoord)),
             yaxis_scaleanchor="x",
             yaxis=dict(range=(-maxcoord, maxcoord)),
+        )
+        return fig
+
+    def plot_3d_complex(
+        self,
+        label_regions: bool = False,
+        color: str | None = None,
+        highlight_regions: Iterable[Polyhedron] | Iterable[str] | None = None,
+        show_axes: bool = False,
+        **kwargs: Any,
+    ) -> go.Figure:
+        """Plot the complex in 3D input space using plotly.
+
+        This visualizes the polyhedral complex of a network with 3D input by
+        drawing each cell as a 3D region in the input space. Axis scaling is
+        automatic based on the traces returned by each polyhedron's plot function.
+
+        Args:
+            label_regions: If True, add text labels at (approximate) centers of
+                polyhedra. Defaults to False.
+            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
+                If None, use an equitable graph coloring. Defaults to None.
+            highlight_regions: If provided, highlight these polyhedra in red and
+                render them as filled meshes instead of wireframes. Can be a
+                list of Polyhedron objects or their string representations.
+                Defaults to None.
+            show_axes: If True, display coordinate axes. Defaults to False.
+            **kwargs: Additional keyword arguments forwarded to
+                ``Polyhedron.plot_3d_complex``.
+
+        Returns:
+            plotly.graph_objects.Figure: A figure containing the 3D plot of the complex.
+        """
+        if self.dim != 3:
+            raise ValueError("Complex must have 3D input to plot 3D complex")
+
+        fig = go.Figure()
+        polys = list(self)
+
+        if color == "Wl2":
+            colors = get_colors([poly.Wl2 for poly in polys])
+        else:
+            color_scheme = px.colors.qualitative.Plotly
+            try:
+                coloring = nx.algorithms.coloring.equitable_color(
+                    self.get_dual_graph(), min(len(color_scheme), len(polys))
+                )
+                remap, idx = dict(), 0
+                for p in polys:
+                    if coloring[p] not in remap:
+                        remap[coloring[p]] = idx
+                        idx += 1
+                colors = [color_scheme[remap[coloring[i]]] for i in polys]
+            except Exception:
+                print("Could not find equitable coloring, using random colors")
+                colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
+
+        for c, poly in tqdm(zip(colors, polys), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
+            is_highlighted = (highlight_regions is not None) and (
+                (poly in highlight_regions) or (str(poly) in highlight_regions)
+            )
+            if is_highlighted:
+                c = "red"
+            traces = poly.plot_3d_complex(
+                showlegend=False,
+                color=c,
+                filled=is_highlighted,
+                **kwargs,
+            )
+            for trace in traces:
+                fig.add_trace(trace)
+            if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[poly.center[0]],
+                        y=[poly.center[1]],
+                        z=[poly.center[2]],
+                        mode="text",
+                        text=str(poly),
+                        showlegend=False,
+                    )
+                )
+
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(visible=show_axes),
+                yaxis=dict(visible=show_axes),
+                zaxis=dict(visible=show_axes),
+            ),
         )
         return fig
 
@@ -1527,7 +1619,7 @@ class Complex:
                             .cpu()
                             .numpy()
                             .squeeze()
-                            .flatten()[:, 0]
+                            .ravel()[:, 0]
                         ],
                         mode="text",
                         text=str(poly),
