@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 from gurobipy import GRB, Model
-from scipy.linalg import null_space
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
@@ -333,9 +332,25 @@ class Polyhedron:
                     else:
                         ## Jittering solved the numerical problems
                         hs = new_hs
+        except ValueError:
+            raise  # Our HIGH_PRECISION raise - do not retry
         except Exception as e:
-            raise ValueError(f"Error while computing halfspace intersection: {e}")
-            # raise ValueError("Error while computing halfspace intersection")
+            if qhull_mode == "JITTERED":
+                try:
+                    hs = HalfspaceIntersection(
+                        halfspaces,
+                        self.interior_point,
+                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                    )  # http://www.qhull.org/html/qh-optq.htm
+                    self.warnings.append(
+                        RuntimeWarning(
+                            f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"
+                        )
+                    )
+                except Exception as e2:
+                    raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
+            else:
+                raise ValueError(f"Error while computing halfspace intersection: {e}")
         self._hs = hs
         # It seems like the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
         # try:
@@ -969,11 +984,57 @@ class Polyhedron:
         )
         if int_point is None:
             return None
-        hs = HalfspaceIntersection(
-            bounded_halfspaces,
-            int_point.squeeze(),
-            # qhull_options="QbB",
-        )  ## http://www.qhull.org/html/qh-optq.htm
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                hs = HalfspaceIntersection(
+                    bounded_halfspaces,
+                    int_point.squeeze(),
+                    qhull_options=None,
+                )  # http://www.qhull.org/html/qh-optq.htm
+            if w:
+                msgs = "; ".join(str(wi.message) for wi in w)
+                if qhull_mode == "IGNORE":
+                    self.warnings.extend([RuntimeWarning(wi) for wi in w])
+                if qhull_mode == "WARN_ALL":
+                    warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
+                elif qhull_mode == "HIGH_PRECISION":
+                    raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
+                elif qhull_mode == "JITTERED":
+                    with warnings.catch_warnings(record=True) as w2:
+                        new_hs = HalfspaceIntersection(
+                            bounded_halfspaces,
+                            int_point.squeeze(),
+                            qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        )  # http://www.qhull.org/html/qh-optq.htm
+                    if w2:
+                        self.warnings.append(
+                            RuntimeWarning(
+                                "Recomputing HalfspaceIntersection with jitter option 'QJ' still had numerical problems"
+                            )
+                        )
+                        self.warnings.extend([RuntimeWarning(wi) for wi in w2])
+                    else:
+                        ## Jittering solved the numerical problems
+                        hs = new_hs
+        except ValueError:
+            raise  # Our HIGH_PRECISION raise - do not retry
+        except Exception as e:
+            if qhull_mode == "JITTERED":
+                try:
+                    hs = HalfspaceIntersection(
+                        bounded_halfspaces,
+                        int_point.squeeze(),
+                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                    )  # http://www.qhull.org/html/qh-optq.htm
+                    self.warnings.append(
+                        RuntimeWarning(
+                            f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"
+                        )
+                    )
+                except Exception as e2:
+                    raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
+            else:
+                raise ValueError(f"Error while computing halfspace intersection: {e}")
         vertices = hs.intersections
         return vertices
 

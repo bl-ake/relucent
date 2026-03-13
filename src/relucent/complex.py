@@ -1497,7 +1497,8 @@ class Complex:
 
         for c, poly in tqdm(zip(colors, polys), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
             is_highlighted = (highlight_regions is not None) and (
-                (poly in highlight_regions) or (str(poly) in highlight_regions)
+                (poly in [p for p in highlight_regions if isinstance(p, Polyhedron)])
+                or (str(poly) in [p for p in highlight_regions if isinstance(p, str)])
             )
             if is_highlighted:
                 c = "red"
