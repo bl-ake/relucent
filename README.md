@@ -1,8 +1,8 @@
 [![Usable](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml/badge.svg)](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml)
 [![Latest Release](https://img.shields.io/github/v/tag/bl-ake/relucent?label=Latest%20Release)](https://github.com/bl-ake/relucent/releases)
 
-# Relucent
-Explore the polyhedral complexes of ReLU neural networks
+# <img src="https://www.bl-ake.com/images/nice_one.svg" height="60" alt="Relucent Icon" style="vertical-align: middle"/> Relucent
+Explore the polyhedral complexes of ReLU neural networks 
 
 This package differs from existing software (for example, check out the amazing [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient, in particular speeding up local search of the complex in higher dimensions.
 
