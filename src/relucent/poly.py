@@ -960,7 +960,7 @@ class Polyhedron:
             np.ndarray or None: Array of vertex coordinates, or None if the
                 polyhedron doesn't intersect the bounded region or computation fails.
         """
-        if self.codimension > 0:
+        if self.codim > 0:
             raise NotImplementedError("Codimension > 0 not yet supported")
 
         try:
