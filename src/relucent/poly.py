@@ -343,9 +343,7 @@ class Polyhedron:
                         qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
                     )  # http://www.qhull.org/html/qh-optq.htm
                     self.warnings.append(
-                        RuntimeWarning(
-                            f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"
-                        )
+                        RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
                     )
                 except Exception as e2:
                     raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
@@ -962,11 +960,14 @@ class Polyhedron:
             np.ndarray or None: Array of vertex coordinates, or None if the
                 polyhedron doesn't intersect the bounded region or computation fails.
         """
+        if self.codimension > 0:
+            raise NotImplementedError("Codimension > 0 not yet supported")
+
         try:
             bounded_halfspaces = self.get_bounded_halfspaces(bound)
         except ValueError as e:
-            print("Could not get bounded halfspaces")
-            print(e)
+            w = RuntimeWarning(f"Error while computing bounded vertices: {e}")
+            self.warnings.append(w)
             return None
         # int_point, _ = solve_radius(get_env(), bounded_halfspaces, max_radius=1000)
         # if not (
@@ -1027,9 +1028,7 @@ class Polyhedron:
                         qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
                     )  # http://www.qhull.org/html/qh-optq.htm
                     self.warnings.append(
-                        RuntimeWarning(
-                            f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"
-                        )
+                        RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
                     )
                 except Exception as e2:
                     raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
