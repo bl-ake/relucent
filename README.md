@@ -1,7 +1,14 @@
+
+
+![Relucent](/docs/title.svg)
+
+<div align="center">
+
+
 [![Usable](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml/badge.svg)](https://github.com/bl-ake/relucent/actions/workflows/python-package.yml)
 [![Latest Release](https://img.shields.io/github/v/tag/bl-ake/relucent?label=Latest%20Release)](https://github.com/bl-ake/relucent/releases)
 
-![Relucent](/docs/title.svg)
+</div>
 
 A little Python package for computing the polyhedra of ReLU networks!
 
