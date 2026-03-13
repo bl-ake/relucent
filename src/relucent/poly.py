@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 from gurobipy import GRB, Model
+from scipy.linalg import null_space
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
@@ -15,8 +16,8 @@ from relucent.config import (
     DEFAULT_PLOT_BOUND,
     GUROBI_SHI_BEST_BD_STOP,
     GUROBI_SHI_BEST_OBJ_STOP,
-    QHULL_MODE,
     MAX_RADIUS,
+    QHULL_MODE,
     TOL_DEAD_RELU,
     TOL_HALFSPACE_CONTAINMENT,
     TOL_NEARLY_VERTICAL,
@@ -59,19 +60,28 @@ def solve_radius(
 
     if isinstance(halfspaces, torch.Tensor):
         halfspaces = halfspaces.detach().cpu().numpy()
-    A = halfspaces[:, :-1]
-    b = halfspaces[:, -1:]
-    norm_vector = np.reshape(np.linalg.norm(A, axis=1), (A.shape[0], 1))
 
     if zero_indices is not None and len(zero_indices) > 0:
         warnings.warn("Working with k<d polyhedron.")
-        norm_vector[zero_indices] = 0
+        equalities = halfspaces[zero_indices]
+        inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices)]
+        P = (
+            np.eye(equalities[:, :-1].shape[1])
+            - equalities[:, :-1].T @ np.linalg.pinv(equalities[:, :-1] @ equalities[:, :-1].T) @ equalities[:, :-1]
+        )
+        norm_vector = np.reshape(np.linalg.norm(inequalities[:, :-1] @ P.T, axis=1), (inequalities[:, :-1].shape[0], 1))
+    else:
+        inequalities = halfspaces
+        equalities = None
+        norm_vector = np.reshape(np.linalg.norm(inequalities[:, :-1], axis=1), (inequalities[:, :-1].shape[0], 1))
 
     model = Model("Interior Point", env)
     x = model.addMVar((halfspaces.shape[1] - 1, 1), lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="x")
     y = model.addMVar((1,), ub=max_radius, vtype=GRB.CONTINUOUS, name="y")
     try:
-        model.addConstr(A @ x + norm_vector * y <= -b)
+        model.addConstr(inequalities[:, :-1] @ x + norm_vector * y <= -inequalities[:, -1:])
+        if equalities is not None:
+            model.addConstr(equalities[:, :-1] @ x == -equalities[:, -1:])
         model.setObjective(y, sense)
     except Exception as e:
         raise ValueError(f"GB Error Building Model: {e}")
@@ -132,10 +142,11 @@ class Polyhedron:
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
         """
         self._net = net
-        self._ss = ss
+        # Store the sign sequence with an integer dtype to ensure consistent
+        # semantics across NumPy and PyTorch backends.
+        self._ss = self._coerce_ss_to_int(ss)
         self._halfspaces: torch.Tensor | np.ndarray | None = halfspaces
         self._halfspaces_np: np.ndarray | None = None
-        self._nonzero_halfspaces_np: np.ndarray | None = None
         self._W: torch.Tensor | np.ndarray | None = W
         self._b: torch.Tensor | np.ndarray | None = b
         self._Wl2: float | None = None
@@ -169,6 +180,24 @@ class Polyhedron:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+        """Return an integer-typed sign sequence (values in {-1, 0, 1})."""
+        if isinstance(value, np.ndarray):
+            if not np.issubdtype(value.dtype, np.integer):
+                value = value.astype(np.int8, copy=False)
+            return value
+        if isinstance(value, torch.Tensor):
+            # Preserve device but ensure integer dtype.
+            if value.dtype not in (
+                torch.int8,
+                torch.int16,
+                torch.int32,
+                torch.int64,
+            ):
+                value = value.to(dtype=torch.int8)
+            return value
+        raise TypeError(f"Unsupported ss type: {type(value)}")
+
     @property
     def net(self) -> NN:
         """The neural network I belong to"""
@@ -187,7 +216,7 @@ class Polyhedron:
 
     @ss.setter
     def ss(self, value: np.ndarray | torch.Tensor) -> None:
-        self._ss = value
+        self._ss = self._coerce_ss_to_int(value)
         self._ss_np = None
 
     @property
@@ -197,13 +226,65 @@ class Polyhedron:
             if isinstance(self._ss, np.ndarray):
                 self._ss_np = self._ss
             elif isinstance(self._ss, torch.Tensor):
-                self._ss_np = self._ss.detach().cpu().numpy()
+                self._ss_np = self._ss.detach().cpu().numpy().astype(np.int8, copy=False)
             else:
                 raise TypeError(f"Unsupported ss type: {type(self._ss)}")
         assert self._ss_np is not None
         return self._ss_np
 
-    def compute_properties(self) -> None:
+    @cached_property
+    def zero_indices(self) -> list[int]:
+        """Indices of sign sequence elements that are zero."""
+        return np.flatnonzero(self.ss_np == 0)
+
+    @cached_property
+    def non_zero_indices(self) -> list[int]:
+        """Indices of sign sequence elements that are not zero."""
+        return np.flatnonzero(self.ss_np != 0)
+
+    @property
+    def hyperplanes(self) -> np.ndarray:
+        """Hyperplanes that are safe to use for computation of polyhedron properties."""
+        return self.halfspaces_np[self.zero_indices]
+
+    @property
+    def inequalities(self) -> np.ndarray:
+        return self.halfspaces_np[self.non_zero_indices]
+
+    @property
+    def equalities(self) -> np.ndarray:
+        """Rows of ``halfspaces_np`` corresponding to equality constraints (zeros in the sign sequence)."""
+        return self.hyperplanes
+
+    # def reparametrize_inequalities(self) -> np.ndarray:
+    #     if not self.zero_indices:
+    #         # No equalities: work in the original coordinates.
+    #         dim = self.ambient_dim
+    #         F = np.eye(dim)
+    #         x0 = np.zeros((dim, 1))
+
+    #         def remapper(x):
+    #             return F @ x + x0
+
+    #         return self.inequalities, remapper, F, x0
+
+    #     eq_A = self.equalities[:, :-1]
+    #     eq_b = self.equalities[:, -1:]
+    #     # Solve eq_A @ x = -eq_b in the least-squares sense to obtain a point on
+    #     # the affine subspace defined by the equalities. This works even when
+    #     # eq_A is not square.
+    #     x0, *_ = np.linalg.lstsq(eq_A, -eq_b, rcond=None)
+    #     F = null_space(eq_A)
+    #     A = self.inequalities[:, :-1] @ F
+    #     b = self.inequalities[:, -1:] - self.inequalities[:, :-1] @ x0
+    #     new_inequalities = np.concatenate([A, b], axis=1)
+
+    #     def remapper(x):
+    #         return F @ x + x0
+
+    #     return new_inequalities, remapper, F, x0
+
+    def compute_properties(self, qhull_mode: str = QHULL_MODE) -> None:
         """Compute additional geometric properties for low-dimensional polyhedra.
 
         Returns:
@@ -218,12 +299,8 @@ class Polyhedron:
 
         if self.net.input_shape[0] > 6:
             raise ValueError("Input shape too large to compute extra properties")
-        # if np.isnan(self.nonzero_halfspaces_np).any():
-        #     raise ValueError("Halfspaces contain NaNs")
-        # if np.isinf(self.nonzero_halfspaces_np).any():
-        #     raise ValueError("Halfspaces contain infinities")
         try:
-            halfspaces = self.nonzero_halfspaces_np
+            halfspaces = self.halfspaces_np
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
                     halfspaces,
@@ -232,13 +309,13 @@ class Polyhedron:
                 )  # http://www.qhull.org/html/qh-optq.htm
             if w:
                 msgs = "; ".join(str(wi.message) for wi in w)
-                if QHULL_MODE == "IGNORE":
+                if qhull_mode == "IGNORE":
                     self.warnings.extend([RuntimeWarning(wi) for wi in w])
-                if QHULL_MODE == "WARN_ALL":
+                if qhull_mode == "WARN_ALL":
                     warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
-                elif QHULL_MODE == "HIGH_PRECISION":
+                elif qhull_mode == "HIGH_PRECISION":
                     raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
-                elif QHULL_MODE == "JITTERED":
+                elif qhull_mode == "JITTERED":
                     with warnings.catch_warnings(record=True) as w2:
                         new_hs = HalfspaceIntersection(
                             halfspaces,
@@ -263,7 +340,7 @@ class Polyhedron:
         # It seems like the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
         # try:
         #     hs_shis = np.unique([shi for shis in hs.dual_facets for shi in shis]).tolist()
-        #     # hs_shis = hs.dual_vertices.flatten().tolist()
+        #     # hs_shis = hs.dual_vertices.ravel().tolist()
         #     if set(hs_shis) != set(self.shis):
         #         w = RuntimeWarning(
         #             f"HalfspaceIntersection SHIs on {self} do not match computed SHIs: {sorted(hs_shis)} vs {sorted(self.shis)}"
@@ -298,8 +375,12 @@ class Polyhedron:
                     self._volume = self._ch.volume
                 except Exception as e:
                     raise ValueError(f"Error while computing convex hull volume: {e}")
-            except Exception:
+            except Exception as e:
                 # warnings.warn("Error while computing convex hull:", e)
+                if qhull_mode == "WARN_ALL":
+                    warnings.warn(f"Error while computing convex hull: {e}")
+                elif qhull_mode == "HIGH_PRECISION":
+                    raise ValueError(f"Error while computing convex hull: {e}")
                 self._ch = None
                 self._volume = -1
         else:
@@ -309,7 +390,6 @@ class Polyhedron:
         self,
         env: Any = None,
         max_radius: float | None = None,
-        zero_indices: MutableSequence[int] | None = None,
     ) -> np.ndarray:
         """Get a point inside the polyhedron.
 
@@ -337,20 +417,16 @@ class Polyhedron:
             env = env or get_env()
             self._interior_point = solve_radius(
                 env,
-                # self.nonzero_halfspaces_np
-                # if self._shis is None and zero_indices is None
-                # else self.halfspaces_np[self.shis],
-                self.halfspaces_np,
+                self.halfspaces_np[:],
+                zero_indices=self.zero_indices,
                 max_radius=max_radius,
-                zero_indices=np.argwhere(self.ss_np.flatten() == 0).flatten().tolist()
-                + list(range(self.ss_np.shape[1], self.halfspaces.shape[0])),
             )[0]
             assert isinstance(self._interior_point, np.ndarray)
             self._interior_point = self._interior_point.squeeze()
         if self._interior_point is None:
             raise ValueError("Interior point not found")
         # if (
-        #     maximum_violation := (self.halfspaces[:, :-1] @ self._interior_point + self.halfspaces[:-1, None]).max()
+        #     maximum_violation := (self.inequalities[:, :-1] @ self._interior_point + self.inequalities[:-1, None]).max()
         # ) > TOL_HALFSPACE_CONTAINMENT:
         #     raise ValueError(f"Interior point invalid - Maximum Violation: {maximum_violation}")
         if self._interior_point is not None and self._interior_point not in self:
@@ -370,7 +446,9 @@ class Polyhedron:
             tuple: (center, inradius) where center is None for unbounded polyhedra.
         """
         env = env or get_env()
-        self._center, self._inradius = solve_radius(env, self.nonzero_halfspaces_np[:])
+        self._center, self._inradius = solve_radius(
+            env, self.halfspaces_np[:], zero_indices=self.zero_indices
+        )  ## TODO: Change
         self._finite = self._center is not None
         return self._center, self._inradius
 
@@ -455,8 +533,11 @@ class Polyhedron:
 
                 mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
-                new_constr_A = current_A * mask
-                new_constr_b = current_b * mask
+                ## Replce mask 0s with 1s
+                nonzero_mask = torch.where(mask == 0, 1, mask)
+
+                new_constr_A = current_A * nonzero_mask
+                new_constr_b = current_b * nonzero_mask
 
                 assert isinstance(constr_A, torch.Tensor)
                 assert isinstance(constr_b, torch.Tensor)
@@ -464,10 +545,8 @@ class Polyhedron:
                 assert isinstance(current_b, torch.Tensor)
                 assert isinstance(mask, torch.Tensor)
 
-                parts_A = (constr_A, new_constr_A[:, mask != 0], current_A[:, mask == 0], -current_A[:, mask == 0])
-                constr_A = torch.cat(parts_A, dim=1)
-                parts_b = (constr_b, new_constr_b[:, mask != 0], current_b[:, mask == 0], -current_b[:, mask == 0])
-                constr_b = torch.cat(parts_b, dim=1)
+                constr_A = torch.cat((constr_A, new_constr_A), dim=1)
+                constr_b = torch.cat((constr_b, new_constr_b), dim=1)
 
                 current_A = current_A * (mask == 1)
                 current_b = current_b * (mask == 1)
@@ -504,7 +583,7 @@ class Polyhedron:
         assert isinstance(current_A, torch.Tensor)
         assert isinstance(current_b, torch.Tensor)
 
-        assert halfspaces.shape[0] == self.ss.shape[1] + (self.ss == 0).sum().item()
+        assert halfspaces.shape[0] == self.ss.shape[1]
         return halfspaces, current_A, current_b
 
     @torch.no_grad()
@@ -553,20 +632,18 @@ class Polyhedron:
                     raise ValueError("ReLU layer must follow a linear layer")
                 mask = self.ss_np[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
-                new_constr_A = current_A * mask
-                new_constr_b = current_b * mask
+                nonzero_mask = np.where(mask == 0, 1, mask)
+
+                new_constr_A = current_A * nonzero_mask
+                new_constr_b = current_b * nonzero_mask
 
                 assert constr_A is not None
                 assert constr_b is not None
                 assert current_A is not None
                 assert current_b is not None
 
-                constr_A = np.concatenate(
-                    (constr_A, new_constr_A[:, mask != 0], current_A[:, mask == 0], -current_A[:, mask == 0]), axis=1
-                )
-                constr_b = np.concatenate(
-                    (constr_b, new_constr_b[:, mask != 0], current_b[:, mask == 0], -current_b[:, mask == 0]), axis=1
-                )
+                constr_A = np.concatenate((constr_A, new_constr_A), axis=1)
+                constr_b = np.concatenate((constr_b, new_constr_b), axis=1)
 
                 current_A = current_A * (mask == 1)
                 current_b = current_b * (mask == 1)
@@ -603,7 +680,7 @@ class Polyhedron:
         assert isinstance(current_A, np.ndarray)
         assert isinstance(current_b, np.ndarray)
 
-        assert halfspaces.shape[0] == self.ss_np.shape[1] + (self.ss_np == 0).sum().item()
+        assert halfspaces.shape[0] == self.ss_np.shape[1]
         return halfspaces, current_A, current_b
 
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
@@ -627,13 +704,13 @@ class Polyhedron:
         bounds_rhs = -np.ones((self.halfspaces_np.shape[1] - 1, 1)) * bound
         halfspaces = np.vstack(
             (
-                self.nonzero_halfspaces_np,
+                self.halfspaces_np,
                 np.hstack((bounds_lhs, bounds_rhs)),
                 np.hstack((-bounds_lhs, bounds_rhs)),
             )
         )
         env = env or get_env()
-        feasible = solve_radius(env, halfspaces, max_radius=bound)[0] is not None
+        feasible = solve_radius(env, halfspaces, max_radius=bound, zero_indices=self.zero_indices)[0] is not None
         if feasible:
             return halfspaces
         else:
@@ -711,7 +788,7 @@ class Polyhedron:
             model.close()
             raise KeyboardInterrupt
         elif model.status == GRB.OPTIMAL:
-            # print("All Hyperplanes Intersect")
+            ## All Hyperplanes Intersect
             shis = list(range(A.shape[0]))
             if collect_info:
                 return shis, []
@@ -755,7 +832,7 @@ class Polyhedron:
                     if dists[(dists > 0)].sum() >= 1 + tol:
                         msg = (
                             f"Invalid Proof for SHI {i}! Violation Sizes: "
-                            f"{np.argwhere(dists.flatten() > 0), dists[np.argwhere(dists.flatten() > 0)]}"
+                            f"{np.argwhere(dists.ravel() > 0), dists[np.argwhere(dists.ravel() > 0)]}"
                         )
                         w = RuntimeWarning(msg)
                         self.warnings.append(w)
@@ -763,7 +840,7 @@ class Polyhedron:
                     else:
                         shis.append(i)
 
-                basis_indices = constrs.CBasis.flatten() != 0
+                basis_indices = constrs.CBasis.ravel() != 0
                 if new_method:
                     if basis_indices.sum() != A.shape[1]:
                         warnings.warn("Bound Constraints in Basis")
@@ -783,7 +860,7 @@ class Polyhedron:
                         A_indices = torch.arange(A.shape[0], device=self.halfspaces.device)[~basis_indices][all_correct]
 
                         old_len = len(subset)
-                        subset -= set(A_indices.detach().cpu().numpy().flatten().tolist())
+                        subset -= set(A_indices.detach().cpu().numpy().ravel().tolist())
                         new_len = len(subset)
                         skip_size = old_len - new_len
             else:
@@ -857,7 +934,7 @@ class Polyhedron:
         eq = (self * other).ss == other.ss
         return bool(cast(torch.Tensor, eq).all())
 
-    def get_bounded_vertices(self, bound: float) -> np.ndarray | None:
+    def get_bounded_vertices(self, bound: float, qhull_mode: str = QHULL_MODE) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
 
         Computes the vertices of the polyhedron after intersecting it with a
@@ -877,18 +954,360 @@ class Polyhedron:
             print(e)
             return None
         # int_point, _ = solve_radius(get_env(), bounded_halfspaces, max_radius=1000)
-        if not (
-            self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT
-        ).all():
-            warnings.warn(f"Interior point ({self.interior_point}) out of bounds ({bound}):")
+        # if not (
+        #     self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT
+        # ).all():
+        #     warnings.warn(f"Interior point ({self.interior_point}) out of bounds ({bound}):")
+        #     return None
+
+        # Recompute interior point
+        int_point, _ = solve_radius(
+            get_env(),
+            bounded_halfspaces,
+            max_radius=1000,
+            zero_indices=self.zero_indices,
+        )
+        if int_point is None:
             return None
         hs = HalfspaceIntersection(
             bounded_halfspaces,
-            self.interior_point,
+            int_point.squeeze(),
             # qhull_options="QbB",
         )  ## http://www.qhull.org/html/qh-optq.htm
         vertices = hs.intersections
         return vertices
+
+    def _get_bounded_plot_geometry(
+        self,
+        bound: float,
+    ) -> tuple[str, np.ndarray] | None:
+        """Classify bounded geometry for plotting as polygon, segment, or point.
+
+        The classification follows the requested behavior:
+        - If there is a single 0 in ss_np, treat the region as a line segment.
+        - If there are two 0s, treat the region as a point.
+        - Otherwise, use the full 2D polygon (via ConvexHull) when possible.
+
+        Returns:
+            None if vertices cannot be computed or are empty, otherwise:
+            ("polygon", verts) where verts are ordered boundary vertices,
+            ("segment", verts) where verts has shape (2, 2) for endpoints,
+            ("point", verts) where verts has shape (1, 2) for the point.
+        """
+        vertices = self.get_bounded_vertices(bound)
+        if vertices is None or vertices.size == 0:
+            return None
+
+        # Ensure 2D coordinates.
+        if vertices.shape[1] != 2:
+            return None
+
+        # Count zeros in the sign sequence (flattened).
+        num_zeros = int(np.sum(self.ss_np == 0))
+
+        # Degenerate to a single point when there are at least two zeros.
+        if num_zeros >= 2:
+            point = vertices.mean(axis=0, keepdims=True)
+            return "point", point
+
+        # Line segment when there is exactly one zero.
+        if num_zeros == 1:
+            # With very few vertices, just fall back to unique points.
+            if vertices.shape[0] == 1:
+                return "point", vertices
+            # Use PCA/SVD to find the main direction and endpoints along it.
+            centered = vertices - vertices.mean(axis=0, keepdims=True)
+            try:
+                _, _, vh = np.linalg.svd(centered, full_matrices=False)
+                direction = vh[0]
+                t = vertices @ direction
+                p_min = vertices[np.argmin(t)]
+                p_max = vertices[np.argmax(t)]
+                segment = np.stack([p_min, p_max], axis=0)
+                return "segment", segment
+            except Exception:
+                # Fallback: use the first two unique vertices if SVD fails.
+                uniq = np.unique(vertices, axis=0)
+                if uniq.shape[0] == 1:
+                    return "point", uniq
+                return "segment", uniq[:2]
+
+        # Default: use ConvexHull to get a polygonal boundary, but only when the
+        # polyhedron has (at least) 2-dimensional support.
+        if self.dim < 2:
+            uniq = np.unique(vertices, axis=0)
+            if uniq.shape[0] == 1:
+                return "point", uniq
+            elif uniq.shape[0] == 2:
+                return "segment", uniq
+            else:
+                return "polygon", uniq
+        try:
+            hull = ConvexHull(vertices)
+            boundary = vertices[hull.vertices]
+            return "polygon", boundary
+        except Exception:
+            # If ConvexHull fails, fall back to unique vertices as a polygonal chain.
+            uniq = np.unique(vertices, axis=0)
+            if uniq.shape[0] == 1:
+                return "point", uniq
+            elif uniq.shape[0] == 2:
+                return "segment", uniq
+            else:
+                return "polygon", uniq
+
+    def plot_3d_complex(
+        self,
+        showlegend: bool = False,
+        bound: float = DEFAULT_PLOT_BOUND,
+        filled: bool = False,
+        **kwargs: Any,
+    ) -> list[go.Mesh3d | go.Scatter3d]:
+        """Plot the (input-space) polyhedron as a 3D region using plotly.
+
+        This visualizes the cell of the polyhedral complex in the 3D input space.
+        Only works when the ambient input dimension is exactly 3.
+
+        Args:
+            showlegend: Whether to show the trace in the legend. Defaults to False.
+            bound: Radius of the bounding cube used to clip the polyhedron for
+                numerical stability. Defaults to config.DEFAULT_PLOT_BOUND.
+            filled: If True, render full-dimensional 3D regions as filled meshes
+                (go.Mesh3d) instead of wireframes. Defaults to False.
+            **kwargs: Additional keyword arguments forwarded to ``go.Scatter3d``
+                or ``go.Mesh3d``.
+
+        Returns:
+            list: A list of plotly traces. For 3D regions this will contain
+            line-based ``go.Scatter3d`` traces that outline the cell (no filled
+            volume), or a filled ``go.Mesh3d`` when filled=True. For degenerate
+            cases (faces, edges, or points) it returns appropriate ``go.Scatter3d``
+            traces.
+        """
+        if self.ambient_dim != 3:
+            raise ValueError("Polyhedron must have ambient dimension 3 to plot 3D complex")
+
+        # Normalize common Mesh3d-style kwargs (e.g., color) to Scatter3d-compatible
+        # kwargs so existing caller code keeps working.
+        base_kwargs: dict[str, Any] = dict(kwargs)
+        line_color = base_kwargs.pop("color", None)
+
+        traces: list[go.Mesh3d | go.Scatter3d] = []
+        vertices = self.get_bounded_vertices(bound)
+        if vertices is None or vertices.size == 0:
+            return traces
+
+        if vertices.shape[1] != 3:
+            return traces
+
+        # Handle degeneracies via effective dimensionality of the vertices.
+        centered = vertices - vertices.mean(axis=0, keepdims=True)
+        try:
+            _, s, vh = np.linalg.svd(centered, full_matrices=False)
+        except Exception:
+            s = np.array([])
+            vh = np.zeros((0, 3))
+        if s.size == 0 or np.all(s < 1e-12):
+            # Point-like.
+            point_kwargs = dict(base_kwargs)
+            if line_color is not None:
+                marker = dict(point_kwargs.get("marker", {}))
+                marker.setdefault("color", line_color)
+                point_kwargs["marker"] = marker
+            traces.append(
+                go.Scatter3d(
+                    x=[vertices[0, 0]],
+                    y=[vertices[0, 1]],
+                    z=[vertices[0, 2]],
+                    mode="markers",
+                    showlegend=showlegend,
+                    **point_kwargs,
+                )
+            )
+            return traces
+
+        tol = 1e-6 * s[0]
+        eff_dim = int(np.sum(s > tol))
+
+        if eff_dim == 1:
+            # Edge-like: show as a line segment between extremal points.
+            direction = vh[0]
+            t = vertices @ direction
+            p_min = vertices[np.argmin(t)]
+            p_max = vertices[np.argmax(t)]
+            seg = np.stack([p_min, p_max], axis=0)
+            line_kwargs = dict(base_kwargs)
+            if line_color is not None:
+                line = dict(line_kwargs.get("line", {}))
+                line.setdefault("color", line_color)
+                line_kwargs["line"] = line
+            traces.append(
+                go.Scatter3d(
+                    x=seg[:, 0],
+                    y=seg[:, 1],
+                    z=seg[:, 2],
+                    mode="lines",
+                    showlegend=showlegend,
+                    **line_kwargs,
+                )
+            )
+            return traces
+
+        if eff_dim == 2:
+            # Face-like: project onto principal plane to order vertices, then
+            # plot as a closed polygon in 3D.
+            basis = vh[:2]  # 2 x 3
+            coords_2d = vertices @ basis.T
+            if self.dim < 2:
+                order = np.arange(vertices.shape[0])
+            else:
+                try:
+                    hull_2d = ConvexHull(coords_2d)
+                    order = hull_2d.vertices
+                except Exception:
+                    order = np.arange(vertices.shape[0])
+            ordered = vertices[order]
+            x = ordered[:, 0].tolist() + [ordered[0, 0]]
+            y = ordered[:, 1].tolist() + [ordered[0, 1]]
+            z = ordered[:, 2].tolist() + [ordered[0, 2]]
+            face_line_kwargs = dict(base_kwargs)
+            if line_color is not None:
+                line = dict(face_line_kwargs.get("line", {}))
+                line.setdefault("color", line_color)
+                face_line_kwargs["line"] = line
+            if filled and line_color is not None:
+                # Use Mesh3d for filled planar face (fan triangulation from vertex 0)
+                n = len(ordered)
+                i_vals = [0] * (n - 2)
+                j_vals = list(range(1, n - 1))
+                k_vals = list(range(2, n))
+                mesh_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("line", "marker")}
+                traces.append(
+                    go.Mesh3d(
+                        x=ordered[:, 0].tolist(),
+                        y=ordered[:, 1].tolist(),
+                        z=ordered[:, 2].tolist(),
+                        i=i_vals,
+                        j=j_vals,
+                        k=k_vals,
+                        color=line_color,
+                        opacity=0.7,
+                        showlegend=showlegend,
+                        **mesh_kwargs,
+                    )
+                )
+            else:
+                traces.append(
+                    go.Scatter3d(
+                        x=x,
+                        y=y,
+                        z=z,
+                        mode="lines",
+                        showlegend=showlegend,
+                        **face_line_kwargs,
+                    )
+                )
+            return traces
+
+        # Full-dimensional 3D region: plot only the wireframe (edges) of the
+        # convex hull, not filled surfaces. Use a single trace with NaN-
+        # separated segments so each polyhedron corresponds to one trace.
+        if self.dim < 2:
+            return traces
+        try:
+            hull = ConvexHull(vertices)
+
+            # Build edge -> incident facet mapping from the triangulated hull.
+            edge_to_facets: dict[tuple[int, int], list[int]] = {}
+            for fi, simplex in enumerate(hull.simplices):
+                a, b, c = simplex
+                for u, v in ((a, b), (a, c), (b, c)):
+                    if u == v:
+                        continue
+                    key = (u, v) if u < v else (v, u)
+                    edge_to_facets.setdefault(key, []).append(fi)
+
+            # Normalize facet planes for coplanarity tests.
+            planes = hull.equations  # shape (n_facets, 4): [nx, ny, nz, d]
+            normals = planes[:, :3]
+            offsets = planes[:, 3]
+            norms = np.linalg.norm(normals, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            normals_n = normals / norms
+            offsets_n = offsets / norms.ravel()
+
+            def facets_coplanar(facet_indices: list[int], atol: float = 1e-6) -> bool:
+                if not facet_indices:
+                    return True
+                f0 = facet_indices[0]
+                n0 = normals_n[f0]
+                d0 = offsets_n[f0]
+                for fi in facet_indices[1:]:
+                    ni = normals_n[fi]
+                    di = offsets_n[fi]
+                    # Same or opposite normal direction and similar offset.
+                    if np.abs(np.dot(n0, ni)) < 1.0 - atol:
+                        return False
+                    if np.abs(d0 - di) > atol:
+                        return False
+                return True
+
+            # Keep only edges that are intersections of non-coplanar facets;
+            # this removes diagonals introduced by triangulation inside
+            # polygonal faces.
+            edges: set[tuple[int, int]] = set()
+            for edge, facet_indices in edge_to_facets.items():
+                if not facets_coplanar(facet_indices):
+                    edges.add(edge)
+
+            # When filled=True, add a Mesh3d trace for solid rendering instead of wireframe
+            if filled and line_color is not None:
+                mesh_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("line", "marker")}
+                traces.append(
+                    go.Mesh3d(
+                        x=vertices[:, 0].tolist(),
+                        y=vertices[:, 1].tolist(),
+                        z=vertices[:, 2].tolist(),
+                        i=hull.simplices[:, 0].tolist(),
+                        j=hull.simplices[:, 1].tolist(),
+                        k=hull.simplices[:, 2].tolist(),
+                        color=line_color,
+                        opacity=0.7,
+                        showlegend=showlegend,
+                        **mesh_kwargs,
+                    )
+                )
+            else:
+                # Wireframe for non-filled regions
+                edge_line_kwargs = dict(base_kwargs)
+                if line_color is not None:
+                    line = dict(edge_line_kwargs.get("line", {}))
+                    line.setdefault("color", line_color)
+                    edge_line_kwargs["line"] = line
+
+                xs: list[float] = []
+                ys: list[float] = []
+                zs: list[float] = []
+                for edge_u, edge_v in edges:
+                    seg = vertices[[edge_u, edge_v]]
+                    xs.extend([float(seg[0, 0]), float(seg[1, 0]), float("nan")])
+                    ys.extend([float(seg[0, 1]), float(seg[1, 1]), float("nan")])
+                    zs.extend([float(seg[0, 2]), float(seg[1, 2]), float("nan")])
+
+                traces.append(
+                    go.Scatter3d(
+                        x=xs,
+                        y=ys,
+                        z=zs,
+                        mode="lines",
+                        showlegend=showlegend,
+                        **edge_line_kwargs,
+                    )
+                )
+        except Exception as e:
+            warnings.warn(f"Error while computing 3D mesh for polyhedron {self}: {e}")
+
+        return traces
 
     def plot_2d_complex(
         self,
@@ -924,16 +1343,43 @@ class Polyhedron:
         """
         if self.W.shape[0] != 2:
             raise ValueError("Polyhedron must be 2D to plot")
-        traces = []
+        traces: list[go.Scatter] = []
         try:
-            vertices = self.get_bounded_vertices(bound)
-            if vertices is not None:
-                hull = ConvexHull(vertices)
-                x = vertices[hull.vertices, 0].tolist() + [vertices[hull.vertices, 0][0]]
-                y = vertices[hull.vertices, 1].tolist() + [vertices[hull.vertices, 1][0]]
-                traces.append(go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs))
+            geom = self._get_bounded_plot_geometry(bound)
+            if geom is not None:
+                kind, verts = geom
+                if kind == "polygon":
+                    x = verts[:, 0].tolist() + [verts[0, 0]]
+                    y = verts[:, 1].tolist() + [verts[0, 1]]
+                    traces.append(go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs))
+                elif kind == "segment":
+                    x = verts[:, 0].tolist()
+                    y = verts[:, 1].tolist()
+                    traces.append(
+                        go.Scatter(
+                            x=x,
+                            y=y,
+                            mode="lines",
+                            fill=None,
+                            showlegend=showlegend,
+                            **kwargs,
+                        )
+                    )
+                elif kind == "point":
+                    x = verts[:, 0].tolist()
+                    y = verts[:, 1].tolist()
+                    traces.append(
+                        go.Scatter(
+                            x=x,
+                            y=y,
+                            mode="markers",
+                            fill=None,
+                            showlegend=showlegend,
+                            **kwargs,
+                        )
+                    )
         except Exception as e:
-            print(self, e)
+            raise e
 
         if plot_halfspaces:
             W = self.halfspaces_np[:, :-1]
@@ -1001,35 +1447,71 @@ class Polyhedron:
         """
         if self.W.shape[0] != 2:
             raise ValueError("Polyhedron must be 2D to plot")
-        vertices = self.get_bounded_vertices(bound)
-        if vertices is not None:
-            try:
-                hull = ConvexHull(vertices)
-                x = vertices[hull.vertices, 0].tolist() + [vertices[hull.vertices, 0][0]]
-                y = vertices[hull.vertices, 1].tolist() + [vertices[hull.vertices, 1][0]]
-                z = (
-                    (
-                        self.net(torch.tensor([x, y], device=self.net.device, dtype=self.net.dtype).T)
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        .squeeze()[:, 1]
-                    )
-                    if project is None
-                    else [project] * (len(x))
-                )
-                mesh = go.Mesh3d(x=x, y=y, z=z, alphahull=-1, lighting=dict(ambient=1), **kwargs)
+        geom = self._get_bounded_plot_geometry(bound)
+        if geom is None:
+            return None
 
+        kind, verts = geom
+        try:
+            # Prepare x, y for all geometry types.
+            x = verts[:, 0].tolist()
+            y = verts[:, 1].tolist()
+            z = (
+                (
+                    self.net(torch.tensor([x, y], device=self.net.device, dtype=self.net.dtype).T)
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .squeeze()[:, 1]
+                )
+                if project is None
+                else [project] * len(x)
+            )
+
+            if kind == "polygon":
+                # Close the loop for polygonal surfaces.
+                x_closed = x + [x[0]]
+                y_closed = y + [y[0]]
+                z_closed = z + [z[0]]
+                mesh = go.Mesh3d(x=x_closed, y=y_closed, z=z_closed, alphahull=-1, lighting=dict(ambient=1), **kwargs)
                 scatter = go.Scatter3d(
-                    x=x, y=y, z=z, mode="lines", showlegend=False, line=dict(width=5, color="black"), visible=False
+                    x=x_closed,
+                    y=y_closed,
+                    z=z_closed,
+                    mode="lines",
+                    showlegend=False,
+                    line=dict(width=5, color="black"),
+                    visible=False,
                 )
-            except Exception as e:
-                warnings.warn(f"Error while plotting polyhedron: {e}")
-                return None
+                return {"mesh": mesh, "outline": scatter}
 
-            return {"mesh": mesh, "outline": scatter}
+            if kind == "segment":
+                # Only an outline line in 3D.
+                scatter = go.Scatter3d(
+                    x=x,
+                    y=y,
+                    z=z,
+                    mode="lines",
+                    showlegend=False,
+                    line=dict(width=5, color="black"),
+                    **kwargs,
+                )
+                return {"outline": scatter}
 
-        else:
+            if kind == "point":
+                # Single point plot.
+                scatter = go.Scatter3d(
+                    x=x,
+                    y=y,
+                    z=z,
+                    mode="markers",
+                    showlegend=False,
+                    marker=dict(size=4, color="black"),
+                    **kwargs,
+                )
+                return {"outline": scatter}
+        except Exception as e:
+            warnings.warn(f"Error while plotting polyhedron: {e}")
             return None
 
     def clean_data(self) -> None:
@@ -1133,14 +1615,6 @@ class Polyhedron:
             return self._halfspaces_np
         else:
             return self._halfspaces_np
-
-    @property
-    def nonzero_halfspaces_np(self) -> np.ndarray:
-        """Cached NumPy representation of nonzero halfspaces."""
-        if self._nonzero_halfspaces_np is None:
-            # remove all 0 rows from the halfspaces_np
-            self._nonzero_halfspaces_np = self.halfspaces_np[~np.all(self.halfspaces_np == 0, axis=1)]
-        return self._nonzero_halfspaces_np
 
     @property
     def W(self) -> torch.Tensor | np.ndarray:
@@ -1253,14 +1727,11 @@ class Polyhedron:
         """Alias for Polyhedron.num_shis"""
         return self.num_shis
 
-    @property
+    @cached_property
     def interior_point(self) -> np.ndarray | None:
         """A point guaranteed to be inside the polyhedron."""
         if self._interior_point is None:
-            zero_indices = np.argwhere((self.ss_np == 0).any(axis=1)).flatten().tolist() + list(
-                range(self.ss_np.shape[1], self.halfspaces.shape[1])
-            )
-            self.get_interior_point(zero_indices=zero_indices)
+            self.get_interior_point()
         return self._interior_point
 
     @property

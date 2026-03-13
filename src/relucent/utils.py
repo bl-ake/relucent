@@ -43,6 +43,10 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     Converts a sign sequence array into a bytes object that can be used as a
     dictionary key or for hashing.
 
+    The sign sequence is always encoded using an integer dtype so that float
+    and integer representations with the same logical values (in {-1, 0, 1})
+    produce identical tags.
+
     Args:
         ss: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
 
@@ -51,7 +55,15 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     """
     if isinstance(ss, torch.Tensor):
         ss = ss.detach().cpu().numpy()
-    return ss.flatten().tobytes()
+    else:
+        ss = np.asarray(ss)
+
+    if not np.issubdtype(ss.dtype, np.integer):
+        ss = ss.astype(np.int8, copy=False)
+    else:
+        ss = ss.astype(np.int8, copy=False)
+
+    return ss.ravel().tobytes()
 
 
 _env: Env | None = None
@@ -444,7 +456,7 @@ def data_graph(
             num_rows = np.ceil(np.sqrt(num_examples)).astype(int)
             num_cols = num_examples // num_rows
             fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 10))
-            axs = axs.flatten() if isinstance(axs, np.ndarray) and num_rows > 1 else [axs]
+            axs = axs.ravel() if isinstance(axs, np.ndarray) and num_rows > 1 else [axs]
             for j, ax in enumerate(axs[:-1]):
                 ax.axis("equal")
                 ax.set_axis_off()

@@ -1,0 +1,1 @@
+- move class methods to separate functions (e.g. visualization functions)
