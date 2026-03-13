@@ -55,7 +55,7 @@ TOL_NEARLY_VERTICAL: float = 1e-10
 
 # Default bound (hypercube half-width) for polyhedron plotting and
 # get_bounded_vertices when not specified by the caller.
-DEFAULT_PLOT_BOUND: float = 10000
+DEFAULT_PLOT_BOUND: float = 10
 
 # Tolerance for asserting that computed (A, b) match network outputs
 # when verifying halfspace construction (torch/np allclose atol).
