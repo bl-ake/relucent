@@ -478,7 +478,7 @@ class Complex:
             get_volumes: Whether to compute volumes for polyhedra when input
                 dimension <= 6. Defaults to True.
             verbose: Whether to print progress information. Defaults to 1.
-            **kwargs: Additional arguments passed to Polyhedron.get_shis().
+            **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
             dict: Search information dictionary containing:
