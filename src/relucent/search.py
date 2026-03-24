@@ -19,7 +19,7 @@ from relucent.config import (
     DEFAULT_SEARCH_BOUND,
     INTERIOR_POINT_RADIUS_SEQUENCE,
 )
-from relucent.poly import Polyhedron
+from relucent.poly import Polyhedron, get_hs, get_shis
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
@@ -44,7 +44,7 @@ def poly_calculations(
     Args:
         task: Either a sign sequence or a tuple containing (sign sequence, ...) with
             additional data to be passed through.
-        **kwargs: Additional arguments passed to get_shis() method, such as
+        **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`, such as
             'collect_info' or 'bound'.
 
     Returns:
@@ -60,7 +60,7 @@ def poly_calculations(
     p = Polyhedron(cx.net, ss)
 
     try:
-        halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], p.get_hs(get_all_Ab=False))
+        halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], get_hs(p, get_all_Ab=False))
         assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
         assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
         assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
@@ -88,11 +88,11 @@ def poly_calculations(
             p.volume
         if p._shis is None:
             if "collect_info" in kwargs:
-                shis, shi_info = p.get_shis(env=cx.env, **kwargs)
+                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
                 assert isinstance(shis, list)
                 p._shis = shis
             else:
-                result = p.get_shis(env=cx.env, **kwargs)
+                result = get_shis(p, env=cx.env, **kwargs)
                 p._shis = result[0] if isinstance(result, tuple) else result
     except ValueError as error:
         return error, *rest
@@ -138,9 +138,7 @@ def parallel_add(
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
     with mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net,)) as pool:
-        ps = pool.map(
-            partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5)
-        )
+        ps = pool.map(partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5))
         ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
         for p in ps:
             if p is not None:
@@ -197,7 +195,7 @@ def astar_calculations(
     Args:
         task: Either a Polyhedron object or a tuple containing (Polyhedron, ...)
             with additional data to be passed through.
-        **kwargs: Additional arguments passed to get_shis() method, such as
+        **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`, such as
             'collect_info' or 'bound'.
 
     Returns:
@@ -223,16 +221,16 @@ def astar_calculations(
     try:
         if p._shis is None:
             if "collect_info" in kwargs:
-                shis, shi_info = p.get_shis(env=cx.env, **kwargs)
+                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
                 assert isinstance(shis, list)
                 p._shis = shis
             else:
-                result = p.get_shis(env=cx.env, **kwargs)
+                result = get_shis(p, env=cx.env, **kwargs)
                 p._shis = result[0] if isinstance(result, tuple) else result
     except Exception as error:
         return p, error, *rest
     p.clean_data()
-    assert isinstance(p._shis, list), "get_shis returns a list"
+    assert isinstance(p._shis, list), "get_shis() returns a list"
     random.shuffle(p._shis)
     return p, *rest
 
@@ -277,7 +275,7 @@ def searcher(
         get_volumes: Whether to compute volumes for polyhedra when input
             dimension <= 6. Defaults to True.
         verbose: Whether to print progress information. Defaults to 1.
-        **kwargs: Additional arguments passed to Polyhedron.get_shis().
+        **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
     Returns:
         dict: Search information dictionary containing:
@@ -359,7 +357,7 @@ def searcher(
     found_sss.add(start.ss_np)
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
-    result = start.get_shis(bound=bound, **kwargs)
+    result = get_shis(start, bound=bound, **kwargs)
     assert isinstance(result, list)
     start._shis = result
     for shi in start.shis:
@@ -394,9 +392,7 @@ def searcher(
                     bad_shi_computations.append((node, shi, depth, str(p)))
                     node._shis.remove(shi)
                     if len(node._shis) < min(cx.dim, cx.n):
-                        warnings.warn(
-                            RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs")
-                        )
+                        warnings.warn(RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"))
                     if unprocessed == 0 or len(cx) >= max_polys:
                         break
                     continue
@@ -475,7 +471,7 @@ def _greedy_path_helper(
     print("Diffs:", diffs)
 
     if not start._shis:
-        start.get_shis()
+        get_shis(start)
     shis_set = set(start.shis)
     groupa = shis_set & diffs
     groupb = shis_set - diffs
@@ -572,7 +568,7 @@ def hamming_astar(
         start_poly._finite = center is not None
 
         start_poly._interior_point = start_poly.get_interior_point()
-        start_poly._shis = cast(list[int], start_poly.get_shis(bound=bound, collect_info=False))
+        start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))
         return [start_poly]
 
     if (start_poly.ss_np == 0).any():
@@ -595,7 +591,7 @@ def hamming_astar(
     gScore[start_poly] = 0
     fScore[start_poly] = (start_poly.ss_np != end_poly.ss_np).sum()
 
-    result = start_poly.get_shis(bound=bound, **kwargs)
+    result = get_shis(start_poly, bound=bound, **kwargs)
     assert isinstance(result, list)
     start_poly._shis = result
 
@@ -628,11 +624,7 @@ def hamming_astar(
     def d(p1: Polyhedron, p2: Polyhedron) -> int:
         return 1
 
-    pool = (
-        mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
-        if nworkers > 1
-        else None
-    )
+    pool = mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads)) if nworkers > 1 else None
     try:
         set_globals(cx.net)
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):

@@ -7,3 +7,4 @@
 - vis tests
 - different CPWL activations
 - maxout layers (max layers)
+- update inner readme
