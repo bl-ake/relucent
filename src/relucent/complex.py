@@ -643,6 +643,7 @@ class Complex:
 
     def get_boundary_edges(self, i):
         """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
+        assert 0 <= i < self.n, "Neuron index out of range"
         return {edge for edge in self.G.edges() if self.G.edges[edge]["shi"] == i}
 
     def get_boundary_graph(self, i):
