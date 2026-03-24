@@ -1,1 +1,4 @@
 - move class methods to separate functions (e.g. visualization functions)
+- fixed typing
+- expand version compatibility
+- compatibility checks
