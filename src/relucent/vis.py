@@ -401,11 +401,13 @@ def _poly_traces_2d_complex(
         elif kind == "segment":
             x = verts[:, 0].tolist()
             y = verts[:, 1].tolist()
-            traces.append(go.Scatter(x=x, y=y, mode="lines", fill=None, showlegend=showlegend, **kwargs))
+            seg_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+            traces.append(go.Scatter(x=x, y=y, mode="lines", fill=None, showlegend=showlegend, **seg_kwargs))
         elif kind == "point":
             x = verts[:, 0].tolist()
             y = verts[:, 1].tolist()
-            traces.append(go.Scatter(x=x, y=y, mode="markers", fill=None, showlegend=showlegend, **kwargs))
+            point_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+            traces.append(go.Scatter(x=x, y=y, mode="markers", fill=None, showlegend=showlegend, **point_kwargs))
 
     if plot_halfspaces:
         W = poly.halfspaces_np[:, :-1]
@@ -487,6 +489,7 @@ def _poly_traces_2d_graph(
             )
             return {"mesh": mesh, "outline": scatter}
         if kind == "segment":
+            seg_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
             scatter = go.Scatter3d(
                 x=x,
                 y=y,
@@ -494,10 +497,11 @@ def _poly_traces_2d_graph(
                 mode="lines",
                 showlegend=False,
                 line=dict(width=5, color="black"),
-                **kwargs,
+                **seg_kwargs,
             )
             return {"outline": scatter}
         if kind == "point":
+            point_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
             scatter = go.Scatter3d(
                 x=x,
                 y=y,
@@ -505,7 +509,7 @@ def _poly_traces_2d_graph(
                 mode="markers",
                 showlegend=False,
                 marker=dict(size=4, color="black"),
-                **kwargs,
+                **point_kwargs,
             )
             return {"outline": scatter}
     except Exception as e:
@@ -565,10 +569,12 @@ def plot_polyhedron(
 
 # Keyword args only used by the 3D cell figure / 3D poly traces; must not reach 2D Scatter paths.
 _CELLS_3D_ONLY_KEYS = frozenset({"fill_mode", "show_axes", "filled"})
+_CELLS_2D_ONLY_KEYS = frozenset({"ss_name"})
 
 # Polyhedron.plot_cells forwards both 2D- and 3D-only kwargs; strip before each trace builder.
 _POLY_CELLS_2D_EXCLUDE = frozenset({"filled"})
-_POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade"})
+# 2D go.Scatter only; invalid on go.Scatter3d / go.Mesh3d (see Polyhedron.plot_cells default fill=...).
+_POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade", "fill", "fillcolor", "ss_name"})
 
 
 def _equitable_colors(
@@ -784,7 +790,8 @@ def plot_complex(
             kw2 = {k: v for k, v in kwargs.items() if k not in _CELLS_3D_ONLY_KEYS}
             return _complex_figure_2d_cells(cpx, **kw2)
         if d == 3:
-            return _complex_figure_3d_cells(cpx, **kwargs)
+            kw3 = {k: v for k, v in kwargs.items() if k not in _CELLS_2D_ONLY_KEYS}
+            return _complex_figure_3d_cells(cpx, **kw3)
         raise ValueError(f"plot_complex(..., plot_mode='cells') supports complex.dim 2 or 3, got {d}")
     if plot_mode == "graph":
         return _complex_figure_graph(cpx, **kwargs)
