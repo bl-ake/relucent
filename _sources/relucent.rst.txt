@@ -60,6 +60,14 @@ relucent.utils module
    :show-inheritance:
    :undoc-members:
 
+relucent.vis module
+-------------------
+
+.. automodule:: relucent.vis
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Module contents
 ---------------
 

@@ -371,105 +371,17 @@ Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.plot_2d_complex">
 <span class="sig-name descname"><span class="pre">plot_2d_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ss_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.plot_2d_complex" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the complex in 2D using plotly.</p>
-<p>Creates a 2D visualization of the complex, showing all polyhedra as
-regions in the input space. Only works for 2D input spaces.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>label_regions</strong> – If True, add text labels showing each polyhedron’s
-string representation at its center. Defaults to False.</p></li>
-<li><p><strong>color</strong> – If “Wl2”, color polyhedra by their Wl2 (weight norm) value.
-If None, use an equitable graph coloring. Defaults to None.</p></li>
-<li><p><strong>highlight_regions</strong> – If provided, highlight these polyhedra in red.
-Can be a list of Polyhedron objects or their string representations.
-Defaults to None.</p></li>
-<li><p><strong>ss_name</strong> – If True, use the full sign sequence as
-the legend label for each polyhedron. Defaults to False.</p></li>
-<li><p><strong>bound</strong> – Constraint radius for plotting bounds. Passed to each
-polyhedron’s plot_2d_complex() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to each polyhedron’s plot_2d_complex() method.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>A plotly figure containing the 2D plot</dt><dd><p>of the complex.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>plotly.graph_objects.Figure</p>
-</dd>
-</dl>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.plot_2d_graph">
 <span class="sig-name descname"><span class="pre">plot_2d_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_axes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex.plot_2d_graph" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the complex in 3D using plotly.</p>
-<p>Creates a 3D visualization of the complex, showing all polyhedra as
-regions in the input space. Only works for 3D input spaces.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>label_regions</strong> – If True, add text labels showing each polyhedron’s
-string representation. Defaults to False.</p></li>
-<li><p><strong>color</strong> – If “Wl2”, color polyhedra by their Wl2 (weight norm) value.
-If None, use an equitable graph coloring. Defaults to None.</p></li>
-<li><p><strong>highlight_regions</strong> – If provided, highlight these polyhedra in red.
-Can be a list of Polyhedron objects or their string representations.
-Defaults to None.</p></li>
-<li><p><strong>show_axes</strong> – If True, display the coordinate axes. Defaults to False.</p></li>
-<li><p><strong>project</strong> – If True, also show a projection of the complex onto the
-xy plane. Defaults to True.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to each polyhedron’s plot_2d_graph() method.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>A plotly figure containing the 3D plot</dt><dd><p>of the complex.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>plotly.graph_objects.Figure</p>
-</dd>
-</dl>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.plot_3d_complex">
-<span class="sig-name descname"><span class="pre">plot_3d_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="relucent.html#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_axes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Figure</span></span></span><a class="headerlink" href="#relucent.Complex.plot_3d_complex" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the complex in 3D input space using plotly.</p>
-<p>This visualizes the polyhedral complex of a network with 3D input by
-drawing each cell as a 3D region in the input space. Axis scaling is
-automatic based on the traces returned by each polyhedron’s plot function.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>label_regions</strong> – If True, add text labels at (approximate) centers of
-polyhedra. Defaults to False.</p></li>
-<li><p><strong>color</strong> – If “Wl2”, color polyhedra by their Wl2 (weight norm) value.
-If None, use an equitable graph coloring. Defaults to None.</p></li>
-<li><p><strong>highlight_regions</strong> – If provided, highlight these polyhedra in red and
-render them as filled meshes instead of wireframes. Can be a
-list of Polyhedron objects or their string representations.
-Defaults to None.</p></li>
-<li><p><strong>show_axes</strong> – If True, display coordinate axes. Defaults to False.</p></li>
-<li><p><strong>**kwargs</strong> – Additional keyword arguments forwarded to
-<code class="docutils literal notranslate"><span class="pre">Polyhedron.plot_3d_complex</span></code>.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A figure containing the 3D plot of the complex.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>plotly.graph_objects.Figure</p>
-</dd>
-</dl>
-</dd></dl>
+<span class="sig-name descname"><span class="pre">plot_3d_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_regions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">highlight_regions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="relucent.html#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_axes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'wireframe'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Figure</span></span></span><a class="headerlink" href="#relucent.Complex.plot_3d_complex" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.point2poly">
@@ -979,104 +891,17 @@ of dictionaries with computation details.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot_2d_complex">
 <span class="sig-name descname"><span class="pre">plot_2d_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_halfspaces</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspace_shade</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Scatter</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Polyhedron.plot_2d_complex" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the polyhedron in 2D using plotly.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fill</strong> – Fill mode passed to go.Scatter. Defaults to “toself”.</p></li>
-<li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
-<li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
-Defaults to config.DEFAULT_PLOT_BOUND.</p></li>
-<li><p><strong>plot_halfspaces</strong> – If True, add one Scatter trace per halfspace (inequality)
-as line or shaded region. Defaults to False.</p></li>
-<li><p><strong>halfspace_shade</strong> – When plot_halfspaces is True, shade the feasible side
-of each halfspace. Defaults to True.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Scatter (polyhedron outline).</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>A list of plotly Scatter traces: [outline_trace] when</dt><dd><p>plot_halfspaces is False, or [outline_trace, <a href="#id1"><span class="problematic" id="id2">*</span></a>halfspace_traces] when
-True. If the main outline fails (e.g. vertex computation or
-ConvexHull raises), returns [] when plot_halfspaces is False, or
-only the halfspace traces when plot_halfspaces is True.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>list</p>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
-</dd>
-</dl>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot_2d_graph">
 <span class="sig-name descname"><span class="pre">plot_2d_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fill</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'toself'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">project</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Mesh3d</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Scatter3d</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.Polyhedron.plot_2d_graph" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the polyhedron in 3D using plotly.</p>
-<p>Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
-by passing the 2D vertices through the network.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fill</strong> – Fill mode (not used for 3D plots). Defaults to “toself”.</p></li>
-<li><p><strong>showlegend</strong> – Whether to show in legend. Defaults to False.</p></li>
-<li><p><strong>bound</strong> – Radius of the bounding hypercube for vertex computation.
-Defaults to config.DEFAULT_PLOT_BOUND.</p></li>
-<li><p><strong>project</strong> – If a number, projects the polyhedron onto this z-value
-instead of computing it from the network. Defaults to None.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to go.Mesh3d.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>Dictionary with ‘mesh’ and ‘outline’ keys containing</dt><dd><p>plotly traces, or None if plotting fails.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>dict or None</p>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>ValueError</strong> – If the polyhedron is not 2D.</p>
-</dd>
-</dl>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Polyhedron.plot_3d_complex">
 <span class="sig-name descname"><span class="pre">plot_3d_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">showlegend</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Mesh3d</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Scatter3d</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Polyhedron.plot_3d_complex" title="Link to this definition">¶</a></dt>
-<dd><p>Plot the (input-space) polyhedron as a 3D region using plotly.</p>
-<p>This visualizes the cell of the polyhedral complex in the 3D input space.
-Only works when the ambient input dimension is exactly 3.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>showlegend</strong> – Whether to show the trace in the legend. Defaults to False.</p></li>
-<li><p><strong>bound</strong> – Radius of the bounding cube used to clip the polyhedron for
-numerical stability. Defaults to config.DEFAULT_PLOT_BOUND.</p></li>
-<li><p><strong>filled</strong> – If True, render full-dimensional 3D regions as filled meshes
-(go.Mesh3d) instead of wireframes. Defaults to False.</p></li>
-<li><p><strong>**kwargs</strong> – Additional keyword arguments forwarded to <code class="docutils literal notranslate"><span class="pre">go.Scatter3d</span></code>
-or <code class="docutils literal notranslate"><span class="pre">go.Mesh3d</span></code>.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list of plotly traces. For 3D regions this will contain
-line-based <code class="docutils literal notranslate"><span class="pre">go.Scatter3d</span></code> traces that outline the cell (no filled
-volume), or a filled <code class="docutils literal notranslate"><span class="pre">go.Mesh3d</span></code> when filled=True. For degenerate
-cases (faces, edges, or points) it returns appropriate <code class="docutils literal notranslate"><span class="pre">go.Scatter3d</span></code>
-traces.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>list</p>
-</dd>
-</dl>
-</dd></dl>
+<dd></dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="relucent.Polyhedron.W">
@@ -1309,7 +1134,7 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <span class="target" id="neural-network-models"></span><section id="neural-network-class">
-<span id="id3"></span><h2>Neural Network Class<a class="headerlink" href="#neural-network-class" title="Link to this heading">¶</a></h2>
+<span id="id1"></span><h2>Neural Network Class<a class="headerlink" href="#neural-network-class" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="relucent.NN">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">NN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN" title="Link to this definition">¶</a></dt>
@@ -1453,7 +1278,7 @@ If return_idx is True: (layer_name, neuron_index) tuple.</p>
 
 </section>
 <section id="model-functions">
-<span id="id4"></span><h2>Model Functions<a class="headerlink" href="#model-functions" title="Link to this heading">¶</a></h2>
+<span id="id2"></span><h2>Model Functions<a class="headerlink" href="#model-functions" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.get_mlp_model">
 <span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_mlp_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_last_relu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></span><a class="headerlink" href="#relucent.get_mlp_model" title="Link to this definition">¶</a></dt>
