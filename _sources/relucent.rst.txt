@@ -44,6 +44,14 @@ relucent.poly module
    :show-inheritance:
    :undoc-members:
 
+relucent.search module
+----------------------
+
+.. automodule:: relucent.search
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 relucent.ss module
 ------------------
 

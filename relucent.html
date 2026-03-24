@@ -132,13 +132,6 @@ if it already exists. Defaults to True.</p></li>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="relucent.complex.Complex.adjacent_polyhedra">
-<span class="sig-name descname"><span class="pre">adjacent_polyhedra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.complex.Complex.adjacent_polyhedra" title="Link to this definition">¶</a></dt>
-<dd><p>Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.</p>
-<p>Also works on lower-dimensional polyhedra.</p>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="relucent.complex.Complex.bfs">
 <span class="sig-name descname"><span class="pre">bfs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.complex.Complex.bfs" title="Link to this definition">¶</a></dt>
 <dd><p>Perform breadth-first search of the complex.</p>
@@ -636,93 +629,6 @@ Will be reshaped to match the network’s input shape.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="relucent.complex.astar_calculations">
-<span class="sig-prename descclassname"><span class="pre">relucent.complex.</span></span><span class="sig-name descname"><span class="pre">astar_calculations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.complex.astar_calculations" title="Link to this definition">¶</a></dt>
-<dd><p>Worker function for computing polyhedron properties in A* search.</p>
-<p>Similar to poly_calculations, but specifically designed for A* search algorithm.
-Computes center, inradius, interior point, and supporting hyperplane indices
-for polyhedra during pathfinding.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>task</strong> – Either a Polyhedron object or a tuple containing (Polyhedron, …)
-with additional data to be passed through.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis() method, such as
-‘collect_info’ or ‘bound’.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>If successful, returns (Polyhedron, <a href="#id1"><span class="problematic" id="id2">*</span></a>rest). If an exception occurs</dt><dd><p>during SHI computation, returns (Polyhedron, error, <a href="#id3"><span class="problematic" id="id4">*</span></a>rest).</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>tuple</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="relucent.complex.get_ip">
-<span class="sig-prename descclassname"><span class="pre">relucent.complex.</span></span><span class="sig-name descname"><span class="pre">get_ip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ValueError</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.complex.get_ip" title="Link to this definition">¶</a></dt>
-<dd><p>Get an interior point for a neighbor polyhedron across a supporting hyperplane.</p>
-<p>This function is used by the A* search algorithm to find interior points for
-neighboring polyhedra. It flips the element of the sign sequence at the specified
-supporting hyperplane index (SHI) and attempts to find an interior point,
-increasing the search radius if necessary.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>p</strong> – The source Polyhedron object.</p></li>
-<li><p><strong>shi</strong> – The index of the supporting hyperplane to cross.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>If successful, returns (neighbor_polyhedron, shi). If a ValueError</dt><dd><p>occurs, returns (error, None).</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>tuple</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="relucent.complex.poly_calculations">
-<span class="sig-prename descclassname"><span class="pre">relucent.complex.</span></span><span class="sig-name descname"><span class="pre">poly_calculations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.complex.poly_calculations" title="Link to this definition">¶</a></dt>
-<dd><p>Worker function for computing polyhedron properties in parallel.</p>
-<p>This function is used by parallel_add() and all search methods to compute
-halfspaces, center, inradius, interior point, and supporting hyperplane
-indices (SHIs) for a given sign sequence.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>task</strong> – Either a sign sequence or a tuple containing (sign sequence, …) with
-additional data to be passed through.</p></li>
-<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis() method, such as
-‘collect_info’ or ‘bound’.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>If successful, returns (Polyhedron, <a href="#id5"><span class="problematic" id="id6">*</span></a>rest) where rest contains</dt><dd><p>any additional data from the input task. If a ValueError occurs
-during computation, returns (error, <a href="#id7"><span class="problematic" id="id8">*</span></a>rest).</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>tuple</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
 <dt class="sig sig-object py" id="relucent.complex.set_globals">
 <span class="sig-prename descclassname"><span class="pre">relucent.complex.</span></span><span class="sig-name descname"><span class="pre">set_globals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">get_net</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.complex.set_globals" title="Link to this definition">¶</a></dt>
 <dd><p>Initialize global variables for worker processes in multiprocessing.</p>
@@ -739,7 +645,8 @@ Defaults to True.</p></li>
 </dd>
 </dl>
 <p class="rubric">Example</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">mp</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">nworkers</span><span class="p">,</span> <span class="n">initializer</span><span class="o">=</span><span class="n">set_globals</span><span class="p">,</span> <span class="n">initargs</span><span class="o">=</span><span class="p">(</span><span class="n">net</span><span class="p">,))</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mp</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="n">mp</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">nworkers</span><span class="p">,</span> <span class="n">initializer</span><span class="o">=</span><span class="n">set_globals</span><span class="p">,</span> <span class="n">initargs</span><span class="o">=</span><span class="p">(</span><span class="n">net</span><span class="p">,))</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
 <span class="gp">... </span>    <span class="c1"># Use pool for parallel processing</span>
 <span class="gp">... </span>    <span class="k">pass</span>
 </pre></div>
@@ -1552,6 +1459,14 @@ constraint a^T x + b &lt;= 0.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="relucent.poly.adjacent_polyhedra">
+<span class="sig-prename descclassname"><span class="pre">relucent.poly.</span></span><span class="sig-name descname"><span class="pre">adjacent_polyhedra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ss2poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.poly.adjacent_polyhedra" title="Link to this definition">¶</a></dt>
+<dd><p>Polyhedra adjacent to <code class="docutils literal notranslate"><span class="pre">poly</span></code> across one bounding hyperplane (one SHI flip).</p>
+<p>Also works on lower-dimensional polyhedra. <code class="docutils literal notranslate"><span class="pre">ss2poly</span></code> maps a sign sequence
+array to the corresponding <a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><code class="xref py py-class docutils literal notranslate"><span class="pre">Polyhedron</span></code></a> (e.g. <code class="docutils literal notranslate"><span class="pre">Complex.ss2poly</span></code>).</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="relucent.poly.solve_radius">
 <span class="sig-prename descclassname"><span class="pre">relucent.poly.</span></span><span class="sig-name descname"><span class="pre">solve_radius</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspaces</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e+100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_indices</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sense</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.poly.solve_radius" title="Link to this definition">¶</a></dt>
 <dd><p>Solve for the Chebyshev center or interior point of a polyhedron.</p>
@@ -1581,6 +1496,247 @@ polyhedron is unbounded and max_radius is infinity.</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><p><strong>ValueError</strong> – If the optimization fails or produces invalid results.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-relucent.search">
+<span id="relucent-search-module"></span><h2>relucent.search module<a class="headerlink" href="#module-relucent.search" title="Link to this heading">¶</a></h2>
+<p>Search and pathfinding over a polyhedral complex.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.astar_calculations">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">astar_calculations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.astar_calculations" title="Link to this definition">¶</a></dt>
+<dd><p>Worker function for computing polyhedron properties in A* search.</p>
+<p>Similar to poly_calculations, but specifically designed for A* search algorithm.
+Computes center, inradius, interior point, and supporting hyperplane indices
+for polyhedra during pathfinding.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> – Either a Polyhedron object or a tuple containing (Polyhedron, …)
+with additional data to be passed through.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis() method, such as
+‘collect_info’ or ‘bound’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>If successful, returns (Polyhedron, <a href="#id1"><span class="problematic" id="id2">*</span></a>rest). If an exception occurs</dt><dd><p>during SHI computation, returns (Polyhedron, error, <a href="#id3"><span class="problematic" id="id4">*</span></a>rest).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.get_ip">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">get_ip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">ValueError</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.get_ip" title="Link to this definition">¶</a></dt>
+<dd><p>Get an interior point for a neighbor polyhedron across a supporting hyperplane.</p>
+<p>This function is used by the A* search algorithm to find interior points for
+neighboring polyhedra. It flips the element of the sign sequence at the specified
+supporting hyperplane index (SHI) and attempts to find an interior point,
+increasing the search radius if necessary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>p</strong> – The source Polyhedron object.</p></li>
+<li><p><strong>shi</strong> – The index of the supporting hyperplane to cross.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>If successful, returns (neighbor_polyhedron, shi). If a ValueError</dt><dd><p>occurs, returns (error, None).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.greedy_path">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">greedy_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.search.greedy_path" title="Link to this definition">¶</a></dt>
+<dd><p>Greedily find a path between two data points.</p>
+<p>Attempts to find a path through adjacent polyhedra from start to end
+using a greedy strategy. This method can be slow for large complexes
+as it explores many paths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cx</strong> – The polyhedral complex.</p></li>
+<li><p><strong>start</strong> – Starting data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>end</strong> – Ending data point as torch.Tensor or np.ndarray.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects representing the path</dt><dd><p>from start to end, or None if no path is found.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.hamming_astar">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">hamming_astar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.search.hamming_astar" title="Link to this definition">¶</a></dt>
+<dd><p>Find a path between two data polyhedra using the A* search algorithm.</p>
+<p>Uses the A* pathfinding algorithm with a heuristic based on Hamming
+distance between sign sequences, plus Euclidean distance between interior
+points to break ties. The heuristic should be admissible for optimal paths.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cx</strong> – The polyhedral complex.</p></li>
+<li><p><strong>start</strong> – Starting data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>end</strong> – Ending data point as torch.Tensor or np.ndarray.</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes for parallel computation.
+Defaults to 1.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.</p></li>
+<li><p><strong>max_polys</strong> – Maximum number of polyhedra to explore during search.
+Defaults to infinity.</p></li>
+<li><p><strong>show_pbar</strong> – Whether to display a progress bar. Defaults to True.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects representing the path</dt><dd><p>from start to end, or None if no path is found.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list or None</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the start point lies exactly on a neuron’s boundary.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.parallel_add">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">parallel_add</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">np.ndarray</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.parallel_add" title="Link to this definition">¶</a></dt>
+<dd><p>Add multiple polyhedra from data points using parallel processing.</p>
+<p>Processes a batch of data points in parallel, computing their corresponding
+polyhedra and adding them to the complex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cx</strong> – The polyhedral complex.</p></li>
+<li><p><strong>points</strong> – A list or iterable of data points (each as torch.Tensor or np.ndarray).</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes to use. If None, uses the number
+of CPU cores. Defaults to None.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to poly_calculations() and get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A list of Polyhedron objects (or None for failed computations)</dt><dd><p>corresponding to the input points.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.poly_calculations">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">poly_calculations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.poly_calculations" title="Link to this definition">¶</a></dt>
+<dd><p>Worker function for computing polyhedron properties in parallel.</p>
+<p>Used by parallel_add() and searcher() to compute halfspaces, center, inradius,
+interior point, and supporting hyperplane indices (SHIs) for a given sign sequence.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>task</strong> – Either a sign sequence or a tuple containing (sign sequence, …) with
+additional data to be passed through.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to get_shis() method, such as
+‘collect_info’ or ‘bound’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>If successful, returns (Polyhedron, <a href="#id5"><span class="problematic" id="id6">*</span></a>rest) where rest contains</dt><dd><p>any additional data from the input task. If a ValueError occurs
+during computation, returns (error, <a href="#id7"><span class="problematic" id="id8">*</span></a>rest).</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.searcher">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.</span></span><span class="sig-name descname"><span class="pre">searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">queue</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_volumes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cube_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'unrestricted'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.search.searcher" title="Link to this definition">¶</a></dt>
+<dd><p>Search for polyhedra in the complex by discovering neighbors.</p>
+<p>This is a generic search method that can be configured for different
+traversal strategies (BFS, DFS, random walk) by providing different
+queue types. It starts from a given point and explores the complex by
+crossing supporting hyperplanes to discover adjacent polyhedra.</p>
+<p>See Complex.bfs(), Complex.dfs(), and Complex.random_walk() for examples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cx</strong> – The polyhedral complex.</p></li>
+<li><p><strong>start</strong> – Starting point (torch.Tensor / np.ndarray / array-like) or a
+Polyhedron, or None (defaults to origin). Defaults to None.</p></li>
+<li><p><strong>max_depth</strong> – Maximum search depth (number of hyperplane crossings).
+Defaults to infinity.</p></li>
+<li><p><strong>max_polys</strong> – Maximum number of polyhedra to discover. Defaults to infinity.</p></li>
+<li><p><strong>queue</strong> – Queue object that defines the order in which polyhedra are
+searched. Must have push() and pop() methods. If None, uses
+BlockingQueue (FIFO). Defaults to None.</p></li>
+<li><p><strong>bound</strong> – Constraint radius for numerical stability when computing halfspaces.
+Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.</p></li>
+<li><p><strong>nworkers</strong> – Number of worker processes for parallel computation. If None,
+uses the number of CPU cores. Defaults to None.</p></li>
+<li><p><strong>get_volumes</strong> – Whether to compute volumes for polyhedra when input
+dimension &lt;= 6. Defaults to True.</p></li>
+<li><p><strong>verbose</strong> – Whether to print progress information. Defaults to 1.</p></li>
+<li><p><strong>**kwargs</strong> – Additional arguments passed to Polyhedron.get_shis().</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Search information dictionary containing:</dt><dd><ul class="simple">
+<li><p>”Search Depth”: Maximum depth reached</p></li>
+<li><p>”Avg # Facets Uncorrected”: Average number of facets per polyhedron</p></li>
+<li><p>”Search Time”: Elapsed time in seconds</p></li>
+<li><p>”Bad SHI Computations”: List of failed computations</p></li>
+<li><p>”Complete”: Whether search completed (no unprocessed items)</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the start point lies on a hyperplane (has zero in SS).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2012,13 +2168,6 @@ if it already exists. Defaults to True.</p></li>
 <dd class="field-odd"><p><a class="reference internal" href="#relucent.Polyhedron" title="relucent.Polyhedron">Polyhedron</a></p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="relucent.Complex.adjacent_polyhedra">
-<span class="sig-name descname"><span class="pre">adjacent_polyhedra</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">set</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.poly.Polyhedron" title="relucent.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Complex.adjacent_polyhedra" title="Link to this definition">¶</a></dt>
-<dd><p>Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.</p>
-<p>Also works on lower-dimensional polyhedra.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -3376,7 +3525,6 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.complex.Complex.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">Complex.adjacent_polyhedra()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
@@ -3406,9 +3554,6 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#relucent.complex.astar_calculations"><code class="docutils literal notranslate"><span class="pre">astar_calculations()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.complex.get_ip"><code class="docutils literal notranslate"><span class="pre">get_ip()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.complex.poly_calculations"><code class="docutils literal notranslate"><span class="pre">poly_calculations()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.complex.set_globals"><code class="docutils literal notranslate"><span class="pre">set_globals()</span></code></a></li>
 </ul>
 </li>
@@ -3486,7 +3631,18 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.poly.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#relucent.poly.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">adjacent_polyhedra()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.poly.solve_radius"><code class="docutils literal notranslate"><span class="pre">solve_radius()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-relucent.search">relucent.search module</a><ul>
+<li><a class="reference internal" href="#relucent.search.astar_calculations"><code class="docutils literal notranslate"><span class="pre">astar_calculations()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.get_ip"><code class="docutils literal notranslate"><span class="pre">get_ip()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.greedy_path"><code class="docutils literal notranslate"><span class="pre">greedy_path()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.hamming_astar"><code class="docutils literal notranslate"><span class="pre">hamming_astar()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.parallel_add"><code class="docutils literal notranslate"><span class="pre">parallel_add()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.poly_calculations"><code class="docutils literal notranslate"><span class="pre">poly_calculations()</span></code></a></li>
+<li><a class="reference internal" href="#relucent.search.searcher"><code class="docutils literal notranslate"><span class="pre">searcher()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-relucent.ss">relucent.ss module</a><ul>
@@ -3547,7 +3703,6 @@ the first network).</p></li>
 <li><a class="reference internal" href="#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
-<li><a class="reference internal" href="#relucent.Complex.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">Complex.adjacent_polyhedra()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
