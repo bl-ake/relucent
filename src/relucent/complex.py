@@ -703,7 +703,6 @@ class Complex:
             bounded_halfspaces = p.get_bounded_halfspaces(cast(float, cube_radius))
             p._halfspaces = bounded_halfspaces  # type: ignore[assignment]
             p._halfspaces_np = bounded_halfspaces
-            p._nonzero_halfspaces_np = None
             p._center = None
             p._inradius = None
             p._finite = True
@@ -1044,6 +1043,8 @@ class Complex:
 
         def heuristic(p: Polyhedron, depth: int, shi: int) -> float:
             hamming = (p.ss_np != end_poly.ss_np).sum()
+            if p.interior_point is None or end_poly.interior_point is None:
+                raise ValueError("Interior point not found")
             dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
             # bias = -1 / ((1 + dist) ** 0.1)  ## TODO: Test if this is faster
             # bias = -1 / (1 + np.log(dist + 10))
@@ -1077,7 +1078,7 @@ class Complex:
 
                 if nworkers == 1:
                     neighbor_iter = map(partial(get_ip, p), (i for i in p.shis if i != shi))
-                else:
+                elif pool is not None:
                     neighbor_iter = pool.imap_unordered(
                         partial(get_ip, p),
                         (i for i in p.shis if i != shi),
@@ -1356,47 +1357,32 @@ class Complex:
         for node in G:
             self[G.nodes[node]["poly"]]._shis = [G.edges[edge]["shi"] for edge in G.edges(node)]
 
-    def plot_2d_complex(
+    def plot_cells(
         self,
         label_regions=False,
         color=None,
         highlight_regions=None,
         ss_name=False,
         bound=DEFAULT_COMPLEX_PLOT_BOUND,
-        **kwargs,
-    ):
+        show_axes: bool = False,
+        fill_mode: str = "wireframe",
+        **kwargs: Any,
+    ) -> go.Figure:
+        """Plot all cells in input space; 2D vs 3D is chosen from :attr:`dim`."""
         return plot_complex(
             self,
-            plot_mode="2d_cells",
+            plot_mode="cells",
             label_regions=label_regions,
             color=color,
             highlight_regions=highlight_regions,
             ss_name=ss_name,
             bound=bound,
-            **kwargs,
-        )
-
-    def plot_3d_complex(
-        self,
-        label_regions: bool = False,
-        color: str | None = None,
-        highlight_regions: Iterable[Polyhedron] | Iterable[str] | None = None,
-        show_axes: bool = False,
-        fill_mode: str = "wireframe",
-        **kwargs: Any,
-    ) -> go.Figure:
-        return plot_complex(
-            self,
-            plot_mode="3d_cells",
-            label_regions=label_regions,
-            color=color,
-            highlight_regions=highlight_regions,
             show_axes=show_axes,
             fill_mode=fill_mode,
             **kwargs,
         )
 
-    def plot_2d_graph(
+    def plot_graph(
         self,
         label_regions=False,
         color=None,

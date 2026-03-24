@@ -2,3 +2,8 @@
 - fixed typing
 - expand version compatibility
 - compatibility checks
+- fix config.py
+- update docs for vis
+- vis tests
+- different CPWL activations
+- maxout layers (max layers)

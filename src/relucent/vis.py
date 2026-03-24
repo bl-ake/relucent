@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, Mapping, Sequence, overload
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -513,30 +513,62 @@ def _poly_traces_2d_graph(
     return None
 
 
+@overload
 def plot_polyhedron(
     poly: Polyhedron,
     *,
-    plot_mode: Literal["2d_cells", "3d_cells", "graph"],
+    plot_mode: Literal["cells"],
+    **kwargs: Any,
+) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d]: ...
+
+
+@overload
+def plot_polyhedron(
+    poly: Polyhedron,
+    *,
+    plot_mode: Literal["graph"],
+    **kwargs: Any,
+) -> dict[str, go.Mesh3d | go.Scatter3d] | None: ...
+
+
+def plot_polyhedron(
+    poly: Polyhedron,
+    *,
+    plot_mode: Literal["cells", "graph"],
     **kwargs: Any,
 ) -> list[go.Mesh3d | go.Scatter3d] | list[go.Scatter] | dict[str, go.Mesh3d | go.Scatter3d] | None:
     """Build plotly traces for one polyhedron.
 
-    * ``2d_cells`` — input-space 2D cell (``go.Scatter`` list).
-    * ``3d_cells`` — input-space 3D cell (``go.Mesh3d`` / ``go.Scatter3d`` list).
+    * ``cells`` — cell in input space: uses ``poly.ambient_dim`` to choose 2D (``go.Scatter``)
+      vs 3D (``go.Mesh3d`` / ``go.Scatter3d``) traces (supports ambient dimensions 2 and 3).
     * ``graph`` — 2D cell lifted through the network (mesh/outline dict or similar).
 
     Uses ``plot_mode`` (keyword-only) so Plotly kwargs such as ``mode=\"lines\"`` are not ambiguous.
     """
-    if plot_mode == "2d_cells":
-        return _poly_traces_2d_complex(poly, **kwargs)
-    if plot_mode == "3d_cells":
-        return _poly_traces_3d_complex(poly, **kwargs)
+    if plot_mode == "cells":
+        ad = poly.ambient_dim
+        if ad == 2:
+            kw2 = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_2D_EXCLUDE}
+            return _poly_traces_2d_complex(poly, **kw2)
+        if ad == 3:
+            kw3 = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_3D_EXCLUDE}
+            return _poly_traces_3d_complex(poly, **kw3)
+        raise ValueError(
+            f"plot_polyhedron(..., plot_mode='cells') supports ambient_dim 2 or 3, got {ad}"
+        )
     if plot_mode == "graph":
         return _poly_traces_2d_graph(poly, **kwargs)
-    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected '2d_cells', '3d_cells', or 'graph'.")
+    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells' or 'graph'.")
 
 
 # --- Complex figures ----------------------------------------------------------------
+
+# Keyword args only used by the 3D cell figure / 3D poly traces; must not reach 2D Scatter paths.
+_CELLS_3D_ONLY_KEYS = frozenset({"fill_mode", "show_axes", "filled"})
+
+# Polyhedron.plot_cells forwards both 2D- and 3D-only kwargs; strip before each trace builder.
+_POLY_CELLS_2D_EXCLUDE = frozenset({"filled"})
+_POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade"})
 
 
 def _equitable_colors(
@@ -586,13 +618,15 @@ def _complex_figure_2d_cells(
     bound: float = DEFAULT_COMPLEX_PLOT_BOUND,
     **kwargs: Any,
 ) -> go.Figure:
+    if cpx.dim != 2:
+        raise ValueError(f"2D cell figure requires complex.dim == 2, got {cpx.dim}")
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
     for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
         c = _highlight(c, poly, highlight_regions)
         name = f"{poly.ss_np.ravel().astype(int).tolist()}" if ss_name else f"{poly}"
-        for trace in poly.plot_2d_complex(
+        for trace in poly.plot_cells(
             name=name,
             fillcolor=c,
             line_color="black",
@@ -605,7 +639,7 @@ def _complex_figure_2d_cells(
             fig.add_trace(
                 go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
             )
-    interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.finite]
+    interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
     maxcoord = (
         (np.mean(interior_points) * PLOT_MARGIN_FACTOR)
         if len(interior_points) > 0
@@ -640,7 +674,7 @@ def _complex_figure_3d_cells(
         is_highlighted = highlight_regions is not None and (poly in highlight_regions or str(poly) in highlight_regions)
         c = "red" if is_highlighted else c
         filled = is_highlighted or fill_mode == "filled"
-        for trace in poly.plot_3d_complex(showlegend=False, color=c, filled=filled, **kwargs):
+        for trace in poly.plot_cells(showlegend=False, color=c, filled=filled, **kwargs):
             fig.add_trace(trace)
         if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
             fig.add_trace(
@@ -676,11 +710,11 @@ def _complex_figure_graph(
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=False)
-    outlines: list[go.Scatter3d] = []
-    meshes: list[go.Mesh3d] = []
+    outlines: list[go.Mesh3d | go.Scatter3d] = []
+    meshes: list[go.Mesh3d | go.Scatter3d] = []
     for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
         c = _highlight(c, poly, highlight_regions)
-        p_plot = poly.plot_2d_graph(name=f"{poly}", color=c, **kwargs)
+        p_plot = poly.plot_graph(name=f"{poly}", color=c, **kwargs)
         if p_plot is not None:
             if isinstance(p_plot, dict):
                 if "mesh" in p_plot:
@@ -690,7 +724,7 @@ def _complex_figure_graph(
             else:
                 fig.add_trace(p_plot)
         if project is not None:
-            p_plot = poly.plot_2d_graph(name=f"{poly}", color=c, project=project, **kwargs)
+            p_plot = poly.plot_graph(name=f"{poly}", color=c, project=project, **kwargs)
             if p_plot is not None:
                 if isinstance(p_plot, dict):
                     if "mesh" in p_plot:
@@ -721,7 +755,7 @@ def _complex_figure_graph(
         fig.add_trace(outline)
     for mesh in meshes:
         fig.add_trace(mesh)
-    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.finite]) * PLOT_MARGIN_FACTOR
+    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
@@ -735,19 +769,23 @@ def _complex_figure_graph(
 def plot_complex(
     cpx: Complex,
     *,
-    plot_mode: Literal["2d_cells", "3d_cells", "graph"],
+    plot_mode: Literal["cells", "graph"],
     **kwargs: Any,
 ) -> go.Figure:
     """Plot an entire ``Complex`` as one Plotly figure.
 
-    * ``2d_cells`` — cells in 2D input space.
-    * ``3d_cells`` — cells in 3D input space.
+    * ``cells`` — cells in input space; 2D vs 3D layout is chosen from ``cpx.dim`` (network input
+      dimension), which must be 2 or 3.
     * ``graph`` — 2D cells with third coordinate from the network (optional projected copy).
     """
-    if plot_mode == "2d_cells":
-        return _complex_figure_2d_cells(cpx, **kwargs)
-    if plot_mode == "3d_cells":
-        return _complex_figure_3d_cells(cpx, **kwargs)
+    if plot_mode == "cells":
+        d = cpx.dim
+        if d == 2:
+            kw2 = {k: v for k, v in kwargs.items() if k not in _CELLS_3D_ONLY_KEYS}
+            return _complex_figure_2d_cells(cpx, **kw2)
+        if d == 3:
+            return _complex_figure_3d_cells(cpx, **kwargs)
+        raise ValueError(f"plot_complex(..., plot_mode='cells') supports complex.dim 2 or 3, got {d}")
     if plot_mode == "graph":
         return _complex_figure_graph(cpx, **kwargs)
-    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected '2d_cells', '3d_cells', or 'graph'.")
+    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells' or 'graph'.")

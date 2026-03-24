@@ -1,7 +1,7 @@
 import hashlib
 import warnings
 from functools import cached_property
-from typing import Any, Iterable, MutableSequence, cast
+from typing import Any, Iterable, cast
 
 import numpy as np
 import plotly.graph_objects as go
@@ -32,7 +32,7 @@ def solve_radius(
     env: Any,
     halfspaces: np.ndarray | torch.Tensor,  ## TODO: Remove redundant check for this
     max_radius: float = GRB.INFINITY,
-    zero_indices: MutableSequence[int] | None = None,
+    zero_indices: np.ndarray | None = None,
     sense: int = GRB.MAXIMIZE,
 ) -> tuple[np.ndarray | None, float]:
     """Solve for the Chebyshev center or interior point of a polyhedron.
@@ -232,12 +232,12 @@ class Polyhedron:
         return self._ss_np
 
     @cached_property
-    def zero_indices(self) -> list[int]:
+    def zero_indices(self) -> np.ndarray:
         """Indices of sign sequence elements that are zero."""
         return np.flatnonzero(self.ss_np == 0)
 
     @cached_property
-    def non_zero_indices(self) -> list[int]:
+    def non_zero_indices(self) -> np.ndarray:
         """Indices of sign sequence elements that are not zero."""
         return np.flatnonzero(self.ss_np != 0)
 
@@ -300,6 +300,8 @@ class Polyhedron:
             raise ValueError("Input shape too large to compute extra properties")
         try:
             halfspaces = self.halfspaces_np
+            if self.interior_point is None:
+                raise ValueError("Interior point not found")
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
                     halfspaces,
@@ -337,6 +339,8 @@ class Polyhedron:
         except Exception as e:
             if qhull_mode == "JITTERED":
                 try:
+                    if self.interior_point is None:
+                        raise ValueError("Interior point not found")
                     hs = HalfspaceIntersection(
                         halfspaces,
                         self.interior_point,
@@ -380,8 +384,8 @@ class Polyhedron:
         #     self._volume = -1
         #     return
         self._vertices = vertices[trust_vertices][trust_vertices_2]
-        self._vertex_set = set(tuple(x) for x in self.vertices)
-        if self.finite and len(self.vertices) > self.ambient_dim:
+        self._vertex_set = set(tuple(x) for x in self._vertices)
+        if self.finite and len(self._vertices) > self.ambient_dim:
             try:
                 self._ch = ConvexHull(vertices)
                 try:
@@ -521,6 +525,7 @@ class Polyhedron:
             If get_all_Ab is False: (halfspaces, W, b) tuple.
             If get_all_Ab is True: List of dicts with 'A', 'b', and 'layer' keys.
         """
+        assert isinstance(self._ss, torch.Tensor)
         constr_A, constr_b = None, None
         current_A, current_b = None, None
         A, b = None, None
@@ -544,10 +549,10 @@ class Polyhedron:
                 assert current_A is not None
                 assert current_b is not None
 
-                mask = self.ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
+                mask = self._ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
-                ## Replce mask 0s with 1s
-                nonzero_mask = torch.where(mask == 0, 1, mask)
+                ## Replace mask 0s with 1s
+                nonzero_mask = torch.where(mask == 0, torch.ones_like(mask), mask)
 
                 new_constr_A = current_A * nonzero_mask
                 new_constr_b = current_b * nonzero_mask
@@ -596,7 +601,7 @@ class Polyhedron:
         assert isinstance(current_A, torch.Tensor)
         assert isinstance(current_b, torch.Tensor)
 
-        assert halfspaces.shape[0] == self.ss.shape[1]
+        assert halfspaces.shape[0] == self._ss.shape[1]
         return halfspaces, current_A, current_b
 
     @torch.no_grad()
@@ -1043,36 +1048,34 @@ class Polyhedron:
     ) -> tuple[str, np.ndarray] | None:
         return bounded_plot_geometry(self, bound)
 
-    def plot_3d_complex(
-        self,
-        showlegend: bool = False,
-        bound: float = DEFAULT_PLOT_BOUND,
-        filled: bool = False,
-        **kwargs: Any,
-    ) -> list[go.Mesh3d | go.Scatter3d]:
-        return plot_polyhedron(self, plot_mode="3d_cells", showlegend=showlegend, bound=bound, filled=filled, **kwargs)
-
-    def plot_2d_complex(
+    def plot_cells(
         self,
         fill: str = "toself",
         showlegend: bool = False,
         bound: float = DEFAULT_PLOT_BOUND,
+        filled: bool = False,
         plot_halfspaces: bool = False,
         halfspace_shade: bool = True,
         **kwargs: Any,
-    ) -> list[go.Scatter]:
+    ) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d]:
+        """Plot this cell in input space (2D ``Scatter`` or 3D ``Mesh3d`` / ``Scatter3d`` traces).
+
+        Chooses 2D vs 3D from :attr:`ambient_dim` (input-space dimension; typically matches
+        :attr:`Complex.dim` when this polyhedron belongs to a complex).
+        """
         return plot_polyhedron(
             self,
-            plot_mode="2d_cells",
+            plot_mode="cells",
             fill=fill,
             showlegend=showlegend,
             bound=bound,
+            filled=filled,
             plot_halfspaces=plot_halfspaces,
             halfspace_shade=halfspace_shade,
             **kwargs,
         )
 
-    def plot_2d_graph(
+    def plot_graph(
         self,
         fill: str = "toself",
         showlegend: bool = False,
@@ -1105,6 +1108,7 @@ class Polyhedron:
         # self._interior_point = None ## TODO: Does this slow down things?
         self._point = None
         self._halfspaces_np = None
+        self._attempted_compute_properties = False
 
     """
     All of the following properties are computed on the fly and cached
@@ -1113,28 +1117,29 @@ class Polyhedron:
     @property
     def vertex_set(self) -> set[tuple[float, ...]]:
         """Set of vertices of the polyhedron (not always reliable)."""
-        if self._hs is None:
+        if not self._attempted_compute_properties:
             self.compute_properties()
         return self._vertex_set
 
     @property
-    def vertices(self) -> np.ndarray:
+    def vertices(self) -> np.ndarray | None:
         """Vertices of the polyhedron (not always reliable)."""
-        if self._vertices is None:
+        if not self._attempted_compute_properties:
             self.compute_properties()
         return self._vertices
 
     @property
     def hs(self) -> HalfspaceIntersection:
         """Halfspace intersection object from scipy."""
-        if self._hs is None:
+        if not self._attempted_compute_properties:
             self.compute_properties()
+        assert isinstance(self._hs, HalfspaceIntersection)
         return self._hs
 
     @property
     def ch(self) -> ConvexHull | None:
         """Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails."""
-        if self._ch is None and self.finite:
+        if not self._attempted_compute_properties and self.finite:
             self.compute_properties()
         return self._ch
 
@@ -1143,9 +1148,9 @@ class Polyhedron:
         """Volume of the polyhedron, infinity for unbounded polyhedra, or -1 if computation fails."""
         if not self.finite:
             self._volume = float("inf")
-        elif self._volume is None:
+        elif not self._attempted_compute_properties:
             self.compute_properties()
-        return self._volume
+        return self._volume if self._volume is not None else -1.0
 
     @cached_property  ## !! See if this works
     def tag(self) -> bytes:
@@ -1239,7 +1244,7 @@ class Polyhedron:
         Returns:
             int: Count of ReLU neurons that are always inactive for this polyhedron.
         """
-        if self._num_dead_relus is None:
+        if not self._attempted_compute_properties:
             halfspaces, W, b = self.get_hs()
             assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
             assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
@@ -1248,6 +1253,7 @@ class Polyhedron:
             self._W = W
             self._b = b
             self._halfspaces_np = None
+        assert self._num_dead_relus is not None
         return self._num_dead_relus
 
     @property
@@ -1282,6 +1288,7 @@ class Polyhedron:
         """Whether the polyhedron is bounded (finite)."""
         if self._finite is None:
             self.get_center_inradius()
+        assert self._finite is not None
         return self._finite
 
     @property
@@ -1328,8 +1335,9 @@ class Polyhedron:
         self._point = value
 
     @property
-    def interior_point_norm(self) -> float:
+    def interior_point_norm(self) -> float | None:
         """L2 norm of the interior point."""
+        assert self.interior_point is not None
         if self._interior_point_norm is None:
             self._interior_point_norm = np.linalg.norm(self.interior_point).item()
         return self._interior_point_norm
@@ -1361,7 +1369,7 @@ class Polyhedron:
             point = point.detach().cpu().numpy().astype(halfspaces.dtype)
         point = point.reshape(1, -1)
         dists = point @ halfspaces[:, :-1].T + halfspaces[:, -1]
-        return (dists <= TOL_HALFSPACE_CONTAINMENT).all().item()
+        return bool((dists <= TOL_HALFSPACE_CONTAINMENT).all().item())
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
