@@ -410,8 +410,10 @@ class Polyhedron:
     ) -> np.ndarray:
         """Get a point inside the polyhedron.
 
-        Computes an interior point of the polyhedron. If the center is already
-        computed, uses that; otherwise solves for an interior point using Gurobi.
+        Computes an interior point of the polyhedron.
+
+        This method is "compute-only": it returns the interior point but does not
+        mutate cached attributes like ``self._interior_point``.
 
         Args:
             env: Gurobi environment for optimization. If None, uses a cached
@@ -429,31 +431,33 @@ class Polyhedron:
         """
         max_radius = max_radius or self.MAX_RADIUS
         if isinstance(self._center, (np.ndarray, torch.Tensor)):
-            self._interior_point = self._center.squeeze()
+            interior_point = self._center.squeeze()
         else:
             env = env or get_env()
-            self._interior_point = solve_radius(
+            interior_point = solve_radius(
                 env,
                 self.halfspaces_np[:],
                 zero_indices=self.zero_indices,
                 max_radius=max_radius,
             )[0]
-            assert isinstance(self._interior_point, np.ndarray)
-            self._interior_point = self._interior_point.squeeze()
-        if self._interior_point is None:
+            assert isinstance(interior_point, np.ndarray)
+            interior_point = interior_point.squeeze()
+        if interior_point is None:
             raise ValueError("Interior point not found")
         # if (
         #     maximum_violation := (self.inequalities[:, :-1] @ self._interior_point + self.inequalities[:-1, None]).max()
         # ) > TOL_HALFSPACE_CONTAINMENT:
         #     raise ValueError(f"Interior point invalid - Maximum Violation: {maximum_violation}")
-        if self._interior_point is not None and self._interior_point not in self:
-            raise ValueError(f"Interior point invalid - {self._interior_point} not in {self}")
-        return self._interior_point
+        if interior_point is not None and interior_point not in self:
+            raise ValueError(f"Interior point invalid - {interior_point} not in {self}")
+        return interior_point
 
     def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float]:
         """Get the Chebyshev center and inradius of the polyhedron.
 
-        Also sets self._finite to indicate if the polyhedron is finite.
+        This method is "compute-only": it returns (center, inradius) but does
+        not mutate cached attributes like ``self._center``, ``self._inradius``,
+        or ``self._finite``.
 
         Args:
             env: Gurobi environment for optimization. If None, uses a cached
@@ -463,11 +467,8 @@ class Polyhedron:
             tuple: (center, inradius) where center is None for unbounded polyhedra.
         """
         env = env or get_env()
-        self._center, self._inradius = solve_radius(
-            env, self.halfspaces_np[:], zero_indices=self.zero_indices
-        )  ## TODO: Change
-        self._finite = self._center is not None
-        return self._center, self._inradius
+        center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)  ## TODO: Change
+        return center, inradius
 
     def get_hs(
         self,
@@ -475,8 +476,8 @@ class Polyhedron:
         get_all_Ab: bool = False,
         force_numpy: bool = False,
     ) -> (
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-        | tuple[np.ndarray, np.ndarray, np.ndarray]
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]
+        | tuple[np.ndarray, np.ndarray, np.ndarray, int]
         | list[dict[str, Any]]
     ):
         """Get the halfspace representation of this polyhedron.
@@ -494,10 +495,11 @@ class Polyhedron:
                 Defaults to False.
 
         Returns:
-            If get_all_Ab is False: tuple (halfspaces, W, b) where halfspaces has
-            shape (n_constraints, n_dim+1), W is the affine matrix, and b is the
-            affine bias. If get_all_Ab is True: list of dicts with 'A', 'b', and
-            'layer' keys for each layer.
+            If get_all_Ab is False: tuple (halfspaces, W, b, num_dead_relus) where
+            halfspaces has shape (n_constraints, n_dim+1), W is the affine matrix,
+            b is the affine bias, and num_dead_relus is the count of dead ReLU
+            neurons (neurons always outputting zero). If get_all_Ab is True:
+            list of dicts with 'A', 'b', and 'layer' keys for each layer.
         """
         # Check underlying attribute directly to avoid property access overhead
         if isinstance(self._ss, torch.Tensor) and not force_numpy:
@@ -510,7 +512,7 @@ class Polyhedron:
         self,
         data: torch.Tensor | None = None,
         get_all_Ab: bool = False,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | list[dict[str, Any]]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, Any]]:
         """Get halfspaces when the sign sequence is a torch.Tensor.
 
         Computes the halfspace representation using PyTorch operations.
@@ -522,7 +524,7 @@ class Polyhedron:
                 each layer instead of just the final halfspaces. Defaults to False.
 
         Returns:
-            If get_all_Ab is False: (halfspaces, W, b) tuple.
+            If get_all_Ab is False: (halfspaces, W, b, num_dead_relus) tuple.
             If get_all_Ab is True: List of dicts with 'A', 'b', and 'layer' keys.
         """
         assert isinstance(self._ss, torch.Tensor)
@@ -591,7 +593,7 @@ class Polyhedron:
         assert constr_A is not None
         assert constr_b is not None
 
-        self._num_dead_relus = int((torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item())
+        num_dead_relus = int((torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item())
         halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
 
         if get_all_Ab:
@@ -602,14 +604,14 @@ class Polyhedron:
         assert isinstance(current_b, torch.Tensor)
 
         assert halfspaces.shape[0] == self._ss.shape[1]
-        return halfspaces, current_A, current_b
+        return halfspaces, current_A, current_b, num_dead_relus
 
     @torch.no_grad()
     def _get_hs_numpy(
         self,
         data: torch.Tensor | None = None,
         get_all_Ab: bool = False,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, Any]]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, Any]]:
         """Get halfspaces when the sign sequence is a numpy array.
 
         Args:
@@ -619,7 +621,7 @@ class Polyhedron:
                 each layer instead of just the final halfspaces. Defaults to False.
 
         Returns:
-            If get_all_Ab is False: (halfspaces, W, b) tuple.
+            If get_all_Ab is False: (halfspaces, W, b, num_dead_relus) tuple.
             If get_all_Ab is True: List of dicts with 'A', 'b', and 'layer' keys.
         """
         constr_A, constr_b = None, None
@@ -690,7 +692,7 @@ class Polyhedron:
         assert constr_A is not None
         assert constr_b is not None
 
-        self._num_dead_relus = (np.abs(constr_A) < TOL_DEAD_RELU).all(axis=0).sum().item()
+        num_dead_relus = (np.abs(constr_A) < TOL_DEAD_RELU).all(axis=0).sum().item()
         halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
         if get_all_Ab:
             return all_Ab
@@ -699,7 +701,7 @@ class Polyhedron:
         assert isinstance(current_b, np.ndarray)
 
         assert halfspaces.shape[0] == self.ss_np.shape[1]
-        return halfspaces, current_A, current_b
+        return halfspaces, current_A, current_b, num_dead_relus
 
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
@@ -974,12 +976,17 @@ class Polyhedron:
             w = RuntimeWarning(f"Error while computing bounded vertices: {e}")
             self.warnings.append(w)
             return None
-        # int_point, _ = solve_radius(get_env(), bounded_halfspaces, max_radius=1000)
-        # if not (
-        #     self.interior_point @ bounded_halfspaces[:, :-1].T + bounded_halfspaces[:, -1] <= TOL_HALFSPACE_CONTAINMENT
-        # ).all():
-        #     warnings.warn(f"Interior point ({self.interior_point}) out of bounds ({bound}):")
-        #     return None
+
+        # `HalfspaceIntersection` can fail on numerically-degenerate constraints like
+        # `0*x + 0 <= 0` (qhull: "feasible point is not clearly inside halfspace").
+        a = bounded_halfspaces[:, :-1]
+        b = bounded_halfspaces[:, -1]
+        a_norm = np.linalg.norm(a, axis=1)
+        degenerate = (a_norm <= TOL_DEAD_RELU) & (np.abs(b) <= TOL_HALFSPACE_CONTAINMENT)
+        if degenerate.any():
+            bounded_halfspaces = bounded_halfspaces[~degenerate]
+            if bounded_halfspaces.shape[0] == 0:
+                return None
 
         # Recompute interior point
         int_point, _ = solve_radius(
@@ -1169,14 +1176,16 @@ class Polyhedron:
                 constraint a^T x + b <= 0.
         """
         if self._halfspaces is None:
-            halfspaces, W, b = self.get_hs()
+            halfspaces, W, b, num_dead_relus = self.get_hs()
             assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
             assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
             assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
             self._halfspaces_np = None
+            self._num_dead_relus = num_dead_relus
             assert isinstance(self._halfspaces, torch.Tensor) or isinstance(self._halfspaces, np.ndarray)
             return self._halfspaces
         else:
@@ -1205,14 +1214,16 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Transformation matrix.
         """
         if self._W is None:
-            halfspaces, W, b = self.get_hs()
+            halfspaces, W, b, num_dead_relus = self.get_hs()
             assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
             assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
             assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
             self._halfspaces_np = None
+            self._num_dead_relus = num_dead_relus
             assert isinstance(self._W, torch.Tensor) or isinstance(self._W, np.ndarray)
             return self._W
         else:
@@ -1226,14 +1237,16 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Bias vector.
         """
         if self._b is None:
-            halfspaces, W, b = self.get_hs()
+            halfspaces, W, b, num_dead_relus = self.get_hs()
             assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
             assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
             assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
             self._halfspaces_np = None
+            self._num_dead_relus = num_dead_relus
         assert isinstance(self._b, torch.Tensor) or isinstance(self._b, np.ndarray)
         return self._b
 
@@ -1244,15 +1257,18 @@ class Polyhedron:
         Returns:
             int: Count of ReLU neurons that are always inactive for this polyhedron.
         """
-        if not self._attempted_compute_properties:
-            halfspaces, W, b = self.get_hs()
+        if self._num_dead_relus is None:
+            force_numpy = isinstance(self._halfspaces, np.ndarray)
+            halfspaces, W, b, num_dead_relus = self.get_hs(force_numpy=force_numpy)
             assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
             assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
             assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
             self._halfspaces_np = None
+            self._num_dead_relus = num_dead_relus
         assert self._num_dead_relus is not None
         return self._num_dead_relus
 
@@ -1273,6 +1289,8 @@ class Polyhedron:
     @property
     def center(self) -> np.ndarray | None:
         """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded polyhedra."""
+        if self._center is None and self._finite is None:
+            _ = self.finite  # compute _center/_inradius/_finite
         return self._center
 
     @property
@@ -1287,7 +1305,10 @@ class Polyhedron:
     def finite(self) -> bool:
         """Whether the polyhedron is bounded (finite)."""
         if self._finite is None:
-            self.get_center_inradius()
+            center, inradius = self.get_center_inradius()
+            self._center = center
+            self._inradius = inradius
+            self._finite = self._center is not None
         assert self._finite is not None
         return self._finite
 
@@ -1314,7 +1335,7 @@ class Polyhedron:
     def interior_point(self) -> np.ndarray | None:
         """A point guaranteed to be inside the polyhedron."""
         if self._interior_point is None:
-            self.get_interior_point()
+            self._interior_point = self.get_interior_point()
         return self._interior_point
 
     @property
