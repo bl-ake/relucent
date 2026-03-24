@@ -49,7 +49,8 @@ TOL_SHI_HYPERPLANE: float = 1e-6
 GUROBI_SHI_BEST_OBJ_STOP: float = 1e-6
 GUROBI_SHI_BEST_BD_STOP: float = -1e-6
 
-# In Polyhedron.plot_2d_complex, halfspace normal components below this are treated as zero
+# In 2D cell plotting (``Polyhedron.plot_cells`` when ``ambient_dim == 2``), halfspace normal
+# components below this are treated as zero
 # (e.g. nearly vertical line: |w[1]| < TOL_NEARLY_VERTICAL).
 TOL_NEARLY_VERTICAL: float = 1e-10
 
