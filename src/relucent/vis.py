@@ -557,9 +557,7 @@ def plot_polyhedron(
         if ad == 3:
             kw3 = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_3D_EXCLUDE}
             return _poly_traces_3d_complex(poly, **kw3)
-        raise ValueError(
-            f"plot_polyhedron(..., plot_mode='cells') supports ambient_dim 2 or 3, got {ad}"
-        )
+        raise ValueError(f"plot_polyhedron(..., plot_mode='cells') supports ambient_dim 2 or 3, got {ad}")
     if plot_mode == "graph":
         return _poly_traces_2d_graph(poly, **kwargs)
     raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells' or 'graph'.")
@@ -761,7 +759,9 @@ def _complex_figure_graph(
         fig.add_trace(outline)
     for mesh in meshes:
         fig.add_trace(mesh)
-    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
+    maxcoord = (
+        np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
+    )
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
