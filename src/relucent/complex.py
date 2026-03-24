@@ -97,16 +97,21 @@ def poly_calculations(
     p = Polyhedron(net, ss)
 
     try:
-        halfspaces, W, b = p.get_hs()
+        halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], p.get_hs(get_all_Ab=False))
         assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
         assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
         assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
         p._halfspaces = halfspaces
         p._W = W
         p._b = b
+        p._num_dead_relus = cast(int, num_dead_relus)
 
-        p.get_center_inradius(env=env)
-        p.get_interior_point(env=env)
+        center, inradius = p.get_center_inradius(env=env)
+        p._center = center
+        p._inradius = inradius
+        p._finite = center is not None
+
+        p._interior_point = p.get_interior_point(env=env)
         if p.interior_point is not None:
             p._interior_point_norm = np.linalg.norm(p.interior_point).item()
         else:
@@ -161,7 +166,7 @@ def get_ip(
         n = Polyhedron(net, ss)
         for max_radius in INTERIOR_POINT_RADIUS_SEQUENCE:
             try:
-                n.get_interior_point(env=env, max_radius=max_radius)
+                n._interior_point = n.get_interior_point(env=env, max_radius=max_radius)
             except ValueError:
                 print("Increasing max radius to find interior point")
         return n, shi
@@ -196,9 +201,12 @@ def astar_calculations(
         p.net = net
 
     if p._inradius is None:
-        p.get_center_inradius(env=env)
+        center, inradius = p.get_center_inradius(env=env)
+        p._center = center
+        p._inradius = inradius
+        p._finite = center is not None
     if p._interior_point is None:
-        p.get_interior_point(env=env)
+        p._interior_point = p.get_interior_point(env=env)
 
     try:
         if p._shis is None:
@@ -990,9 +998,13 @@ class Complex:
         end_poly = self.add_polyhedron(end) if isinstance(end, Polyhedron) else self.add_point(end)
         if start_poly == end_poly:
             print("Start and end points are in the same region")
-            start_poly.get_center_inradius()
-            start_poly.get_interior_point()
-            start_poly.get_shis(bound=bound)
+            center, inradius = start_poly.get_center_inradius()
+            start_poly._center = center
+            start_poly._inradius = inradius
+            start_poly._finite = center is not None
+
+            start_poly._interior_point = start_poly.get_interior_point()
+            start_poly._shis = cast(list[int], start_poly.get_shis(bound=bound, collect_info=False))
             return [start_poly]
 
         if (start_poly.ss_np == 0).any():
