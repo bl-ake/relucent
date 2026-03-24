@@ -29,7 +29,6 @@ from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
     UpdatablePriorityQueue,
-    close_env,
     get_env,
     process_aware_cpu_count,
 )
@@ -264,8 +263,8 @@ class Complex:
 
         self._G = None
 
-    def __del__(self) -> None:
-        close_env()
+    # def __del__(self) -> None:
+    #     close_env()
 
     def __getitem__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> Polyhedron:
         """Retrieve a Polyhedron from the complex by its key.
@@ -558,22 +557,6 @@ class Complex:
         """
         for poly in self:
             poly.clean_data()
-
-    @torch.no_grad()
-    def adjacent_polyhedra(self, poly: Polyhedron) -> set[Polyhedron]:
-        """Get the Polyhedra that are adjacent (across one BH) from the given Polyhedron.
-
-        Also works on lower-dimensional polyhedra.
-        """
-        ps = set()
-        shis = poly.shis
-        for shi in shis:
-            if poly.ss_np[0, shi] == 0:
-                continue
-            ss = poly.ss_np.copy()
-            ss[0, shi] = -ss[0, shi]
-            ps.add(self.ss2poly(ss))
-        return ps
 
     def parallel_add(
         self,

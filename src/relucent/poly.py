@@ -1,7 +1,7 @@
 import hashlib
 import warnings
 from functools import cached_property
-from typing import Any, Iterable, Literal, cast, overload
+from typing import Any, Callable, Iterable, Literal, cast, overload
 
 import numpy as np
 import plotly.graph_objects as go
@@ -109,6 +109,26 @@ def solve_radius(
             #     breakpoint()
             model.close()
             raise ValueError(f"Interior Point Model Status: {status}")
+
+
+@torch.no_grad()
+def adjacent_polyhedra(
+    poly: "Polyhedron",
+    ss2poly: Callable[..., "Polyhedron"],
+) -> set["Polyhedron"]:
+    """Polyhedra adjacent to ``poly`` across one bounding hyperplane (one SHI flip).
+
+    Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
+    array to the corresponding :class:`Polyhedron` (e.g. ``Complex.ss2poly``).
+    """
+    ps: set["Polyhedron"] = set()
+    for shi in poly.shis:
+        if poly.ss_np[0, shi] == 0:
+            continue
+        ss = poly.ss_np.copy()
+        ss[0, shi] = -ss[0, shi]
+        ps.add(ss2poly(ss))
+    return ps
 
 
 class Polyhedron:

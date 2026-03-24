@@ -180,7 +180,7 @@ class NN(nn.Module):
                     return (name, remaining_rows) if return_idx else layer.weight.data[remaining_rows]
                 else:
                     remaining_rows -= layer.weight.shape[0]
-        raise ValueError("Invalid Neuron Index")
+        raise ValueError(f"Invalid Neuron Index: {shi}")
 
 
 def get_mlp_model(widths: Iterable[int], add_last_relu: bool = False) -> NN:
