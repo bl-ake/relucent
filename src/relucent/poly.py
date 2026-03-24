@@ -1,7 +1,7 @@
 import hashlib
 import warnings
 from functools import cached_property
-from typing import Any, Iterable, cast
+from typing import Any, Iterable, Literal, cast, overload
 
 import numpy as np
 import plotly.graph_objects as go
@@ -470,6 +470,22 @@ class Polyhedron:
         center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)  ## TODO: Change
         return center, inradius
 
+    @overload
+    def get_hs(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[False] = False,
+        force_numpy: bool = False,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
+
+    @overload
+    def get_hs(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[True] = True,
+        force_numpy: bool = False,
+    ) -> list[dict[str, Any]]: ...
+
     def get_hs(
         self,
         data: torch.Tensor | None = None,
@@ -506,6 +522,20 @@ class Polyhedron:
             return self._get_hs_torch(data, get_all_Ab)
         else:
             return self._get_hs_numpy(data, get_all_Ab)
+
+    @overload
+    def _get_hs_torch(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[False] = False,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]: ...
+
+    @overload
+    def _get_hs_torch(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[True] = True,
+    ) -> list[dict[str, Any]]: ...
 
     @torch.no_grad()
     def _get_hs_torch(
@@ -605,6 +635,20 @@ class Polyhedron:
 
         assert halfspaces.shape[0] == self._ss.shape[1]
         return halfspaces, current_A, current_b, num_dead_relus
+
+    @overload
+    def _get_hs_numpy(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[False] = False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
+
+    @overload
+    def _get_hs_numpy(
+        self,
+        data: torch.Tensor | None = None,
+        get_all_Ab: Literal[True] = True,
+    ) -> list[dict[str, Any]]: ...
 
     @torch.no_grad()
     def _get_hs_numpy(
@@ -1177,10 +1221,6 @@ class Polyhedron:
         """
         if self._halfspaces is None:
             halfspaces, W, b, num_dead_relus = self.get_hs()
-            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
-            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
@@ -1215,10 +1255,6 @@ class Polyhedron:
         """
         if self._W is None:
             halfspaces, W, b, num_dead_relus = self.get_hs()
-            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
-            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
@@ -1238,10 +1274,6 @@ class Polyhedron:
         """
         if self._b is None:
             halfspaces, W, b, num_dead_relus = self.get_hs()
-            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
-            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
@@ -1260,10 +1292,6 @@ class Polyhedron:
         if self._num_dead_relus is None:
             force_numpy = isinstance(self._halfspaces, np.ndarray)
             halfspaces, W, b, num_dead_relus = self.get_hs(force_numpy=force_numpy)
-            assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-            assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-            assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
-            assert isinstance(num_dead_relus, int)
             self._halfspaces = halfspaces
             self._W = W
             self._b = b
