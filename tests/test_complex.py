@@ -8,6 +8,7 @@ import pytest
 import torch
 
 from relucent import Complex, get_mlp_model
+from relucent.poly import adjacent_polyhedra
 
 
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
@@ -216,7 +217,7 @@ class TestComplexAdjacent:
         start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
         cplx.bfs(start=start, max_polys=25)
         p = next(iter(cplx))
-        neighbors = cplx.adjacent_polyhedra(p)
+        neighbors = adjacent_polyhedra(p, cplx.ss2poly)
         assert isinstance(neighbors, set)
         for q in neighbors:
             assert (p.ss_np != q.ss_np).sum() >= 1
