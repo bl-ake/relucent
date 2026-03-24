@@ -67,11 +67,11 @@ TOL_VERIFY_AB_ATOL: float = 1e-6
 # -----------------------------------------------------------------------------
 
 # Sequence of max_radius values tried when finding an interior point for
-# a neighbor polyhedron in get_ip (increasing on failure).
+# a neighbor polyhedron in relucent.search.get_ip (increasing on failure).
 INTERIOR_POINT_RADIUS_SEQUENCE: list[float] = [0.01, 0.1, 1, 10, 100]
 
 # Default bound for numerical stability when computing halfspaces in
-# parallel_add (larger than searcher to allow broader exploration).
+# relucent.search.parallel_add (larger than searcher to allow broader exploration).
 DEFAULT_PARALLEL_ADD_BOUND: float = 1e8
 
 # Default bound for halfspace computation in searcher and hamming_astar.
