@@ -9,7 +9,6 @@ from typing import Any, Generator, Iterable, Iterator, cast
 
 import networkx as nx
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
 import torch
 import torch.nn as nn
@@ -22,13 +21,19 @@ from relucent.config import (
     DEFAULT_PARALLEL_ADD_BOUND,
     DEFAULT_SEARCH_BOUND,
     INTERIOR_POINT_RADIUS_SEQUENCE,
-    PLOT_DEFAULT_MAXCOORD,
-    PLOT_MARGIN_FACTOR,
 )
 from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
-from relucent.utils import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue, close_env, get_colors, get_env
+from relucent.utils import (
+    BlockingQueue,
+    NonBlockingQueue,
+    UpdatablePriorityQueue,
+    close_env,
+    get_env,
+    process_aware_cpu_count,
+)
+from relucent.vis import get_colors, plot_complex
 
 # Worker process state (set by set_globals when used as pool initializer).
 env: Env | None = None
@@ -586,7 +591,7 @@ class Complex:
             list: A list of Polyhedron objects (or None for failed computations)
                 corresponding to the input points.
         """
-        nworkers = nworkers or os.process_cpu_count()
+        nworkers = nworkers or process_aware_cpu_count()
         print(f"Running on {nworkers} workers")
         sss = []
         for p in tqdm(points, desc="Getting SSs", mininterval=5):
@@ -708,7 +713,7 @@ class Complex:
             return True
 
         found_sss = SSManager()
-        nworkers = nworkers or os.process_cpu_count()
+        nworkers = nworkers or process_aware_cpu_count()
         ## NOTE: If nworkers>1, the traversal order may not be correct
         if verbose:
             print(f"Running on {nworkers} workers")
@@ -995,7 +1000,7 @@ class Complex:
             raise ValueError("Start point must not be on a hyperplane")
 
         nhs = len(start_poly.halfspaces)
-        nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (os.process_cpu_count() or 1)), nhs)
+        nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (process_aware_cpu_count() or 1)), nhs)
         print(f"Using {nworkers} workers")
 
         cameFrom: dict[Polyhedron, Polyhedron] = {}
@@ -1008,7 +1013,7 @@ class Complex:
             pop=lambda pq: pq.pop(),
         )
         # found_sss = SSManager()
-        # nworkers = nworkers or os.process_cpu_count()
+        # nworkers = nworkers or process_aware_cpu_count()
 
         gScore[start_poly] = 0
         fScore[start_poly] = (start_poly.ss_np != end_poly.ss_np).sum()
@@ -1360,86 +1365,16 @@ class Complex:
         bound=DEFAULT_COMPLEX_PLOT_BOUND,
         **kwargs,
     ):
-        """Plot the complex in 2D using plotly.
-
-        Creates a 2D visualization of the complex, showing all polyhedra as
-        regions in the input space. Only works for 2D input spaces.
-
-        Args:
-            label_regions: If True, add text labels showing each polyhedron's
-                string representation at its center. Defaults to False.
-            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
-                If None, use an equitable graph coloring. Defaults to None.
-            highlight_regions: If provided, highlight these polyhedra in red.
-                Can be a list of Polyhedron objects or their string representations.
-                Defaults to None.
-            ss_name: If True, use the full sign sequence as
-                the legend label for each polyhedron. Defaults to False.
-            bound: Constraint radius for plotting bounds. Passed to each
-                polyhedron's plot_2d_complex() method. Defaults to config.DEFAULT_COMPLEX_PLOT_BOUND.
-            **kwargs: Additional arguments passed to each polyhedron's plot_2d_complex() method.
-
-        Returns:
-            plotly.graph_objects.Figure: A plotly figure containing the 2D plot
-                of the complex.
-        """
-        fig = go.Figure()
-        polys = list(self)
-        if color == "Wl2":
-            colors = get_colors([poly.Wl2 for poly in polys])
-        else:
-            color_scheme = px.colors.qualitative.Plotly
-            try:
-                coloring = nx.algorithms.coloring.equitable_color(
-                    self.get_dual_graph(), min(len(color_scheme), len(polys))
-                )
-                remap, idx = dict(), 0
-                for p in polys:
-                    if coloring[p] not in remap:
-                        remap[coloring[p]] = idx
-                        idx += 1
-                colors = [color_scheme[remap[coloring[i]]] for i in polys]
-            except Exception:
-                print("Could not find equitable coloring, using random colors")
-                colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
-        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
-            if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
-                c = "red"
-            if ss_name:
-                name = f"{poly.ss_np.ravel().astype(int).tolist()}"
-            else:
-                name = f"{poly}"
-            p_plot = poly.plot_2d_complex(
-                name=name,
-                fillcolor=c,
-                line_color="black",
-                mode="lines",  ## Comment out to mouse over intersections
-                bound=bound,
-                **kwargs,
-            )
-            for trace in p_plot:
-                fig.add_trace(trace)
-            if label_regions and poly.center is not None:
-                fig.add_trace(
-                    go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
-                )
-        interior_points = [np.max(np.abs(p.interior_point)) for p in self if p.finite]
-        maxcoord = (
-            (np.mean(interior_points) * PLOT_MARGIN_FACTOR)
-            if len(interior_points) > 0
-            else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
+        return plot_complex(
+            self,
+            plot_mode="2d_cells",
+            label_regions=label_regions,
+            color=color,
+            highlight_regions=highlight_regions,
+            ss_name=ss_name,
+            bound=bound,
+            **kwargs,
         )
-        # maxcoord = 10
-        fig.update_layout(
-            showlegend=True,
-            # xaxis = dict(visible=False),
-            # yaxis = dict(visible=False),
-            plot_bgcolor="white",
-            xaxis=dict(range=(-maxcoord, maxcoord)),
-            yaxis_scaleanchor="x",
-            yaxis=dict(range=(-maxcoord, maxcoord)),
-        )
-        return fig
 
     def plot_3d_complex(
         self,
@@ -1447,89 +1382,19 @@ class Complex:
         color: str | None = None,
         highlight_regions: Iterable[Polyhedron] | Iterable[str] | None = None,
         show_axes: bool = False,
+        fill_mode: str = "wireframe",
         **kwargs: Any,
     ) -> go.Figure:
-        """Plot the complex in 3D input space using plotly.
-
-        This visualizes the polyhedral complex of a network with 3D input by
-        drawing each cell as a 3D region in the input space. Axis scaling is
-        automatic based on the traces returned by each polyhedron's plot function.
-
-        Args:
-            label_regions: If True, add text labels at (approximate) centers of
-                polyhedra. Defaults to False.
-            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
-                If None, use an equitable graph coloring. Defaults to None.
-            highlight_regions: If provided, highlight these polyhedra in red and
-                render them as filled meshes instead of wireframes. Can be a
-                list of Polyhedron objects or their string representations.
-                Defaults to None.
-            show_axes: If True, display coordinate axes. Defaults to False.
-            **kwargs: Additional keyword arguments forwarded to
-                ``Polyhedron.plot_3d_complex``.
-
-        Returns:
-            plotly.graph_objects.Figure: A figure containing the 3D plot of the complex.
-        """
-        if self.dim != 3:
-            raise ValueError("Complex must have 3D input to plot 3D complex")
-
-        fig = go.Figure()
-        polys = list(self)
-
-        if color == "Wl2":
-            colors = get_colors([poly.Wl2 for poly in polys])
-        else:
-            color_scheme = px.colors.qualitative.Plotly
-            try:
-                coloring = nx.algorithms.coloring.equitable_color(
-                    self.get_dual_graph(), min(len(color_scheme), len(polys))
-                )
-                remap, idx = dict(), 0
-                for p in polys:
-                    if coloring[p] not in remap:
-                        remap[coloring[p]] = idx
-                        idx += 1
-                colors = [color_scheme[remap[coloring[i]]] for i in polys]
-            except Exception:
-                print("Could not find equitable coloring, using random colors")
-                colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
-
-        for c, poly in tqdm(zip(colors, polys), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
-            is_highlighted = (highlight_regions is not None) and (
-                (poly in [p for p in highlight_regions if isinstance(p, Polyhedron)])
-                or (str(poly) in [p for p in highlight_regions if isinstance(p, str)])
-            )
-            if is_highlighted:
-                c = "red"
-            traces = poly.plot_3d_complex(
-                showlegend=False,
-                color=c,
-                filled=is_highlighted,
-                **kwargs,
-            )
-            for trace in traces:
-                fig.add_trace(trace)
-            if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
-                fig.add_trace(
-                    go.Scatter3d(
-                        x=[poly.center[0]],
-                        y=[poly.center[1]],
-                        z=[poly.center[2]],
-                        mode="text",
-                        text=str(poly),
-                        showlegend=False,
-                    )
-                )
-
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(visible=show_axes),
-                yaxis=dict(visible=show_axes),
-                zaxis=dict(visible=show_axes),
-            ),
+        return plot_complex(
+            self,
+            plot_mode="3d_cells",
+            label_regions=label_regions,
+            color=color,
+            highlight_regions=highlight_regions,
+            show_axes=show_axes,
+            fill_mode=fill_mode,
+            **kwargs,
         )
-        return fig
 
     def plot_2d_graph(
         self,
@@ -1540,103 +1405,13 @@ class Complex:
         project=True,
         **kwargs,
     ):
-        """Plot the complex in 3D using plotly.
-
-        Creates a 3D visualization of the complex, showing all polyhedra as
-        regions in the input space. Only works for 3D input spaces.
-
-        Args:
-            label_regions: If True, add text labels showing each polyhedron's
-                string representation. Defaults to False.
-            color: If "Wl2", color polyhedra by their Wl2 (weight norm) value.
-                If None, use an equitable graph coloring. Defaults to None.
-            highlight_regions: If provided, highlight these polyhedra in red.
-                Can be a list of Polyhedron objects or their string representations.
-                Defaults to None.
-            show_axes: If True, display the coordinate axes. Defaults to False.
-            project: If True, also show a projection of the complex onto the
-                xy plane. Defaults to True.
-            **kwargs: Additional arguments passed to each polyhedron's plot_2d_graph() method.
-
-        Returns:
-            plotly.graph_objects.Figure: A plotly figure containing the 3D plot
-                of the complex.
-        """
-        fig = go.Figure()
-        polys = list(self)
-        if color == "Wl2":
-            colors = get_colors([poly.Wl2 for poly in polys])
-        else:
-            color_scheme = px.colors.qualitative.Plotly
-            try:
-                coloring = nx.algorithms.coloring.equitable_color(
-                    self.get_dual_graph(), min(len(color_scheme), len(polys))
-                )
-                colors = [color_scheme[coloring[i]] for i in polys]
-            except Exception:
-                print("Could not find equitable coloring, using random colors")
-                colors = [color_scheme[i % len(color_scheme)] for i in range(len(polys))]
-        outlines, meshes = [], []
-        for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
-            if (highlight_regions is not None) and ((poly in highlight_regions) or (str(poly) in highlight_regions)):
-                c = "red"
-            p_plot = poly.plot_2d_graph(
-                name=f"{poly}",
-                color=c,
-                # outlinecolor="black",
-                **kwargs,
-            )
-            if p_plot is not None:
-                if isinstance(p_plot, dict):
-                    if "mesh" in p_plot:
-                        meshes.append(p_plot["mesh"])
-                    if "outline" in p_plot:
-                        outlines.append(p_plot["outline"])
-                else:
-                    fig.add_trace(p_plot)
-            if project is not None:
-                p_plot = poly.plot_2d_graph(
-                    name=f"{poly}",
-                    color=c,
-                    project=project,
-                    **kwargs,
-                )
-                if p_plot is not None:
-                    if isinstance(p_plot, dict):
-                        if "mesh" in p_plot:
-                            meshes.append(p_plot["mesh"])
-                        if "outline" in p_plot:
-                            outlines.append(p_plot["outline"])
-                    else:
-                        fig.add_trace(p_plot)
-            if label_regions and poly.center is not None:
-                fig.add_trace(
-                    go.Scatter3d(
-                        x=[poly.center[0]],
-                        y=[poly.center[1]],
-                        z=[
-                            self.net(torch.tensor(poly.center, device=self.net.device, dtype=self.net.dtype).T)
-                            .detach()
-                            .cpu()
-                            .numpy()
-                            .squeeze()
-                            .ravel()[:, 0]
-                        ],
-                        mode="text",
-                        text=str(poly),
-                        showlegend=False,
-                    )
-                )
-        for outline in outlines:
-            fig.add_trace(outline)
-        for mesh in meshes:
-            fig.add_trace(mesh)
-        maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in self if p.finite]) * PLOT_MARGIN_FACTOR
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
-                yaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
-                zaxis=dict(visible=show_axes),
-            ),
+        return plot_complex(
+            self,
+            plot_mode="graph",
+            label_regions=label_regions,
+            color=color,
+            highlight_regions=highlight_regions,
+            show_axes=show_axes,
+            project=project,
+            **kwargs,
         )
-        return fig

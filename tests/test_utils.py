@@ -11,12 +11,12 @@ from relucent.utils import (
     NonBlockingQueue,
     UpdatablePriorityQueue,
     encode_ss,
-    get_colors,
     get_env,
     normalize_weights,
     set_seeds,
     split_sequential,
 )
+from relucent.vis import get_colors
 
 from relucent import get_mlp_model
 

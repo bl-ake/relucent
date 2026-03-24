@@ -15,16 +15,21 @@ from .model import NN, get_mlp_model
 from .poly import Polyhedron
 from .ss import SSManager
 from .utils import get_env, set_seeds, split_sequential
+from .vis import data_graph, get_colors, plot_complex, plot_polyhedron
 
 __all__ = [
     "Complex",
     "Polyhedron",
     "NN",
-    "config",
-    "get_mlp_model",
     "SSManager",
+    "config",
     "convert",
+    "data_graph",
+    "get_colors",
     "get_env",
-    "split_sequential",
+    "get_mlp_model",
+    "plot_complex",
+    "plot_polyhedron",
     "set_seeds",
+    "split_sequential",
 ]

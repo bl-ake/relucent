@@ -19,13 +19,13 @@ from relucent.config import (
     QHULL_MODE,
     TOL_DEAD_RELU,
     TOL_HALFSPACE_CONTAINMENT,
-    TOL_NEARLY_VERTICAL,
     TOL_SHI_HYPERPLANE,
     TOL_VERIFY_AB_ATOL,
     VERTEX_TRUST_THRESHOLD,
 )
 from relucent.model import NN
 from relucent.utils import encode_ss, get_env
+from relucent.vis import bounded_plot_geometry, plot_polyhedron
 
 
 def solve_radius(
@@ -1041,80 +1041,7 @@ class Polyhedron:
         self,
         bound: float,
     ) -> tuple[str, np.ndarray] | None:
-        """Classify bounded geometry for plotting as polygon, segment, or point.
-
-        The classification follows the requested behavior:
-        - If there is a single 0 in ss_np, treat the region as a line segment.
-        - If there are two 0s, treat the region as a point.
-        - Otherwise, use the full 2D polygon (via ConvexHull) when possible.
-
-        Returns:
-            None if vertices cannot be computed or are empty, otherwise:
-            ("polygon", verts) where verts are ordered boundary vertices,
-            ("segment", verts) where verts has shape (2, 2) for endpoints,
-            ("point", verts) where verts has shape (1, 2) for the point.
-        """
-        vertices = self.get_bounded_vertices(bound)
-        if vertices is None or vertices.size == 0:
-            return None
-
-        # Ensure 2D coordinates.
-        if vertices.shape[1] != 2:
-            return None
-
-        # Count zeros in the sign sequence (flattened).
-        num_zeros = int(np.sum(self.ss_np == 0))
-
-        # Degenerate to a single point when there are at least two zeros.
-        if num_zeros >= 2:
-            point = vertices.mean(axis=0, keepdims=True)
-            return "point", point
-
-        # Line segment when there is exactly one zero.
-        if num_zeros == 1:
-            # With very few vertices, just fall back to unique points.
-            if vertices.shape[0] == 1:
-                return "point", vertices
-            # Use PCA/SVD to find the main direction and endpoints along it.
-            centered = vertices - vertices.mean(axis=0, keepdims=True)
-            try:
-                _, _, vh = np.linalg.svd(centered, full_matrices=False)
-                direction = vh[0]
-                t = vertices @ direction
-                p_min = vertices[np.argmin(t)]
-                p_max = vertices[np.argmax(t)]
-                segment = np.stack([p_min, p_max], axis=0)
-                return "segment", segment
-            except Exception:
-                # Fallback: use the first two unique vertices if SVD fails.
-                uniq = np.unique(vertices, axis=0)
-                if uniq.shape[0] == 1:
-                    return "point", uniq
-                return "segment", uniq[:2]
-
-        # Default: use ConvexHull to get a polygonal boundary, but only when the
-        # polyhedron has (at least) 2-dimensional support.
-        if self.dim < 2:
-            uniq = np.unique(vertices, axis=0)
-            if uniq.shape[0] == 1:
-                return "point", uniq
-            elif uniq.shape[0] == 2:
-                return "segment", uniq
-            else:
-                return "polygon", uniq
-        try:
-            hull = ConvexHull(vertices)
-            boundary = vertices[hull.vertices]
-            return "polygon", boundary
-        except Exception:
-            # If ConvexHull fails, fall back to unique vertices as a polygonal chain.
-            uniq = np.unique(vertices, axis=0)
-            if uniq.shape[0] == 1:
-                return "point", uniq
-            elif uniq.shape[0] == 2:
-                return "segment", uniq
-            else:
-                return "polygon", uniq
+        return bounded_plot_geometry(self, bound)
 
     def plot_3d_complex(
         self,
@@ -1123,251 +1050,7 @@ class Polyhedron:
         filled: bool = False,
         **kwargs: Any,
     ) -> list[go.Mesh3d | go.Scatter3d]:
-        """Plot the (input-space) polyhedron as a 3D region using plotly.
-
-        This visualizes the cell of the polyhedral complex in the 3D input space.
-        Only works when the ambient input dimension is exactly 3.
-
-        Args:
-            showlegend: Whether to show the trace in the legend. Defaults to False.
-            bound: Radius of the bounding cube used to clip the polyhedron for
-                numerical stability. Defaults to config.DEFAULT_PLOT_BOUND.
-            filled: If True, render full-dimensional 3D regions as filled meshes
-                (go.Mesh3d) instead of wireframes. Defaults to False.
-            **kwargs: Additional keyword arguments forwarded to ``go.Scatter3d``
-                or ``go.Mesh3d``.
-
-        Returns:
-            list: A list of plotly traces. For 3D regions this will contain
-            line-based ``go.Scatter3d`` traces that outline the cell (no filled
-            volume), or a filled ``go.Mesh3d`` when filled=True. For degenerate
-            cases (faces, edges, or points) it returns appropriate ``go.Scatter3d``
-            traces.
-        """
-        if self.ambient_dim != 3:
-            raise ValueError("Polyhedron must have ambient dimension 3 to plot 3D complex")
-
-        # Normalize common Mesh3d-style kwargs (e.g., color) to Scatter3d-compatible
-        # kwargs so existing caller code keeps working.
-        base_kwargs: dict[str, Any] = dict(kwargs)
-        line_color = base_kwargs.pop("color", None)
-
-        traces: list[go.Mesh3d | go.Scatter3d] = []
-        vertices = self.get_bounded_vertices(bound)
-        if vertices is None or vertices.size == 0:
-            return traces
-
-        if vertices.shape[1] != 3:
-            return traces
-
-        # Handle degeneracies via effective dimensionality of the vertices.
-        centered = vertices - vertices.mean(axis=0, keepdims=True)
-        try:
-            _, s, vh = np.linalg.svd(centered, full_matrices=False)
-        except Exception:
-            s = np.array([])
-            vh = np.zeros((0, 3))
-        if s.size == 0 or np.all(s < 1e-12):
-            # Point-like.
-            point_kwargs = dict(base_kwargs)
-            if line_color is not None:
-                marker = dict(point_kwargs.get("marker", {}))
-                marker.setdefault("color", line_color)
-                point_kwargs["marker"] = marker
-            traces.append(
-                go.Scatter3d(
-                    x=[vertices[0, 0]],
-                    y=[vertices[0, 1]],
-                    z=[vertices[0, 2]],
-                    mode="markers",
-                    showlegend=showlegend,
-                    **point_kwargs,
-                )
-            )
-            return traces
-
-        tol = 1e-6 * s[0]
-        eff_dim = int(np.sum(s > tol))
-
-        if eff_dim == 1:
-            # Edge-like: show as a line segment between extremal points.
-            direction = vh[0]
-            t = vertices @ direction
-            p_min = vertices[np.argmin(t)]
-            p_max = vertices[np.argmax(t)]
-            seg = np.stack([p_min, p_max], axis=0)
-            line_kwargs = dict(base_kwargs)
-            if line_color is not None:
-                line = dict(line_kwargs.get("line", {}))
-                line.setdefault("color", line_color)
-                line_kwargs["line"] = line
-            traces.append(
-                go.Scatter3d(
-                    x=seg[:, 0],
-                    y=seg[:, 1],
-                    z=seg[:, 2],
-                    mode="lines",
-                    showlegend=showlegend,
-                    **line_kwargs,
-                )
-            )
-            return traces
-
-        if eff_dim == 2:
-            # Face-like: project onto principal plane to order vertices, then
-            # plot as a closed polygon in 3D.
-            basis = vh[:2]  # 2 x 3
-            coords_2d = vertices @ basis.T
-            if self.dim < 2:
-                order = np.arange(vertices.shape[0])
-            else:
-                try:
-                    hull_2d = ConvexHull(coords_2d)
-                    order = hull_2d.vertices
-                except Exception:
-                    order = np.arange(vertices.shape[0])
-            ordered = vertices[order]
-            x = ordered[:, 0].tolist() + [ordered[0, 0]]
-            y = ordered[:, 1].tolist() + [ordered[0, 1]]
-            z = ordered[:, 2].tolist() + [ordered[0, 2]]
-            face_line_kwargs = dict(base_kwargs)
-            if line_color is not None:
-                line = dict(face_line_kwargs.get("line", {}))
-                line.setdefault("color", line_color)
-                face_line_kwargs["line"] = line
-            if filled and line_color is not None:
-                # Use Mesh3d for filled planar face (fan triangulation from vertex 0)
-                n = len(ordered)
-                i_vals = [0] * (n - 2)
-                j_vals = list(range(1, n - 1))
-                k_vals = list(range(2, n))
-                mesh_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("line", "marker")}
-                traces.append(
-                    go.Mesh3d(
-                        x=ordered[:, 0].tolist(),
-                        y=ordered[:, 1].tolist(),
-                        z=ordered[:, 2].tolist(),
-                        i=i_vals,
-                        j=j_vals,
-                        k=k_vals,
-                        color=line_color,
-                        opacity=0.7,
-                        showlegend=showlegend,
-                        **mesh_kwargs,
-                    )
-                )
-            else:
-                traces.append(
-                    go.Scatter3d(
-                        x=x,
-                        y=y,
-                        z=z,
-                        mode="lines",
-                        showlegend=showlegend,
-                        **face_line_kwargs,
-                    )
-                )
-            return traces
-
-        # Full-dimensional 3D region: plot only the wireframe (edges) of the
-        # convex hull, not filled surfaces. Use a single trace with NaN-
-        # separated segments so each polyhedron corresponds to one trace.
-        if self.dim < 2:
-            return traces
-        try:
-            hull = ConvexHull(vertices)
-
-            # Build edge -> incident facet mapping from the triangulated hull.
-            edge_to_facets: dict[tuple[int, int], list[int]] = {}
-            for fi, simplex in enumerate(hull.simplices):
-                a, b, c = simplex
-                for u, v in ((a, b), (a, c), (b, c)):
-                    if u == v:
-                        continue
-                    key = (u, v) if u < v else (v, u)
-                    edge_to_facets.setdefault(key, []).append(fi)
-
-            # Normalize facet planes for coplanarity tests.
-            planes = hull.equations  # shape (n_facets, 4): [nx, ny, nz, d]
-            normals = planes[:, :3]
-            offsets = planes[:, 3]
-            norms = np.linalg.norm(normals, axis=1, keepdims=True)
-            norms[norms == 0] = 1.0
-            normals_n = normals / norms
-            offsets_n = offsets / norms.ravel()
-
-            def facets_coplanar(facet_indices: list[int], atol: float = 1e-6) -> bool:
-                if not facet_indices:
-                    return True
-                f0 = facet_indices[0]
-                n0 = normals_n[f0]
-                d0 = offsets_n[f0]
-                for fi in facet_indices[1:]:
-                    ni = normals_n[fi]
-                    di = offsets_n[fi]
-                    # Same or opposite normal direction and similar offset.
-                    if np.abs(np.dot(n0, ni)) < 1.0 - atol:
-                        return False
-                    if np.abs(d0 - di) > atol:
-                        return False
-                return True
-
-            # Keep only edges that are intersections of non-coplanar facets;
-            # this removes diagonals introduced by triangulation inside
-            # polygonal faces.
-            edges: set[tuple[int, int]] = set()
-            for edge, facet_indices in edge_to_facets.items():
-                if not facets_coplanar(facet_indices):
-                    edges.add(edge)
-
-            # When filled=True, add a Mesh3d trace for solid rendering instead of wireframe
-            if filled and line_color is not None:
-                mesh_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("line", "marker")}
-                traces.append(
-                    go.Mesh3d(
-                        x=vertices[:, 0].tolist(),
-                        y=vertices[:, 1].tolist(),
-                        z=vertices[:, 2].tolist(),
-                        i=hull.simplices[:, 0].tolist(),
-                        j=hull.simplices[:, 1].tolist(),
-                        k=hull.simplices[:, 2].tolist(),
-                        color=line_color,
-                        opacity=0.7,
-                        showlegend=showlegend,
-                        **mesh_kwargs,
-                    )
-                )
-            else:
-                # Wireframe for non-filled regions
-                edge_line_kwargs = dict(base_kwargs)
-                if line_color is not None:
-                    line = dict(edge_line_kwargs.get("line", {}))
-                    line.setdefault("color", line_color)
-                    edge_line_kwargs["line"] = line
-
-                xs: list[float] = []
-                ys: list[float] = []
-                zs: list[float] = []
-                for edge_u, edge_v in edges:
-                    seg = vertices[[edge_u, edge_v]]
-                    xs.extend([float(seg[0, 0]), float(seg[1, 0]), float("nan")])
-                    ys.extend([float(seg[0, 1]), float(seg[1, 1]), float("nan")])
-                    zs.extend([float(seg[0, 2]), float(seg[1, 2]), float("nan")])
-
-                traces.append(
-                    go.Scatter3d(
-                        x=xs,
-                        y=ys,
-                        z=zs,
-                        mode="lines",
-                        showlegend=showlegend,
-                        **edge_line_kwargs,
-                    )
-                )
-        except Exception as e:
-            warnings.warn(f"Error while computing 3D mesh for polyhedron {self}: {e}")
-
-        return traces
+        return plot_polyhedron(self, plot_mode="3d_cells", showlegend=showlegend, bound=bound, filled=filled, **kwargs)
 
     def plot_2d_complex(
         self,
@@ -1378,103 +1061,16 @@ class Polyhedron:
         halfspace_shade: bool = True,
         **kwargs: Any,
     ) -> list[go.Scatter]:
-        """Plot the polyhedron in 2D using plotly.
-
-        Args:
-            fill: Fill mode passed to go.Scatter. Defaults to "toself".
-            showlegend: Whether to show in legend. Defaults to False.
-            bound: Radius of the bounding hypercube for vertex computation.
-                Defaults to config.DEFAULT_PLOT_BOUND.
-            plot_halfspaces: If True, add one Scatter trace per halfspace (inequality)
-                as line or shaded region. Defaults to False.
-            halfspace_shade: When plot_halfspaces is True, shade the feasible side
-                of each halfspace. Defaults to True.
-            **kwargs: Additional arguments passed to go.Scatter (polyhedron outline).
-
-        Returns:
-            list: A list of plotly Scatter traces: [outline_trace] when
-                plot_halfspaces is False, or [outline_trace, *halfspace_traces] when
-                True. If the main outline fails (e.g. vertex computation or
-                ConvexHull raises), returns [] when plot_halfspaces is False, or
-                only the halfspace traces when plot_halfspaces is True.
-
-        Raises:
-            ValueError: If the polyhedron is not 2D.
-        """
-        if self.W.shape[0] != 2:
-            raise ValueError("Polyhedron must be 2D to plot")
-        traces: list[go.Scatter] = []
-        try:
-            geom = self._get_bounded_plot_geometry(bound)
-            if geom is not None:
-                kind, verts = geom
-                if kind == "polygon":
-                    x = verts[:, 0].tolist() + [verts[0, 0]]
-                    y = verts[:, 1].tolist() + [verts[0, 1]]
-                    traces.append(go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs))
-                elif kind == "segment":
-                    x = verts[:, 0].tolist()
-                    y = verts[:, 1].tolist()
-                    traces.append(
-                        go.Scatter(
-                            x=x,
-                            y=y,
-                            mode="lines",
-                            fill=None,
-                            showlegend=showlegend,
-                            **kwargs,
-                        )
-                    )
-                elif kind == "point":
-                    x = verts[:, 0].tolist()
-                    y = verts[:, 1].tolist()
-                    traces.append(
-                        go.Scatter(
-                            x=x,
-                            y=y,
-                            mode="markers",
-                            fill=None,
-                            showlegend=showlegend,
-                            **kwargs,
-                        )
-                    )
-        except Exception as e:
-            raise e
-
-        if plot_halfspaces:
-            W = self.halfspaces_np[:, :-1]
-            b = self.halfspaces_np[:, -1]
-            bounds = (-bound, bound)
-            for i in range(W.shape[0]):
-                w = W[i]
-                if np.abs(w[1]) < TOL_NEARLY_VERTICAL:
-                    # Nearly vertical line: x = -b / w[0]
-                    x_line = -b[i] / w[0] if np.abs(w[0]) >= TOL_NEARLY_VERTICAL else 0.0
-                    xs = [x_line, x_line]
-                    ys = [bounds[0], bounds[1]]
-                    halfspace_shade_this = False
-                else:
-                    halfspace_shade_this = halfspace_shade
-                    y0 = (-b[i] - w[0] * bounds[0]) / w[1]
-                    y1 = (-b[i] - w[0] * bounds[1]) / w[1]
-                    if halfspace_shade_this:
-                        outer = max(bounds[1], y0, y1) if w[1] < 0 else min(bounds[0], y0, y1)
-                        xs = [bounds[0], bounds[0], bounds[1], bounds[1], bounds[0]]
-                        ys = [outer, y0, y1, outer, outer]
-                    else:
-                        xs = [bounds[0], bounds[1]]
-                        ys = [y0, y1]
-                traces.append(
-                    go.Scatter(
-                        x=xs,
-                        y=ys,
-                        name=f"Halfspace {i}",
-                        fill="toself" if halfspace_shade_this else None,
-                        visible="legendonly",
-                        showlegend=True,
-                    )
-                )
-        return traces
+        return plot_polyhedron(
+            self,
+            plot_mode="2d_cells",
+            fill=fill,
+            showlegend=showlegend,
+            bound=bound,
+            plot_halfspaces=plot_halfspaces,
+            halfspace_shade=halfspace_shade,
+            **kwargs,
+        )
 
     def plot_2d_graph(
         self,
@@ -1484,95 +1080,15 @@ class Polyhedron:
         project: float | None = None,
         **kwargs: Any,
     ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
-        """Plot the polyhedron in 3D using plotly.
-
-        Creates a 3D mesh plot of the polyhedron. The z-coordinates are computed
-        by passing the 2D vertices through the network.
-
-        Args:
-            fill: Fill mode (not used for 3D plots). Defaults to "toself".
-            showlegend: Whether to show in legend. Defaults to False.
-            bound: Radius of the bounding hypercube for vertex computation.
-                Defaults to config.DEFAULT_PLOT_BOUND.
-            project: If a number, projects the polyhedron onto this z-value
-                instead of computing it from the network. Defaults to None.
-            **kwargs: Additional arguments passed to go.Mesh3d.
-
-        Returns:
-            dict or None: Dictionary with 'mesh' and 'outline' keys containing
-                plotly traces, or None if plotting fails.
-
-        Raises:
-            ValueError: If the polyhedron is not 2D.
-        """
-        if self.W.shape[0] != 2:
-            raise ValueError("Polyhedron must be 2D to plot")
-        geom = self._get_bounded_plot_geometry(bound)
-        if geom is None:
-            return None
-
-        kind, verts = geom
-        try:
-            # Prepare x, y for all geometry types.
-            x = verts[:, 0].tolist()
-            y = verts[:, 1].tolist()
-            z = (
-                (
-                    self.net(torch.tensor([x, y], device=self.net.device, dtype=self.net.dtype).T)
-                    .detach()
-                    .cpu()
-                    .numpy()
-                    .squeeze()[:, 1]
-                )
-                if project is None
-                else [project] * len(x)
-            )
-
-            if kind == "polygon":
-                # Close the loop for polygonal surfaces.
-                x_closed = x + [x[0]]
-                y_closed = y + [y[0]]
-                z_closed = z + [z[0]]
-                mesh = go.Mesh3d(x=x_closed, y=y_closed, z=z_closed, alphahull=-1, lighting=dict(ambient=1), **kwargs)
-                scatter = go.Scatter3d(
-                    x=x_closed,
-                    y=y_closed,
-                    z=z_closed,
-                    mode="lines",
-                    showlegend=False,
-                    line=dict(width=5, color="black"),
-                    visible=False,
-                )
-                return {"mesh": mesh, "outline": scatter}
-
-            if kind == "segment":
-                # Only an outline line in 3D.
-                scatter = go.Scatter3d(
-                    x=x,
-                    y=y,
-                    z=z,
-                    mode="lines",
-                    showlegend=False,
-                    line=dict(width=5, color="black"),
-                    **kwargs,
-                )
-                return {"outline": scatter}
-
-            if kind == "point":
-                # Single point plot.
-                scatter = go.Scatter3d(
-                    x=x,
-                    y=y,
-                    z=z,
-                    mode="markers",
-                    showlegend=False,
-                    marker=dict(size=4, color="black"),
-                    **kwargs,
-                )
-                return {"outline": scatter}
-        except Exception as e:
-            warnings.warn(f"Error while plotting polyhedron: {e}")
-            return None
+        return plot_polyhedron(
+            self,
+            plot_mode="graph",
+            fill=fill,
+            showlegend=showlegend,
+            bound=bound,
+            project=project,
+            **kwargs,
+        )
 
     def clean_data(self) -> None:
         """Clear cached data to reduce memory usage.
