@@ -4,6 +4,14 @@ relucent package
 Submodules
 ----------
 
+relucent.calculations module
+----------------------------
+
+.. automodule:: relucent.calculations
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 relucent.complex module
 -----------------------
 
