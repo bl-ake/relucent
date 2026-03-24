@@ -1,11 +1,7 @@
-import multiprocessing as mp
 import os
 import pickle
 import random
-import warnings
-from collections import defaultdict
-from functools import partial
-from typing import Any, Generator, Iterable, Iterator, cast
+from typing import Any, Generator, Iterable, Iterator
 
 import networkx as nx
 import numpy as np
@@ -16,21 +12,28 @@ from gurobipy import Env
 from tqdm.auto import tqdm
 
 from relucent.config import (
-    ASTAR_BIAS_WEIGHT,
     DEFAULT_COMPLEX_PLOT_BOUND,
     DEFAULT_PARALLEL_ADD_BOUND,
     DEFAULT_SEARCH_BOUND,
-    INTERIOR_POINT_RADIUS_SEQUENCE,
 )
 from relucent.model import NN
 from relucent.poly import Polyhedron
+from relucent.search import (
+    greedy_path as _greedy_path_fn,
+)
+from relucent.search import (
+    hamming_astar as _hamming_astar_fn,
+)
+from relucent.search import (
+    parallel_add as _parallel_add_fn,
+)
+from relucent.search import (
+    searcher as _searcher_fn,
+)
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
-    NonBlockingQueue,
-    UpdatablePriorityQueue,
     get_env,
-    process_aware_cpu_count,
 )
 from relucent.vis import get_colors, plot_complex
 
@@ -54,6 +57,7 @@ def set_globals(get_net: NN, get_volumes: bool = True, num_threads: int | None =
             Defaults to True.
 
     Example:
+        >>> import multiprocessing as mp
         >>> with mp.Pool(nworkers, initializer=set_globals, initargs=(net,)) as pool:
         ...     # Use pool for parallel processing
         ...     pass
@@ -67,162 +71,6 @@ def set_globals(get_net: NN, get_volumes: bool = True, num_threads: int | None =
     dim = int(np.prod(net.input_shape))
     global get_vol_calc
     get_vol_calc = get_volumes
-
-
-def poly_calculations(
-    task: np.ndarray | torch.Tensor | tuple[Any, ...],
-    **kwargs: Any,
-) -> tuple[Any, ...]:
-    """Worker function for computing polyhedron properties in parallel.
-
-    This function is used by parallel_add() and all search methods to compute
-    halfspaces, center, inradius, interior point, and supporting hyperplane
-    indices (SHIs) for a given sign sequence.
-
-    Args:
-        task: Either a sign sequence or a tuple containing (sign sequence, ...) with
-            additional data to be passed through.
-        **kwargs: Additional arguments passed to get_shis() method, such as
-            'collect_info' or 'bound'.
-
-    Returns:
-        tuple: If successful, returns (Polyhedron, *rest) where rest contains
-            any additional data from the input task. If a ValueError occurs
-            during computation, returns (error, *rest).
-    """
-    assert net is not None, "set_globals must be used as pool initializer"
-    ss = task[0] if isinstance(task, tuple) else task
-    rest = task[1:] if isinstance(task, tuple) else ()
-    p = Polyhedron(net, ss)
-
-    try:
-        halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], p.get_hs(get_all_Ab=False))
-        assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-        assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-        assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
-        p._halfspaces = halfspaces
-        p._W = W
-        p._b = b
-        p._num_dead_relus = cast(int, num_dead_relus)
-
-        center, inradius = p.get_center_inradius(env=env)
-        p._center = center
-        p._inradius = inradius
-        p._finite = center is not None
-
-        p._interior_point = p.get_interior_point(env=env)
-        if p.interior_point is not None:
-            p._interior_point_norm = np.linalg.norm(p.interior_point).item()
-        else:
-            p._interior_point_norm = float("inf")
-        if isinstance(p.W, torch.Tensor):
-            p._Wl2 = torch.linalg.norm(p.W).item()
-        else:
-            p._Wl2 = np.linalg.norm(p.W).item()
-
-        if dim <= 6 and get_vol_calc:
-            p.volume
-        if p._shis is None:
-            if "collect_info" in kwargs:
-                shis, shi_info = p.get_shis(env=env, **kwargs)
-                assert isinstance(shis, list)
-                p._shis = shis
-            else:
-                result = p.get_shis(env=env, **kwargs)
-                p._shis = result[0] if isinstance(result, tuple) else result
-    except ValueError as error:
-        return error, *rest
-    p.clean_data()
-
-    if isinstance(p._shis, list):
-        random.shuffle(p._shis)
-    return (p, *rest)
-
-
-def get_ip(
-    p: Polyhedron,
-    shi: int,
-) -> tuple[Polyhedron, int] | tuple[ValueError, int]:
-    """Get an interior point for a neighbor polyhedron across a supporting hyperplane.
-
-    This function is used by the A* search algorithm to find interior points for
-    neighboring polyhedra. It flips the element of the sign sequence at the specified
-    supporting hyperplane index (SHI) and attempts to find an interior point,
-    increasing the search radius if necessary.
-
-    Args:
-        p: The source Polyhedron object.
-        shi: The index of the supporting hyperplane to cross.
-
-    Returns:
-        tuple: If successful, returns (neighbor_polyhedron, shi). If a ValueError
-            occurs, returns (error, None).
-    """
-    try:
-        ss = p.ss_np.copy()
-        ss[0, shi] = -ss[0, shi]
-        assert net is not None, "set_globals must be used as pool initializer"
-        n = Polyhedron(net, ss)
-        for max_radius in INTERIOR_POINT_RADIUS_SEQUENCE:
-            try:
-                n._interior_point = n.get_interior_point(env=env, max_radius=max_radius)
-            except ValueError:
-                print("Increasing max radius to find interior point")
-        return n, shi
-    except ValueError as e:
-        return e, shi
-
-
-def astar_calculations(
-    task: Polyhedron | tuple[Any, ...],
-    **kwargs: Any,
-) -> tuple[Any, ...]:
-    """Worker function for computing polyhedron properties in A* search.
-
-    Similar to poly_calculations, but specifically designed for A* search algorithm.
-    Computes center, inradius, interior point, and supporting hyperplane indices
-    for polyhedra during pathfinding.
-
-    Args:
-        task: Either a Polyhedron object or a tuple containing (Polyhedron, ...)
-            with additional data to be passed through.
-        **kwargs: Additional arguments passed to get_shis() method, such as
-            'collect_info' or 'bound'.
-
-    Returns:
-        tuple: If successful, returns (Polyhedron, *rest). If an exception occurs
-            during SHI computation, returns (Polyhedron, error, *rest).
-    """
-    p = task[0] if isinstance(task, tuple) else task
-    rest = task[1:] if isinstance(task, tuple) else ()
-    if p.net is None:
-        assert net is not None, "set_globals must be used as pool initializer"
-        p.net = net
-
-    if p._inradius is None:
-        center, inradius = p.get_center_inradius(env=env)
-        p._center = center
-        p._inradius = inradius
-        p._finite = center is not None
-    if p._interior_point is None:
-        p._interior_point = p.get_interior_point(env=env)
-
-    try:
-        if p._shis is None:
-            if "collect_info" in kwargs:
-                shis, shi_info = p.get_shis(env=env, **kwargs)
-                assert isinstance(shis, list)
-                p._shis = shis
-            else:
-                result = p.get_shis(env=env, **kwargs)
-                p._shis = result[0] if isinstance(result, tuple) else result
-    except Exception as error:
-        return p, error, *rest
-    p.clean_data()
-    assert isinstance(p._shis, list), "get_shis returns a list"
-    random.shuffle(p._shis)
-    # p, neighbors = get_neighbors(p, (shi for shi in p._shis if shi != task[1]))
-    return p, *rest
 
 
 class Complex:
@@ -582,22 +430,13 @@ class Complex:
             list: A list of Polyhedron objects (or None for failed computations)
                 corresponding to the input points.
         """
-        nworkers = nworkers or process_aware_cpu_count()
-        print(f"Running on {nworkers} workers")
-        sss = []
-        for p in tqdm(points, desc="Getting SSs", mininterval=5):
-            s = self.point2ss(p)
-            sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
-
-        with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
-            ps = pool.map(
-                partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5)
-            )
-            ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
-            for p in ps:
-                if p is not None:
-                    self.add_polyhedron(p)
-            return ps
+        return _parallel_add_fn(
+            self,
+            points,
+            nworkers=nworkers,
+            bound=bound,
+            **kwargs,
+        )
 
     def searcher(
         self,
@@ -652,185 +491,20 @@ class Complex:
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
         """
-
-        if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
-            raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
-        elif cube_mode != "unrestricted":
-            assert cube_radius is not None, "cube_radius must be provided when cube_mode is not 'unrestricted'"
-            if verbose:
-                print(f"Applying cube filter with mode '{cube_mode}' and radius {cube_radius}")
-        elif cube_radius is not None:
-            warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.")
-            cube_radius = None
-
-        ## TODO: Move intersection computations to the workers
-        def _poly_intersects_cube(p: Polyhedron) -> bool:
-            try:
-                # get_bounded_halfspaces raises ValueError when the intersection is empty
-                p.get_bounded_halfspaces(cast(float, cube_radius))
-                return True
-            except ValueError:
-                return False
-
-        def _apply_cube_filter(p: Polyhedron) -> bool:
-            """Apply the cube filter to a polyhedron.
-
-            Returns True if the polyhedron should be kept (and possibly clipped),
-            or False if it should be discarded from the search.
-            """
-            intersects = _poly_intersects_cube(p)
-
-            if cube_mode == "intersect":
-                # Keep only polyhedra that intersect the cube, but leave them unchanged.
-                return intersects
-            if cube_mode == "exclude":
-                # Exclude polyhedra that intersect the cube; keep only those completely outside.
-                return not intersects
-
-            # cube_mode == "clipped": intersect the polyhedron with the cube and
-            # replace its halfspaces with the bounded version.
-            if not intersects:
-                return False
-            bounded_halfspaces = p.get_bounded_halfspaces(cast(float, cube_radius))
-            p._halfspaces = bounded_halfspaces  # type: ignore[assignment]
-            p._halfspaces_np = bounded_halfspaces
-            p._center = None
-            p._inradius = None
-            p._finite = True
-            p._vertices = None
-            p._volume = None
-            p._hs = None
-            return True
-
-        found_sss = SSManager()
-        nworkers = nworkers or process_aware_cpu_count()
-        ## NOTE: If nworkers>1, the traversal order may not be correct
-        if verbose:
-            print(f"Running on {nworkers} workers")
-        if queue is None:
-            queue = BlockingQueue()
-        if start is None:
-            start = self.add_point(torch.zeros(self.net.input_shape, device=self.net.device, dtype=self.net.dtype))
-        elif isinstance(start, Polyhedron):
-            start = self.add_polyhedron(start)
-        else:
-            # Treat as a point.
-            start = self.add_point(start)
-        if cube_mode != "unrestricted" and not _apply_cube_filter(start):
-            queue.close()
-            return {
-                "Search Depth": 0,
-                "Avg # Facets Uncorrected": 0.0,
-                "Search Time": 0.0,
-                "Bad SHI Computations": [],
-                "Complete": True,
-            }
-        found_sss.add(start.ss_np)
-        if (start.ss_np == 0).any():
-            raise ValueError("Start point must not be on a hyperplane")
-        result = start.get_shis(bound=bound, **kwargs)
-        assert isinstance(result, list)
-        start._shis = result
-        ##TODO: replace with something like queue.push((start.ss_np, None, 0, self.ssm[start.ss_np]))
-        for shi in start.shis:
-            new_ss = start.ss_np.copy()
-            new_ss[0, shi] *= -1
-            found_sss.add(new_ss)
-            queue.push((new_ss, shi, 1, self.ssm[start.ss_np]))
-            assert new_ss in found_sss
-
-        rolling_average = len(start.shis)
-        bad_shi_computations = []
-        pbar = tqdm(
-            desc="Search Progress",
-            mininterval=5,
-            total=max_polys if max_polys != float("inf") else None,
-            disable=not verbose,
+        return _searcher_fn(
+            self,
+            start=start,
+            max_depth=max_depth,
+            max_polys=max_polys,
+            queue=queue,
+            bound=bound,
+            nworkers=nworkers,
+            get_volumes=get_volumes,
+            verbose=verbose,
+            cube_radius=cube_radius,
+            cube_mode=cube_mode,
+            **kwargs,
         )
-        pbar.update(n=1)
-        pbar.get_lock().locks = []
-
-        unprocessed = len(queue)
-        depth = 0
-
-        with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net, get_volumes)) as pool:
-            try:
-                for p, shi, depth, node_index in pool.imap_unordered(
-                    partial(poly_calculations, bound=bound, **kwargs), queue
-                ):
-                    unprocessed -= 1
-                    node = self.index2poly[node_index]
-                    if not isinstance(p, Polyhedron):
-                        bad_shi_computations.append((node, shi, depth, str(p)))
-                        ## TODO: Should this be double checked?
-                        node._shis.remove(shi)
-                        if len(node._shis) < min(self.dim, self.n):
-                            # raise ValueError(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
-                            warnings.warn(
-                                RuntimeWarning(f"Polyhedron {node} has less than {min(self.dim, self.n)} SHIs")
-                            )
-                        if unprocessed == 0 or len(self) >= max_polys:
-                            break
-                        continue
-
-                    if p.net is None:
-                        p.net = self.net
-
-                    if cube_mode != "unrestricted" and not _apply_cube_filter(p):
-                        if unprocessed == 0 or len(self) >= max_polys:
-                            break
-                        continue
-
-                    p = self.add_polyhedron(p)
-
-                    if getattr(p, "warnings", None):
-                        for warning in p.warnings:
-                            try:
-                                warnings.warn(warning)
-                            except Exception as e:
-                                print(warning, type(warning), e, end="\n\n")
-
-                    if depth < max_depth:
-                        for new_shi in p.shis:
-                            if new_shi != shi and len(self) < max_polys:
-                                ss = p.ss_np.copy()
-                                ss[0, new_shi] *= -1
-                                if ss not in found_sss:
-                                    queue.push((ss, new_shi, depth + 1, self.ssm[p.ss_np]))
-                                    found_sss.add(ss)
-                                    unprocessed += 1
-
-                    pbar.update(n=len(self) - pbar.n)
-                    rolling_average = (rolling_average * (len(self) - 1) + len(p.shis)) / len(self)
-
-                    assert isinstance(p._shis, list)
-                    pbar.set_postfix_str(
-                        f"Depth: {depth}  Unprocessed: {unprocessed}  Faces: {len(p._shis)}  Avg: {rolling_average:.2f} IP Norm: {p._interior_point_norm or -1:.2f}  Finite: {p._finite} Mistakes: {len(bad_shi_computations)}",
-                        refresh=False,
-                    )
-
-                    if unprocessed == 0 or len(self) >= max_polys:
-                        break
-            except Exception:
-                raise
-            finally:
-                queue.close()
-                pbar.close()
-
-                pool.close()
-                pool.terminate()
-                pool.join()
-                pool.close()
-
-        search_info = {
-            "Search Depth": depth,
-            "Avg # Facets Uncorrected": rolling_average,
-            "Search Time": pbar.format_dict["elapsed"],
-            "Bad SHI Computations": bad_shi_computations,
-            "Complete": unprocessed == 0,
-        }
-
-        return search_info
 
     def bfs(self, **kwargs):
         """Perform breadth-first search of the complex.
@@ -881,43 +555,6 @@ class Complex:
             **kwargs,
         )
 
-    def _greedy_path_helper(
-        self, start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None
-    ) -> list[Polyhedron]:
-        if start == end:
-            # print("Start and end points are the same")
-            return [start]
-
-        if (start.ss_np == 0).any():
-            raise ValueError("Start point must not be on a hyperplane")
-
-        diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).ravel()).ravel().tolist())
-
-        print("Diffs:", diffs)
-
-        if not start._shis:
-            start.get_shis()
-        shis_set = set(start.shis)
-        groupa = shis_set & diffs
-        groupb = shis_set - diffs
-        for shi in list(groupa):
-            print("Crossing", shi)
-            new_ss = start.ss_np.copy()
-            new_ss[0, shi] *= -1
-            next_poly = self.ss2poly(new_ss)
-            rest = self._greedy_path_helper(next_poly, end, diffs - {shi})
-            if rest is not None:
-                return [start] + rest
-        for shi in list(groupb):
-            print("Crossing", shi)
-            new_ss = start.ss_np.copy()
-            new_ss[0, shi] *= -1
-            next_poly = self.ss2poly(new_ss)
-            rest = self._greedy_path_helper(next_poly, end, diffs | {shi})
-            if rest is not None:
-                return [start] + rest
-        return []
-
     def greedy_path(
         self,
         start: torch.Tensor | np.ndarray | Polyhedron,
@@ -937,9 +574,7 @@ class Complex:
             list or None: A list of Polyhedron objects representing the path
                 from start to end, or None if no path is found.
         """
-        start_poly = self.add_polyhedron(start) if isinstance(start, Polyhedron) else self.add_point(start)
-        end_poly = self.add_polyhedron(end) if isinstance(end, Polyhedron) else self.add_point(end)
-        return self._greedy_path_helper(start_poly, end_poly)
+        return _greedy_path_fn(self, start, end)
 
     def hamming_astar(
         self,
@@ -977,191 +612,17 @@ class Complex:
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
-        start_poly = self.add_polyhedron(start) if isinstance(start, Polyhedron) else self.add_point(start)
-        end_poly = self.add_polyhedron(end) if isinstance(end, Polyhedron) else self.add_point(end)
-        if start_poly == end_poly:
-            print("Start and end points are in the same region")
-            center, inradius = start_poly.get_center_inradius()
-            start_poly._center = center
-            start_poly._inradius = inradius
-            start_poly._finite = center is not None
-
-            start_poly._interior_point = start_poly.get_interior_point()
-            start_poly._shis = cast(list[int], start_poly.get_shis(bound=bound, collect_info=False))
-            return [start_poly]
-
-        if (start_poly.ss_np == 0).any():
-            raise ValueError("Start point must not be on a hyperplane")
-
-        nhs = len(start_poly.halfspaces)
-        nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (process_aware_cpu_count() or 1)), nhs)
-        print(f"Using {nworkers} workers")
-
-        cameFrom: dict[Polyhedron, Polyhedron] = {}
-        gScore = defaultdict(lambda: float("inf"))
-        fScore = defaultdict(lambda: float("inf"))
-
-        openSet = NonBlockingQueue(
-            queue_class=UpdatablePriorityQueue,
-            push=lambda pq, task, priority: pq.push(task, priority=priority),
-            pop=lambda pq: pq.pop(),
+        return _hamming_astar_fn(
+            self,
+            start=start,
+            end=end,
+            nworkers=nworkers,
+            bound=bound,
+            max_polys=max_polys,
+            show_pbar=show_pbar,
+            num_threads=num_threads,
+            **kwargs,
         )
-        # found_sss = SSManager()
-        # nworkers = nworkers or process_aware_cpu_count()
-
-        gScore[start_poly] = 0
-        fScore[start_poly] = (start_poly.ss_np != end_poly.ss_np).sum()
-        # found_sss.add(start_poly.ss)
-        # found = set(start_poly)
-
-        result = start_poly.get_shis(bound=bound, **kwargs)
-        assert isinstance(result, list)
-        start_poly._shis = result
-
-        openSet.push((start_poly, None, 0), 0)
-
-        bad_shi_computations = []
-        pbar = tqdm(
-            desc="Search Progress" + (str(show_pbar) if show_pbar is not True else ""),
-            mininterval=1,
-            leave=True,
-            total=max_polys if max_polys != float("inf") else None,
-            disable=not show_pbar,
-        )
-        pbar.update(n=1)
-
-        unprocessed = len(openSet)
-        depth = 0
-        neighbor: Polyhedron | ValueError | None = None
-        min_dist = float("inf")
-        min_p = start_poly
-
-        def heuristic(p: Polyhedron, depth: int, shi: int) -> float:
-            hamming = (p.ss_np != end_poly.ss_np).sum()
-            if p.interior_point is None or end_poly.interior_point is None:
-                raise ValueError("Interior point not found")
-            dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
-            # bias = -1 / ((1 + dist) ** 0.1)  ## TODO: Test if this is faster
-            # bias = -1 / (1 + np.log(dist + 10))
-            bias = -1 / (1 + dist)
-            # bias = 0
-            # bias = 1 / (1 + depth) - 1
-            return hamming + ASTAR_BIAS_WEIGHT * bias
-
-        def d(p1: Polyhedron, p2: Polyhedron) -> int:
-            return 1
-
-        # with mp.Pool(nworkers, initializer=set_globals, initargs=(self.net,)) as pool:
-        pool = (
-            mp.Pool(nworkers, initializer=set_globals, initargs=(self.net, False, num_threads))
-            if nworkers > 1
-            else None
-        )
-        try:
-            # for p, neighbors, shi, depth, node_index in pool.imap(
-            #     partial(astar_calculations, bound=bound, **kwargs), openSet
-            # ):
-            set_globals(self.net)
-            for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
-                # found.remove(item[0])
-                if isinstance(item[1], Exception):
-                    bad_shi_computations.append(item)
-                    continue
-                unprocessed -= 1
-
-                p, shi, depth = item
-
-                if nworkers == 1:
-                    neighbor_iter = map(partial(get_ip, p), (i for i in p.shis if i != shi))
-                elif pool is not None:
-                    neighbor_iter = pool.imap_unordered(
-                        partial(get_ip, p),
-                        (i for i in p.shis if i != shi),
-                        chunksize=max(nhs // nworkers, 1),
-                    )
-
-                for neighbor, neighbor_shi in neighbor_iter:
-                    if not isinstance(neighbor, Polyhedron):
-                        ## TODO: Should this be double checked?
-                        p._shis.remove(neighbor_shi)
-                    else:
-                        tentative_gScore = gScore[p] + d(p, neighbor)
-                        if neighbor.net is None:
-                            neighbor.net = self.net
-                        if tentative_gScore < gScore[neighbor]:  ## Only needed with an inconsistent heuristic
-                            cameFrom[neighbor] = p
-                            gScore[neighbor] = tentative_gScore
-                            dist = heuristic(neighbor, depth, shi)
-                            fScore[neighbor] = tentative_gScore + dist
-                            # options.append(
-                            #     {
-                            #         "neighbor": neighbor,
-                            #         "neighbor_shi": neighbor_shi,
-                            #         "fScore": fScore[neighbor],
-                            #         "improvement": neighbor.ss[0, neighbor_shi] == end.ss[0, neighbor_shi],
-                            #     }
-                            # )
-                            if dist < min_dist:
-                                min_dist = dist
-                                min_p = neighbor
-                            openSet.push((neighbor, neighbor_shi, depth + 1), fScore[neighbor])
-                            unprocessed += 1
-                            if neighbor == end_poly:
-                                break
-                    if neighbor == end_poly:
-                        break
-
-                pbar.update(n=len(cameFrom) - pbar.n)
-                pbar.set_postfix_str(
-                    f"Min Distance: {min_dist:.3f} Depth: {depth} Open Set: {unprocessed} Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
-                    refresh=False,
-                )
-
-                if min_dist < 1:
-                    if 0 < min_dist:
-                        ## TODO: What if there are no/multiple differences?
-                        last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).ravel()).item()
-                        if last_shi in min_p.shis:
-                            cameFrom[end_poly] = min_p
-                            neighbor = end_poly
-                            break
-                    else:
-                        # raise ValueError("what in tarnation???")
-                        neighbor = end_poly
-                        break
-
-                if unprocessed == 0 or len(cameFrom) >= max_polys:
-                    break
-        except Exception:
-            raise
-        finally:
-            # print(f"Closing out after {pbar.n} iterations")
-
-            if pool is not None:
-                pool.terminate()
-                pool.join()
-                pool.close()
-
-            openSet.close()
-            tqdm.get_lock().locks = []
-            pbar.close()
-        #     print("Closed out")
-        # print("Finished A* Search")
-        if neighbor == end_poly:
-            path = [end_poly]
-            while path[-1] != start_poly:
-                assert cameFrom[path[-1]] not in path, path
-                path.append(cameFrom[path[-1]])
-            path.reverse()
-            [(p.Wl2, p.inradius) for p in path]
-            # print(f"Path found with length {len(path) - 1}:")
-            # if len(path) < 100:
-            #     for p1, p2 in zip(path[:-1], path[1:]):
-            #         print(f"    {p1} - {np.argwhere((p1.ss != p2.ss).ravel()).item()} -> {p2}")
-            return path
-        else:
-            # print(f"No Path Found - Final Distance: {min_dist - 1}")
-            return None
 
     def get_poly_attrs(self, attrs: Iterable[str]) -> dict[str, list[Any]]:
         """Extract specified attributes from all polyhedra in the complex.
