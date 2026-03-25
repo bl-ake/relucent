@@ -630,14 +630,19 @@ def _complex_figure_2d_cells(
     for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
         c = _highlight(c, poly, highlight_regions)
         name = f"{poly.ss_np.ravel().astype(int).tolist()}" if ss_name else f"{poly}"
-        for trace in poly.plot_cells(
-            name=name,
-            fillcolor=c,
-            line_color="black",
-            mode="lines",
-            bound=bound,
-            **kwargs,
-        ):
+        try:
+            traces = poly.plot_cells(
+                name=name,
+                fillcolor=c,
+                line_color="black",
+                mode="lines",
+                bound=bound,
+                **kwargs,
+            )
+        except Exception as e:
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            continue
+        for trace in traces:
             fig.add_trace(trace)
         if label_regions and poly.center is not None:
             fig.add_trace(
@@ -678,7 +683,12 @@ def _complex_figure_3d_cells(
         is_highlighted = highlight_regions is not None and (poly in highlight_regions or str(poly) in highlight_regions)
         c = "red" if is_highlighted else c
         filled = is_highlighted or fill_mode == "filled"
-        for trace in poly.plot_cells(showlegend=False, color=c, filled=filled, **kwargs):
+        try:
+            traces = poly.plot_cells(showlegend=False, color=c, filled=filled, **kwargs)
+        except Exception as e:
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            continue
+        for trace in traces:
             fig.add_trace(trace)
         if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
             fig.add_trace(
