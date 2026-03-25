@@ -26,7 +26,7 @@ from relucent.config import (
     VERTEX_TRUST_THRESHOLD,
 )
 from relucent.utils import get_env
-
+from relucent.poly import Polyhedron
 
 def solve_radius(
     env: Any,
