@@ -1,7 +1,14 @@
 ## Source Code Structure
-* [model.py](src/relucent/model.py): PyTorch Module that acts as an interface between the model and the rest of the code
-* [poly.py](src/relucent/poly.py): Class for calculations involving individual polyhedrons (e.g. computing boundaries, neighbors, volume)
-* [complex.py](src/relucent/complex.py): Class for calculations involving the polyhedral cplx (e.g. polyhedron search, connectivity graph calculation)
-* [convert_model.py](src/relucent/convert_model.py): Utilities for converting various PyTorch.nn layers to Linear layers
-* [ss.py](src/relucent/ss.py): Data structures for storing large numbers of sign sequence vectors
-* [config.py](src/relucent/config.py): Global variables controlling numerics and default values
+This folder contains the implementation of the `relucent` Python package.
+
+- **`__init__.py`**: Public API exports (what you can `from relucent import ...`)
+- **`config.py`**: Global configuration and numeric defaults
+- **`model.py`**: `torch.nn.Module` wrappers/utilities (e.g. `NN`, `get_mlp_model`)
+- **`convert_model.py`**: Utilities to convert supported `torch.nn` layers to linear layers
+- **`ss.py`**: Data structures for storing large numbers of sign-sequence vectors
+- **`poly.py`**: Polyhedron-level computations (e.g. boundaries, neighbors, volume)
+- **`complex.py`**: Polyhedral complex computations (e.g. search, connectivity/dual graph)
+- **`search.py`**: Search algorithms/utilities used for exploring the complex
+- **`calculations.py`**: Lower-level numeric/geometry routines used across the codebase
+- **`utils.py`**: Misc helpers (env, reproducibility utilities, sequential splitting, etc.)
+- **`vis.py`**: Visualization utilities (Plotly/matplotlib helpers, colors, plotting)
