@@ -613,6 +613,38 @@ def _highlight(c: str, poly: Any, highlight_regions: Iterable[Any] | None) -> st
     return c
 
 
+def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) -> None:
+    if total == 0:
+        return
+    minimum_required = (total + 1) // 2
+    if plotted < minimum_required:
+        raise RuntimeError(
+            f"Unable to plot at least half of polyhedra for {context}: "
+            f"plotted {plotted} of {total} intersecting the plot bounds (minimum required {minimum_required})."
+        )
+
+
+def _poly_intersects_plot_bound(poly: Any, bound: float) -> bool:
+    """True if ``poly`` intersects the axis-aligned bounding hypercube of half-width ``bound``.
+
+    Matches the feasibility check used before ``get_bounded_vertices`` / cell plotting: polyhedra
+    that miss the box entirely are excluded from the success threshold denominator.
+
+    Uses :meth:`~relucent.poly.Polyhedron.get_bounded_halfspaces` when available (cheap feasibility
+    only). Otherwise falls back to :meth:`~relucent.poly.Polyhedron.get_bounded_vertices` so test
+    doubles and stubs without halfspace helpers still work.
+    """
+    get_hs = getattr(poly, "get_bounded_halfspaces", None)
+    if callable(get_hs):
+        try:
+            get_hs(bound)
+            return True
+        except ValueError:
+            return False
+    verts = poly.get_bounded_vertices(bound)
+    return verts is not None and getattr(verts, "size", 0) > 0
+
+
 def _complex_figure_2d_cells(
     cpx: Complex,
     *,
@@ -628,7 +660,12 @@ def _complex_figure_2d_cells(
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
+    eligible_polys = 0
+    plotted_polys = 0
     for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
+        if not _poly_intersects_plot_bound(poly, bound):
+            continue
+        eligible_polys += 1
         c = _highlight(c, poly, highlight_regions)
         name = f"{poly.ss_np.ravel().astype(int).tolist()}" if ss_name else f"{poly}"
         try:
@@ -643,12 +680,17 @@ def _complex_figure_2d_cells(
         except Exception as e:
             warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
             continue
+        if len(traces) == 0:
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
+            continue
+        plotted_polys += 1
         for trace in traces:
             fig.add_trace(trace)
         if label_regions and poly.center is not None:
             fig.add_trace(
                 go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
             )
+    _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
     interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
     maxcoord = (
         (np.mean(interior_points) * PLOT_MARGIN_FACTOR)
@@ -677,10 +719,16 @@ def _complex_figure_3d_cells(
 ) -> go.Figure:
     if cpx.dim != 3:
         raise ValueError("Complex must have 3D input to plot 3D complex")
+    bound_effective = kwargs.get("bound", DEFAULT_PLOT_BOUND)
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
+    eligible_polys = 0
+    plotted_polys = 0
     for c, poly in tqdm(zip(colors, polys), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
+        if not _poly_intersects_plot_bound(poly, bound_effective):
+            continue
+        eligible_polys += 1
         is_highlighted = highlight_regions is not None and (poly in highlight_regions or str(poly) in highlight_regions)
         c = "red" if is_highlighted else c
         filled = is_highlighted or fill_mode == "filled"
@@ -689,6 +737,10 @@ def _complex_figure_3d_cells(
         except Exception as e:
             warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
             continue
+        if len(traces) == 0:
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
+            continue
+        plotted_polys += 1
         for trace in traces:
             fig.add_trace(trace)
         if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
@@ -702,6 +754,7 @@ def _complex_figure_3d_cells(
                     showlegend=False,
                 )
             )
+    _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "3D complex cell plot")
     fig.update_layout(
         scene=dict(
             xaxis=dict(visible=show_axes),
@@ -722,32 +775,53 @@ def _complex_figure_graph(
     project: Any = True,
     **kwargs: Any,
 ) -> go.Figure:
+    bound_effective = kwargs.get("bound", DEFAULT_PLOT_BOUND)
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=False)
     outlines: list[go.Mesh3d | go.Scatter3d] = []
     meshes: list[go.Mesh3d | go.Scatter3d] = []
+    eligible_polys = 0
+    plotted_polys = 0
     for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
+        if not _poly_intersects_plot_bound(poly, bound_effective):
+            continue
+        eligible_polys += 1
         c = _highlight(c, poly, highlight_regions)
-        p_plot = poly.plot_graph(name=f"{poly}", color=c, **kwargs)
-        if p_plot is not None:
-            if isinstance(p_plot, dict):
-                if "mesh" in p_plot:
-                    meshes.append(p_plot["mesh"])
-                if "outline" in p_plot:
-                    outlines.append(p_plot["outline"])
-            else:
-                fig.add_trace(p_plot)
-        if project is not None:
-            p_plot = poly.plot_graph(name=f"{poly}", color=c, project=project, **kwargs)
+        poly_plotted = False
+        try:
+            p_plot = poly.plot_graph(name=f"{poly}", color=c, **kwargs)
             if p_plot is not None:
                 if isinstance(p_plot, dict):
                     if "mesh" in p_plot:
                         meshes.append(p_plot["mesh"])
+                        poly_plotted = True
                     if "outline" in p_plot:
                         outlines.append(p_plot["outline"])
+                        poly_plotted = True
                 else:
                     fig.add_trace(p_plot)
+                    poly_plotted = True
+            if project is not None:
+                p_plot = poly.plot_graph(name=f"{poly}", color=c, project=project, **kwargs)
+                if p_plot is not None:
+                    if isinstance(p_plot, dict):
+                        if "mesh" in p_plot:
+                            meshes.append(p_plot["mesh"])
+                            poly_plotted = True
+                        if "outline" in p_plot:
+                            outlines.append(p_plot["outline"])
+                            poly_plotted = True
+                    else:
+                        fig.add_trace(p_plot)
+                        poly_plotted = True
+        except Exception as e:
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            continue
+        if poly_plotted:
+            plotted_polys += 1
+        else:
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
         if label_regions and poly.center is not None:
             fig.add_trace(
                 go.Scatter3d(
@@ -766,6 +840,7 @@ def _complex_figure_graph(
                     showlegend=False,
                 )
             )
+    _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "complex graph plot")
     for outline in outlines:
         fig.add_trace(outline)
     for mesh in meshes:
