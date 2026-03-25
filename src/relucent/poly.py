@@ -381,16 +381,14 @@ class Polyhedron:
             return None
 
         # Recompute interior point
-        int_point, _ = solve_radius(
+        int_point, radius = solve_radius(
             get_env(),
             bounded_halfspaces,
             max_radius=1000,
             zero_indices=self.zero_indices,
         )
-        if int_point is None or int_point not in self:
-            w = RuntimeWarning(f"Interior point invalid - {int_point} not in {self}")
-            self.warnings.append(w)
-            return None
+        if int_point is None:
+            raise ValueError("Interior point not found in bounded region")
         try:
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
