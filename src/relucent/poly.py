@@ -19,6 +19,7 @@ from relucent.config import (
     DEFAULT_PLOT_BOUND,
     MAX_RADIUS,
     TOL_HALFSPACE_CONTAINMENT,
+    QHULL_MODE,
 )
 from relucent.model import NN
 from relucent.utils import encode_ss, get_env
@@ -356,7 +357,7 @@ class Polyhedron:
         eq = (self * other).ss == other.ss
         return bool(cast(torch.Tensor, eq).all())
 
-    def get_bounded_vertices(self, bound: float, qhull_mode: str = "JITTERED") -> np.ndarray | None:
+    def get_bounded_vertices(self, bound: float, qhull_mode: str = QHULL_MODE) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
 
         Computes the vertices of the polyhedron after intersecting it with a
@@ -386,7 +387,9 @@ class Polyhedron:
             max_radius=1000,
             zero_indices=self.zero_indices,
         )
-        if int_point is None:
+        if int_point is None or int_point not in self:
+            w = RuntimeWarning(f"Interior point invalid - {int_point} not in {self}")
+            self.warnings.append(w)
             return None
         try:
             with warnings.catch_warnings(record=True) as w:

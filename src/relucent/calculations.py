@@ -63,6 +63,7 @@ def solve_radius(
         halfspaces = halfspaces.detach().cpu().numpy()
 
     if zero_indices is not None and len(zero_indices) > 0:
+        raise NotImplementedError("Working with k<d polyhedron is not supported yet.")
         warnings.warn("Working with k<d polyhedron.")
         equalities = halfspaces[zero_indices]
         inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices)]
