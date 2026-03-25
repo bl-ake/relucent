@@ -7,7 +7,10 @@ Functions here take a :class:`~relucent.poly.Polyhedron` instance; the class liv
 from __future__ import annotations
 
 import warnings
-from typing import Any, Callable, Iterable, Literal, overload
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, overload
+
+if TYPE_CHECKING:
+    from relucent.poly import Polyhedron
 
 import numpy as np
 import torch
@@ -26,7 +29,6 @@ from relucent.config import (
     VERTEX_TRUST_THRESHOLD,
 )
 from relucent.utils import get_env
-from relucent.poly import Polyhedron
 
 def solve_radius(
     env: Any,
@@ -113,15 +115,15 @@ def solve_radius(
 
 @torch.no_grad()
 def adjacent_polyhedra(
-    poly: "Polyhedron",
-    ss2poly: Callable[..., "Polyhedron"],
-) -> set["Polyhedron"]:
+    poly: Polyhedron,
+    ss2poly: Callable[..., Polyhedron],
+) -> set[Polyhedron]:
     """Polyhedra adjacent to ``poly`` across one bounding hyperplane (one SHI flip).
 
     Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
     array to the corresponding :class:`Polyhedron` (e.g. ``Complex.ss2poly``).
     """
-    ps: set["Polyhedron"] = set()
+    ps: set[Polyhedron] = set()
     for shi in poly.shis:
         if poly.ss_np[0, shi] == 0:
             continue
@@ -133,7 +135,7 @@ def adjacent_polyhedra(
 
 @overload
 def get_hs(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[False] = False,
     force_numpy: bool = False,
@@ -142,7 +144,7 @@ def get_hs(
 
 @overload
 def get_hs(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[True] = True,
     force_numpy: bool = False,
@@ -150,7 +152,7 @@ def get_hs(
 
 
 def get_hs(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: bool = False,
     force_numpy: bool = False,
@@ -180,7 +182,7 @@ def get_hs(
 
 @overload
 def _get_hs_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[False] = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]: ...
@@ -188,7 +190,7 @@ def _get_hs_torch(
 
 @overload
 def _get_hs_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[True] = True,
 ) -> list[dict[str, Any]]: ...
@@ -196,7 +198,7 @@ def _get_hs_torch(
 
 @torch.no_grad()
 def _get_hs_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, Any]]:
@@ -280,7 +282,7 @@ def _get_hs_torch(
 
 @overload
 def _get_hs_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[False] = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
@@ -288,7 +290,7 @@ def _get_hs_numpy(
 
 @overload
 def _get_hs_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: Literal[True] = True,
 ) -> list[dict[str, Any]]: ...
@@ -296,7 +298,7 @@ def _get_hs_numpy(
 
 @torch.no_grad()
 def _get_hs_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     get_all_Ab: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, Any]]:
@@ -379,7 +381,7 @@ def _get_hs_numpy(
 
 
 def get_shis(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     collect_info: bool | str = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
@@ -531,7 +533,7 @@ def get_shis(
     return shis
 
 
-def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None:
+def compute_properties(poly: Polyhedron, qhull_mode: str = QHULL_MODE) -> None:
     """Compute additional geometric properties for low-dimensional polyhedra (vertices, hull, volume).
 
     Mutates ``poly`` cache fields (``_hs``, ``_vertices``, ``_ch``, ``_volume``,
