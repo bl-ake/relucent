@@ -75,7 +75,8 @@ def data_graph(
     save_file: str = DEFAULT_PYVIS_SAVE_FILE,
 ) -> None:
     """Create an interactive pyvis graph from dataframes of nodes and edges."""
-    from pyvis.network import Network
+
+    from pyvis.network import Network  # type: ignore
 
     if class_labels is True and dataset is not None:
         class_labels_list = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
