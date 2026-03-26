@@ -616,6 +616,7 @@ def _highlight(c: str, poly: Any, highlight_regions: Iterable[Any] | None) -> st
 def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) -> None:
     if total == 0:
         return
+    print(f"Plotted {plotted/total*100:.2f}% of polyhedra within the bounds")
     minimum_required = (total + 1) // 2
     if plotted < minimum_required:
         raise RuntimeError(
