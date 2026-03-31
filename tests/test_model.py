@@ -62,7 +62,7 @@ class TestNN:
         assert isinstance(outs, dict)
         names = list(outs.keys())
         assert len(names) == len(net.layers)
-        for n, t in outs.items():
+        for _n, t in outs.items():
             assert isinstance(t, torch.Tensor)
 
     def test_get_grid(self, seeded):
