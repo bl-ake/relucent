@@ -1,4 +1,3 @@
-- move class methods to separate functions (e.g. visualization functions)
 - fix config.py
 - update docs for vis
 - different CPWL activations
