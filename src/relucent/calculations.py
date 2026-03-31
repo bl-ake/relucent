@@ -524,7 +524,10 @@ def get_shis(
 
             basis_indices = constrs.CBasis.ravel() != 0
             if new_method and basis_indices.sum() != A.shape[1]:
-                warnings.warn("Bound Constraints in Basis", stacklevel=2)
+                    warnings.warn(
+                        "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
+                        stacklevel=2,
+                    )
             skip_size = 0
             if new_method and basis_indices.sum() == A.shape[1]:
                 point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
@@ -532,7 +535,10 @@ def get_shis(
                 try:
                     sols = torch.linalg.solve(point_shis, others.T)
                 except RuntimeError:
-                    warnings.warn("Could not solve linear system", stacklevel=2)
+                    warnings.warn(
+                        "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                        stacklevel=2,
+                    )
                     sols = torch.zeros(others.T.shape, device=poly.halfspaces.device)
                 all_correct = (sols > 0).all(dim=0)
                 assert all_correct.shape[0] == others.shape[0]
@@ -610,7 +616,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
             if qhull_mode == "IGNORE":
                 poly.warnings.extend([RuntimeWarning(wi) for wi in w])
             if qhull_mode == "WARN_ALL":
-                warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}", stacklevel=2)
+                warnings.warn(f"Halfspace intersection emitted warnings: {msgs}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
                 raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
             elif qhull_mode == "JITTERED":
