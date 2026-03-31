@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+
 from relucent.convert_model import combine_linear_layers, convert
 from relucent.model import NN, get_mlp_model
 
