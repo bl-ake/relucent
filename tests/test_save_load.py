@@ -3,9 +3,9 @@
 import numpy as np
 import torch
 
-from relucent import Complex, get_mlp_model
-
 from tests.helpers import ss_to_numpy
+
+from relucent import Complex, get_mlp_model
 
 
 def test_complex_save_load_roundtrip_with_ssm(tmp_path, seeded):
