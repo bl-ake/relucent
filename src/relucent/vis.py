@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, Mapping, Sequence, overload
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -64,12 +63,10 @@ def data_graph(
     node_label_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
         row["label"] if "label" in row else str(i)
     ),
-    node_size_formatter: Callable[[Mapping[str, Any]], int] = lambda row: row["size"] if "size" in row else 10,
-    edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row["title"] if "title" in row else "",
-    edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row["label"] if "label" in row else "",
-    edge_value_formatter: Callable[[Mapping[str, Any]], float | int] = lambda row: (
-        row["value"] if "value" in row else 1
-    ),
+    node_size_formatter: Callable[[Mapping[str, Any]], int] = lambda row: row.get("size", 10),
+    edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("title", ""),
+    edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("label", ""),
+    edge_value_formatter: Callable[[Mapping[str, Any]], float | int] = lambda row: row.get("value", 1),
     max_images: int = MAX_IMAGES_PYVIS,
     max_num_examples: int = MAX_NUM_EXAMPLES_PYVIS,
     save_file: str = DEFAULT_PYVIS_SAVE_FILE,
@@ -78,6 +75,7 @@ def data_graph(
 
     from pyvis.network import Network  # type: ignore
 
+    class_labels_list: list = []
     if class_labels is True and dataset is not None:
         class_labels_list = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
 
@@ -143,7 +141,7 @@ def data_graph(
 # --- Polyhedron geometry & traces (used by ``Polyhedron`` methods) -----------------
 
 
-def bounded_plot_geometry(poly: Polyhedron, bound: float) -> tuple[str, np.ndarray] | None:
+def bounded_plot_geometry(poly: "Polyhedron", bound: float) -> tuple[str, np.ndarray] | None:
     """Classify bounded 2D geometry for plotting as polygon, segment, or point."""
     vertices = poly.get_bounded_vertices(bound)
     if vertices is None or vertices.size == 0:
@@ -194,7 +192,7 @@ def bounded_plot_geometry(poly: Polyhedron, bound: float) -> tuple[str, np.ndarr
 
 
 def _poly_traces_3d_complex(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     showlegend: bool = False,
     bound: float = DEFAULT_PLOT_BOUND,
     filled: bool = False,
@@ -381,7 +379,7 @@ def _poly_traces_3d_complex(
 
 
 def _poly_traces_2d_complex(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     fill: str = "toself",
     showlegend: bool = False,
     bound: float = DEFAULT_PLOT_BOUND,
@@ -446,7 +444,7 @@ def _poly_traces_2d_complex(
 
 
 def _poly_traces_2d_graph(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     fill: str = "toself",
     showlegend: bool = False,
     bound: float = DEFAULT_PLOT_BOUND,
@@ -520,7 +518,7 @@ def _poly_traces_2d_graph(
 
 @overload
 def plot_polyhedron(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     *,
     plot_mode: Literal["cells"],
     **kwargs: Any,
@@ -529,7 +527,7 @@ def plot_polyhedron(
 
 @overload
 def plot_polyhedron(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     *,
     plot_mode: Literal["graph"],
     **kwargs: Any,
@@ -537,7 +535,7 @@ def plot_polyhedron(
 
 
 def plot_polyhedron(
-    poly: Polyhedron,
+    poly: "Polyhedron",
     *,
     plot_mode: Literal["cells", "graph"],
     **kwargs: Any,
@@ -599,7 +597,7 @@ def _equitable_colors(
         return [color_scheme[i % len(color_scheme)] for i in range(n)]
 
 
-def _per_poly_colors(cpx: Complex, polys: list[Any], color: str | None, *, remap_equitable: bool) -> list[str]:
+def _per_poly_colors(cpx: "Complex", polys: list[Any], color: str | None, *, remap_equitable: bool) -> list[str]:
     if color == "Wl2":
         return get_colors([poly.Wl2 for poly in polys])
     return _equitable_colors(cpx.get_dual_graph(), polys, remap=remap_equitable)
@@ -616,7 +614,7 @@ def _highlight(c: str, poly: Any, highlight_regions: Iterable[Any] | None) -> st
 def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) -> None:
     if total == 0:
         return
-    print(f"Plotted {plotted/total*100:.2f}% of polyhedra within the bounds")
+    print(f"Plotted {plotted / total * 100:.2f}% of polyhedra within the bounds")
     minimum_required = (total + 1) // 2
     if plotted < minimum_required:
         raise RuntimeError(
@@ -647,7 +645,7 @@ def _poly_intersects_plot_bound(poly: Any, bound: float) -> bool:
 
 
 def _complex_figure_2d_cells(
-    cpx: Complex,
+    cpx: "Complex",
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -663,7 +661,7 @@ def _complex_figure_2d_cells(
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
+    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound):
             continue
         eligible_polys += 1
@@ -710,7 +708,7 @@ def _complex_figure_2d_cells(
 
 
 def _complex_figure_3d_cells(
-    cpx: Complex,
+    cpx: "Complex",
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -768,7 +766,7 @@ def _complex_figure_3d_cells(
 
 
 def _complex_figure_graph(
-    cpx: Complex,
+    cpx: "Complex",
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -861,7 +859,7 @@ def _complex_figure_graph(
 
 
 def plot_complex(
-    cpx: Complex,
+    cpx: "Complex",
     *,
     plot_mode: Literal["cells", "graph"],
     **kwargs: Any,

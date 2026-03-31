@@ -1,13 +1,12 @@
 """Search and pathfinding over a polyhedral complex."""
 
-from __future__ import annotations
-
 import multiprocessing as mp
 import random
 import warnings
 from collections import defaultdict
+from collections.abc import Iterable
 from functools import partial
-from typing import TYPE_CHECKING, Any, Iterable, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import torch
@@ -30,6 +29,16 @@ from relucent.utils import (
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
+
+__all__ = [
+    "astar_calculations",
+    "get_ip",
+    "greedy_path",
+    "hamming_astar",
+    "parallel_add",
+    "poly_calculations",
+    "searcher",
+]
 
 
 def poly_calculations(
@@ -61,9 +70,9 @@ def poly_calculations(
 
     try:
         halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], get_hs(p, get_all_Ab=False))
-        assert isinstance(halfspaces, torch.Tensor) or isinstance(halfspaces, np.ndarray)
-        assert isinstance(W, torch.Tensor) or isinstance(W, np.ndarray)
-        assert isinstance(b, torch.Tensor) or isinstance(b, np.ndarray)
+        assert isinstance(halfspaces, (torch.Tensor, np.ndarray))
+        assert isinstance(W, (torch.Tensor, np.ndarray))
+        assert isinstance(b, (torch.Tensor, np.ndarray))
         p._halfspaces = halfspaces
         p._W = W
         p._b = b
@@ -85,7 +94,7 @@ def poly_calculations(
             p._Wl2 = np.linalg.norm(p.W).item()
 
         if cx.dim <= 6 and cx.get_vol_calc:
-            p.volume
+            _ = p.volume
         if p._shis is None:
             if "collect_info" in kwargs:
                 shis, shi_info = get_shis(p, env=cx.env, **kwargs)
@@ -104,7 +113,7 @@ def poly_calculations(
 
 
 def parallel_add(
-    cx: Complex,
+    cx: "Complex",
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float = DEFAULT_PARALLEL_ADD_BOUND,
@@ -236,7 +245,7 @@ def astar_calculations(
 
 
 def searcher(
-    cx: Complex,
+    cx: "Complex",
     start=None,
     max_depth=float("inf"),
     max_polys=float("inf"),
@@ -444,7 +453,6 @@ def searcher(
             pool.close()
             pool.terminate()
             pool.join()
-            pool.close()
 
     search_info = {
         "Search Depth": depth,
@@ -458,7 +466,7 @@ def searcher(
 
 
 def _greedy_path_helper(
-    cx: Complex, start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None
+    cx: "Complex", start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None
 ) -> list[Polyhedron]:
     if start == end:
         return [start]
@@ -495,7 +503,7 @@ def _greedy_path_helper(
 
 
 def greedy_path(
-    cx: Complex,
+    cx: "Complex",
     start: torch.Tensor | np.ndarray | Polyhedron,
     end: torch.Tensor | np.ndarray | Polyhedron,
 ) -> list[Polyhedron] | None:
@@ -520,7 +528,7 @@ def greedy_path(
 
 
 def hamming_astar(
-    cx: Complex,
+    cx: "Complex",
     start: torch.Tensor | np.ndarray | Polyhedron,
     end: torch.Tensor | np.ndarray | Polyhedron,
     nworkers: int | None = None,
@@ -673,7 +681,7 @@ def hamming_astar(
             )
 
             if min_dist < 1:
-                if 0 < min_dist:
+                if min_dist > 0:
                     last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).ravel()).item()
                     if last_shi in min_p.shis:
                         cameFrom[end_poly] = min_p
@@ -702,7 +710,6 @@ def hamming_astar(
             assert cameFrom[path[-1]] not in path, path
             path.append(cameFrom[path[-1]])
         path.reverse()
-        [(p.Wl2, p.inradius) for p in path]
         return path
     else:
         return None

@@ -9,7 +9,6 @@ import torch
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 from relucent.calculations import (
-    adjacent_polyhedra,
     compute_properties,
     get_hs,
     get_shis,
@@ -26,14 +25,7 @@ from relucent.model import NN
 from relucent.utils import encode_ss, get_env
 from relucent.vis import bounded_plot_geometry, plot_polyhedron
 
-__all__ = [
-    "Polyhedron",
-    "adjacent_polyhedra",
-    "compute_properties",
-    "get_hs",
-    "get_shis",
-    "solve_radius",
-]
+__all__ = ["Polyhedron"]
 
 
 class Polyhedron:
@@ -268,7 +260,7 @@ class Polyhedron:
             tuple: (center, inradius) where center is None for unbounded polyhedra.
         """
         env = env or get_env()
-        center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)  ## TODO: Change
+        center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)
         return center, inradius
 
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
@@ -610,7 +602,7 @@ class Polyhedron:
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-            assert isinstance(self._halfspaces, torch.Tensor) or isinstance(self._halfspaces, np.ndarray)
+            assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
             return self._halfspaces
         else:
             return self._halfspaces
@@ -644,7 +636,7 @@ class Polyhedron:
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-            assert isinstance(self._W, torch.Tensor) or isinstance(self._W, np.ndarray)
+            assert isinstance(self._W, (torch.Tensor, np.ndarray))
             return self._W
         else:
             return self._W
@@ -663,7 +655,7 @@ class Polyhedron:
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-        assert isinstance(self._b, torch.Tensor) or isinstance(self._b, np.ndarray)
+        assert isinstance(self._b, (torch.Tensor, np.ndarray))
         return self._b
 
     @property
