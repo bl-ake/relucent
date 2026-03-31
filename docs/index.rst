@@ -10,8 +10,8 @@ Welcome to the Relucent documentation!
 
 .. _complex:
 
-.. Complex
-.. -------
+Complex
+-------
 
 .. autoclass:: relucent.Complex
    :members:
@@ -20,8 +20,8 @@ Welcome to the Relucent documentation!
 
 .. _polyhedron:
 
-.. Polyhedron
-.. ----------
+Polyhedron
+----------
 
 .. autoclass:: relucent.Polyhedron
    :members:
@@ -31,8 +31,8 @@ Welcome to the Relucent documentation!
 
 .. _neural-network-models:
 
-.. Neural Network Models
-.. ---------------------
+Neural Network Models
+---------------------
 
 .. _neural-network-class:
 
@@ -55,8 +55,8 @@ Model Functions
 
 .. _utility-functions:
 
-.. Utility Functions
-.. -----------------
+Utility Functions
+-----------------
 
 .. autofunction:: relucent.get_env
 
