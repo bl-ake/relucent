@@ -18,8 +18,8 @@ from relucent.calculations import (
 from relucent.config import (
     DEFAULT_PLOT_BOUND,
     MAX_RADIUS,
-    TOL_HALFSPACE_CONTAINMENT,
     QHULL_MODE,
+    TOL_HALFSPACE_CONTAINMENT,
 )
 from relucent.model import NN
 from relucent.utils import encode_ss, get_env
@@ -390,6 +390,26 @@ class Polyhedron:
         if int_point is None:
             raise ValueError("Interior point not found in bounded region")
         try:
+            # Debug aid for rare Qhull failures (e.g. QH6023: feasible point not clearly inside halfspace).
+            # If any halfspace normal is ~0, Qhull can behave pathologically.
+            try:
+                normals = bounded_halfspaces[:, :-1]
+                normal_norms = np.linalg.norm(normals, axis=1)
+                tiny = np.flatnonzero(normal_norms < 1e-12)
+                if tiny.size > 0:
+                    print(
+                        "[relucent] DEBUG: near-zero halfspace normals detected before HalfspaceIntersection\n"
+                        f"  poly={self}\n"
+                        f"  bound={bound}\n"
+                        f"  int_point={np.asarray(int_point).ravel()}\n"
+                        f"  tiny_indices={tiny.tolist()}\n"
+                        f"  tiny_rows={bounded_halfspaces[tiny].tolist()}\n"
+                        f"  normal_norms: min={float(normal_norms.min()):.3e}, "
+                        f"median={float(np.median(normal_norms)):.3e}, max={float(normal_norms.max()):.3e}"
+                    )
+            except Exception:
+                # Never fail geometry due to debug printing.
+                pass
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
                     bounded_halfspaces,
