@@ -21,6 +21,8 @@ from relucent.config import (
     GUROBI_SHI_BEST_OBJ_STOP,
     QHULL_MODE,
     TOL_DEAD_RELU,
+    TOL_HALFSPACE_CONTAINMENT,
+    TOL_HALFSPACE_NORMAL,
     TOL_SHI_HYPERPLANE,
     TOL_VERIFY_AB_ATOL,
     VERTEX_TRUST_THRESHOLD,
@@ -29,6 +31,39 @@ from relucent.utils import get_env
 
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
+
+
+def _drop_degenerate_halfspaces(
+    halfspaces: np.ndarray,
+    *,
+    tol_normal: float = TOL_HALFSPACE_NORMAL,
+    tol_bias: float = TOL_HALFSPACE_CONTAINMENT,
+) -> np.ndarray:
+    """Remove degenerate halfspaces with near-zero normals.
+
+    A halfspace row represents a^T x + b <= 0. If ||a|| ~ 0, then the constraint
+    is either always satisfied (b <= 0) or infeasible (b > 0). Keeping such rows
+    can trigger Qhull errors (e.g. QH6023) and destabilize interior-point solves.
+    """
+    if halfspaces.size == 0:
+        return halfspaces
+    a = halfspaces[:, :-1]
+    b = halfspaces[:, -1]
+    norms = np.linalg.norm(a, axis=1)
+    deg = norms < tol_normal
+    if not np.any(deg):
+        return halfspaces
+
+    # If any degenerate constraint has positive bias, it encodes 0 + b <= 0 with b>0 (infeasible).
+    # Treat this as a hard error rather than silently dropping constraints.
+    if np.any(b[deg] > tol_bias):
+        bad = np.flatnonzero(deg & (b > tol_bias)).tolist()
+        raise ValueError(
+            f"Degenerate halfspace(s) imply infeasibility (||a||<{tol_normal:g} with b>{tol_bias:g}) at rows {bad}"
+        )
+
+    return halfspaces[~deg]
+
 
 def solve_radius(
     env: Any,
@@ -61,6 +96,10 @@ def solve_radius(
 
     if isinstance(halfspaces, torch.Tensor):
         halfspaces = halfspaces.detach().cpu().numpy()
+
+    # Remove degenerate constraints (near-zero normals) before building the model.
+    # This prevents pathologies like 0*x + 0*y <= -b and makes results more stable across platforms.
+    halfspaces = _drop_degenerate_halfspaces(halfspaces)
 
     if zero_indices is not None and len(zero_indices) > 0:
         warnings.warn("Working with k<d polyhedron.")
@@ -550,7 +589,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
     if poly.net.input_shape[0] > 6:
         raise ValueError("Input shape too large to compute extra properties")
     try:
-        halfspaces = poly.halfspaces_np
+        # Filter degenerate constraints before calling Qhull.
+        halfspaces = _drop_degenerate_halfspaces(poly.halfspaces_np)
         if poly.interior_point is None:
             raise ValueError("Interior point not found")
         with warnings.catch_warnings(record=True) as w:
@@ -653,4 +693,3 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
             poly._volume = -1
     else:
         poly._volume = float("inf")
-
