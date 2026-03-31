@@ -81,7 +81,7 @@ def test_hamming_astar_path(seeded):
     assert path is not None
     assert start in path[0]
     assert end in path[-1]
-    for p1, p2 in zip(path[:-1], path[1:]):
+    for p1, p2 in zip(path[:-1], path[1:], strict=True):
         assert (p1.ss_np != p2.ss_np).sum().item() == 1
 
 
