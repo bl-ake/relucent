@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from relucent import Complex, get_mlp_model
-from relucent.poly import adjacent_polyhedra
+from relucent.calculations import adjacent_polyhedra
 
 
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
@@ -68,7 +68,7 @@ def test_dfs_max_depth_and_shis(seeded):
     cplx = Complex(model)
     result = cplx.dfs(max_depth=2, nworkers=1, get_volumes=False)
     assert result["Search Depth"] == 2
-    assert [poly.shis is not None for poly in cplx]
+    assert all(poly.shis is not None for poly in cplx)
 
 
 def test_hamming_astar_path(seeded):

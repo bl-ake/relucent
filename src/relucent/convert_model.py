@@ -6,7 +6,7 @@ which consists of Linear and ReLU layers only.
 """
 
 from collections import OrderedDict
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 
 import numpy as np
 import torch
@@ -15,10 +15,12 @@ from tqdm.auto import tqdm
 
 from relucent.model import NN
 
+__all__ = ["convert"]
+
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
 @torch.no_grad()
-def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int, int]) -> torch.nn.Linear:
+def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int, int]) -> torch.nn.Linear:
     """Convert a Conv2d layer to an equivalent Linear layer.
 
     Args:
@@ -37,7 +39,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
             for b in range(to_b):
                 yield a, b
 
-    def enc_tuple(tup: Tuple[int, int, int], shape: Tuple[int, int, int]) -> int:
+    def enc_tuple(tup: tuple[int, int, int], shape: tuple[int, int, int]) -> int:
         res = 0
         coef = 1
         for i in reversed(range(len(shape))):
@@ -47,7 +49,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
 
         return res
 
-    def dec_tuple(x: int, shape: Tuple[int, int, int]) -> Tuple[int, int, int]:
+    def dec_tuple(x: int, shape: tuple[int, int, int]) -> tuple[int, int, int]:
         res: list[int] = []
         for i in reversed(range(len(shape))):
             res.append(x % shape[i])
@@ -106,7 +108,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: Tuple[int, int
 
 
 @torch.no_grad()
-def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: Tuple[int, int, int]) -> torch.nn.Linear:
+def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: tuple[int, int, int]) -> torch.nn.Linear:
     """Convert an AvgPool2d layer to an equivalent Linear layer.
 
     Converts average pooling into a fully connected layer by representing it
@@ -227,9 +229,7 @@ def convert(model: NN) -> NN:
         print("    Layer:", name)
         if isinstance(module, (nn.Linear, nn.ReLU)):
             layers[name] = module
-        elif isinstance(module, nn.Dropout):
-            pass
-        elif isinstance(module, nn.Flatten):
+        elif isinstance(module, (nn.Dropout, nn.Flatten)):
             pass
         elif isinstance(module, nn.LogSoftmax):
             break

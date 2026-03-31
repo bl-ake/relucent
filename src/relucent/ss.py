@@ -1,9 +1,18 @@
-from typing import Iterator
+"""Sign-sequence storage and lookup for the polyhedral complex.
+
+Provides :class:`SSManager`, a dict-like container that maps sign sequences
+(arrays of {-1, 0, 1}) to contiguous integer indices, enabling O(1) membership
+testing and insertion via a bytes-encoded hash key.
+"""
+
+from collections.abc import Iterator
 
 import numpy as np
 import torch
 
 from relucent.utils import encode_ss
+
+__all__ = ["SSManager"]
 
 
 class SSManager:

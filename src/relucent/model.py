@@ -1,12 +1,22 @@
+"""Neural network wrapper for use with the relucent polyhedral complex tools.
+
+Provides the :class:`NN` class, a thin :class:`torch.nn.Module` subclass that
+stores layer weights in a named :class:`~torch.nn.ModuleDict` and exposes
+helpers for grid generation, layer-output inspection, and weight access by
+neuron index.  Also provides :func:`get_mlp_model` for constructing standard
+ReLU MLPs.
+"""
+
 from collections import OrderedDict
-from collections.abc import Container
-from typing import Iterable, Tuple
+from collections.abc import Container, Iterable
 
 import numpy as np
 import torch
 import torch.nn as nn
 
 from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
+
+__all__ = ["NN", "get_mlp_model"]
 
 
 class NN(nn.Module):
@@ -15,7 +25,7 @@ class NN(nn.Module):
     def __init__(
         self,
         layers: OrderedDict[str, nn.Module] | None = None,
-        input_shape: Tuple[int, ...] | None = None,
+        input_shape: tuple[int, ...] | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ) -> None:
@@ -34,23 +44,21 @@ class NN(nn.Module):
         Raises:
             ValueError: If input_shape cannot be determined.
         """
-        super(NN, self).__init__()
+        super().__init__()
 
         self.layers = nn.ModuleDict(layers) if layers is not None else nn.ModuleDict()
 
-        self.to(device or self.device, dtype or self.dtype)
         if input_shape is not None:
-            resolved_shape: Tuple[int, ...] = input_shape
+            resolved_shape: tuple[int, ...] = input_shape
         elif isinstance(fl := next(iter(self.layers.values())), nn.Linear):
             resolved_shape = (fl.in_features,)
         else:
             raise ValueError("Input shape must be provided")
 
-        self.input_shape: Tuple[int, ...] = resolved_shape
+        self.input_shape: tuple[int, ...] = resolved_shape
+        self.trained_on = None
 
         self.to(device or self.device, dtype or self.dtype)
-
-        self.trained_on = None
 
     def save_numpy_weights(self) -> None:
         """Save NumPy weights and biases for all Linear layers.
@@ -109,7 +117,7 @@ class NN(nn.Module):
 
     def get_grid(
         self, bounds: float | None = None, res: int | None = None
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Generate a 2D grid of input points.
 
         Creates a regular grid of points in 2D space. Only works for 2D input spaces.
@@ -133,12 +141,12 @@ class NN(nn.Module):
         X = np.reshape(X, -1)
         Y = np.reshape(Y, -1)
 
-        inputVal = np.vstack((X, Y)).T
-        return x, y, inputVal
+        input_val = np.vstack((X, Y)).T
+        return x, y, input_val
 
     def output_grid(
         self, bounds: float | None = None, res: int | None = None
-    ) -> Tuple[np.ndarray, np.ndarray, OrderedDict[str, torch.Tensor]]:
+    ) -> tuple[np.ndarray, np.ndarray, OrderedDict[str, torch.Tensor]]:
         """Generate a grid and compute network outputs for all points.
 
         Args:
@@ -149,9 +157,9 @@ class NN(nn.Module):
             tuple: (x_coords, y_coords, layer_outputs) where layer_outputs is
                 an OrderedDict mapping layer names to outputs.
         """
-        x, y, inputVal = self.get_grid(bounds, res)
+        x, y, input_val = self.get_grid(bounds, res)
 
-        outs = self.get_all_layer_outputs(torch.Tensor(inputVal).to(self.device, self.dtype))
+        outs = self.get_all_layer_outputs(torch.Tensor(input_val).to(self.device, self.dtype))
 
         return x, y, outs
 

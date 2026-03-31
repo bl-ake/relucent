@@ -1,7 +1,8 @@
+from collections.abc import Generator, Iterable, Iterator
 import os
 import pickle
 import random
-from typing import Any, Generator, Iterable, Iterator
+from typing import Any
 
 import networkx as nx
 import numpy as np
@@ -20,14 +21,8 @@ from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.search import (
     greedy_path as _greedy_path_fn,
-)
-from relucent.search import (
     hamming_astar as _hamming_astar_fn,
-)
-from relucent.search import (
     parallel_add as _parallel_add_fn,
-)
-from relucent.search import (
     searcher as _searcher_fn,
 )
 from relucent.ss import SSManager
@@ -37,7 +32,9 @@ from relucent.utils import (
 )
 from relucent.vis import get_colors, plot_complex
 
-# Worker process state (set by set_globals when used as pool initializer).
+__all__ = ["Complex"]
+
+# Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
 net: NN | None = None
 dim: int = 0
@@ -90,9 +87,8 @@ class Complex:
         self._net = net
         self.net.save_numpy_weights()
 
-        ## TODO: Try replacing with just a dictionary that incremements by 1
         self.ssm = SSManager()
-        self.index2poly = list()
+        self.index2poly: list[Polyhedron] = []
 
         net_layers = list(net.layers.values())
         self.ss_layers = [
@@ -170,8 +166,7 @@ class Complex:
         Yields:
             Polyhedron: Polyhedra in the order they were added to the complex.
         """
-        for p in self.index2poly:
-            yield p
+        yield from self.index2poly
 
     def __len__(self) -> int:
         return len(self.index2poly)

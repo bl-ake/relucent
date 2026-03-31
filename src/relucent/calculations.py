@@ -4,10 +4,9 @@ Functions here take a :class:`~relucent.poly.Polyhedron` instance; the class liv
 ``poly.py`` to avoid import cycles.
 """
 
-from __future__ import annotations
-
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, overload
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import numpy as np
 import torch
@@ -31,6 +30,14 @@ from relucent.utils import get_env
 
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
+
+__all__ = [
+    "adjacent_polyhedra",
+    "compute_properties",
+    "get_hs",
+    "get_shis",
+    "solve_radius",
+]
 
 
 def _drop_degenerate_halfspaces(
@@ -67,7 +74,7 @@ def _drop_degenerate_halfspaces(
 
 def solve_radius(
     env: Any,
-    halfspaces: np.ndarray | torch.Tensor,  ## TODO: Remove redundant check for this
+    halfspaces: np.ndarray | torch.Tensor,
     max_radius: float = GRB.INFINITY,
     zero_indices: np.ndarray | None = None,
     sense: int = GRB.MAXIMIZE,
@@ -156,13 +163,13 @@ def solve_radius(
 def adjacent_polyhedra(
     poly: "Polyhedron",
     ss2poly: Callable[..., "Polyhedron"],
-) -> set["Polyhedron"]:
+) -> "set[Polyhedron]":
     """Polyhedra adjacent to ``poly`` across one bounding hyperplane (one SHI flip).
 
     Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
     array to the corresponding :class:`Polyhedron` (e.g. ``Complex.ss2poly``).
     """
-    ps: set["Polyhedron"] = set()
+    ps: "set[Polyhedron]" = set()  # noqa: UP037 — Polyhedron is TYPE_CHECKING-only
     for shi in poly.shis:
         if poly.ss_np[0, shi] == 0:
             continue
@@ -205,7 +212,7 @@ def get_hs(
     Includes constraints from every neuron, not only supporting hyperplanes.
 
     Args:
-        poly: Polyhedron whose sign sequence defines the region.
+        poly: "Polyhedron" whose sign sequence defines the region.
         data: Optional network input for verifying intermediate affine maps.
         get_all_Ab: If True, return per-layer ``A``, ``b`` instead of final halfspaces.
         force_numpy: If True, use the NumPy path even when ``ss`` is a tensor.
@@ -436,7 +443,7 @@ def get_shis(
     actually faces of the polyhedron).
 
     Args:
-        poly: Polyhedron to analyze.
+        poly: "Polyhedron" to analyze.
         collect_info: If true, also return debug info; ``"All"`` adds more detail.
         bound: Hypercube bound for the Gurobi variable box.
         subset: Halfspace indices to consider; default is all.

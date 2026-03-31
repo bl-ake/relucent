@@ -1,9 +1,17 @@
+"""Utility functions and data structures for relucent.
+
+Provides RNG seeding, sign-sequence encoding, a cached Gurobi environment,
+thread-safe queue implementations, and network manipulation helpers used
+throughout the package.
+"""
+
 import os
 import random
 from collections import OrderedDict, deque
+from collections.abc import Callable, Iterator
 from heapq import heappop, heappush
 from threading import Condition
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import numpy as np
 import torch
@@ -12,7 +20,21 @@ from gurobipy import Env, disposeDefaultEnv
 from relucent.config import BLOCKING_QUEUE_WAIT_TIMEOUT
 from relucent.model import NN
 
-disposeDefaultEnv()
+__all__ = [
+    "BlockingQueue",
+    "NonBlockingQueue",
+    "UpdatablePriorityQueue",
+    "close_env",
+    "encode_ss",
+    "get_env",
+    "normalize_weights",
+    "process_aware_cpu_count",
+    "set_seeds",
+    "split_sequential",
+]
+
+_env: Env | None = None
+_default_env_disposed: bool = False
 
 
 def set_seeds(seed: int) -> None:
@@ -28,9 +50,9 @@ def set_seeds(seed: int) -> None:
 
 def process_aware_cpu_count() -> int | None:
     """Return process CPU count when available, else system CPU count."""
-    process_cpu_count = getattr(os, "process_cpu_count", None)
-    if callable(process_cpu_count):
-        return process_cpu_count()
+    fn = getattr(os, "process_cpu_count", None)
+    if callable(fn):
+        return fn()  # type: ignore[return-value]
     return os.cpu_count()
 
 
@@ -55,15 +77,8 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     else:
         ss = np.asarray(ss)
 
-    if not np.issubdtype(ss.dtype, np.integer):
-        ss = ss.astype(np.int8, copy=False)
-    else:
-        ss = ss.astype(np.int8, copy=False)
-
+    ss = ss.astype(np.int8, copy=False)
     return ss.ravel().tobytes()
-
-
-_env: Env | None = None
 
 
 def get_env(num_threads: int | None = None) -> Env:
@@ -84,9 +99,12 @@ def get_env(num_threads: int | None = None) -> Env:
     Returns:
         gurobipy.Env: A Gurobi environment with logging disabled.
     """
-    global _env
+    global _env, _default_env_disposed
     if _env is not None:
         return _env
+    if not _default_env_disposed:
+        disposeDefaultEnv()
+        _default_env_disposed = True
     _env = Env(logfilename="", empty=True)
     if num_threads is not None:
         _env.setParam("Threads", num_threads)
