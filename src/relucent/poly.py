@@ -238,7 +238,7 @@ class Polyhedron:
         if interior_point is None:
             raise ValueError("Interior point not found")
         # if (
-        #     maximum_violation := (self.inequalities[:, :-1] @ self._interior_point + self.inequalities[:-1, None]).max()
+        #     maximum_violation := (self.inequalities[:, :-1] @ interior_point + self.inequalities[:-1, None]).max()
         # ) > TOL_HALFSPACE_CONTAINMENT:
         #     raise ValueError(f"Interior point invalid - Maximum Violation: {maximum_violation}")
         if interior_point is not None and interior_point not in self:

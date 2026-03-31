@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import torch
 
+from relucent import get_mlp_model
 from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
@@ -17,8 +18,6 @@ from relucent.utils import (
     split_sequential,
 )
 from relucent.vis import get_colors
-
-from relucent import get_mlp_model
 
 
 class TestSetSeeds:
