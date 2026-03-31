@@ -109,7 +109,7 @@ def solve_radius(
     halfspaces = _drop_degenerate_halfspaces(halfspaces)
 
     if zero_indices is not None and len(zero_indices) > 0:
-        warnings.warn("Working with k<d polyhedron.")
+        warnings.warn("Working with k<d polyhedron.", stacklevel=2)
         equalities = halfspaces[zero_indices]
         inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices)]
         P = (
@@ -619,7 +619,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
                     new_hs = HalfspaceIntersection(
                         halfspaces,
                         poly.interior_point,
-                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        qhull_options="QJ",
                     )  # http://www.qhull.org/html/qh-optq.htm
                 if w2:
                     poly.warnings.append(
@@ -642,7 +643,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
                 hs = HalfspaceIntersection(
                     halfspaces,
                     poly.interior_point,
-                    qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                    # Triangulated output is approximately 1000 times more accurate than joggled input.
+                    qhull_options="QJ",
                 )  # http://www.qhull.org/html/qh-optq.htm
                 poly.warnings.append(
                     RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
@@ -659,7 +661,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
     #     # hs_shis = hs.dual_vertices.ravel().tolist()
     #     if set(hs_shis) != set(poly.shis):
     #         w = RuntimeWarning(
-    #             f"HalfspaceIntersection SHIs on {poly} do not match computed SHIs: {sorted(hs_shis)} vs {sorted(poly.shis)}"
+    #             f"HalfspaceIntersection SHIs on {poly} != computed SHIs: {sorted(hs_shis)} vs {sorted(poly.shis)}"
     #         )
     #         poly.warnings.append(w)
     # except Exception as e:
@@ -671,17 +673,6 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
     trust_vertices_2 = (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(
         axis=0
     ) < VERTEX_TRUST_THRESHOLD
-    # if not (
-    #     (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(axis=0)
-    #     < VERTEX_TRUST_THRESHOLD
-    # ).all():
-    #     w = RuntimeWarning(
-    #         f"Vertex computation failed - Maximum Violation: {(halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).max()}"
-    #     )
-    #     # warnings.warn(w)
-    #     poly.warnings.append(w)
-    #     poly._volume = -1
-    #     return
     poly._vertices = vertices[trust_vertices][trust_vertices_2]
     if poly.finite and len(poly._vertices) > poly.ambient_dim:
         try:

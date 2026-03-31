@@ -3,9 +3,9 @@
 
 def test_top_level_imports():
     from relucent import (
+        NN,
         Complex,
         Polyhedron,
-        NN,
         SSManager,
         convert,
         get_env,
