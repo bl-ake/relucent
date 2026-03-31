@@ -93,6 +93,11 @@ def test_plot_and_dual_graph_smoke(seeded):
             message=r".*[Ii]nterior point.*out of bounds.*",
             category=UserWarning,
         )
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*divide by zero encountered in divide.*",
+            category=RuntimeWarning,
+        )
         model = get_mlp_model(widths=[2, 10, 5, 1])
         cplx = Complex(model)
         cplx.bfs()
