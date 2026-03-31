@@ -392,9 +392,7 @@ def searcher(
 
     with mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
         try:
-            for p, shi, depth, node_index in pool.imap_unordered(
-                partial(poly_calculations, bound=bound, **kwargs), queue
-            ):
+            for p, shi, depth, node_index in pool.imap_unordered(partial(poly_calculations, bound=bound, **kwargs), queue):
                 unprocessed -= 1
                 node = cx.index2poly[node_index]
                 if not isinstance(p, Polyhedron):
@@ -470,9 +468,7 @@ def searcher(
     return search_info
 
 
-def _greedy_path_helper(
-    cx: "Complex", start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None
-) -> list[Polyhedron]:
+def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None) -> list[Polyhedron]:
     if start == end:
         return [start]
 

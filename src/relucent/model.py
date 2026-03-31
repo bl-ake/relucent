@@ -115,9 +115,7 @@ class NN(nn.Module):
                 outputs.append((name, x))
         return OrderedDict(outputs)
 
-    def get_grid(
-        self, bounds: float | None = None, res: int | None = None
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def get_grid(self, bounds: float | None = None, res: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Generate a 2D grid of input points.
 
         Creates a regular grid of points in 2D space. Only works for 2D input spaces.
