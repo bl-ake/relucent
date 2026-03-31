@@ -27,11 +27,8 @@ jobs:
         python -m pip install torch torchvision
         pip install ".[docs]"
 
-    - name: Generate and Build Sphinx HTML documentation
+    - name: Build Sphinx HTML documentation
       run: |
-        # Use sphinx-apidoc to auto-generate .rst files from your code
-        sphinx-apidoc -o docs src -f 
-        # Build the HTML documentation
         cd docs
         make html
 
