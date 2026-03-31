@@ -160,7 +160,7 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
         OrderedDict: New dictionary with consecutive Linear layers combined.
             Layer names are concatenated with '+' for combined layers.
     """
-    new_layers: OrderedDict[str, nn.Module] = OrderedDict()
+    new_layers: OrderedDict[str, nn.Module] = OrderedDict([])
     current_linear: nn.Linear | None = None
     current_name: str = ""
     for name, layer in old_layers.items():

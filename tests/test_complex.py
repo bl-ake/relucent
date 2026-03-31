@@ -189,7 +189,7 @@ class TestComplexDualGraph:
         cplx.bfs(start=start, max_polys=30)
         G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
-        for u, v, d in G.edges(data=True):
+        for _, _, d in G.edges(data=True):
             assert "shi" in d
 
     def test_dual_graph_relabel(self, small_mlp):
