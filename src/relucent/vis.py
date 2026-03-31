@@ -512,7 +512,7 @@ def _poly_traces_2d_graph(
             )
             return {"outline": scatter}
     except Exception as e:
-        warnings.warn(f"Error while plotting polyhedron: {e}", stacklevel=2)
+        warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
     return None
 
 

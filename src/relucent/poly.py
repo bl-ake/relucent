@@ -439,7 +439,7 @@ class Polyhedron:
                 if qhull_mode == "IGNORE":
                     self.warnings.extend([RuntimeWarning(wi) for wi in w])
                 if qhull_mode == "WARN_ALL":
-                    warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}", stacklevel=2)
+                    warnings.warn(f"Halfspace intersection emitted warnings: {msgs}", stacklevel=2)
                 elif qhull_mode == "HIGH_PRECISION":
                     raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
                 elif qhull_mode == "JITTERED":
