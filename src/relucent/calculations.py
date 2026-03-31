@@ -402,9 +402,7 @@ def _get_hs_numpy(
         if data is not None:
             assert isinstance(current_A, np.ndarray)
             assert isinstance(current_b, np.ndarray)
-            assert np.allclose(
-                outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL
-            )
+            assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -524,10 +522,10 @@ def get_shis(
 
             basis_indices = constrs.CBasis.ravel() != 0
             if new_method and basis_indices.sum() != A.shape[1]:
-                    warnings.warn(
-                        "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
-                        stacklevel=2,
-                    )
+                warnings.warn(
+                    "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
+                    stacklevel=2,
+                )
             skip_size = 0
             if new_method and basis_indices.sum() == A.shape[1]:
                 point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
@@ -651,9 +649,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
                     # Triangulated output is approximately 1000 times more accurate than joggled input.
                     qhull_options="QJ",
                 )  # http://www.qhull.org/html/qh-optq.htm
-                poly.warnings.append(
-                    RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
-                )
+                poly.warnings.append(RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"))
             except Exception as e2:
                 raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
         else:

@@ -62,18 +62,14 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
 
     # Formula from the Torch docs:
     # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
-    output_size = [
-        (input_size[i + 1] + 2 * int(conv.padding[i]) - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]
-    ]
+    output_size = [(input_size[i + 1] + 2 * int(conv.padding[i]) - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]]
 
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
 
     conv.bias = conv.bias or torch.zeros(conv.out_channels, device=conv.weight.device)
 
-    fc = nn.Linear(
-        in_features=np.prod(in_shape).item(), out_features=np.prod(out_shape).item(), device=conv.weight.device
-    )
+    fc = nn.Linear(in_features=np.prod(in_shape).item(), out_features=np.prod(out_shape).item(), device=conv.weight.device)
     fc.weight.data.fill_(0.0)
 
     # Output coordinates

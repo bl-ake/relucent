@@ -60,9 +60,7 @@ def data_graph(
     node_title_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
         row["title"] if "title" in row else str(row)
     ),
-    node_label_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
-        row["label"] if "label" in row else str(i)
-    ),
+    node_label_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: row["label"] if "label" in row else str(i),
     node_size_formatter: Callable[[Mapping[str, Any]], int] = lambda row: row.get("size", 10),
     edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("title", ""),
     edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("label", ""),
@@ -687,9 +685,7 @@ def _complex_figure_2d_cells(
         for trace in traces:
             fig.add_trace(trace)
         if label_regions and poly.center is not None:
-            fig.add_trace(
-                go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False)
-            )
+            fig.add_trace(go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False))
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
     interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
     maxcoord = (
@@ -845,9 +841,7 @@ def _complex_figure_graph(
         fig.add_trace(outline)
     for mesh in meshes:
         fig.add_trace(mesh)
-    maxcoord = (
-        np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
-    )
+    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
