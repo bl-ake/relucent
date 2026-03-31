@@ -316,7 +316,9 @@ class Polyhedron:
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
         elif isinstance(other, str):
-            warnings.warn("Comparing Polyhedron with string is deprecated and will be removed in a future version")
+            warnings.warn(
+                "Comparing Polyhedron with string is deprecated and will be removed in a future version", stacklevel=2
+            )
             return str(self) == other
         elif other is None:
             return False
@@ -437,7 +439,7 @@ class Polyhedron:
                 if qhull_mode == "IGNORE":
                     self.warnings.extend([RuntimeWarning(wi) for wi in w])
                 if qhull_mode == "WARN_ALL":
-                    warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
+                    warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}", stacklevel=2)
                 elif qhull_mode == "HIGH_PRECISION":
                     raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
                 elif qhull_mode == "JITTERED":
@@ -445,7 +447,8 @@ class Polyhedron:
                         new_hs = HalfspaceIntersection(
                             bounded_halfspaces,
                             int_point.squeeze(),
-                            qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                            # Triangulated output is approximately 1000 times more accurate than joggled input.
+                            qhull_options="QJ",
                         )  # http://www.qhull.org/html/qh-optq.htm
                     if w2:
                         self.warnings.append(
@@ -465,7 +468,8 @@ class Polyhedron:
                     hs = HalfspaceIntersection(
                         bounded_halfspaces,
                         int_point.squeeze(),
-                        qhull_options="QJ",  # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        # Triangulated output is approximately 1000 times more accurate than joggled input.
+                        qhull_options="QJ",
                     )  # http://www.qhull.org/html/qh-optq.htm
                     self.warnings.append(
                         RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
@@ -473,7 +477,7 @@ class Polyhedron:
                 except Exception as e2:
                     raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
             else:
-                raise ValueError(f"Error while computing halfspace intersection: {e}")
+                raise ValueError(f"Error while computing halfspace intersection: {e}") from e
         vertices = hs.intersections
         return vertices
 
@@ -762,7 +766,9 @@ class Polyhedron:
 
     @property
     def dim(self) -> int:
-        """Dimension of the polyhedron, equal to the dimension of the ambient space minus the number of zero sign sequence elements."""
+        """Dimension of the polyhedron, equal to the dimension of the ambient space minus
+        the number of zero sign sequence elements.
+        """
         return self.ambient_dim - self.codim
 
     def __repr__(self) -> str:

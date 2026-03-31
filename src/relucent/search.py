@@ -306,7 +306,7 @@ def searcher(
         if verbose:
             print(f"Applying cube filter with mode '{cube_mode}' and radius {cube_radius}")
     elif cube_radius is not None:
-        warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.")
+        warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.", stacklevel=2)
         cube_radius = None
 
     def _poly_intersects_cube(p: Polyhedron) -> bool:
@@ -401,7 +401,10 @@ def searcher(
                     bad_shi_computations.append((node, shi, depth, str(p)))
                     node._shis.remove(shi)
                     if len(node._shis) < min(cx.dim, cx.n):
-                        warnings.warn(RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"))
+                        warnings.warn(
+                            RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
+                            stacklevel=2,
+                        )
                     if unprocessed == 0 or len(cx) >= max_polys:
                         break
                     continue
@@ -419,7 +422,7 @@ def searcher(
                 if getattr(p, "warnings", None):
                     for warning in p.warnings:
                         try:
-                            warnings.warn(warning)
+                            warnings.warn(warning, stacklevel=2)
                         except Exception as e:
                             print(warning, type(warning), e, end="\n\n")
 

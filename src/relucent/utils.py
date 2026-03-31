@@ -72,10 +72,7 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     Returns:
         bytes: A hashable bytes representation of the flattened sign sequence.
     """
-    if isinstance(ss, torch.Tensor):
-        ss = ss.detach().cpu().numpy()
-    else:
-        ss = np.asarray(ss)
+    ss = ss.detach().cpu().numpy() if isinstance(ss, torch.Tensor) else np.asarray(ss)
 
     ss = ss.astype(np.int8, copy=False)
     return ss.ravel().tobytes()

@@ -49,16 +49,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
-ignore = [
-    "E501",   # line too long — handled by formatter
-    "B006",   # mutable default arg — intentional in queue constructors
-    "B028",   # warnings.warn without stacklevel — pre-existing pattern
-    "B904",   # raise inside except without `from` — pre-existing pattern
-    "B905",   # zip() without strict — pre-existing pattern
-    "SIM102", # combine nested if — subjective
-    "SIM108", # ternary suggestion — not always clearer
-    "SIM117", # combine with statements — subjective
-]
 
 [tool.ruff.lint.isort]
 known-first-party = ["relucent"]
