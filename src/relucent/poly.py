@@ -20,6 +20,7 @@ from relucent.config import (
     MAX_RADIUS,
     QHULL_MODE,
     TOL_HALFSPACE_CONTAINMENT,
+    TOL_HALFSPACE_NORMAL,
 )
 from relucent.model import NN
 from relucent.utils import encode_ss, get_env
@@ -296,6 +297,22 @@ class Polyhedron:
                 np.hstack((-bounds_lhs, bounds_rhs)),
             )
         )
+        # Drop any degenerate rows (near-zero normals). These can arise from dead/near-dead
+        # constraints and are toxic for both Gurobi feasibility checks and Qhull.
+        normals = halfspaces[:, :-1]
+        norms = np.linalg.norm(normals, axis=1)
+        deg = norms < TOL_HALFSPACE_NORMAL
+        if np.any(deg):
+            b = halfspaces[:, -1]
+            # A degenerate row encodes 0 + b <= 0. If b>0 it's infeasible; raise rather than
+            # silently widening the region by dropping it.
+            if np.any(b[deg] > TOL_HALFSPACE_CONTAINMENT):
+                bad = np.flatnonzero(deg & (b > TOL_HALFSPACE_CONTAINMENT)).tolist()
+                raise ValueError(
+                    "Degenerate halfspace(s) imply infeasibility after bounding; "
+                    f"rows={bad}, tol_normal={TOL_HALFSPACE_NORMAL:g}"
+                )
+            halfspaces = halfspaces[~deg]
         env = env or get_env()
         feasible = solve_radius(env, halfspaces, max_radius=bound, zero_indices=self.zero_indices)[0] is not None
         if feasible:
@@ -379,6 +396,13 @@ class Polyhedron:
             w = RuntimeWarning(f"Error while computing bounded vertices: {e}")
             self.warnings.append(w)
             return None
+
+        # Last-resort guard: Qhull requires non-degenerate halfspace normals.
+        normals = bounded_halfspaces[:, :-1]
+        norms = np.linalg.norm(normals, axis=1)
+        deg = norms < TOL_HALFSPACE_NORMAL
+        if np.any(deg):
+            bounded_halfspaces = bounded_halfspaces[~deg]
 
         # Recompute interior point
         int_point, radius = solve_radius(

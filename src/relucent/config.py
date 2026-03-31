@@ -43,6 +43,12 @@ TOL_DEAD_RELU: float = 1e-8
 # when A @ x == -b - TOL_SHI_HYPERPLANE (relaxed for numerical stability).
 TOL_SHI_HYPERPLANE: float = 1e-6
 
+# Threshold for treating a halfspace normal as "degenerate".
+# If ||a|| < TOL_HALFSPACE_NORMAL, the constraint a^T x + b <= 0 is either
+# redundant (if b <= 0) or infeasible (if b > 0). Degenerate constraints can
+# cause Qhull (HalfspaceIntersection) failures and numerical pathologies.
+TOL_HALFSPACE_NORMAL: float = 1e-12
+
 # Gurobi MIP tolerances when computing supporting halfspace indices (SHIs).
 # BestObjStop: stop when objective >= this (for maximization).
 # BestBdStop: stop when best bound <= this.
