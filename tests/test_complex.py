@@ -107,6 +107,14 @@ def test_plot_and_dual_graph_smoke(seeded):
         x = np.random.random(model.input_shape).astype(np.float32)
         p = cplx.point2poly(x)
         _ = p.halfspaces[p.shis, :]
+        _ = p.W
+        _ = p.b
+        _ = p.finite
+        _ = p.center
+        _ = p.inradius
+        _ = p.interior_point
+        _ = p.interior_point_norm
+        _ = sum(len(p.shis) for p in cplx) / len(cplx)
         G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
 
