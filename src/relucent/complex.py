@@ -99,7 +99,7 @@ class Complex:
         net_layers = list(net.layers.values())
         self.ss_layers = [
             i
-            for i, (layer, next_layer) in enumerate(zip(net_layers[:-1], net_layers[1:]))
+            for i, (layer, next_layer) in enumerate(zip(net_layers[:-1], net_layers[1:], strict=True))
             if isinstance(next_layer, nn.ReLU)
         ]
 
@@ -746,17 +746,17 @@ class Complex:
 
             if node_color == "Wl2":
                 colors = get_colors([poly.Wl2 for poly in G.nodes], cmap=cmap)
-                for c, poly in zip(colors, G.nodes):
+                for c, poly in zip(colors, G.nodes, strict=True):
                     G.nodes[poly]["color"] = c
             elif node_color == "volume":
                 colors = get_colors([poly.ch.volume for poly in G.nodes], cmap=cmap)
-                for c, poly in zip(colors, G.nodes):
+                for c, poly in zip(colors, G.nodes, strict=True):
                     G.nodes[poly]["color"] = c
 
             if node_size == "volume":
                 sizes = [poly.ch.volume for poly in G.nodes]
                 maxsize = max(sizes)
-                for size, poly in zip(sizes, G.nodes):
+                for size, poly in zip(sizes, G.nodes, strict=True):
                     G.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
             else:
                 nx.set_node_attributes(G, values=4, name="size")  # type: ignore

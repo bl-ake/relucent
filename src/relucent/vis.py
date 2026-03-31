@@ -374,7 +374,7 @@ def _poly_traces_3d_complex(
                 zs.extend([float(seg[0, 2]), float(seg[1, 2]), float("nan")])
             traces.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines", showlegend=showlegend, **edge_line_kwargs))
     except Exception as e:
-        warnings.warn(f"Error while computing 3D mesh for polyhedron {poly}: {e}")
+        warnings.warn(f"Error while computing 3D mesh for polyhedron {poly}: {e}", stacklevel=2)
     return traces
 
 
@@ -512,7 +512,7 @@ def _poly_traces_2d_graph(
             )
             return {"outline": scatter}
     except Exception as e:
-        warnings.warn(f"Error while plotting polyhedron: {e}")
+        warnings.warn(f"Error while plotting polyhedron: {e}", stacklevel=2)
     return None
 
 
@@ -677,11 +677,11 @@ def _complex_figure_2d_cells(
                 **kwargs,
             )
         except Exception as e:
-            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
             print("AHHHHHH", e)
             continue
         if len(traces) == 0:
-            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
             continue
         plotted_polys += 1
         for trace in traces:
@@ -725,7 +725,7 @@ def _complex_figure_3d_cells(
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
+    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
             continue
         eligible_polys += 1
@@ -735,10 +735,10 @@ def _complex_figure_3d_cells(
         try:
             traces = poly.plot_cells(showlegend=False, color=c, filled=filled, **kwargs)
         except Exception as e:
-            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
             continue
         if len(traces) == 0:
-            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
             continue
         plotted_polys += 1
         for trace in traces:
@@ -783,7 +783,7 @@ def _complex_figure_graph(
     meshes: list[go.Mesh3d | go.Scatter3d] = []
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys), desc="Plotting Polyhedra", total=len(polys), delay=1):
+    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
             continue
         eligible_polys += 1
@@ -816,12 +816,12 @@ def _complex_figure_graph(
                         fig.add_trace(p_plot)
                         poly_plotted = True
         except Exception as e:
-            warnings.warn(f"Error while plotting polyhedron {poly}: {e}")
+            warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
             continue
         if poly_plotted:
             plotted_polys += 1
         else:
-            warnings.warn(f"No traces generated while plotting polyhedron {poly}.")
+            warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
         if label_regions and poly.center is not None:
             fig.add_trace(
                 go.Scatter3d(

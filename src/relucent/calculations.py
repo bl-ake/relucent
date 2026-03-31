@@ -131,7 +131,7 @@ def solve_radius(
             model.addConstr(equalities[:, :-1] @ x == -equalities[:, -1:])
         model.setObjective(y, sense)
     except Exception as e:
-        raise ValueError(f"GB Error Building Model: {e}")
+        raise ValueError(f"GB Error Building Model: {e}") from e
     model.optimize()
     status = model.status
 
@@ -518,14 +518,13 @@ def get_shis(
                     )
                     w = RuntimeWarning(msg)
                     poly.warnings.append(w)
-                    warnings.warn(w)
+                    warnings.warn(w, stacklevel=2)
                 else:
                     shis.append(i)
 
             basis_indices = constrs.CBasis.ravel() != 0
-            if new_method:
-                if basis_indices.sum() != A.shape[1]:
-                    warnings.warn("Bound Constraints in Basis")
+            if new_method and basis_indices.sum() != A.shape[1]:
+                warnings.warn("Bound Constraints in Basis", stacklevel=2)
             skip_size = 0
             if new_method and basis_indices.sum() == A.shape[1]:
                 point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
@@ -533,7 +532,7 @@ def get_shis(
                 try:
                     sols = torch.linalg.solve(point_shis, others.T)
                 except RuntimeError:
-                    warnings.warn("Could not solve linear system")
+                    warnings.warn("Could not solve linear system", stacklevel=2)
                     sols = torch.zeros(others.T.shape, device=poly.halfspaces.device)
                 all_correct = (sols > 0).all(dim=0)
                 assert all_correct.shape[0] == others.shape[0]
@@ -611,7 +610,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
             if qhull_mode == "IGNORE":
                 poly.warnings.extend([RuntimeWarning(wi) for wi in w])
             if qhull_mode == "WARN_ALL":
-                warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}")
+                warnings.warn(f"HalfspaceIntersection emitted warnings in WARN_ALL mode: {msgs}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
                 raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
             elif qhull_mode == "JITTERED":
@@ -652,7 +651,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
             except Exception as e2:
                 raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
         else:
-            raise ValueError(f"Error while computing halfspace intersection: {e}")
+            raise ValueError(f"Error while computing halfspace intersection: {e}") from e
 
     poly._hs = hs
     # It seems like the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
@@ -680,13 +679,13 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
             try:
                 poly._volume = poly._ch.volume
             except Exception as e:
-                raise ValueError(f"Error while computing convex hull volume: {e}")
+                raise ValueError(f"Error while computing convex hull volume: {e}") from e
         except Exception as e:
             # warnings.warn("Error while computing convex hull:", e)
             if qhull_mode == "WARN_ALL":
-                warnings.warn(f"Error while computing convex hull: {e}")
+                warnings.warn(f"Error while computing convex hull: {e}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
-                raise ValueError(f"Error while computing convex hull: {e}")
+                raise ValueError(f"Error while computing convex hull: {e}") from e
             poly._ch = None
             poly._volume = -1
     else:
