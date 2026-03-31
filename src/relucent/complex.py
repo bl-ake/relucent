@@ -1,7 +1,7 @@
-from collections.abc import Generator, Iterable, Iterator
 import os
 import pickle
 import random
+from collections.abc import Generator, Iterable, Iterator
 from typing import Any
 
 import networkx as nx
@@ -21,8 +21,14 @@ from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.search import (
     greedy_path as _greedy_path_fn,
+)
+from relucent.search import (
     hamming_astar as _hamming_astar_fn,
+)
+from relucent.search import (
     parallel_add as _parallel_add_fn,
+)
+from relucent.search import (
     searcher as _searcher_fn,
 )
 from relucent.ss import SSManager
