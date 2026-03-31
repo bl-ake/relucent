@@ -43,6 +43,7 @@
               <!-- Local TOC -->
               <div class="local-toc"><ul>
 <li><a class="reference internal" href="#">Relucent</a><ul>
+<li><a class="reference internal" href="#complex">Complex</a><ul>
 <li><a class="reference internal" href="#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
 <li><a class="reference internal" href="#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
@@ -77,6 +78,9 @@
 <li><a class="reference internal" href="#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li><a class="reference internal" href="#polyhedron">Polyhedron</a><ul>
 <li><a class="reference internal" href="#relucent.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
 <li><a class="reference internal" href="#relucent.Polyhedron.clean_data"><code class="docutils literal notranslate"><span class="pre">Polyhedron.clean_data()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
@@ -120,6 +124,9 @@
 <li><a class="reference internal" href="#relucent.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li><a class="reference internal" href="#neural-network-models">Neural Network Models</a><ul>
 <li><a class="reference internal" href="#neural-network-class">Neural Network Class</a><ul>
 <li><a class="reference internal" href="#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
 <li><a class="reference internal" href="#relucent.NN.forward"><code class="docutils literal notranslate"><span class="pre">NN.forward()</span></code></a></li>
@@ -138,6 +145,11 @@
 <li><a class="reference internal" href="#model-functions">Model Functions</a><ul>
 <li><a class="reference internal" href="#relucent.get_mlp_model"><code class="docutils literal notranslate"><span class="pre">get_mlp_model()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#utility-functions">Utility Functions</a><ul>
 <li><a class="reference internal" href="#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
 <li><a class="reference internal" href="#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
 </ul>
@@ -174,7 +186,9 @@
   <section id="relucent">
 <h1>Relucent<a class="headerlink" href="#relucent" title="Link to this heading"></a></h1>
 <p>Welcome to the Relucent documentation!</p>
-<span class="target" id="complex"></span><dl class="py class">
+<section id="complex">
+<span id="id1"></span><h2>Complex<a class="headerlink" href="#complex" title="Link to this heading"></a></h2>
+<dl class="py class">
 <dt class="sig sig-object py" id="relucent.Complex">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">Complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Complex" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
@@ -764,7 +778,10 @@ Will be reshaped to match the network’s input shape.</p>
 
 </dd></dl>
 
-<span class="target" id="polyhedron"></span><dl class="py class">
+</section>
+<section id="polyhedron">
+<span id="id2"></span><h2>Polyhedron<a class="headerlink" href="#polyhedron" title="Link to this heading"></a></h2>
+<dl class="py class">
 <dt class="sig sig-object py" id="relucent.Polyhedron">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">Polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ss</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">halfspaces</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.Polyhedron" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
@@ -1163,8 +1180,11 @@ constraint a^T x + b &lt;= 0.</p>
 
 </dd></dl>
 
-<span class="target" id="neural-network-models"></span><section id="neural-network-class">
-<span id="id1"></span><h2>Neural Network Class<a class="headerlink" href="#neural-network-class" title="Link to this heading"></a></h2>
+</section>
+<section id="neural-network-models">
+<span id="id3"></span><h2>Neural Network Models<a class="headerlink" href="#neural-network-models" title="Link to this heading"></a></h2>
+<section id="neural-network-class">
+<span id="id4"></span><h3>Neural Network Class<a class="headerlink" href="#neural-network-class" title="Link to this heading"></a></h3>
 <dl class="py class">
 <dt class="sig sig-object py" id="relucent.NN">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">NN</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">OrderedDict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.NN" title="Link to this definition"></a></dt>
@@ -1308,7 +1328,7 @@ If return_idx is True: (layer_name, neuron_index) tuple.</p>
 
 </section>
 <section id="model-functions">
-<span id="id2"></span><h2>Model Functions<a class="headerlink" href="#model-functions" title="Link to this heading"></a></h2>
+<span id="id5"></span><h3>Model Functions<a class="headerlink" href="#model-functions" title="Link to this heading"></a></h3>
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.get_mlp_model">
 <span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_mlp_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_last_relu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="relucent.html#relucent.model.NN" title="relucent.model.NN"><span class="pre">NN</span></a></span></span><a class="headerlink" href="#relucent.get_mlp_model" title="Link to this definition"></a></dt>
@@ -1371,7 +1391,11 @@ and a <code class="docutils literal notranslate"><span class="pre">layers</span>
 </dl>
 </dd></dl>
 
-<span class="target" id="utility-functions"></span><dl class="py function">
+</section>
+</section>
+<section id="utility-functions">
+<span id="id6"></span><h2>Utility Functions<a class="headerlink" href="#utility-functions" title="Link to this heading"></a></h2>
+<dl class="py function">
 <dt class="sig sig-object py" id="relucent.get_env">
 <span class="sig-prename descclassname"><span class="pre">relucent.</span></span><span class="sig-name descname"><span class="pre">get_env</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_threads</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Env</span></span></span><a class="headerlink" href="#relucent.get_env" title="Link to this definition"></a></dt>
 <dd><p>Get a cached Gurobi environment.</p>
