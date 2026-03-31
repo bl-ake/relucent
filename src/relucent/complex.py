@@ -671,6 +671,7 @@ class Complex:
 
     @property
     def G(self) -> nx.Graph:
+        """The adjacency graph of top-dimensional cells in the complex."""
         if self._G is None:
             self._G = self.get_dual_graph()
         return self._G
