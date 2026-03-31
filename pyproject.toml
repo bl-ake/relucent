@@ -37,9 +37,6 @@ Documentation = "https://bl-ake.github.io/relucent/"
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    "ignore::UserWarning",
-    "ignore:divide by zero encountered in divide:RuntimeWarning",
-#    "ignore:.*U.*mode is deprecated:DeprecationWarning",
     "ignore:This process .* is multi-threaded, use of fork\\(\\).*:DeprecationWarning",
 ]
 
