@@ -10,12 +10,17 @@
 
 </div>
 
-A Python package for computing the polyhedra of ReLU networks!
+Relucent is a Python package for computing the polyhedra of ReLU networks! Its main features include:
+- Distributed calculation of the activation regions of ReLU networks via local search
+- Visualization of ReLU complexes in two or three dimensions
+- Automatic compatibility with existing PyTorch networks
+- Computation of the complex's dual graph in [NetworkX Graph](https://networkx.org/documentation/stable/tutorial.html) format
 
-Relucent differs from existing packages (for example, check out [CanonicalPoly 2.0](https://github.com/mmasden/canonicalpoly2.0) by Marissa Maden and [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient for a given network architecture, in particular allowing local search of the complex for networks with higher input dimensions. This package also extends [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar, implementing functionality for things like distributed search, visualization, and analysis of polyhedra with codimension > 0. If you do not need a Python package, you might be interested in [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek, which provides an interactive interface for visualizing 2-input networks.
+Relucent differs from existing packages (for example, check out [CanonicalPoly 2.0](https://github.com/mmasden/canonicalpoly2.0) by Marissa Maden and [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient for a given network architecture, in particular allowing local search of the complex for networks with higher input dimensions. This package also extends the functionality of [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar. If you do not need a Python package, you might be interested in [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek, which provides an interactive interface for visualizing 2-input networks.
+
 
 ## Environment Setup 
-1. Install Python 3.13
+1. Install Python >= 3.11
 2. Install [PyTorch](https://pytorch.org/get-started/locally/)
 3. Run `pip install relucent`
 
@@ -31,7 +36,7 @@ fig = cplx.plot_cells(bound=10000)
 fig.show()
 ```
 
-The "NN" object returned by get_mlp_model inherits from torch.nn.Module, so you can train and manipulate it just like you're used to :)
+The `get_mlp_model` function returns a PyTorch Module, so you can train and manipulate it just like you're used to!
 
 Given some input point, you could get a minimal H-representation of the polyhedron containing it like this:
 ```
@@ -46,7 +51,7 @@ You could also check the average number of faces of all polyhedrons with:
 ```
 sum(len(p.shis) for p in cplx) / len(cplx)
 ```
-Or, get the adjacency graph of top-dimensional cells in the complex as a [NetworkX Graph](https://networkx.org/documentation/stable/tutorial.html) with:
+Or, get the adjacency graph of top-dimensional cells in the complex with:
 ```
 print(cplx.get_dual_graph())
 ```
@@ -54,12 +59,14 @@ print(cplx.get_dual_graph())
 You can view the full documentation for this library at https://bl-ake.github.io/relucent/
 
 ## Obtaining a Gurobi License
-Without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license), Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:
-1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/), for example using `pip install gurobipy`
+This package will work for most applications without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license). However, without one, Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:
+0. Create a fresh Python environment using a distribution of [Anaconda](https://mamba.readthedocs.io/en/latest/index.html).
+1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/) using `conda install -c gurobi gurobi`.
 2. [Obtain a Gurobi license](https://support.gurobi.com/hc/en-us/articles/360040541251-How-do-I-obtain-a-free-academic-license) (Note: a WLS license will limit the number of concurrent sessions across multiple devices, which can result in slowdowns when using this library on different machines simultaneously.)
 3. In your Conda environment, run `grbgetkey` followed by your license key
+4. Complete the remaining steps in [Getting Started](#getting-started)
 
-## Usage Notes
+## Citing this Package
 If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
 
 ```
