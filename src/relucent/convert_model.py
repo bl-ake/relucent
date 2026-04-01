@@ -6,7 +6,7 @@ which consists of Linear and ReLU layers only.
 """
 
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import torch
@@ -67,7 +67,8 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
 
-    conv.bias = conv.bias or torch.zeros(conv.out_channels, device=conv.weight.device)
+    if conv.bias is None:
+        conv.bias = nn.Parameter(torch.zeros(conv.out_channels, device=conv.weight.device))
 
     fc = nn.Linear(in_features=np.prod(in_shape).item(), out_features=np.prod(out_shape).item(), device=conv.weight.device)
     fc.weight.data.fill_(0.0)
@@ -138,7 +139,8 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: tuple[int, int,
     scale = 1.0 / float(kernel_area)
     for i in range(input_size[0]):
         conv2d.weight.data[i, i, :, :].fill_(scale)
-    conv2d.bias = conv2d.bias or torch.zeros(input_size[0], device=conv2d.weight.device)
+    if conv2d.bias is None:
+        conv2d.bias = nn.Parameter(torch.zeros(input_size[0], device=conv2d.weight.device))
     conv2d.bias.data.fill_(0.0)
     return torch_conv_layer_to_affine(conv2d, input_size)
 
@@ -187,7 +189,9 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
 
 
 @torch.no_grad()
-def convert(model: NN) -> NN:
+def convert(
+    input: nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module], input_shape: tuple[int, ...] | None = None
+) -> NN:
     """Convert a PyTorch model to canonical NN format.
 
     Converts various PyTorch layer types (Conv2d, AvgPool2d, etc.) into the
@@ -202,9 +206,9 @@ def convert(model: NN) -> NN:
         - LogSoftmax: Stops conversion (output layer)
 
     Args:
-        model: An NN (or compatible) object with an ``input_shape`` attribute
-            and a ``layers`` attribute containing an OrderedDict of layers.
-
+        input: An torch.nn.Module, a ModuleList, or a ModuleDict.
+        input_shape: Shape of the input data (excluding batch dimension).
+            If None, infers from the input model. Defaults to None.
     Returns:
         NN: A new NN object in canonical format.
 
@@ -212,11 +216,25 @@ def convert(model: NN) -> NN:
         ValueError: If an unsupported layer type is encountered or the model
         does not define an input_shape attribute.
     """
+    if isinstance(input, NN):
+        model = input
+        if input_shape is not None:
+            model.input_shape = input_shape
+    elif isinstance(input, nn.Module):
+        model = NN(layers=input.children(), input_shape=input_shape)
+    elif isinstance(input, (Iterable, Mapping)):
+        model = NN(layers=input, input_shape=input_shape)
+    else:
+        raise ValueError(
+            f"Unsupported input type: {type(input)}."
+            "Must be an NN object, an Iterable of nn.Module objects, or a Mapping of str -> nn.Module."
+        )
+
     params = next(model.parameters())
     input_shape = getattr(model, "input_shape", None)
     if input_shape is None:
         raise ValueError("Model must define input_shape for conversion.")
-    x = torch.zeros(input_shape, dtype=params.dtype, device=params.device)
+    x = torch.zeros((1,) + input_shape, dtype=params.dtype, device=params.device)
     layers = OrderedDict()
     assert "Flatten Input" not in model.layers
     layers["Flatten Input"] = nn.Flatten()
@@ -245,4 +263,19 @@ def convert(model: NN) -> NN:
         module.to(model.device)
     layers = combine_linear_layers(layers)
     new_model = NN(layers=layers, input_shape=(np.prod(model.input_shape, dtype=int),)).to(model.device, model.dtype)
+
+    has_logsoftmax = any(isinstance(m, nn.LogSoftmax) for m in model.layers.values())
+    if not has_logsoftmax:
+        try:
+            was_training = model.training
+            model.eval()
+            new_model.eval()
+            x = torch.randn(input_shape, dtype=params.dtype, device=params.device)
+            old_y = model(x)
+            new_y = new_model(x)
+            assert torch.allclose(old_y, new_y, atol=1e-5, rtol=1e-5)
+        except Exception as e:
+            raise ValueError(f"Conversion failed: {e}") from e
+        finally:
+            model.train(was_training)
     return new_model
