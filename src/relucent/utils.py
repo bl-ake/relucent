@@ -5,11 +5,13 @@ thread-safe queue implementations, and network manipulation helpers used
 throughout the package.
 """
 
+import multiprocessing as mp
 import os
 import random
 from collections import OrderedDict, deque
 from collections.abc import Callable, Iterator
 from heapq import heappop, heappush
+from multiprocessing.context import BaseContext
 from threading import Condition
 from typing import Any
 
@@ -27,6 +29,7 @@ __all__ = [
     "close_env",
     "encode_ss",
     "get_env",
+    "get_mp_context",
     "normalize_weights",
     "process_aware_cpu_count",
     "set_seeds",
@@ -35,6 +38,29 @@ __all__ = [
 
 _env: Env | None = None
 _default_env_disposed: bool = False
+
+
+def get_mp_context() -> BaseContext:
+    """Return the appropriate multiprocessing context for the current platform.
+
+    Prefers ``fork`` where available (Linux/macOS) because workers inherit the
+    parent's already-loaded model weights without any serialisation overhead.
+    Falls back to ``spawn`` on platforms where ``fork`` is unavailable (e.g.
+    Windows). When using ``spawn``, the caller's main module must use the
+    standard ``if __name__ == "__main__":`` guard to prevent worker processes
+    from re-executing top-level code.
+
+    ``forkserver`` is intentionally avoided: it uses OS semaphores for
+    inter-process coordination that are not always released before Python's
+    resource tracker runs at shutdown, producing spurious leaked-semaphore
+    warnings (CPython issue #91435).
+
+    Returns:
+        A multiprocessing context object whose ``.Pool(...)`` method can be
+        used to create a process pool.
+    """
+    available = mp.get_all_start_methods()
+    return mp.get_context("fork" if "fork" in available else "spawn")
 
 
 def set_seeds(seed: int) -> None:
