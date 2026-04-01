@@ -688,7 +688,7 @@ def _complex_figure_2d_cells(
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
     interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
     maxcoord = (
-        (np.mean(interior_points) * PLOT_MARGIN_FACTOR)
+        min(float(np.median(interior_points)) * PLOT_MARGIN_FACTOR, bound)
         if len(interior_points) > 0
         else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
     )
