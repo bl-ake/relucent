@@ -1,6 +1,5 @@
 """Search and pathfinding over a polyhedral complex."""
 
-import multiprocessing as mp
 import random
 import warnings
 from collections import defaultdict
@@ -24,6 +23,7 @@ from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
     UpdatablePriorityQueue,
+    get_mp_context,
     process_aware_cpu_count,
 )
 
@@ -146,7 +146,7 @@ def parallel_add(
         s = cx.point2ss(p)
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
-    with mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net,)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net,)) as pool:
         ps = pool.map(partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5))
         ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
         for p in ps:
@@ -390,7 +390,7 @@ def searcher(
     unprocessed = len(queue)
     depth = 0
 
-    with mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
         try:
             for p, shi, depth, node_index in pool.imap_unordered(partial(poly_calculations, bound=bound, **kwargs), queue):
                 unprocessed -= 1
@@ -633,7 +633,11 @@ def hamming_astar(
     def d(p1: Polyhedron, p2: Polyhedron) -> int:
         return 1
 
-    pool = mp.Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads)) if nworkers > 1 else None
+    pool = (
+        get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
+        if nworkers > 1
+        else None
+    )
     try:
         set_globals(cx.net)
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
