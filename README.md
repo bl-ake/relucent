@@ -10,12 +10,9 @@
 
 </div>
 
-A little Python package for computing the polyhedra of ReLU networks!
+A Python package for computing the polyhedra of ReLU networks!
 
-Relucent differs from existing packages (for example, check out the amazing [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient, in particular speeding up local search of the complex in higher dimensions. If you do not need a Python package, you might be interested in [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek, which provides an interactive interface for visualizing 2-input networks.
-
-If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent/issues). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
-
+Relucent differs from existing packages (for example, check out [CanonicalPoly 2.0](https://github.com/mmasden/canonicalpoly2.0) by Marissa Maden and [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient for a given network architecture, in particular allowing local search of the complex for networks with higher input dimensions. This package also extends [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar, implementing functionality for things like distributed search, visualization, and analysis of polyhedra with codimension > 0. If you do not need a Python package, you might be interested in [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek, which provides an interactive interface for visualizing 2-input networks.
 
 ## Environment Setup 
 1. Install Python 3.13
@@ -61,6 +58,20 @@ Without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-
 1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/), for example using `pip install gurobipy`
 2. [Obtain a Gurobi license](https://support.gurobi.com/hc/en-us/articles/360040541251-How-do-I-obtain-a-free-academic-license) (Note: a WLS license will limit the number of concurrent sessions across multiple devices, which can result in slowdowns when using this library on different machines simultaneously.)
 3. In your Conda environment, run `grbgetkey` followed by your license key
+
+## Usage Notes
+If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
+
+```
+@inproceedings{
+  gaines2026characterizing,
+  title={Characterizing the Discrete Geometry of Re{LU} Networks},
+  author={Blake B. Gaines and Jinbo Bi},
+  booktitle={The Fourteenth International Conference on Learning Representations},
+  year={2026},
+  url={https://openreview.net/forum?id=TgLW2DiRDG}
+}
+```
 
 ## Bibliography
 This package was made possible by the following works:
