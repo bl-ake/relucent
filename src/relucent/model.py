@@ -8,7 +8,8 @@ ReLU MLPs.
 """
 
 from collections import OrderedDict
-from collections.abc import Container, Iterable
+from collections.abc import Container, Iterable, Mapping
+from typing import cast
 
 import numpy as np
 import torch
@@ -24,7 +25,7 @@ class NN(nn.Module):
 
     def __init__(
         self,
-        layers: OrderedDict[str, nn.Module] | None = None,
+        layers: Iterable[nn.Module] | Mapping[str, nn.Module],
         input_shape: tuple[int, ...] | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
@@ -32,8 +33,7 @@ class NN(nn.Module):
         """Initialize a neural network.
 
         Args:
-            layers: Dictionary of layers (nn.ModuleDict or dict-like). If None,
-                creates an empty network. Defaults to None.
+            layers: Dictionary of layers (nn.ModuleDict or dict-like).
             input_shape: Shape of the input data (excluding batch dimension).
                 If None, infers from the first Linear layer. Defaults to None.
             device: PyTorch device to use. If None, uses the device of the first
@@ -46,7 +46,22 @@ class NN(nn.Module):
         """
         super().__init__()
 
-        self.layers = nn.ModuleDict(layers) if layers is not None else nn.ModuleDict()
+        if isinstance(layers, nn.ModuleDict):
+            self.layers = layers
+        elif isinstance(layers, Mapping):
+            self.layers = nn.ModuleDict(cast(Mapping[str, nn.Module], layers))
+        elif isinstance(layers, Iterable):
+            items = list(layers)
+            if len(items) == 1 and isinstance(items[0], nn.ModuleDict):
+                # Handles nn.Module.children(), which yields a single ModuleDict
+                self.layers = items[0]
+            else:
+                self.layers = nn.ModuleDict(OrderedDict([(f"layer{i}", layer) for i, layer in enumerate(items)]))
+        else:
+            raise ValueError(
+                f"Unsupported layers type: {type(layers)}."
+                "Must be a Mapping of str -> nn.Module or an Iterable of nn.Module objects."
+            )
 
         if input_shape is not None:
             resolved_shape: tuple[int, ...] = input_shape
