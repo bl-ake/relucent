@@ -17,6 +17,7 @@ from relucent.config import (
     DEFAULT_PARALLEL_ADD_BOUND,
     DEFAULT_SEARCH_BOUND,
 )
+from relucent.convert_model import convert
 from relucent.model import NN
 from relucent.poly import Polyhedron
 from relucent.search import (
@@ -83,13 +84,15 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
-    def __init__(self, net: NN) -> None:
+    def __init__(self, net: nn.Module) -> None:
         """Initialize the complex for a given network.
 
         Args:
-            net: The NN (neural network) instance whose polyhedral complex
+            net: The nn.Module instance whose polyhedral complex
                 is to be built and queried.
         """
+        if not isinstance(net, NN):
+            net = convert(net)
         self._net = net
         self.net.save_numpy_weights()
 

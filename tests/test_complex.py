@@ -1,14 +1,17 @@
 """Tests for relucent.complex (Complex, BFS/DFS, dual graph, pathfinding)."""
 
 import warnings
+from collections import OrderedDict
 
 import networkx as nx
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 
 from relucent import Complex, get_mlp_model
 from relucent.calculations import adjacent_polyhedra
+from relucent.model import NN
 
 
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
@@ -98,13 +101,19 @@ def test_plot_and_dual_graph_smoke(seeded):
             message=r".*divide by zero encountered in divide.*",
             category=RuntimeWarning,
         )
-        model = get_mlp_model(widths=[2, 10, 5, 1])
-        cplx = Complex(model)
+        network = nn.Sequential(
+            nn.Linear(2, 10),
+            nn.ReLU(),
+            nn.Linear(10, 5),
+            nn.ReLU(),
+            nn.Linear(5, 1),
+        )
+        cplx = Complex(network)
         cplx.bfs()
         fig = cplx.plot_cells(bound=10000)
         assert fig is not None
         _ = sum(len(p.shis) for p in cplx) / len(cplx)
-        x = np.random.random(model.input_shape).astype(np.float32)
+        x = np.random.random(cplx.net.input_shape).astype(np.float32)
         p = cplx.point2poly(x)
         _ = p.halfspaces[p.shis, :]
         _ = p.W
@@ -234,6 +243,66 @@ class TestComplexAdjacent:
         assert isinstance(neighbors, set)
         for q in neighbors:
             assert (p.ss_np != q.ss_np).sum() >= 1
+
+
+class TestComplexAutoConversion:
+    def test_sequential_is_accepted(self, seeded):
+        """Complex accepts a plain nn.Sequential and auto-converts it."""
+        sequential = nn.Sequential(
+            nn.Linear(4, 8),
+            nn.ReLU(),
+            nn.Linear(8, 2),
+        )
+        cplx = Complex(sequential)
+        assert isinstance(cplx.net, NN)
+
+    def test_module_dict_is_accepted(self, seeded):
+        """Complex accepts an OrderedDict of layers and auto-converts it."""
+        layers: OrderedDict[str, nn.Module] = OrderedDict(
+            [
+                ("fc0", nn.Linear(4, 8)),
+                ("relu0", nn.ReLU()),
+                ("fc1", nn.Linear(8, 2)),
+            ]
+        )
+        cplx = Complex(NN(layers=layers))
+        assert isinstance(cplx.net, NN)
+
+    def test_auto_converted_dim_and_n(self, seeded):
+        """Auto-converted sequential has correct input dim and neuron count."""
+        sequential = nn.Sequential(
+            nn.Linear(4, 8),
+            nn.ReLU(),
+            nn.Linear(8, 2),
+        )
+        cplx = Complex(sequential)
+        assert cplx.dim == 4
+        assert cplx.n == 8
+
+    def test_auto_converted_matches_explicit_nn(self, seeded):
+        """Auto-converting a Sequential gives the same complex as the explicit NN."""
+        net = get_mlp_model(widths=[4, 8, 2])
+        # Build an equivalent Sequential sharing the same weight tensors
+        sequential = nn.Sequential(
+            net.layers["fc0"],
+            net.layers["relu0"],
+            net.layers["fc1"],
+        )
+        cplx_nn = Complex(net)
+        cplx_seq = Complex(sequential)
+        assert cplx_nn.dim == cplx_seq.dim
+        assert cplx_nn.n == cplx_seq.n
+        # Both should compute the same polyhedron for the same input point
+        x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
+        ss_nn = cplx_nn.point2ss(x)
+        ss_seq = cplx_seq.point2ss(x)
+        assert torch.equal(torch.as_tensor(ss_nn), torch.as_tensor(ss_seq))
+
+    def test_nn_module_passed_directly_unchanged(self, seeded):
+        """An NN instance is not re-wrapped; cplx.net is the same object."""
+        net = get_mlp_model(widths=[4, 8, 2])
+        cplx = Complex(net)
+        assert cplx.net is net
 
 
 class TestComplexMisc:
