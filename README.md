@@ -13,9 +13,9 @@
 Relucent is a Python package for computing the polyhedra of ReLU networks! Its main features include:
 - Distributed calculation of the activation regions of ReLU networks via local search
 - Visualization of ReLU complexes in two or three dimensions with [Plotly](https://plotly.com/python/)
-- Automatic compatibility with existing PyTorch networks
-- Computation of the complex's dual graph as a [NetworkX Graph](https://networkx.org/documentation/stable/tutorial.html)
-- Various geometry and topology calculations
+- Automatic compatibility with existing [PyTorch](https://docs.pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html) networks
+- Computation of the complex's dual as a [NetworkX](https://networkx.org/documentation/stable/tutorial.html) Graph
+- Various calculations for individual activation regions, decision boundaries, and affine splines
 
 ## Environment Setup 
 1. Install Python >= 3.11
@@ -36,7 +36,7 @@ network = nn.Sequential(
     nn.Linear(10, 5),
     nn.ReLU(),
     nn.Linear(5, 1),
-) ## or relucent.get_mlp_model(widths=[2, 10, 5, 1])
+) ## or conveniently, relucent.get_mlp_model(widths=[2, 10, 5, 1])
 
 ## Initialize a Complex to track calculations
 cplx = relucent.Complex(network)
@@ -48,14 +48,15 @@ cplx.bfs()
 cplx.plot_cells(bound=10000).show()
 ```
 
-Given some input point, you could get a minimal H-representation of the polyhedron containing it like this:
+Given some input point, you could get a minimal H-representation of the polyhedral region containing it like this:
 ```
 import numpy as np
 
 input_point = np.random.random(network.input_shape)
 p = cplx.point2poly(input_point)
-print(p.halfspaces[p.shis, :])
+print(p.halfspaces[p.shis])
 ```
+Attributes like `p.halfspaces` (halfspaces of the form Ax + b <= 0, in format [A; b], induced by each neuron), `p.shis` (the indices of the non-redundant halfspaces), and `p.center` (the Chebyshev Center) are computed lazily.
 
 You could also check the average number of faces of all polyhedrons with:
 ```
@@ -91,7 +92,7 @@ If you run into any problems or have any feature requests, please create an issu
 ```
 
 ## Related Software:
-Please check out the amazing software created by others working in this area. Depending on your situation, some of these could be even better!
+Please check out the amazing software created by others working in this area. Depending on your goal, some of these could be even better!
 - [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar ([Paper](https://doi.org/10.3389/fdata.2023.1274831))
 - [CanonicalPoly 2.0](https://github.com/mmasden/canonicalpoly2.0) by Marissa Maden ([Paper](https://doi.org/10.1137/24M1646996))
 - [ReLU Edge Subdivision](https://github.com/arturs-berzins/relu_edge_subdivision) by Arturs Berzins ([Paper](https://proceedings.mlr.press/v202/berzins23a.html))
