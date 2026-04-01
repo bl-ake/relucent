@@ -676,7 +676,6 @@ def _complex_figure_2d_cells(
             )
         except Exception as e:
             warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
-            print("AHHHHHH", e)
             continue
         if len(traces) == 0:
             warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
