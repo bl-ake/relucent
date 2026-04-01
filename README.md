@@ -36,16 +36,18 @@ network = nn.Sequential(
     nn.Linear(10, 5),
     nn.ReLU(),
     nn.Linear(5, 1),
-) ## or conveniently, relucent.get_mlp_model(widths=[2, 10, 5, 1])
+)  ## or conveniently, relucent.get_mlp_model(widths=[2, 10, 5, 1])
 
 ## Initialize a Complex to track calculations
 cplx = relucent.Complex(network)
 
 ## Calculate the activation regions via local search
-cplx.bfs()
+if __name__ == "__main__":
+    cplx.bfs()
 
-## Plot
-cplx.plot_cells(bound=10000).show()
+## Plotting functions return Plotly figures
+fig = cplx.plot_cells()
+fig.show()
 ```
 
 Given some input point, you could get a minimal H-representation of the polyhedral region containing it like this:
