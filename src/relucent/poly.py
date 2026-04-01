@@ -50,11 +50,11 @@ class Polyhedron:
     ) -> None:
         """Create a Polyhedron object.
 
-        The kwargs can be used to supply precomputed values for various properties.
-
         Args:
             net: Instance of the NN class from the "model" module.
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
+
+        The kwargs can be used to supply precomputed values for various properties.
         """
         self._net = net
         # Store the sign sequence with an integer dtype to ensure consistent
