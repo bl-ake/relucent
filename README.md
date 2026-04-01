@@ -26,6 +26,7 @@ Relucent is a Python package for computing the polyhedra of ReLU networks! Its m
 To see if the installation has been successful, try plotting the complex of a randomly initialized network in 2 dimensions like this:
 
 ```python
+import numpy as np
 import torch.nn as nn
 import relucent
 
@@ -52,9 +53,7 @@ fig.show()
 
 Given some input point, you could get a minimal H-representation of the polyhedral region containing it like this:
 ```
-import numpy as np
-
-input_point = np.random.random(network.input_shape)
+input_point = np.random.random((1, 2))
 p = cplx.point2poly(input_point)
 print(p.halfspaces[p.shis])
 ```
