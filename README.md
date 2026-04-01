@@ -12,7 +12,7 @@
 
 A little Python package for computing the polyhedra of ReLU networks!
 
-This package differs from existing software (for example, check out the amazing [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient, in particular speeding up local search of the complex in higher dimensions.
+Relucent differs from existing packages (for example, check out the amazing [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun) because it avoids computing vertices of the complex. This tradeoff changes which computations are efficient, in particular speeding up local search of the complex in higher dimensions. If you do not need a Python package, you might be interested in [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek, which provides an interactive interface for visualizing 2-input networks.
 
 If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent/issues). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
 
