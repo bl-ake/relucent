@@ -681,6 +681,17 @@ class Complex:
             cplx.add_polyhedron(poly)
         return cplx
 
+    def contract(self):
+        """Contract the maximal cells in the complex."""
+        G = self.get_dual_graph()
+        new_complex = Complex(self.net)
+        for e1, e2, shi in G.edges(data="shi"):
+            new_ss = e1.ss_np.copy()
+            new_ss[0, shi] = 0
+            new_complex.add_ss(new_ss, halfspaces=e1.halfspaces, shis=list(set(e1.shis) & set(e2.shis) - {shi}))
+
+        return new_complex
+
     @property
     def G(self) -> nx.Graph:
         """The adjacency graph of top-dimensional cells in the complex."""
