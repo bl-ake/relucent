@@ -382,8 +382,6 @@ class Polyhedron:
             np.ndarray or None: Array of vertex coordinates, or None if the
                 polyhedron doesn't intersect the bounded region or computation fails.
         """
-        if self.codim > 0:
-            raise NotImplementedError("Codimension > 0 not yet supported")
 
         if qhull_mode is None:
             qhull_mode = cfg.QHULL_MODE
@@ -395,22 +393,89 @@ class Polyhedron:
             self.warnings.append(w)
             return None
 
+        ## TODO: Move this logic into a separate method and reuse it here and in get_interior_point()
+        n_rows_raw = bounded_halfspaces.shape[0]
+        zero_idx = self.zero_indices[(self.zero_indices >= 0) & (self.zero_indices < n_rows_raw)]
+
         # Last-resort guard: Qhull requires non-degenerate halfspace normals.
         normals = bounded_halfspaces[:, :-1]
         norms = np.linalg.norm(normals, axis=1)
         deg = norms < cfg.TOL_HALFSPACE_NORMAL
         if np.any(deg):
+            old_to_new = np.full(n_rows_raw, -1, dtype=np.intp)
+            kept = np.flatnonzero(~deg)
+            old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
             bounded_halfspaces = bounded_halfspaces[~deg]
+            if zero_idx.size > 0:
+                zero_idx = old_to_new[zero_idx]
+                zero_idx = zero_idx[zero_idx >= 0]
 
         # Recompute interior point
-        int_point, radius = solve_radius(
+        int_point, _ = solve_radius(
             get_env(),
             bounded_halfspaces,
             max_radius=1000,
-            zero_indices=self.zero_indices,
+            zero_indices=zero_idx,
         )
         if int_point is None:
             raise ValueError("Interior point not found in bounded region")
+
+        projected_halfspaces = bounded_halfspaces
+        projected_int_point = np.asarray(int_point).reshape(-1)
+        remap_vertices = lambda verts: verts  # noqa: E731
+
+        # HalfspaceIntersection expects a full-dimensional interior. For k<d cells
+        # (equalities induced by zero sign entries), project to nullspace coords.
+        if zero_idx.size > 0:
+            equalities = bounded_halfspaces[zero_idx]
+            inequalities = bounded_halfspaces[~np.isin(np.arange(bounded_halfspaces.shape[0]), zero_idx)]
+            eq_A = equalities[:, :-1]
+            eq_b = equalities[:, -1:]
+            x0, *_ = np.linalg.lstsq(eq_A, -eq_b, rcond=None)
+            x0 = np.asarray(x0).reshape(-1, 1)
+
+            _, s, vh = np.linalg.svd(eq_A, full_matrices=True)
+            rank = int(np.sum(s > cfg.TOL_HALFSPACE_NORMAL))
+            null_basis = vh[rank:, :].T
+
+            if null_basis.shape[1] == 0:
+                return x0.reshape(1, -1)
+
+            A_red = inequalities[:, :-1] @ null_basis
+            b_red = inequalities[:, :-1] @ x0 + inequalities[:, -1:]
+            projected_halfspaces = np.hstack((A_red, b_red))
+
+            z0, *_ = np.linalg.lstsq(null_basis, projected_int_point[:, None] - x0, rcond=None)
+            projected_int_point = np.asarray(z0).reshape(-1)
+
+            def _remap_vertices(verts: np.ndarray) -> np.ndarray:
+                return (null_basis @ verts.T + x0).T
+
+            remap_vertices = _remap_vertices
+
+        reduced_dim = projected_halfspaces.shape[1] - 1
+        if reduced_dim == 1:
+            a = projected_halfspaces[:, 0]
+            b = projected_halfspaces[:, 1]
+            lower = -float("inf")
+            upper = float("inf")
+            tol_a = cfg.TOL_HALFSPACE_NORMAL
+            tol_b = cfg.TOL_HALFSPACE_CONTAINMENT
+            for ai, bi in zip(a, b, strict=True):
+                if abs(ai) <= tol_a:
+                    if bi > tol_b:
+                        raise ValueError("Infeasible 1D projected halfspace system")
+                    continue
+                cutoff = -bi / ai
+                if ai > 0:
+                    upper = min(upper, cutoff)
+                else:
+                    lower = max(lower, cutoff)
+            if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper + tol_b:
+                raise ValueError("Projected 1D intersection is empty or unbounded")
+            reduced_vertices = np.array([[lower], [upper]], dtype=np.float64)
+            vertices = remap_vertices(reduced_vertices)
+            return np.unique(vertices, axis=0)
         try:
             # Debug aid for rare Qhull failures (e.g. QH6023: feasible point not clearly inside halfspace).
             # If any halfspace normal is ~0, Qhull can behave pathologically.
@@ -434,8 +499,8 @@ class Polyhedron:
                 pass
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
-                    bounded_halfspaces,
-                    int_point.squeeze(),
+                    projected_halfspaces,
+                    projected_int_point,
                     qhull_options=None,
                 )  # http://www.qhull.org/html/qh-optq.htm
             if w:
@@ -449,8 +514,8 @@ class Polyhedron:
                 elif qhull_mode == "JITTERED":
                     with warnings.catch_warnings(record=True) as w2:
                         new_hs = HalfspaceIntersection(
-                            bounded_halfspaces,
-                            int_point.squeeze(),
+                            projected_halfspaces,
+                            projected_int_point,
                             # Triangulated output is approximately 1000 times more accurate than joggled input.
                             qhull_options="QJ",
                         )  # http://www.qhull.org/html/qh-optq.htm
@@ -470,8 +535,8 @@ class Polyhedron:
             if qhull_mode == "JITTERED":
                 try:
                     hs = HalfspaceIntersection(
-                        bounded_halfspaces,
-                        int_point.squeeze(),
+                        projected_halfspaces,
+                        projected_int_point,
                         # Triangulated output is approximately 1000 times more accurate than joggled input.
                         qhull_options="QJ",
                     )  # http://www.qhull.org/html/qh-optq.htm
@@ -482,7 +547,7 @@ class Polyhedron:
                     raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
             else:
                 raise ValueError(f"Error while computing halfspace intersection: {e}") from e
-        vertices = hs.intersections
+        vertices = remap_vertices(hs.intersections)
         return vertices
 
     def _get_bounded_plot_geometry(
