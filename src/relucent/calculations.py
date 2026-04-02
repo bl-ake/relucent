@@ -30,6 +30,44 @@ __all__ = [
 ]
 
 
+def _drop_degenerate_halfspaces_tracked(
+    halfspaces: np.ndarray,
+    *,
+    tol_normal: float | None = None,
+    tol_bias: float | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Like :func:`_drop_degenerate_halfspaces` but also returns an old-row → new-row map.
+
+    ``old_to_new[i]`` is the row index in the returned array corresponding to
+    original row ``i``, or ``-1`` if that row was dropped.
+    """
+    n_old = halfspaces.shape[0]
+    if tol_normal is None:
+        tol_normal = cfg.TOL_HALFSPACE_NORMAL
+    if tol_bias is None:
+        tol_bias = cfg.TOL_HALFSPACE_CONTAINMENT
+    if halfspaces.size == 0:
+        return halfspaces, np.arange(0, dtype=np.intp)
+
+    a = halfspaces[:, :-1]
+    b = halfspaces[:, -1]
+    norms = np.linalg.norm(a, axis=1)
+    deg = norms < tol_normal
+    if not np.any(deg):
+        return halfspaces, np.arange(n_old, dtype=np.intp)
+
+    if np.any(b[deg] > tol_bias):
+        bad = np.flatnonzero(deg & (b > tol_bias)).tolist()
+        raise ValueError(
+            f"Degenerate halfspace(s) imply infeasibility (||a||<{tol_normal:g} with b>{tol_bias:g}) at rows {bad}"
+        )
+
+    kept = np.flatnonzero(~deg)
+    old_to_new = np.full(n_old, -1, dtype=np.intp)
+    old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
+    return halfspaces[~deg], old_to_new
+
+
 def _drop_degenerate_halfspaces(
     halfspaces: np.ndarray,
     *,
@@ -42,28 +80,52 @@ def _drop_degenerate_halfspaces(
     is either always satisfied (b <= 0) or infeasible (b > 0). Keeping such rows
     can trigger Qhull errors (e.g. QH6023) and destabilize interior-point solves.
     """
-    if tol_normal is None:
-        tol_normal = cfg.TOL_HALFSPACE_NORMAL
-    if tol_bias is None:
-        tol_bias = cfg.TOL_HALFSPACE_CONTAINMENT
-    if halfspaces.size == 0:
-        return halfspaces
-    a = halfspaces[:, :-1]
-    b = halfspaces[:, -1]
-    norms = np.linalg.norm(a, axis=1)
-    deg = norms < tol_normal
-    if not np.any(deg):
-        return halfspaces
+    dropped, _ = _drop_degenerate_halfspaces_tracked(halfspaces, tol_normal=tol_normal, tol_bias=tol_bias)
+    return dropped
 
-    # If any degenerate constraint has positive bias, it encodes 0 + b <= 0 with b>0 (infeasible).
-    # Treat this as a hard error rather than silently dropping constraints.
-    if np.any(b[deg] > tol_bias):
-        bad = np.flatnonzero(deg & (b > tol_bias)).tolist()
-        raise ValueError(
-            f"Degenerate halfspace(s) imply infeasibility (||a||<{tol_normal:g} with b>{tol_bias:g}) at rows {bad}"
-        )
 
-    return halfspaces[~deg]
+def _remap_zero_indices(zero_indices: np.ndarray | None, old_to_new: np.ndarray) -> np.ndarray | None:
+    """Map sign-sequence indices through a degenerate-row removal map."""
+    if zero_indices is None or len(zero_indices) == 0:
+        return None
+    zm = old_to_new[np.asarray(zero_indices, dtype=np.intp)]
+    zm = zm[zm >= 0]
+    if zm.size == 0:
+        return None
+    return zm
+
+
+def _halfspaces_feasible(
+    env: Any,
+    halfspaces: np.ndarray,
+    zero_indices: np.ndarray | None,
+) -> bool:
+    """Return True iff the linear system has at least one feasible point."""
+    if zero_indices is not None and len(zero_indices) > 0:
+        equalities = halfspaces[zero_indices]
+        inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices)]
+    else:
+        inequalities = halfspaces
+        equalities = None
+
+    model = Model("Feasibility", env)
+    x = model.addMVar((halfspaces.shape[1] - 1, 1), lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS)
+    model.addConstr(inequalities[:, :-1] @ x <= -inequalities[:, -1:])
+    if equalities is not None:
+        model.addConstr(equalities[:, :-1] @ x == -equalities[:, -1:])
+    model.setObjective(0.0, GRB.MINIMIZE)
+    model.optimize()
+    status = model.status
+    model.close()
+    # Minimize 0 over Ax<=b, Ex=f: INFEASIBLE iff the linear system is empty.
+    if status == GRB.INFEASIBLE:
+        return False
+    if status == GRB.INF_OR_UNBD:
+        # Rare for this model; treat as undetermined and assume nonempty if not proven empty.
+        return True
+    if status == GRB.NUMERIC:
+        raise ValueError("Feasibility model ended with NUMERIC status (ill-conditioned?)")
+    return True
 
 
 def solve_radius(
@@ -72,7 +134,7 @@ def solve_radius(
     max_radius: float = GRB.INFINITY,
     zero_indices: np.ndarray | None = None,
     sense: int = GRB.MAXIMIZE,
-) -> tuple[np.ndarray | None, float]:
+) -> tuple[np.ndarray | None, float | None]:
     """Solve for the Chebyshev center or interior point of a polyhedron.
 
     Only works if all polyhedron vertices are within 2*max_radius of each other.
@@ -87,9 +149,9 @@ def solve_radius(
         sense: Optimization sense, should typically be GRB.MAXIMIZE. Defaults to GRB.MAXIMIZE.
 
     Returns:
-        tuple: (center_point, radius) where center_point is the center/interior
-            point and radius is the inradius. Returns (None, float('inf')) if the
-            polyhedron is unbounded and max_radius is infinity.
+        tuple: ``(center_point, radius)``. For ``max_radius`` infinite: ``(None, None)``
+            if the region is empty (infeasible), ``(None, inf)`` if nonempty and unbounded,
+            or ``(x, r)`` with ``r > 0`` if bounded with nonempty interior.
 
     Raises:
         ValueError: If the optimization fails or produces invalid results.
@@ -100,12 +162,13 @@ def solve_radius(
 
     # Remove degenerate constraints (near-zero normals) before building the model.
     # This prevents pathologies like 0*x + 0*y <= -b and makes results more stable across platforms.
-    halfspaces = _drop_degenerate_halfspaces(halfspaces)
+    halfspaces, old_to_new = _drop_degenerate_halfspaces_tracked(halfspaces)
+    zero_indices_eff = _remap_zero_indices(zero_indices, old_to_new)
 
-    if zero_indices is not None and len(zero_indices) > 0:
+    if zero_indices_eff is not None and len(zero_indices_eff) > 0:
         warnings.warn("Working with k<d polyhedron.", stacklevel=2)
-        equalities = halfspaces[zero_indices]
-        inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices)]
+        equalities = halfspaces[zero_indices_eff]
+        inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices_eff)]
         P = (
             np.eye(equalities[:, :-1].shape[1])
             - equalities[:, :-1].T @ np.linalg.pinv(equalities[:, :-1] @ equalities[:, :-1].T) @ equalities[:, :-1]
@@ -129,6 +192,12 @@ def solve_radius(
     model.optimize()
     status = model.status
 
+    if status == GRB.INF_OR_UNBD:
+        model.setParam(GRB.Param.DualReductions, 0)
+        model.reset()
+        model.optimize()
+        status = model.status
+
     if status == GRB.OPTIMAL:
         objVal = model.objVal
         x, y = x.X, float(np.squeeze(y.X))
@@ -143,13 +212,24 @@ def solve_radius(
         model.close()
         raise KeyboardInterrupt
     else:
+        model.close()
         if max_radius == GRB.INFINITY:
-            model.close()
-            return None, float("inf")
+            # Chebyshev LP can be INFEASIBLE while the linear system is still feasible
+            # (e.g. intrinsic inradius 0).
+            if status == GRB.INFEASIBLE:
+                # if _halfspaces_feasible(env, halfspaces, zero_indices_eff):
+                #     warnings.warn(
+                #         "Chebyshev LP is INFEASIBLE but halfspace system is feasible.",
+                #         stacklevel=2,
+                #     )
+                # return None, float("inf")
+                return None, None
+            elif status == GRB.INF_OR_UNBD:
+                raise ValueError("Unable to disambiguate INF_OR_UNBD status.")
+            elif status == GRB.UNBOUNDED:
+                return None, float("inf")
+            raise ValueError(f"Interior Point Model Status: {status}")
         else:
-            # if status == GRB.INFEASIBLE:
-            #     breakpoint()
-            model.close()
             raise ValueError(f"Interior Point Model Status: {status}")
 
 

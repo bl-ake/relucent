@@ -70,6 +70,7 @@ class Polyhedron:
         self._shis: list[int] | None = shis
         self._hs: HalfspaceIntersection | None = None
         self._ch: ConvexHull | None = None
+        self._finite_computed: bool = False
         self._finite: bool | None = None
         self._vertices: np.ndarray | None = None
         self._volume: float | None = None
@@ -218,8 +219,11 @@ class Polyhedron:
             ValueError: If no interior point can be found.
         """
         max_radius = max_radius or cfg.MAX_RADIUS
-        if isinstance(self._center, (np.ndarray, torch.Tensor)):
-            interior_point = self._center.squeeze()
+        if self.finite is None:
+            raise ValueError("Polyhedron is infeasible (empty).")
+        if self._finite is True:
+            assert self._center is not None
+            interior_point = np.asarray(self._center).squeeze()
         else:
             env = env or get_env()
             interior_point = solve_radius(
@@ -240,7 +244,7 @@ class Polyhedron:
             raise ValueError(f"Interior point invalid - {interior_point} not in {self}")
         return interior_point
 
-    def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float]:
+    def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
         """Get the Chebyshev center and inradius of the polyhedron.
 
         This method is "compute-only": it returns (center, inradius) but does
@@ -252,7 +256,9 @@ class Polyhedron:
                 environment. Defaults to None.
 
         Returns:
-            tuple: (center, inradius) where center is None for unbounded polyhedra.
+            tuple: ``(center, inradius)``. ``inradius`` is ``None`` if the halfspace
+            system is infeasible (empty); ``center`` is ``None`` and ``inradius``
+            is ``inf`` for nonempty unbounded polyhedra (with infinite Chebyshev formulation).
         """
         env = env or get_env()
         center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)
@@ -549,6 +555,9 @@ class Polyhedron:
         # self._interior_point = None ## TODO: Does this slow down things?
         self._halfspaces_np = None
         self._attempted_compute_properties = False
+        self._finite_computed = False
+        self._finite = None
+        self._inradius = None
 
     """
     All of the following properties are computed on the fly and cached
@@ -579,8 +588,11 @@ class Polyhedron:
     @property
     def volume(self) -> float:
         """Volume of the polyhedron, infinity for unbounded polyhedra, or -1 if computation fails."""
-        if not self.finite:
+        fin = self.finite
+        if fin is False:
             self._volume = float("inf")
+        elif fin is None:
+            self._volume = -1.0
         elif not self._attempted_compute_properties:
             compute_properties(self)
         return self._volume if self._volume is not None else -1.0
@@ -698,29 +710,47 @@ class Polyhedron:
 
     @property
     def center(self) -> np.ndarray | None:
-        """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded polyhedra."""
-        if self._center is None and self._finite is None:
-            _ = self.finite  # compute _center/_inradius/_finite
+        """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded or infeasible."""
+        if not self._finite_computed:
+            _ = self.finite
         return self._center
 
     @property
-    def inradius(self) -> float:
-        """Inradius of the polyhedron (radius of largest inscribed ball), infinity for unbounded polyhedra."""
-        if self.finite:
-            assert self._inradius is not None  # when finite, get_center_inradius() has set it
+    def inradius(self) -> float | None:
+        """Inradius of the polyhedron, ``inf`` if unbounded feasible, ``None`` if infeasible."""
+        if not self._finite_computed:
+            _ = self.finite
+        if self._finite is True:
+            assert self._inradius is not None  # when bounded, get_center_inradius() has set it
             return self._inradius
-        return float("inf")
+        if self._finite is False:
+            return float("inf")
+        return None
 
     @property
-    def finite(self) -> bool:
-        """Whether the polyhedron is bounded (finite)."""
-        if self._finite is None:
+    def finite(self) -> bool | None:
+        """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``."""
+        if not self._finite_computed:
             center, inradius = self.get_center_inradius()
             self._center = center
             self._inradius = inradius
-            self._finite = self._center is not None
-        assert self._finite is not None
+            if center is not None:
+                self._finite = True
+            elif inradius is None:
+                self._finite = None
+            elif inradius == float("inf"):
+                self._finite = False
+            else:
+                raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
+            self._finite_computed = True
+            if self._finite is None:
+                self._interior_point = None
         return self._finite
+
+    @property
+    def feasible(self) -> bool:
+        """Whether the halfspace system is nonempty (``finite`` is not ``None``)."""
+        return self.finite is not None
 
     @property
     def shis(self) -> list[int]:
@@ -795,11 +825,15 @@ class Polyhedron:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
+        if not hasattr(self, "_finite_computed"):
+            # Legacy pickle: ``_finite`` was only True/False; None meant "not computed".
+            self._finite_computed = self._finite is not None
 
     def __getstate__(self) -> dict[str, Any]:
         return {
             "_tag": self.tag,
             "_hash": self._hash,
+            "_finite_computed": self._finite_computed,
             "_finite": self._finite,
             "_interior_point_norm": self._interior_point_norm,
             "_inradius": self._inradius,

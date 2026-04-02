@@ -30,31 +30,21 @@ __all__ = [
     "get_ip",
     "greedy_path",
     "hamming_astar",
+    "parallel_compute_geometric_properties",
     "parallel_add",
-    "poly_calculations",
+    "search_calculations",
     "searcher",
 ]
 
 
-def poly_calculations(
+def search_calculations(
     task: np.ndarray | torch.Tensor | tuple[Any, ...],
     **kwargs: Any,
 ) -> tuple[Any, ...]:
-    """Worker function for computing polyhedron properties in parallel.
+    """Worker function for neighbor enumeration in search.
 
-    Used by parallel_add() and searcher() to compute halfspaces, center, inradius,
-    interior point, and supporting hyperplane indices (SHIs) for a given sign sequence.
-
-    Args:
-        task: Either a sign sequence or a tuple containing (sign sequence, ...) with
-            additional data to be passed through.
-        **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`, such as
-            'collect_info' or 'bound'.
-
-    Returns:
-        tuple: If successful, returns (Polyhedron, *rest) where rest contains
-            any additional data from the input task. If a ValueError occurs
-            during computation, returns (error, *rest).
+    This intentionally computes only what the traversal needs:
+    feasibility and supporting halfspace indices (SHIs).
     """
     from relucent import complex as cx
 
@@ -63,20 +53,47 @@ def poly_calculations(
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(cx.net, ss)
 
+    if not p.feasible:
+        return "Polyhedron is infeasible (empty).", *rest
+
+    try:
+        if p._shis is None:
+            if "collect_info" in kwargs:
+                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
+                assert isinstance(shis, list)
+                p._shis = shis
+            else:
+                result = get_shis(p, env=cx.env, **kwargs)
+                p._shis = result[0] if isinstance(result, tuple) else result
+    except ValueError as error:
+        return error, *rest
+
+    p.clean_data()
+    if isinstance(p._shis, list):
+        random.shuffle(p._shis)
+    return (p, *rest)
+
+
+def geometric_calculations(
+    task: tuple[np.ndarray, list[int] | None, int] | tuple[Any, ...],
+    compute_volumes: bool = True,
+) -> tuple[Any, ...]:
+    """Worker function for geometric-property computation on known polyhedra."""
+    from relucent import complex as cx
+
+    assert cx.net is not None, "set_globals must be used as pool initializer"
+    ss, shis, poly_index, *rest = task
+    p = Polyhedron(cx.net, ss, shis=shis)
     try:
         halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], get_hs(p, get_all_Ab=False))
-        assert isinstance(halfspaces, (torch.Tensor, np.ndarray))
-        assert isinstance(W, (torch.Tensor, np.ndarray))
-        assert isinstance(b, (torch.Tensor, np.ndarray))
         p._halfspaces = halfspaces
         p._W = W
         p._b = b
         p._num_dead_relus = cast(int, num_dead_relus)
 
-        center, inradius = p.get_center_inradius(env=cx.env)
-        p._center = center
-        p._inradius = inradius
-        p._finite = center is not None
+        _ = p.finite
+        if p._finite is None:
+            raise ValueError("Polyhedron is infeasible (empty).")
 
         p._interior_point = p.get_interior_point(env=cx.env)
         if p.interior_point is not None:
@@ -88,23 +105,55 @@ def poly_calculations(
         else:
             p._Wl2 = np.linalg.norm(p.W).item()
 
-        if cx.dim <= 6 and cx.get_vol_calc:
+        if compute_volumes and cx.dim <= 6:
             _ = p.volume
-        if p._shis is None:
-            if "collect_info" in kwargs:
-                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
-                assert isinstance(shis, list)
-                p._shis = shis
-            else:
-                result = get_shis(p, env=cx.env, **kwargs)
-                p._shis = result[0] if isinstance(result, tuple) else result
     except ValueError as error:
-        return error, *rest
-    p.clean_data()
+        return error, poly_index, *rest
 
-    if isinstance(p._shis, list):
-        random.shuffle(p._shis)
-    return (p, *rest)
+    # Keep computed scalar geometry caches while dropping heavy matrices.
+    p._halfspaces = None
+    p._halfspaces_np = None
+    p._W = None
+    p._b = None
+    return (p, poly_index, *rest)
+
+
+def parallel_compute_geometric_properties(
+    cx: "Complex",
+    nworkers: int | None = None,
+    get_volumes: bool = True,
+    verbose: int = 1,
+) -> dict[str, Any]:
+    """Compute geometric properties for all existing polyhedra in parallel."""
+    from relucent.complex import set_globals
+
+    if len(cx) == 0:
+        return {"Computed": 0, "Failed": []}
+
+    nworkers = nworkers or process_aware_cpu_count()
+    if verbose:
+        print(f"Computing geometric properties on {nworkers} workers")
+
+    tasks = [(poly.ss_np, poly._shis, i) for i, poly in enumerate(cx)]
+    failed: list[tuple[int, str]] = []
+    computed = 0
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
+        for result in tqdm(
+            pool.imap_unordered(partial(geometric_calculations, compute_volumes=get_volumes), tasks),
+            total=len(tasks),
+            desc="Computing Geometry",
+            mininterval=5,
+            disable=not verbose,
+        ):
+            poly_or_error, poly_index, *_ = result
+            if isinstance(poly_or_error, Polyhedron):
+                if poly_or_error.net is None:
+                    poly_or_error.net = cx.net
+                cx.index2poly[poly_index] = poly_or_error
+                computed += 1
+            else:
+                failed.append((poly_index, str(poly_or_error)))
+    return {"Computed": computed, "Failed": failed}
 
 
 def parallel_add(
@@ -126,7 +175,7 @@ def parallel_add(
             of CPU cores. Defaults to None.
         bound: Constraint radius for numerical stability when computing halfspaces.
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
-        **kwargs: Additional arguments passed to poly_calculations() and get_shis().
+        **kwargs: Additional arguments passed to search_calculations() and get_shis().
 
     Returns:
         list: A list of Polyhedron objects (or None for failed computations)
@@ -144,7 +193,7 @@ def parallel_add(
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
     with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net,)) as pool:
-        ps = pool.map(partial(poly_calculations, bound=bound, **kwargs), tqdm(sss, desc="Adding Polys", mininterval=5))
+        ps = pool.map(partial(geometric_calculations, compute_volumes=False), tqdm(sss, desc="Adding Polys", mininterval=5))
         ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
         for p in ps:
             if p is not None:
@@ -194,7 +243,7 @@ def astar_calculations(
 ) -> tuple[Any, ...]:
     """Worker function for computing polyhedron properties in A* search.
 
-    Similar to poly_calculations, but specifically designed for A* search algorithm.
+    Similar to search_calculations, but specifically designed for A* search algorithm.
     Computes center, inradius, interior point, and supporting hyperplane indices
     for polyhedra during pathfinding.
 
@@ -216,11 +265,8 @@ def astar_calculations(
         assert cx.net is not None, "set_globals must be used as pool initializer"
         p.net = cx.net
 
-    if p._inradius is None:
-        center, inradius = p.get_center_inradius(env=cx.env)
-        p._center = center
-        p._inradius = inradius
-        p._finite = center is not None
+    if p.finite is None:
+        raise ValueError("Polyhedron is infeasible (empty).")
     if p._interior_point is None:
         p._interior_point = p.get_interior_point(env=cx.env)
 
@@ -249,7 +295,6 @@ def searcher(
     queue=None,
     bound=None,
     nworkers=None,
-    get_volumes=True,
     verbose=1,
     cube_radius: float | None = None,
     cube_mode: str = "unrestricted",
@@ -278,8 +323,6 @@ def searcher(
             Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
         nworkers: Number of worker processes for parallel computation. If None,
             uses the number of CPU cores. Defaults to None.
-        get_volumes: Whether to compute volumes for polyhedra when input
-            dimension <= 6. Defaults to True.
         verbose: Whether to print progress information. Defaults to 1.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
@@ -334,13 +377,7 @@ def searcher(
         bounded_halfspaces = p.get_bounded_halfspaces(cast(float, cube_radius))
         p._halfspaces = bounded_halfspaces  # type: ignore[assignment]
         p._halfspaces_np = bounded_halfspaces
-        p._center = None
-        p._inradius = None
-        p._finite = True
-        p._vertices = None
-        p._volume = None
-        p._hs = None
-        return True
+        return p.feasible
 
     found_sss = SSManager()
     nworkers = nworkers or process_aware_cpu_count()
@@ -390,9 +427,9 @@ def searcher(
     unprocessed = len(queue)
     depth = 0
 
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False)) as pool:
         try:
-            for p, shi, depth, node_index in pool.imap_unordered(partial(poly_calculations, bound=bound, **kwargs), queue):
+            for p, shi, depth, node_index in pool.imap_unordered(partial(search_calculations, bound=bound, **kwargs), queue):
                 unprocessed -= 1
                 node = cx.index2poly[node_index]
                 if not isinstance(p, Polyhedron):
@@ -574,10 +611,7 @@ def hamming_astar(
     end_poly = cx.add_polyhedron(end) if isinstance(end, Polyhedron) else cx.add_point(end)
     if start_poly == end_poly:
         print("Start and end points are in the same region")
-        center, inradius = start_poly.get_center_inradius()
-        start_poly._center = center
-        start_poly._inradius = inradius
-        start_poly._finite = center is not None
+        _ = start_poly.finite
 
         start_poly._interior_point = start_poly.get_interior_point()
         start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))

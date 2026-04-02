@@ -27,6 +27,9 @@ from relucent.search import (
     parallel_add as _parallel_add_fn,
 )
 from relucent.search import (
+    parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn,
+)
+from relucent.search import (
     searcher as _searcher_fn,
 )
 from relucent.ss import SSManager
@@ -455,7 +458,6 @@ class Complex:
         queue=None,
         bound=None,
         nworkers=None,
-        get_volumes=True,
         verbose=1,
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
@@ -484,8 +486,6 @@ class Complex:
                 Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
-            get_volumes: Whether to compute volumes for polyhedra when input
-                dimension <= 6. Defaults to True.
             verbose: Whether to print progress information. Defaults to 1.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
@@ -510,11 +510,27 @@ class Complex:
             queue=queue,
             bound=bound,
             nworkers=nworkers,
-            get_volumes=get_volumes,
             verbose=verbose,
             cube_radius=cube_radius,
             cube_mode=cube_mode,
             **kwargs,
+        )
+
+    def compute_geometric_properties(
+        self,
+        nworkers: int | None = None,
+        get_volumes: bool = True,
+        verbose: int = 1,
+    ) -> dict[str, Any]:
+        """Compute geometric caches (center/inradius/interior-point/etc.) in parallel.
+
+        This is intended to run after a topology-only search pass.
+        """
+        return _parallel_compute_geometric_properties_fn(
+            self,
+            nworkers=nworkers,
+            get_volumes=get_volumes,
+            verbose=verbose,
         )
 
     def bfs(self, **kwargs):
@@ -652,6 +668,7 @@ class Complex:
                 values, with one value per polyhedron in the complex based on the order
                 they were added.
         """
+        self.compute_geometric_properties()  ## TODO: Specify which attributes to compute
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
     def get_boundary_edges(self, i):
@@ -699,6 +716,7 @@ class Complex:
 
     def get_dual_graph(
         self,
+        auto_add=False,
         relabel=False,
         plot=False,
         node_color=None,
@@ -715,6 +733,8 @@ class Complex:
         sharing a supporting hyperplane).
 
         Args:
+            auto_add: If True, add polyhedra to the complex if they are not already present.
+                Defaults to False.
             relabel: If True, nodes are indexed by integers matching self.index2poly
                 indices. If False, nodes are Polyhedron objects. Defaults to False.
             plot: If True, prepare the graph for visualization with pyvis by
@@ -739,16 +759,35 @@ class Complex:
         Raises:
             ValueError: If match_locations is True and the complex is not 2D.
         """
+        max_dim = max(poly.dim for poly in self)
         G = nx.Graph()
         for poly in self:
-            G.add_node(poly, label=str(poly))
-        for poly in tqdm(self, desc="Creating Dual Graph", leave=False):
+            if poly.dim == max_dim:
+                G.add_node(poly, label=str(poly))
+        missing = []
+        for poly in tqdm(G.nodes(), desc="Creating Dual Graph", leave=False):
             ss = poly.ss_np.copy()
             for shi in poly.shis:
+                assert ss[0, shi] != 0
                 ss[0, shi] *= -1
-                if ss in self:
+                try:
                     G.add_edge(poly, self[ss], shi=shi)
+                except KeyError:
+                    missing.append((ss, shi))
                 ss[0, shi] *= -1
+
+        if len(missing) > 0:
+            warnings.warn(
+                f"Dual graph is incomplete. {len(missing)} boundary cells were not added to the complex."
+                "Set auto_add=True to add them.",
+                stacklevel=2,
+            )
+        if auto_add:
+            for ss, shi in missing:
+                neighbor = self.ss2poly(ss, check_exists=False)
+                if neighbor.feasible:
+                    self.add_polyhedron(neighbor, check_exists=False)
+                    G.add_edge(poly, neighbor, shi=shi)
         if plot:
             if match_locations:
                 if self.dim != 2:
@@ -824,7 +863,7 @@ class Complex:
         if copy:
             G = G.copy()
         initial_p = self.add_ss(initial_ss)
-        initial_p._shis = set()
+        initial_p._shis = []
         G.nodes[source]["poly"] = initial_p
         for edge in tqdm(nx.bfs_edges(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
             poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
@@ -832,8 +871,10 @@ class Complex:
             assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
             poly2 = self.add_ss(poly2_ss, check_exists=False)
-            poly1._shis.add(shi)
-            poly2._shis = {shi}
+            assert isinstance(poly1._shis, list)
+            if shi not in poly1._shis:
+                poly1._shis.append(shi)
+            poly2._shis = [shi]
 
             G.nodes[edge[1]]["poly"] = poly2
 
