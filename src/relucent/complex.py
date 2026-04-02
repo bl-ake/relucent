@@ -813,6 +813,7 @@ class Complex:
         if copy:
             G = G.copy()
         initial_p = self.add_ss(initial_ss)
+        initial_p._shis = set()
         G.nodes[source]["poly"] = initial_p
         for edge in tqdm(nx.bfs_edges(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
             poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
@@ -820,6 +821,8 @@ class Complex:
             assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
             poly2 = self.add_ss(poly2_ss, check_exists=False)
+            poly1._shis.add(shi)
+            poly2._shis = {shi}
 
             G.nodes[edge[1]]["poly"] = poly2
 
