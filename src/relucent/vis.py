@@ -845,7 +845,9 @@ def _complex_figure_graph(
         fig.add_trace(outline)
     for mesh in meshes:
         fig.add_trace(mesh)
-    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * cfg.PLOT_MARGIN_FACTOR
+    maxcoord = (
+        np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * cfg.PLOT_MARGIN_FACTOR
+    )
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
