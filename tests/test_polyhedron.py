@@ -101,6 +101,7 @@ class TestPolyhedronContainment:
         assert x in p
 
 
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
 class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
         net = get_mlp_model(widths=[2, 1], add_last_relu=True)
