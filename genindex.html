@@ -40,7 +40,27 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#settings-reference">Settings reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#polyhedron-and-halfspace-geometry">Polyhedron and halfspace geometry</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#utilities-and-visualization">Utilities and visualization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#model-and-grid">Model and grid</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
@@ -50,6 +70,8 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_cells()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_complex()</span></code></a></li>
@@ -100,6 +122,7 @@
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
@@ -192,6 +215,7 @@
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
+ | <a href="#U"><strong>U</strong></a>
  | <a href="#V"><strong>V</strong></a>
  | <a href="#W"><strong>W</strong></a>
  | <a href="#Z"><strong>Z</strong></a>
@@ -244,6 +268,10 @@
 </li>
       <li><a href="complex.html#relucent.Complex">Complex (class in relucent)</a>
 </li>
+      <li><a href="complex.html#relucent.Complex.compute_geometric_properties">compute_geometric_properties() (relucent.Complex method)</a>
+</li>
+      <li><a href="complex.html#relucent.Complex.contract">contract() (relucent.Complex method)</a>
+</li>
       <li><a href="nn.html#relucent.convert">convert() (in module relucent)</a>
 </li>
   </ul></td>
@@ -280,10 +308,12 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.finite">finite (relucent.Polyhedron property)</a>
+      <li><a href="polyhedron.html#relucent.Polyhedron.feasible">feasible (relucent.Polyhedron property)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="polyhedron.html#relucent.Polyhedron.finite">finite (relucent.Polyhedron property)</a>
+</li>
       <li><a href="nn.html#relucent.NN.forward">forward() (relucent.NN method)</a>
 </li>
   </ul></td>
@@ -487,6 +517,14 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.tag">tag (relucent.Polyhedron property)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="configuration.html#relucent.config.update_settings">update_settings() (in module relucent.config)</a>
 </li>
   </ul></td>
 </tr></table>

@@ -1,0 +1,496 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuration &mdash; relucent  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+      <script src="_static/custom.js?v=add1a637"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Complex" href="complex.html" />
+    <link rel="prev" title="Relucent" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            relucent
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#settings-reference">Settings reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#polyhedron-and-halfspace-geometry">Polyhedron and halfspace geometry</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#utilities-and-visualization">Utilities and visualization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#model-and-grid">Model and grid</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_cells"><code class="docutils literal notranslate"><span class="pre">Complex.plot_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_graph"><code class="docutils literal notranslate"><span class="pre">Complex.plot_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.save"><code class="docutils literal notranslate"><span class="pre">Complex.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.clean_data"><code class="docutils literal notranslate"><span class="pre">Polyhedron.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_vertices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.plot_cells"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.plot_graph"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.hyperplanes"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hyperplanes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.inequalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inequalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.non_zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.non_zero_indices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_dead_relus"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_dead_relus</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_faces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nn.html">Neural Network Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.forward"><code class="docutils literal notranslate"><span class="pre">NN.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_grid"><code class="docutils literal notranslate"><span class="pre">NN.get_grid()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.output_grid"><code class="docutils literal notranslate"><span class="pre">NN.output_grid()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.dtype"><code class="docutils literal notranslate"><span class="pre">NN.dtype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.num_relus"><code class="docutils literal notranslate"><span class="pre">NN.num_relus</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.get_mlp_model"><code class="docutils literal notranslate"><span class="pre">get_mlp_model()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">relucent</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/configuration.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="configuration">
+<h1>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h1>
+<p>Relucent exposes numeric defaults and tolerances as <strong>module-level attributes</strong> on
+<code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>. Library code reads these values when routines run, so you
+can tune behavior for your model or hardware without editing source files.</p>
+<section id="changing-settings">
+<h2>Changing settings<a class="headerlink" href="#changing-settings" title="Link to this heading"></a></h2>
+<p>Import the module (or the package namespace) and assign new values:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+<span class="n">relucent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">TOL_HALFSPACE_CONTAINMENT</span> <span class="o">=</span> <span class="mf">1e-7</span>
+<span class="n">relucent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">MAX_RADIUS</span> <span class="o">=</span> <span class="mi">500</span>
+</pre></div>
+</div>
+<p>To set several attributes at once, use <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.config.update_settings()</span></code></a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">relucent.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">update_settings</span>
+<span class="n">update_settings</span><span class="p">(</span>
+    <span class="n">TOL_HALFSPACE_CONTAINMENT</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">,</span>
+    <span class="n">DEFAULT_SEARCH_BOUND</span><span class="o">=</span><span class="mf">1e7</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">update_settings</span></code> only accepts names listed under <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>
+(excluding the helper itself). Unknown keys raise <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
+<p><strong>Defaults in function signatures:</strong> Parameters documented as “defaults to
+<code class="docutils literal notranslate"><span class="pre">relucent.config.X</span></code>” resolve that value <strong>when the function runs</strong>, not when
+Python first imports the package. If you pass an argument explicitly, it always
+overrides the module setting for that call.</p>
+</section>
+<section id="settings-reference">
+<h2>Settings reference<a class="headerlink" href="#settings-reference" title="Link to this heading"></a></h2>
+<p>The following tables summarize each public setting. Types and defaults match the
+shipped <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code> module.</p>
+<section id="polyhedron-and-halfspace-geometry">
+<h3>Polyhedron and halfspace geometry<a class="headerlink" href="#polyhedron-and-halfspace-geometry" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19.6%" />
+<col style="width: 25.0%" />
+<col style="width: 10.7%" />
+<col style="width: 44.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">QHULL_MODE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;IGNORE&quot;</span></code></p></td>
+<td><p>How Qhull warnings from <code class="docutils literal notranslate"><span class="pre">HalfspaceIntersection</span></code> are handled: <code class="docutils literal notranslate"><span class="pre">&quot;IGNORE&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;WARN_ALL&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;HIGH_PRECISION&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;JITTERED&quot;</span></code> (retry with QJ).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_RADIUS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>Maximum Chebyshev / interior-point search radius when solving with Gurobi.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VERTEX_TRUST_THRESHOLD</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p>Threshold for trusting vertex positions from HalfspaceIntersection.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p>Feasibility tolerance for halfspace containment (<span class="math notranslate nohighlight">\(a^\top x + b \le 0\)</span>) in checks and related geometry.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_DEAD_RELU</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-8</span></code></p></td>
+<td><p>Column norm below which a ReLU is treated as dead.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_HYPERPLANE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p>Hyperplane equality tolerance in SHI computation.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_NORMAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-12</span></code></p></td>
+<td><p>Norms below this are treated as degenerate halfspace normals.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_OBJ_STOP</span></code> / <code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_BD_STOP</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code> / <code class="docutils literal notranslate"><span class="pre">-1e-6</span></code></p></td>
+<td><p>Gurobi early-stop tolerances for the SHI MIP models.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-10</span></code></p></td>
+<td><p>2D plotting: halfspace normals with small <code class="docutils literal notranslate"><span class="pre">w[1]</span></code> are treated as vertical.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">allclose</span></code> atol when verifying halfspace <code class="docutils literal notranslate"><span class="pre">(A,</span> <span class="pre">b)</span></code> against network outputs.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="complex-search-and-parallel-add">
+<h2>Complex search and parallel add<a class="headerlink" href="#complex-search-and-parallel-add" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19.6%" />
+<col style="width: 25.0%" />
+<col style="width: 10.7%" />
+<col style="width: 44.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">list[float]</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">[0.01,</span> <span class="pre">0.1,</span> <span class="pre">1,</span> <span class="pre">10,</span> <span class="pre">100]</span></code></p></td>
+<td><p>Radii tried in order when locating an interior point for a neighbor in <code class="xref py py-func docutils literal notranslate"><span class="pre">get_ip()</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PARALLEL_ADD_BOUND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
+<td><p>Default halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">parallel_add()</span></code> and <code class="xref py py-meth docutils literal notranslate"><span class="pre">parallel_add()</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_SEARCH_BOUND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
+<td><p>Default halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">searcher()</span></code>, <code class="xref py py-func docutils literal notranslate"><span class="pre">hamming_astar()</span></code>, and matching <a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> methods.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.9</span></code></p></td>
+<td><p>Weight on Euclidean-distance bias in the A* heuristic.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_MARGIN_FACTOR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.1</span></code></p></td>
+<td><p>Axis margin multiplier when deriving plot extent from interior points.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_DEFAULT_MAXCOORD</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>Fallback axis half-extent when no interior points exist (2D complex plots).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_COMPLEX_PLOT_BOUND</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
+<td><p>Default bound for <code class="xref py py-meth docutils literal notranslate"><span class="pre">plot_cells()</span></code> when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="utilities-and-visualization">
+<h3>Utilities and visualization<a class="headerlink" href="#utilities-and-visualization" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19.6%" />
+<col style="width: 25.0%" />
+<col style="width: 10.7%" />
+<col style="width: 44.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
+<td><p>Seconds to wait on <code class="docutils literal notranslate"><span class="pre">Condition.wait</span></code> when polling a <code class="xref py py-class docutils literal notranslate"><span class="pre">BlockingQueue</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PIE_LABEL_DISTANCE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.6</span></code></p></td>
+<td><p>Matplotlib pie <code class="docutils literal notranslate"><span class="pre">labeldistance</span></code> in pyvis node thumbnails.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_IMAGES_PYVIS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3000</span></code></p></td>
+<td><p>Maximum node images generated in <code class="xref py py-func docutils literal notranslate"><span class="pre">data_graph()</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_NUM_EXAMPLES_PYVIS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>Examples per node in <code class="docutils literal notranslate"><span class="pre">data_graph</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PYVIS_SAVE_FILE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;./graph.html&quot;</span></code></p></td>
+<td><p>Default output path for the HTML graph.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="model-and-grid">
+<h3>Model and grid<a class="headerlink" href="#model-and-grid" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19.6%" />
+<col style="width: 25.0%" />
+<col style="width: 10.7%" />
+<col style="width: 44.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_GRID_BOUNDS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
+<td><p>Half-width of the default 2D input grid for <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_grid()</span></code> / <code class="xref py py-meth docutils literal notranslate"><span class="pre">output_grid()</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_GRID_RES</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>Points per axis for that grid.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="api">
+<h2>API<a class="headerlink" href="#api" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.config.update_settings">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">update_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.config.update_settings" title="Link to this definition"></a></dt>
+<dd><p>Set one or more <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code> attributes.</p>
+<p>Keys must be names listed in <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code> (excluding
+<code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself). Values replace the current module-level
+constants.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <code class="docutils literal notranslate"><span class="pre">NAME=value</span></code> pairs matching public config attributes.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>TypeError</strong> – If any key is not a known setting name.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p>Valid keys for <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a> are the names listed in
+<code class="docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>, except <code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Relucent" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="complex.html" class="btn btn-neutral float-right" title="Complex" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Blake B. Gaines.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
