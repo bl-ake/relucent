@@ -43,7 +43,8 @@ def test_recover_from_dual_graph(seeded):
     G1 = cplx1.get_dual_graph(relabel=True)
     cplx2 = Complex(model)
     cplx2.recover_from_dual_graph(G1, initial_ss=cplx1.point2ss(start1), source=0)
-    G2 = cplx2.get_dual_graph(relabel=True)
+    G2 = cplx2.get_dual_graph(relabel=True, auto_add=True)
+    assert all(p.feasible for p in cplx2)
     assert nx.is_isomorphic(G1, G2, edge_match=lambda u, v: u["shi"] == v["shi"])
 
 
@@ -66,10 +67,10 @@ def test_bfs_polyhedron_affine_and_membership(seeded):
 
 
 def test_dfs_max_depth_and_shis(seeded):
-    """DFS with max_depth, nworkers=1, get_volumes=False"""
+    """DFS with max_depth and nworkers=1."""
     model = get_mlp_model(widths=[6, 8, 10])
     cplx = Complex(model)
-    result = cplx.dfs(max_depth=2, nworkers=1, get_volumes=False)
+    result = cplx.dfs(max_depth=2, nworkers=1)
     assert result["Search Depth"] == 2
     assert all(poly.shis is not None for poly in cplx)
 
@@ -209,7 +210,8 @@ class TestComplexDualGraph:
         cplx = Complex(small_mlp)
         start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
         cplx.bfs(start=start, max_polys=30)
-        G = cplx.get_dual_graph()
+        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
+            G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
         for _, _, d in G.edges(data=True):
             assert "shi" in d
@@ -218,7 +220,8 @@ class TestComplexDualGraph:
         cplx = Complex(small_mlp)
         start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
         cplx.bfs(start=start, max_polys=15)
-        G = cplx.get_dual_graph(relabel=True)
+        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
+            G = cplx.get_dual_graph(relabel=True)
         assert set(G.nodes()) == set(range(len(cplx)))
 
 
@@ -310,7 +313,7 @@ class TestComplexMisc:
         """Smoke test for random_walk search."""
         cplx = Complex(small_mlp)
         start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
-        result = cplx.random_walk(start=start, max_polys=15, nworkers=1, get_volumes=False)
+        result = cplx.random_walk(start=start, max_polys=15, nworkers=1)
         assert "Search Depth" in result
         assert len(cplx) <= 15
 
