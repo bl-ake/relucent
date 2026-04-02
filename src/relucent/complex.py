@@ -1,6 +1,7 @@
 import os
 import pickle
 import random
+import warnings
 from collections.abc import Generator, Iterable, Iterator
 from typing import Any
 
@@ -12,11 +13,7 @@ import torch.nn as nn
 from gurobipy import Env
 from tqdm.auto import tqdm
 
-from relucent.config import (
-    DEFAULT_COMPLEX_PLOT_BOUND,
-    DEFAULT_PARALLEL_ADD_BOUND,
-    DEFAULT_SEARCH_BOUND,
-)
+import relucent.config as cfg
 from relucent.convert_model import convert
 from relucent.model import NN
 from relucent.poly import Polyhedron
@@ -456,7 +453,7 @@ class Complex:
         max_depth=float("inf"),
         max_polys=float("inf"),
         queue=None,
-        bound=DEFAULT_SEARCH_BOUND,
+        bound=None,
         nworkers=None,
         get_volumes=True,
         verbose=1,
@@ -503,6 +500,8 @@ class Complex:
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
         """
+        if bound is None:
+            bound = cfg.DEFAULT_SEARCH_BOUND
         return _searcher_fn(
             self,
             start=start,
@@ -593,7 +592,7 @@ class Complex:
         start: torch.Tensor | np.ndarray | Polyhedron,
         end: torch.Tensor | np.ndarray | Polyhedron,
         nworkers: int | None = None,
-        bound: float = DEFAULT_SEARCH_BOUND,
+        bound: float | None = None,
         max_polys: float = float("inf"),
         show_pbar: bool = True,
         num_threads: int = 1,
@@ -624,6 +623,8 @@ class Complex:
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
+        if bound is None:
+            bound = cfg.DEFAULT_SEARCH_BOUND
         return _hamming_astar_fn(
             self,
             start=start,
@@ -831,12 +832,14 @@ class Complex:
         color=None,
         highlight_regions=None,
         ss_name=False,
-        bound=DEFAULT_COMPLEX_PLOT_BOUND,
+        bound=None,
         show_axes: bool = False,
         fill_mode: str = "wireframe",
         **kwargs: Any,
     ) -> go.Figure:
         """Plot all cells in input space; 2D vs 3D is chosen from :attr:`dim`."""
+        if bound is None:
+            bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND
         return plot_complex(
             self,
             plot_mode="cells",

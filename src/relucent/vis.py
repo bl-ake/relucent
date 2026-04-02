@@ -14,17 +14,7 @@ from PIL import Image
 from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
 
-from relucent.config import (
-    DEFAULT_COMPLEX_PLOT_BOUND,
-    DEFAULT_PLOT_BOUND,
-    DEFAULT_PYVIS_SAVE_FILE,
-    MAX_IMAGES_PYVIS,
-    MAX_NUM_EXAMPLES_PYVIS,
-    PIE_LABEL_DISTANCE,
-    PLOT_DEFAULT_MAXCOORD,
-    PLOT_MARGIN_FACTOR,
-    TOL_NEARLY_VERTICAL,
-)
+import relucent.config as cfg
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -65,13 +55,20 @@ def data_graph(
     edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("title", ""),
     edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("label", ""),
     edge_value_formatter: Callable[[Mapping[str, Any]], float | int] = lambda row: row.get("value", 1),
-    max_images: int = MAX_IMAGES_PYVIS,
-    max_num_examples: int = MAX_NUM_EXAMPLES_PYVIS,
-    save_file: str = DEFAULT_PYVIS_SAVE_FILE,
+    max_images: int | None = None,
+    max_num_examples: int | None = None,
+    save_file: str | None = None,
 ) -> None:
     """Create an interactive pyvis graph from dataframes of nodes and edges."""
 
     from pyvis.network import Network  # type: ignore
+
+    if max_images is None:
+        max_images = cfg.MAX_IMAGES_PYVIS
+    if max_num_examples is None:
+        max_num_examples = cfg.MAX_NUM_EXAMPLES_PYVIS
+    if save_file is None:
+        save_file = cfg.DEFAULT_PYVIS_SAVE_FILE
 
     class_labels_list: list = []
     if class_labels is True and dataset is not None:
@@ -96,7 +93,7 @@ def data_graph(
             if class_labels and "class_proportions" in row:
                 axs[-1].pie(
                     row["class_proportions"],
-                    labeldistance=PIE_LABEL_DISTANCE,
+                    labeldistance=cfg.PIE_LABEL_DISTANCE,
                     labels=class_labels_list,
                 )
             axs[-1].axis("equal")
@@ -192,10 +189,12 @@ def bounded_plot_geometry(poly: "Polyhedron", bound: float) -> tuple[str, np.nda
 def _poly_traces_3d_complex(
     poly: "Polyhedron",
     showlegend: bool = False,
-    bound: float = DEFAULT_PLOT_BOUND,
+    bound: float | None = None,
     filled: bool = False,
     **kwargs: Any,
 ) -> list[go.Mesh3d | go.Scatter3d]:
+    if bound is None:
+        bound = cfg.DEFAULT_PLOT_BOUND
     if poly.ambient_dim != 3:
         raise ValueError("Polyhedron must have ambient dimension 3 to plot 3D complex")
     base_kwargs: dict[str, Any] = dict(kwargs)
@@ -380,11 +379,13 @@ def _poly_traces_2d_complex(
     poly: "Polyhedron",
     fill: str = "toself",
     showlegend: bool = False,
-    bound: float = DEFAULT_PLOT_BOUND,
+    bound: float | None = None,
     plot_halfspaces: bool = False,
     halfspace_shade: bool = True,
     **kwargs: Any,
 ) -> list[go.Scatter]:
+    if bound is None:
+        bound = cfg.DEFAULT_PLOT_BOUND
     if poly.W.shape[0] != 2:
         raise ValueError("Polyhedron must be 2D to plot")
     traces: list[go.Scatter] = []
@@ -412,8 +413,8 @@ def _poly_traces_2d_complex(
         bounds = (-bound, bound)
         for i in range(W.shape[0]):
             w = W[i]
-            if np.abs(w[1]) < TOL_NEARLY_VERTICAL:
-                x_line = -b[i] / w[0] if np.abs(w[0]) >= TOL_NEARLY_VERTICAL else 0.0
+            if np.abs(w[1]) < cfg.TOL_NEARLY_VERTICAL:
+                x_line = -b[i] / w[0] if np.abs(w[0]) >= cfg.TOL_NEARLY_VERTICAL else 0.0
                 xs = [x_line, x_line]
                 ys = [bounds[0], bounds[1]]
                 halfspace_shade_this = False
@@ -445,10 +446,12 @@ def _poly_traces_2d_graph(
     poly: "Polyhedron",
     fill: str = "toself",
     showlegend: bool = False,
-    bound: float = DEFAULT_PLOT_BOUND,
+    bound: float | None = None,
     project: float | None = None,
     **kwargs: Any,
 ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
+    if bound is None:
+        bound = cfg.DEFAULT_PLOT_BOUND
     _ = fill
     if poly.W.shape[0] != 2:
         raise ValueError("Polyhedron must be 2D to plot")
@@ -649,9 +652,11 @@ def _complex_figure_2d_cells(
     color: str | None = None,
     highlight_regions: Iterable[Any] | None = None,
     ss_name: bool = False,
-    bound: float = DEFAULT_COMPLEX_PLOT_BOUND,
+    bound: float | None = None,
     **kwargs: Any,
 ) -> go.Figure:
+    if bound is None:
+        bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND
     if cpx.dim != 2:
         raise ValueError(f"2D cell figure requires complex.dim == 2, got {cpx.dim}")
     fig = go.Figure()
@@ -688,9 +693,9 @@ def _complex_figure_2d_cells(
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
     interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
     maxcoord = (
-        min(float(np.median(interior_points)) * PLOT_MARGIN_FACTOR, bound)
+        min(float(np.median(interior_points)) * cfg.PLOT_MARGIN_FACTOR, bound)
         if len(interior_points) > 0
-        else min(PLOT_DEFAULT_MAXCOORD, bound if bound else PLOT_DEFAULT_MAXCOORD)
+        else min(cfg.PLOT_DEFAULT_MAXCOORD, bound if bound else cfg.PLOT_DEFAULT_MAXCOORD)
     )
     fig.update_layout(
         showlegend=True,
@@ -714,7 +719,7 @@ def _complex_figure_3d_cells(
 ) -> go.Figure:
     if cpx.dim != 3:
         raise ValueError("Complex must have 3D input to plot 3D complex")
-    bound_effective = kwargs.get("bound", DEFAULT_PLOT_BOUND)
+    bound_effective = kwargs.get("bound", cfg.DEFAULT_PLOT_BOUND)
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
@@ -770,7 +775,7 @@ def _complex_figure_graph(
     project: Any = True,
     **kwargs: Any,
 ) -> go.Figure:
-    bound_effective = kwargs.get("bound", DEFAULT_PLOT_BOUND)
+    bound_effective = kwargs.get("bound", cfg.DEFAULT_PLOT_BOUND)
     fig = go.Figure()
     polys = list(cpx)
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=False)
@@ -840,7 +845,7 @@ def _complex_figure_graph(
         fig.add_trace(outline)
     for mesh in meshes:
         fig.add_trace(mesh)
-    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * PLOT_MARGIN_FACTOR
+    maxcoord = np.median([np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]) * cfg.PLOT_MARGIN_FACTOR
     fig.update_layout(
         scene=dict(
             xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),

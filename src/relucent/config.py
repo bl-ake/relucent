@@ -1,12 +1,30 @@
 """Central configuration for relucent package constants.
 
 All tunable numerical constants, tolerances, and defaults used across the
-package are defined here with brief explanations. Code should import from
-this module rather than hard-coding values.
+package are defined here with brief explanations. Code reads values from this
+module at **use time** (via ``import relucent.config as cfg`` and ``cfg.NAME``)
+so you can adjust behavior by assigning to attributes on :mod:`relucent.config`
+before or between calls.
 
-You can override values at runtime by mutating attributes on this module,
-e.g. ``relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7``.
+**How to change settings**
+
+* Assign directly::
+
+    import relucent
+    relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7
+
+* Or use :func:`update_settings` to set several keys at once::
+
+    from relucent.config import update_settings
+    update_settings(TOL_HALFSPACE_CONTAINMENT=1e-7, MAX_RADIUS=200)
+
+See the :doc:`configuration` chapter in the HTML documentation for a full
+settings reference.
 """
+
+from __future__ import annotations
+
+from typing import Any
 
 # -----------------------------------------------------------------------------
 # Polyhedron & halfspace geometry
@@ -126,3 +144,56 @@ DEFAULT_GRID_BOUNDS: float = 2
 
 # get_grid / output_grid: default resolution (points per dimension).
 DEFAULT_GRID_RES: int = 100
+
+
+__all__ = [
+    "ASTAR_BIAS_WEIGHT",
+    "BLOCKING_QUEUE_WAIT_TIMEOUT",
+    "DEFAULT_COMPLEX_PLOT_BOUND",
+    "DEFAULT_GRID_BOUNDS",
+    "DEFAULT_GRID_RES",
+    "DEFAULT_PARALLEL_ADD_BOUND",
+    "DEFAULT_PLOT_BOUND",
+    "DEFAULT_PYVIS_SAVE_FILE",
+    "DEFAULT_SEARCH_BOUND",
+    "GUROBI_SHI_BEST_BD_STOP",
+    "GUROBI_SHI_BEST_OBJ_STOP",
+    "INTERIOR_POINT_RADIUS_SEQUENCE",
+    "MAX_IMAGES_PYVIS",
+    "MAX_RADIUS",
+    "MAX_NUM_EXAMPLES_PYVIS",
+    "PIE_LABEL_DISTANCE",
+    "PLOT_DEFAULT_MAXCOORD",
+    "PLOT_MARGIN_FACTOR",
+    "QHULL_MODE",
+    "TOL_DEAD_RELU",
+    "TOL_HALFSPACE_CONTAINMENT",
+    "TOL_HALFSPACE_NORMAL",
+    "TOL_NEARLY_VERTICAL",
+    "TOL_SHI_HYPERPLANE",
+    "TOL_VERIFY_AB_ATOL",
+    "VERTEX_TRUST_THRESHOLD",
+    "update_settings",
+]
+
+
+def update_settings(**kwargs: Any) -> None:
+    """Set one or more :mod:`relucent.config` attributes.
+
+    Keys must be names listed in :data:`relucent.config.__all__` (excluding
+    ``update_settings`` itself). Values replace the current module-level
+    constants.
+
+    Args:
+        **kwargs: ``NAME=value`` pairs matching public config attributes.
+
+    Raises:
+        TypeError: If any key is not a known setting name.
+    """
+    allowed = set(__all__) - {"update_settings"}
+    unknown = set(kwargs) - allowed
+    if unknown:
+        raise TypeError(f"Unknown config keys: {sorted(unknown)}")
+    mod = globals()
+    for k, v in kwargs.items():
+        mod[k] = v

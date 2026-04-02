@@ -8,18 +8,12 @@ import plotly.graph_objects as go
 import torch
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 
+import relucent.config as cfg
 from relucent.calculations import (
     compute_properties,
     get_hs,
     get_shis,
     solve_radius,
-)
-from relucent.config import (
-    DEFAULT_PLOT_BOUND,
-    MAX_RADIUS,
-    QHULL_MODE,
-    TOL_HALFSPACE_CONTAINMENT,
-    TOL_HALFSPACE_NORMAL,
 )
 from relucent.model import NN
 from relucent.utils import encode_ss, get_env
@@ -33,9 +27,10 @@ class Polyhedron:
 
     Several methods use Gurobi environments for optimization. If one is not
     provided, an environment will be created automatically.
-    """
 
-    MAX_RADIUS = MAX_RADIUS  # from config; smaller is faster but may exclude polyhedra
+    Interior-point search radius follows :data:`relucent.config.MAX_RADIUS`
+    unless overridden per call.
+    """
 
     def __init__(
         self,
@@ -212,7 +207,7 @@ class Polyhedron:
             env: Gurobi environment for optimization. If None, uses a cached
                 environment. Defaults to None.
             max_radius: Maximum radius constraint for the search. If None, uses
-                self.MAX_RADIUS. Defaults to None.
+                :data:`relucent.config.MAX_RADIUS`. Defaults to None.
             zero_indices: Indices of sign sequence elements that are zero (for
                 lower-dimensional polyhedra). Defaults to None.
 
@@ -222,7 +217,7 @@ class Polyhedron:
         Raises:
             ValueError: If no interior point can be found.
         """
-        max_radius = max_radius or self.MAX_RADIUS
+        max_radius = max_radius or cfg.MAX_RADIUS
         if isinstance(self._center, (np.ndarray, torch.Tensor)):
             interior_point = self._center.squeeze()
         else:
@@ -236,7 +231,7 @@ class Polyhedron:
             assert isinstance(interior_point, np.ndarray)
             interior_point = interior_point.squeeze()
         if interior_point is None:
-            raise ValueError("Interior point not found")
+            raise ValueError("Interior point not found. Check that the polyhedron is feasible and MAX_RADIUS is large enough.")
         # if (
         #     maximum_violation := (self.inequalities[:, :-1] @ interior_point + self.inequalities[:-1, None]).max()
         # ) > TOL_HALFSPACE_CONTAINMENT:
@@ -293,16 +288,16 @@ class Polyhedron:
         # constraints and are toxic for both Gurobi feasibility checks and Qhull.
         normals = halfspaces[:, :-1]
         norms = np.linalg.norm(normals, axis=1)
-        deg = norms < TOL_HALFSPACE_NORMAL
+        deg = norms < cfg.TOL_HALFSPACE_NORMAL
         if np.any(deg):
             b = halfspaces[:, -1]
             # A degenerate row encodes 0 + b <= 0. If b>0 it's infeasible; raise rather than
             # silently widening the region by dropping it.
-            if np.any(b[deg] > TOL_HALFSPACE_CONTAINMENT):
-                bad = np.flatnonzero(deg & (b > TOL_HALFSPACE_CONTAINMENT)).tolist()
+            if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
+                bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
                 raise ValueError(
                     "Degenerate halfspace(s) imply infeasibility after bounding; "
-                    f"rows={bad}, tol_normal={TOL_HALFSPACE_NORMAL:g}"
+                    f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
                 )
             halfspaces = halfspaces[~deg]
         env = env or get_env()
@@ -368,7 +363,7 @@ class Polyhedron:
         eq = (self * other).ss == other.ss
         return bool(cast(torch.Tensor, eq).all())
 
-    def get_bounded_vertices(self, bound: float, qhull_mode: str = QHULL_MODE) -> np.ndarray | None:
+    def get_bounded_vertices(self, bound: float, qhull_mode: str | None = None) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
 
         Computes the vertices of the polyhedron after intersecting it with a
@@ -384,6 +379,9 @@ class Polyhedron:
         if self.codim > 0:
             raise NotImplementedError("Codimension > 0 not yet supported")
 
+        if qhull_mode is None:
+            qhull_mode = cfg.QHULL_MODE
+
         try:
             bounded_halfspaces = self.get_bounded_halfspaces(bound)
         except ValueError as e:
@@ -394,7 +392,7 @@ class Polyhedron:
         # Last-resort guard: Qhull requires non-degenerate halfspace normals.
         normals = bounded_halfspaces[:, :-1]
         norms = np.linalg.norm(normals, axis=1)
-        deg = norms < TOL_HALFSPACE_NORMAL
+        deg = norms < cfg.TOL_HALFSPACE_NORMAL
         if np.any(deg):
             bounded_halfspaces = bounded_halfspaces[~deg]
 
@@ -491,7 +489,7 @@ class Polyhedron:
         self,
         fill: str = "toself",
         showlegend: bool = False,
-        bound: float = DEFAULT_PLOT_BOUND,
+        bound: float | None = None,
         filled: bool = False,
         plot_halfspaces: bool = False,
         halfspace_shade: bool = True,
@@ -502,6 +500,8 @@ class Polyhedron:
         Chooses 2D vs 3D from :attr:`ambient_dim` (input-space dimension; typically matches
         :attr:`Complex.dim` when this polyhedron belongs to a complex).
         """
+        if bound is None:
+            bound = cfg.DEFAULT_PLOT_BOUND
         return plot_polyhedron(
             self,
             plot_mode="cells",
@@ -518,10 +518,12 @@ class Polyhedron:
         self,
         fill: str = "toself",
         showlegend: bool = False,
-        bound: float = DEFAULT_PLOT_BOUND,
+        bound: float | None = None,
         project: float | None = None,
         **kwargs: Any,
     ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
+        if bound is None:
+            bound = cfg.DEFAULT_PLOT_BOUND
         return plot_polyhedron(
             self,
             plot_mode="graph",
@@ -783,7 +785,7 @@ class Polyhedron:
             point = point.detach().cpu().numpy().astype(halfspaces.dtype)
         point = point.reshape(1, -1)
         dists = point @ halfspaces[:, :-1].T + halfspaces[:, -1]
-        return bool((dists <= TOL_HALFSPACE_CONTAINMENT).all().item())
+        return bool((dists <= cfg.TOL_HALFSPACE_CONTAINMENT).all().item())
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
