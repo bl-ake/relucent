@@ -8,6 +8,7 @@ throughout the package.
 import multiprocessing as mp
 import os
 import random
+import sys
 from collections import OrderedDict, deque
 from collections.abc import Callable, Iterator
 from heapq import heappop, heappush
@@ -43,12 +44,13 @@ _default_env_disposed: bool = False
 def get_mp_context() -> BaseContext:
     """Return the appropriate multiprocessing context for the current platform.
 
-    Prefers ``fork`` where available (Linux/macOS) because workers inherit the
-    parent's already-loaded model weights without any serialisation overhead.
-    Falls back to ``spawn`` on platforms where ``fork`` is unavailable (e.g.
-    Windows). When using ``spawn``, the caller's main module must use the
-    standard ``if __name__ == "__main__":`` guard to prevent worker processes
-    from re-executing top-level code.
+    On macOS, uses ``spawn`` to avoid fork-after-PyTorch/BLAS issues that can
+    segfault worker processes. Elsewhere, prefers ``fork`` when available so
+    workers inherit the parent's already-loaded model weights without
+    serialisation overhead. Falls back to ``spawn`` where ``fork`` is
+    unavailable (e.g. Windows). When using ``spawn``, the caller's main
+    module must use the standard ``if __name__ == "__main__":`` guard to
+    prevent worker processes from re-executing top-level code.
 
     ``forkserver`` is intentionally avoided: it uses OS semaphores for
     inter-process coordination that are not always released before Python's
@@ -60,6 +62,8 @@ def get_mp_context() -> BaseContext:
         used to create a process pool.
     """
     available = mp.get_all_start_methods()
+    if sys.platform == "darwin":
+        return mp.get_context("spawn")
     return mp.get_context("fork" if "fork" in available else "spawn")
 
 
