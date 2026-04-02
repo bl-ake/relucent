@@ -3,7 +3,7 @@ import pickle
 import random
 import warnings
 from collections.abc import Generator, Iterable, Iterator
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
 import numpy as np
@@ -292,7 +292,12 @@ class Complex:
             return result
         return result.detach().cpu().numpy()
 
-    def point2poly(self, point, check_exists=True, **kwargs: Any):
+    def point2poly(
+        self,
+        point: torch.Tensor | np.ndarray,
+        check_exists: bool = True,
+        **kwargs: Any,
+    ) -> Polyhedron:
         """Convert a data point to its corresponding Polyhedron.
 
         Finds the polyhedron that contains the given data point. Does not add
@@ -309,7 +314,12 @@ class Complex:
         """
         return self.ss2poly(self.point2ss(point), check_exists=check_exists, **kwargs)
 
-    def ss2poly(self, ss, check_exists=True, **kwargs: Any):
+    def ss2poly(
+        self,
+        ss: np.ndarray | torch.Tensor,
+        check_exists: bool = True,
+        **kwargs: Any,
+    ) -> Polyhedron:
         """Convert a sign sequence to a Polyhedron.
 
         Creates a Polyhedron object from the given sign sequence. Does not add
@@ -452,17 +462,17 @@ class Complex:
 
     def searcher(
         self,
-        start=None,
-        max_depth=float("inf"),
-        max_polys=float("inf"),
-        queue=None,
-        bound=None,
-        nworkers=None,
-        verbose=1,
+        start: torch.Tensor | np.ndarray | Polyhedron | None = None,
+        max_depth: float = float("inf"),
+        max_polys: float = float("inf"),
+        queue: Any = None,
+        bound: float | None = None,
+        nworkers: int | None = None,
+        verbose: int = 1,
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Search for polyhedra in the complex by discovering neighbors.
 
         This is a generic search method that can be configured for different
@@ -533,7 +543,7 @@ class Complex:
             verbose=verbose,
         )
 
-    def bfs(self, **kwargs):
+    def bfs(self, **kwargs: Any) -> dict[str, Any]:
         """Perform breadth-first search of the complex.
 
         Explores the complex using a breadth-first strategy, discovering all
@@ -547,7 +557,7 @@ class Complex:
         """
         return self.searcher(**kwargs)
 
-    def dfs(self, **kwargs):
+    def dfs(self, **kwargs: Any) -> dict[str, Any]:
         """Perform depth-first search of the complex.
 
         Explores the complex using a depth-first strategy, following paths as
@@ -561,7 +571,7 @@ class Complex:
         """
         return self.searcher(queue=BlockingQueue(pop=lambda x: x.popleft()), **kwargs)
 
-    def random_walk(self, **kwargs):
+    def random_walk(self, **kwargs: Any) -> dict[str, Any]:
         """Perform random walk search of the complex.
 
         Explores the complex by randomly selecting which polyhedron to explore
@@ -671,18 +681,18 @@ class Complex:
         self.compute_geometric_properties()  ## TODO: Specify which attributes to compute
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
-    def get_boundary_edges(self, i):
+    def get_boundary_edges(self, i: int) -> set[tuple[Polyhedron, Polyhedron]]:
         """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
         assert 0 <= i < self.n, "Neuron index out of range"
         return {edge for edge in self.G.edges() if self.G.edges[edge]["shi"] == i}
 
-    def get_boundary_graph(self, i):
+    def get_boundary_graph(self, i: int) -> nx.Graph:
         """Get the induced subgraph of neuron i's BH."""
         return self.G.subgraph(
             [edge[0] for edge in self.get_boundary_edges(i)] + [edge[1] for edge in self.get_boundary_edges(i)]
         )
 
-    def get_boundary_cells(self, i):
+    def get_boundary_cells(self, i: int) -> set[Polyhedron]:
         """Get all (d-1)-cells in neuron i's BH."""
         faces = set()
         for edge in self.get_boundary_edges(i):
@@ -691,23 +701,37 @@ class Complex:
             faces.add(self.ss2poly(ss))
         return faces
 
-    def get_boundary_complex(self, i):
+    def get_boundary_complex(self, i: int) -> "Complex":
         """Get the boundary complex of neuron i."""
         cplx = Complex(self.net)
         for poly in self.get_boundary_cells(i):
             cplx.add_polyhedron(poly)
         return cplx
 
-    def contract(self):
+    def contract(self) -> "Complex":
         """Contract the maximal cells in the complex."""
         G = self.get_dual_graph()
         new_complex = Complex(self.net)
         for e1, e2, shi in G.edges(data="shi"):
-            new_ss = e1.ss_np.copy()
+            p1 = cast(Polyhedron, e1)
+            p2 = cast(Polyhedron, e2)
+            new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
-            new_complex.add_ss(new_ss, halfspaces=e1.halfspaces, shis=list(set(e1.shis) & set(e2.shis) - {shi}))
+            new_complex.add_ss(new_ss, halfspaces=p1.halfspaces, shis=list(set(p1.shis) & set(p2.shis) - {shi}))
 
         return new_complex
+
+    def get_chain_complex(self) -> list["Complex"]:
+        """Get the chain complex of the complex."""
+        chain: list[Complex] = [self]
+        while True:
+            new_complex = chain[-1].contract()
+            if len(new_complex) == 0:
+                break
+            chain.append(new_complex)
+            print("\rChain: " + ", ".join([str(len(c)) for c in chain]) + ", ... ", end="\r")
+        print("\rChain: " + ", ".join([str(len(c)) for c in chain]))
+        return chain
 
     @property
     def G(self) -> nx.Graph:
@@ -716,16 +740,16 @@ class Complex:
 
     def get_dual_graph(
         self,
-        auto_add=False,
-        relabel=False,
-        plot=False,
-        node_color=None,
-        node_size=None,
-        cmap="viridis",
-        match_locations=False,
-        show_node_labels=False,
-        show_edge_labels=False,
-    ):
+        auto_add: bool = False,
+        relabel: bool = False,
+        plot: bool = False,
+        node_color: str | None = None,
+        node_size: str | None = None,
+        cmap: str = "viridis",
+        match_locations: bool = False,
+        show_node_labels: bool = False,
+        show_edge_labels: bool = False,
+    ) -> nx.Graph:
         """Construct the dual graph of the complex.
 
         The dual graph represents the connectivity structure of the complex,
@@ -883,11 +907,11 @@ class Complex:
 
     def plot_cells(
         self,
-        label_regions=False,
-        color=None,
-        highlight_regions=None,
-        ss_name=False,
-        bound=None,
+        label_regions: bool = False,
+        color: Any = None,
+        highlight_regions: Any = None,
+        ss_name: bool = False,
+        bound: float | None = None,
         show_axes: bool = False,
         fill_mode: str = "wireframe",
         **kwargs: Any,
@@ -910,13 +934,13 @@ class Complex:
 
     def plot_graph(
         self,
-        label_regions=False,
-        color=None,
-        highlight_regions=None,
-        show_axes=False,
-        project=True,
-        **kwargs,
-    ):
+        label_regions: bool = False,
+        color: Any = None,
+        highlight_regions: Any = None,
+        show_axes: bool = False,
+        project: bool = True,
+        **kwargs: Any,
+    ) -> go.Figure:
         return plot_complex(
             self,
             plot_mode="graph",
