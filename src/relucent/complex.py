@@ -292,7 +292,7 @@ class Complex:
             return result
         return result.detach().cpu().numpy()
 
-    def point2poly(self, point, check_exists=True):
+    def point2poly(self, point, check_exists=True, **kwargs: Any):
         """Convert a data point to its corresponding Polyhedron.
 
         Finds the polyhedron that contains the given data point. Does not add
@@ -302,13 +302,14 @@ class Complex:
             point: A single data point as a torch.Tensor or np.ndarray.
             check_exists: If True, return the existing polyhedron from the complex
                 if it already exists. Defaults to True.
+            **kwargs: Additional arguments passed to the Polyhedron constructor.
 
         Returns:
             Polyhedron: The polyhedron containing the given point.
         """
-        return self.ss2poly(self.point2ss(point), check_exists=check_exists)
+        return self.ss2poly(self.point2ss(point), check_exists=check_exists, **kwargs)
 
-    def ss2poly(self, ss, check_exists=True):
+    def ss2poly(self, ss, check_exists=True, **kwargs: Any):
         """Convert a sign sequence to a Polyhedron.
 
         Creates a Polyhedron object from the given sign sequence. Does not add
@@ -318,6 +319,7 @@ class Complex:
             ss: A sign sequence as a torch.Tensor or np.ndarray.
             check_exists: If True, return the existing polyhedron from the complex
                 if it already exists. Defaults to True.
+            **kwargs: Additional arguments passed to the Polyhedron constructor.
 
         Returns:
             Polyhedron: The polyhedron corresponding to the given sign sequence.
@@ -325,12 +327,13 @@ class Complex:
         if check_exists and ss in self:
             return self[ss]
         else:
-            return Polyhedron(self.net, ss)
+            return Polyhedron(self.net, ss, **kwargs)
 
     def add_ss(
         self,
         ss: np.ndarray | torch.Tensor,
         check_exists: bool = True,
+        **kwargs: Any,
     ) -> Polyhedron:
         """Convert a sign sequence to a Polyhedron and add it to the complex.
 
@@ -338,11 +341,12 @@ class Complex:
             ss: A sign sequence as a torch.Tensor or np.ndarray.
             check_exists: If True, return the existing polyhedron from the complex
                 if it already exists. Defaults to True.
+            **kwargs: Additional arguments passed to the Polyhedron constructor.
 
         Returns:
             Polyhedron: The polyhedron that was added (or already existed) in the complex.
         """
-        return self.add_polyhedron(Polyhedron(self.net, ss), check_exists=check_exists)
+        return self.add_polyhedron(self.ss2poly(ss, check_exists=check_exists, **kwargs), check_exists=check_exists)
 
     def add_polyhedron(
         self,
@@ -387,6 +391,7 @@ class Complex:
         self,
         data: torch.Tensor | np.ndarray,
         check_exists: bool = True,
+        **kwargs: Any,
     ) -> Polyhedron:
         """Find the polyhedron containing a data point and add it to the complex.
 
@@ -395,11 +400,12 @@ class Complex:
             check_exists: If True, check whether the polyhedron already exists in
                 the complex and return it if so. Only set to false if you know it does not.
                 Defaults to True.
+            **kwargs: Additional arguments passed to the Polyhedron constructor.
 
         Returns:
             Polyhedron: The polyhedron containing the given point, now stored in the complex.
         """
-        return self.add_ss(self.point2ss(data), check_exists=check_exists)
+        return self.add_ss(self.point2ss(data), check_exists=check_exists, **kwargs)
 
     def clean_data(self) -> None:
         """Clean cached data from all polyhedra in the complex.
@@ -414,7 +420,7 @@ class Complex:
         self,
         points: Iterable[torch.Tensor | np.ndarray],
         nworkers: int | None = None,
-        bound: float = DEFAULT_PARALLEL_ADD_BOUND,
+        bound: float | None = None,
         **kwargs: Any,
     ) -> list[Polyhedron | None]:
         """Add multiple polyhedra from data points using parallel processing.
@@ -434,6 +440,8 @@ class Complex:
             list: A list of Polyhedron objects (or None for failed computations)
                 corresponding to the input points.
         """
+        if bound is None:
+            bound = cfg.DEFAULT_PARALLEL_ADD_BOUND
         return _parallel_add_fn(
             self,
             points,
