@@ -9,6 +9,7 @@ except ImportError as e:
     ) from e
 
 from . import config
+from .config import update_settings
 from .complex import Complex
 from .convert_model import convert
 from .model import NN, get_mlp_model
@@ -23,6 +24,7 @@ __all__ = [
     "NN",
     "SSManager",
     "config",
+    "update_settings",
     "convert",
     "data_graph",
     "get_colors",

@@ -20,7 +20,7 @@ import numpy as np
 import torch
 from gurobipy import Env, disposeDefaultEnv
 
-from relucent.config import BLOCKING_QUEUE_WAIT_TIMEOUT
+import relucent.config as cfg
 from relucent.model import NN
 
 __all__ = [
@@ -236,7 +236,7 @@ class BlockingQueue:
     def pop(self, *args: Any, **kwargs: Any) -> Any:
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
-                self.lock.wait(timeout=BLOCKING_QUEUE_WAIT_TIMEOUT)
+                self.lock.wait(timeout=cfg.BLOCKING_QUEUE_WAIT_TIMEOUT)
             return self.pop_element(self.deque, *args, **kwargs)
 
     def push(self, element: Any, *args: Any, **kwargs: Any) -> None:

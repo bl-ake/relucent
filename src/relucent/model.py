@@ -15,7 +15,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from relucent.config import DEFAULT_GRID_BOUNDS, DEFAULT_GRID_RES
+import relucent.config as cfg
 
 __all__ = ["NN", "get_mlp_model"]
 
@@ -144,8 +144,8 @@ class NN(nn.Module):
             tuple: (x_coords, y_coords, input_points) where input_points is an
                 array of shape (res*res, 2).
         """
-        bounds = bounds if bounds is not None else DEFAULT_GRID_BOUNDS
-        res = res if res is not None else DEFAULT_GRID_RES
+        bounds = bounds if bounds is not None else cfg.DEFAULT_GRID_BOUNDS
+        res = res if res is not None else cfg.DEFAULT_GRID_RES
         x = np.linspace(-bounds, bounds, res)
         y = np.copy(x)
 

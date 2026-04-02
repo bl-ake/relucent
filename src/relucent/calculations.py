@@ -15,17 +15,7 @@ from gurobipy import GRB, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
-from relucent.config import (
-    GUROBI_SHI_BEST_BD_STOP,
-    GUROBI_SHI_BEST_OBJ_STOP,
-    QHULL_MODE,
-    TOL_DEAD_RELU,
-    TOL_HALFSPACE_CONTAINMENT,
-    TOL_HALFSPACE_NORMAL,
-    TOL_SHI_HYPERPLANE,
-    TOL_VERIFY_AB_ATOL,
-    VERTEX_TRUST_THRESHOLD,
-)
+import relucent.config as cfg
 from relucent.utils import get_env
 
 if TYPE_CHECKING:
@@ -43,8 +33,8 @@ __all__ = [
 def _drop_degenerate_halfspaces(
     halfspaces: np.ndarray,
     *,
-    tol_normal: float = TOL_HALFSPACE_NORMAL,
-    tol_bias: float = TOL_HALFSPACE_CONTAINMENT,
+    tol_normal: float | None = None,
+    tol_bias: float | None = None,
 ) -> np.ndarray:
     """Remove degenerate halfspaces with near-zero normals.
 
@@ -52,6 +42,10 @@ def _drop_degenerate_halfspaces(
     is either always satisfied (b <= 0) or infeasible (b > 0). Keeping such rows
     can trigger Qhull errors (e.g. QH6023) and destabilize interior-point solves.
     """
+    if tol_normal is None:
+        tol_normal = cfg.TOL_HALFSPACE_NORMAL
+    if tol_bias is None:
+        tol_bias = cfg.TOL_HALFSPACE_CONTAINMENT
     if halfspaces.size == 0:
         return halfspaces
     a = halfspaces[:, :-1]
@@ -302,7 +296,7 @@ def _get_hs_torch(
         if data is not None:
             assert isinstance(current_A, torch.Tensor)
             assert isinstance(current_b, torch.Tensor)
-            assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
+            assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -312,7 +306,7 @@ def _get_hs_torch(
     assert constr_A is not None
     assert constr_b is not None
 
-    num_dead_relus = int((torch.abs(constr_A) < TOL_DEAD_RELU).all(dim=0).sum().item())
+    num_dead_relus = int((torch.abs(constr_A) < cfg.TOL_DEAD_RELU).all(dim=0).sum().item())
     halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
 
     if get_all_Ab:
@@ -402,7 +396,7 @@ def _get_hs_numpy(
         if data is not None:
             assert isinstance(current_A, np.ndarray)
             assert isinstance(current_b, np.ndarray)
-            assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=TOL_VERIFY_AB_ATOL)
+            assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -412,7 +406,7 @@ def _get_hs_numpy(
     assert constr_A is not None
     assert constr_b is not None
 
-    num_dead_relus = (np.abs(constr_A) < TOL_DEAD_RELU).all(axis=0).sum().item()
+    num_dead_relus = (np.abs(constr_A) < cfg.TOL_DEAD_RELU).all(axis=0).sum().item()
     halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
     if get_all_Ab:
         return all_Ab
@@ -429,7 +423,7 @@ def get_shis(
     collect_info: bool | str = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
-    tol: float = TOL_SHI_HYPERPLANE,
+    tol: float | None = None,
     new_method: bool = False,
     env: Any = None,
     shi_pbar: bool = False,
@@ -457,6 +451,8 @@ def get_shis(
     Raises:
         ValueError: If the initial Gurobi solve fails.
     """
+    if tol is None:
+        tol = cfg.TOL_SHI_HYPERPLANE
     shis = []
     A = poly.halfspaces_np[:, :-1]
     b = poly.halfspaces_np[:, -1:]
@@ -498,8 +494,8 @@ def get_shis(
         constrs[i].setAttr("RHS", -b[i, 0] + push_size)
 
         model.setObjective((A[i] @ x).item() + b[i, 0], GRB.MAXIMIZE)
-        model.params.BestObjStop = GUROBI_SHI_BEST_OBJ_STOP
-        model.params.BestBdStop = GUROBI_SHI_BEST_BD_STOP
+        model.params.BestObjStop = cfg.GUROBI_SHI_BEST_OBJ_STOP
+        model.params.BestBdStop = cfg.GUROBI_SHI_BEST_BD_STOP
         # model.update()
         model.optimize()
 
@@ -582,7 +578,7 @@ def get_shis(
     return shis
 
 
-def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None:
+def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> None:
     """Compute additional geometric properties for low-dimensional polyhedra (vertices, hull, volume).
 
     Mutates ``poly`` cache fields (``_hs``, ``_vertices``, ``_ch``, ``_volume``,
@@ -592,6 +588,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
         ValueError: If input dimension > 6, interior point is missing, or qhull fails
             (depending on ``qhull_mode``).
     """
+    if qhull_mode is None:
+        qhull_mode = cfg.QHULL_MODE
     if poly._attempted_compute_properties:
         return
     poly._attempted_compute_properties = True
@@ -673,7 +671,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str = QHULL_MODE) -> None
     trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
     trust_vertices_2 = (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(
         axis=0
-    ) < VERTEX_TRUST_THRESHOLD
+    ) < cfg.VERTEX_TRUST_THRESHOLD
     poly._vertices = vertices[trust_vertices][trust_vertices_2]
     if poly.finite and len(poly._vertices) > poly.ambient_dim:
         try:

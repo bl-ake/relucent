@@ -11,12 +11,7 @@ import numpy as np
 import torch
 from tqdm.auto import tqdm
 
-from relucent.config import (
-    ASTAR_BIAS_WEIGHT,
-    DEFAULT_PARALLEL_ADD_BOUND,
-    DEFAULT_SEARCH_BOUND,
-    INTERIOR_POINT_RADIUS_SEQUENCE,
-)
+import relucent.config as cfg
 from relucent.poly import Polyhedron, get_hs, get_shis
 from relucent.ss import SSManager
 from relucent.utils import (
@@ -116,7 +111,7 @@ def parallel_add(
     cx: "Complex",
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
-    bound: float = DEFAULT_PARALLEL_ADD_BOUND,
+    bound: float | None = None,
     **kwargs: Any,
 ) -> list[Polyhedron | None]:
     """Add multiple polyhedra from data points using parallel processing.
@@ -137,6 +132,8 @@ def parallel_add(
         list: A list of Polyhedron objects (or None for failed computations)
             corresponding to the input points.
     """
+    if bound is None:
+        bound = cfg.DEFAULT_PARALLEL_ADD_BOUND
     from relucent.complex import set_globals
 
     nworkers = nworkers or process_aware_cpu_count()
@@ -181,7 +178,7 @@ def get_ip(
         ss[0, shi] = -ss[0, shi]
         assert cx.net is not None, "set_globals must be used as pool initializer"
         n = Polyhedron(cx.net, ss)
-        for max_radius in INTERIOR_POINT_RADIUS_SEQUENCE:
+        for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
             try:
                 n._interior_point = n.get_interior_point(env=cx.env, max_radius=max_radius)
             except ValueError:
@@ -250,7 +247,7 @@ def searcher(
     max_depth=float("inf"),
     max_polys=float("inf"),
     queue=None,
-    bound=DEFAULT_SEARCH_BOUND,
+    bound=None,
     nworkers=None,
     get_volumes=True,
     verbose=1,
@@ -298,6 +295,9 @@ def searcher(
         ValueError: If the start point lies on a hyperplane (has zero in SS).
     """
     from relucent.complex import set_globals
+
+    if bound is None:
+        bound = cfg.DEFAULT_SEARCH_BOUND
 
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
@@ -533,7 +533,7 @@ def hamming_astar(
     start: torch.Tensor | np.ndarray | Polyhedron,
     end: torch.Tensor | np.ndarray | Polyhedron,
     nworkers: int | None = None,
-    bound: float = DEFAULT_SEARCH_BOUND,
+    bound: float | None = None,
     max_polys: float = float("inf"),
     show_pbar: bool = True,
     num_threads: int = 1,
@@ -566,6 +566,9 @@ def hamming_astar(
         ValueError: If the start point lies exactly on a neuron's boundary.
     """
     from relucent.complex import set_globals
+
+    if bound is None:
+        bound = cfg.DEFAULT_SEARCH_BOUND
 
     start_poly = cx.add_polyhedron(start) if isinstance(start, Polyhedron) else cx.add_point(start)
     end_poly = cx.add_polyhedron(end) if isinstance(end, Polyhedron) else cx.add_point(end)
@@ -628,7 +631,7 @@ def hamming_astar(
             raise ValueError("Interior point not found")
         dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
         bias = -1 / (1 + dist)
-        return hamming + ASTAR_BIAS_WEIGHT * bias
+        return hamming + cfg.ASTAR_BIAS_WEIGHT * bias
 
     def d(p1: Polyhedron, p2: Polyhedron) -> int:
         return 1
