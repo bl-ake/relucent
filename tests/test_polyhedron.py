@@ -101,6 +101,34 @@ class TestPolyhedronContainment:
         assert x in p
 
 
+class TestPolyhedronBoundedVertices:
+    def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
+        net = get_mlp_model(widths=[2, 1], add_last_relu=True)
+        net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype)
+        net.layers["fc0"].bias.data = torch.tensor([0.0], device=net.device, dtype=net.dtype)
+        net.save_numpy_weights()
+        p = Polyhedron(net, np.array([[0]], dtype=np.int8))
+
+        verts = p.get_bounded_vertices(bound=1.0)
+        assert verts is not None
+        assert verts.shape[1] == 2
+        assert np.allclose(verts[:, 0], 0.0, atol=1e-6)
+        assert np.isclose(np.max(verts[:, 1]), 1.0, atol=1e-4)
+        assert np.isclose(np.min(verts[:, 1]), -1.0, atol=1e-4)
+
+    def test_bounded_vertices_supports_point_polyhedron(self, seeded):
+        net = get_mlp_model(widths=[2, 2], add_last_relu=True)
+        net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype)
+        net.layers["fc0"].bias.data = torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype)
+        net.save_numpy_weights()
+        p = Polyhedron(net, np.array([[0, 0]], dtype=np.int8))
+
+        verts = p.get_bounded_vertices(bound=1.0)
+        assert verts is not None
+        assert verts.shape == (1, 2)
+        assert np.allclose(verts[0], np.array([0.0, 0.0]), atol=1e-6)
+
+
 class TestPolyhedronOps:
     def test_nflips(self, seeded):
         net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
