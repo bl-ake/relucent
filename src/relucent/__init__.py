@@ -9,8 +9,8 @@ except ImportError as e:
     ) from e
 
 from . import config
-from .config import update_settings
 from .complex import Complex
+from .config import update_settings
 from .convert_model import convert
 from .model import NN, get_mlp_model
 from .poly import Polyhedron
