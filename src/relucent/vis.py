@@ -694,9 +694,7 @@ def _complex_figure_2d_cells(
     # Skip empty cells before touching ``interior_point`` (expensive / may raise). Duck-typed
     # plot stubs may omit ``feasible``; treat those as feasible.
     interior_points = [
-        np.max(np.abs(p.interior_point))
-        for p in cpx
-        if (not hasattr(p, "feasible") or p.feasible) and p.interior_point is not None
+        np.max(np.abs(p.interior_point)) for p in cpx.index2poly[:100] if p.finite and p.interior_point is not None
     ]
     maxcoord = (
         min(float(np.median(interior_points)) * cfg.PLOT_MARGIN_FACTOR, bound)
