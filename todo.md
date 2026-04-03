@@ -4,3 +4,4 @@
 - different CPWL activations
 - maxout layers (max layers)
 - ensure vis works on windows
+- Hamming returns search info
