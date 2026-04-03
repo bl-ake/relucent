@@ -245,6 +245,14 @@ def solve_radius(
         model.optimize()
         status = model.status
 
+    # Rarely, the Chebyshev LP can end with NUMERIC due to ill-conditioning.
+    # A second attempt with NumericFocus can recover; avoid doing this for INFEASIBLE
+    # since infeasibility is common during local search and the retry is expensive.
+    if status == GRB.NUMERIC:
+        model.setParam("NumericFocus", 1)
+        model.optimize()
+        status = model.status
+
     if status == GRB.OPTIMAL:
         objVal = model.objVal
         x, y = x.X, float(np.squeeze(y.X))
@@ -277,6 +285,15 @@ def solve_radius(
                 return None, float("inf")
             raise ValueError(f"Interior Point Model Status: {status}")
         else:
+            # Finite max_radius: same Chebyshev outcomes as above (intrinsic inradius 0, etc.).
+            if status == GRB.INFEASIBLE:
+                return None, None
+            if status == GRB.NUMERIC:
+                return None, None
+            if status == GRB.INF_OR_UNBD:
+                raise ValueError("Unable to disambiguate INF_OR_UNBD status.")
+            if status == GRB.UNBOUNDED:
+                return None, None
             raise ValueError(f"Interior Point Model Status: {status}")
 
 
