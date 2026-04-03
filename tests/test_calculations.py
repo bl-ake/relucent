@@ -124,3 +124,56 @@ def test_solve_radius_raises_on_nonfinite_halfspaces():
     )
     with pytest.raises(ValueError, match="Halfspaces contain NaN or Inf coefficients"):
         solve_radius(env, hs_inf)
+
+
+def test_solve_radius_no_inequalities_after_degenerate_drop():
+    """All halfspaces degenerate and redundant → full space; must not call Gurobi with 0-row mats."""
+    env = get_env()
+    hs = np.array(
+        [
+            [0.0, 0.0, -1.0],
+            [0.0, 0.0, 0.0],
+        ]
+    )
+    center, r = solve_radius(env, hs, max_radius=50.0)
+    assert center is not None
+    np.testing.assert_allclose(center.ravel(), 0.0)
+    assert r == 50.0
+
+
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
+def test_solve_radius_equalities_only_after_split():
+    """Inequalities empty but equalities remain — avoid 0-row norm_vector * y in Gurobi."""
+    env = get_env()
+    # x == 0, y free: two equalities in R^2, no strict inequalities.
+    hs = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [-1.0, 0.0, 0.0],
+        ]
+    )
+    center, r = solve_radius(
+        env, hs, max_radius=10.0, zero_indices=np.array([0, 1], dtype=np.intp)
+    )
+    assert center is not None
+    np.testing.assert_allclose(center.ravel(), [0.0, 0.0], atol=1e-8)
+    # Redundant equalities x=0: rank 1 → affine line; relative inradius hits max_radius cap.
+    assert r == 10.0
+
+
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
+def test_solve_radius_equalities_only_unique_point():
+    """Independent equalities pin a unique point → relative inradius 0."""
+    env = get_env()
+    hs = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ]
+    )
+    center, r = solve_radius(
+        env, hs, max_radius=100.0, zero_indices=np.array([0, 1], dtype=np.intp)
+    )
+    assert center is not None
+    np.testing.assert_allclose(center.ravel(), [0.0, 0.0], atol=1e-8)
+    assert r == 0.0

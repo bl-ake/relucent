@@ -153,9 +153,14 @@ def solve_radius(
         sense: Optimization sense, should typically be GRB.MAXIMIZE. Defaults to GRB.MAXIMIZE.
 
     Returns:
-        tuple: ``(center_point, radius)``. For ``max_radius`` infinite: ``(None, None)``
-            if the region is empty (infeasible), ``(None, inf)`` if nonempty and unbounded,
-            or ``(x, r)`` with ``r > 0`` if bounded with nonempty interior.
+        tuple: ``(center_point, radius)``. Radius is the largest ball in the **affine
+        hull** of the feasible region (relative Chebyshev inradius), except that
+        ``max_radius`` caps the LP when finite. For ``max_radius`` infinite:
+        ``(None, None)`` if infeasible; ``(None, inf)`` if the region is all of
+        :math:`\\mathbb{R}^d` with no constraints; otherwise ``(x, r)`` with
+        ``r = inf`` when the hull has positive dimension and no inequalities cut it,
+        ``r = 0`` when the hull is a **single point**, and ``r > 0`` when bounded
+        with nonempty relative interior in the usual LP.
 
     Raises:
         ValueError: If the optimization fails or produces invalid results.
@@ -192,6 +197,34 @@ def solve_radius(
 
     if not np.isfinite(norm_vector).all():
         raise ValueError("Norm vector contains NaN or Inf coefficients")
+
+    # No inequality rows: the Chebyshev LP has no constraints linking x and y.
+    # Building ``norm_vector * y`` with shape (0, 1) hits a gurobipy matrix-API
+    # AssertionError on some platforms (e.g. certain Python/gurobipy combos).
+    if inequalities.shape[0] == 0:
+        dim = halfspaces.shape[1] - 1
+        if equalities is not None and equalities.shape[0] > 0:
+            A_eq = equalities[:, :-1]
+            b_vec = -equalities[:, -1:].ravel()
+            x_feas, *_ = np.linalg.lstsq(A_eq, b_vec, rcond=None)
+            x_feas = np.asarray(x_feas, dtype=np.float64).reshape(dim, 1)
+            if A_eq.shape[0] > 0:
+                rnorm = np.linalg.norm(A_eq @ x_feas.ravel() - b_vec)
+                if rnorm > 1e-5 * max(1.0, float(np.linalg.norm(b_vec))):
+                    return None, None
+            # No strict inequalities: feasible set is an affine subspace {x : A_eq x = b}.
+            # Relative inradius in that hull is infinite unless the hull is 0-dimensional.
+            rnk = int(np.linalg.matrix_rank(A_eq))
+            aff_dim = dim - rnk
+            if aff_dim <= 0:
+                # Unique feasible point (affine hull is a single point).
+                return x_feas, 0.0
+            if max_radius == GRB.INFINITY:
+                return x_feas, float("inf")
+            return x_feas, float(max_radius)
+        if max_radius == GRB.INFINITY:
+            return None, float("inf")
+        return np.zeros((dim, 1), dtype=np.float64), float(max_radius)
 
     model = Model("Interior Point", env)
     x = model.addMVar((halfspaces.shape[1] - 1, 1), lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="x")
