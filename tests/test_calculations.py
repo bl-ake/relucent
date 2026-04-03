@@ -152,9 +152,7 @@ def test_solve_radius_equalities_only_after_split():
             [-1.0, 0.0, 0.0],
         ]
     )
-    center, r = solve_radius(
-        env, hs, max_radius=10.0, zero_indices=np.array([0, 1], dtype=np.intp)
-    )
+    center, r = solve_radius(env, hs, max_radius=10.0, zero_indices=np.array([0, 1], dtype=np.intp))
     assert center is not None
     np.testing.assert_allclose(center.ravel(), [0.0, 0.0], atol=1e-8)
     # Redundant equalities x=0: rank 1 → affine line; relative inradius hits max_radius cap.
@@ -171,9 +169,7 @@ def test_solve_radius_equalities_only_unique_point():
             [0.0, 1.0, 0.0],
         ]
     )
-    center, r = solve_radius(
-        env, hs, max_radius=100.0, zero_indices=np.array([0, 1], dtype=np.intp)
-    )
+    center, r = solve_radius(env, hs, max_radius=100.0, zero_indices=np.array([0, 1], dtype=np.intp))
     assert center is not None
     np.testing.assert_allclose(center.ravel(), [0.0, 0.0], atol=1e-8)
     assert r == 0.0
