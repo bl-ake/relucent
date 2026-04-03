@@ -693,9 +693,19 @@ def _complex_figure_2d_cells(
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
     # Skip empty cells before touching ``interior_point`` (expensive / may raise). Duck-typed
     # plot stubs may omit ``feasible``; treat those as feasible.
-    interior_points = [
-        np.max(np.abs(p.interior_point)) for p in cpx.index2poly[:100] if p.finite and p.interior_point is not None
-    ]
+    # NOTE: Use the already materialized `polys` list so this helper also works with
+    # lightweight test doubles that don't implement Complex.index2poly.
+    interior_points: list[float] = []
+    for p in polys[:100]:
+        finite = getattr(p, "finite", True)
+        if not finite:
+            continue
+        # Prefer the cached private interior point to avoid expensive Gurobi solves.
+        ip = getattr(p, "_interior_point", None)
+        if ip is None:
+            ip = getattr(p, "interior_point", None)
+        if ip is not None:
+            interior_points.append(float(np.max(np.abs(ip))))
     maxcoord = (
         min(float(np.median(interior_points)) * cfg.PLOT_MARGIN_FACTOR, bound)
         if len(interior_points) > 0
