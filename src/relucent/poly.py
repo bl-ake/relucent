@@ -324,9 +324,9 @@ class Polyhedron:
         if isinstance(other, Polyhedron):
             return self.tag == other.tag  # and (self.ss == other.ss).all()
         elif isinstance(other, str):
-            warnings.warn(
-                "Comparing Polyhedron with string is deprecated and will be removed in a future version", stacklevel=2
-            )
+            # warnings.warn(
+            #     "Comparing Polyhedron with string is deprecated and will be removed in a future version", stacklevel=2
+            # )
             return str(self) == other
         elif other is None:
             return False

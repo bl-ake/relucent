@@ -182,7 +182,7 @@ def solve_radius(
     zero_indices_eff = _remap_zero_indices(zero_indices, old_to_new)
 
     if zero_indices_eff is not None and len(zero_indices_eff) > 0:
-        warnings.warn("Working with k<d polyhedron.", stacklevel=2)
+        # warnings.warn("Working with k<d polyhedron.", stacklevel=2)
         equalities = halfspaces[zero_indices_eff]
         inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices_eff)]
         P = (
