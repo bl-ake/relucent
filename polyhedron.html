@@ -215,9 +215,12 @@ unless overridden per call.</p>
 <dt class="sig sig-object py" id="relucent.Polyhedron.clean_data">
 <span class="sig-name descname"><span class="pre">clean_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.Polyhedron.clean_data" title="Link to this definition"></a></dt>
 <dd><p>Clear cached data to reduce memory usage.</p>
-<p>Removes large cached properties like halfspaces, W matrix, center,
-and halfspace intersection data. Keeps small properties, the sign sequence,
-and the interior point.</p>
+<p>Drops large tensors (halfspaces, <code class="docutils literal notranslate"><span class="pre">W</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>) and Qhull-derived geometry
+(<code class="docutils literal notranslate"><span class="pre">_hs</span></code>, vertices, hull, volume). Resets <code class="docutils literal notranslate"><span class="pre">_attempted_compute_properties</span></code> so
+<code class="xref py py-func docutils literal notranslate"><span class="pre">compute_properties()</span></code> can run again. Keeps the sign
+sequence, interior-point cache, and lightweight Chebyshev classification
+(<code class="docutils literal notranslate"><span class="pre">finite</span></code>, <code class="docutils literal notranslate"><span class="pre">center</span></code>, <code class="docutils literal notranslate"><span class="pre">inradius</span></code>, and related flags) so search/plotting
+need not redo Gurobi Chebyshev solves after a cleanup pass.</p>
 </dd></dl>
 
 <dl class="py method">
