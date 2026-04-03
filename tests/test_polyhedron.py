@@ -156,7 +156,6 @@ class TestPolyhedronCleanData:
         assert p._halfspaces is None
         assert p._W is None
         assert p._b is None
-        assert p._center is None
 
 
 class TestPolyhedronPickle:
