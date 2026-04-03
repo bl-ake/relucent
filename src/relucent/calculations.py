@@ -30,6 +30,10 @@ __all__ = [
 ]
 
 
+class DegenerateHalfspaceInfeasibility(ValueError):
+    """Near-zero normal with positive bias: :math:`a^\\top x + b \\le 0` is empty when ``||a||≈0`` and ``b>0``."""
+
+
 def _drop_degenerate_halfspaces_tracked(
     halfspaces: np.ndarray,
     *,
@@ -58,7 +62,7 @@ def _drop_degenerate_halfspaces_tracked(
 
     if np.any(b[deg] > tol_bias):
         bad = np.flatnonzero(deg & (b > tol_bias)).tolist()
-        raise ValueError(
+        raise DegenerateHalfspaceInfeasibility(
             f"Degenerate halfspace(s) imply infeasibility (||a||<{tol_normal:g} with b>{tol_bias:g}) at rows {bad}"
         )
 
@@ -162,7 +166,11 @@ def solve_radius(
 
     # Remove degenerate constraints (near-zero normals) before building the model.
     # This prevents pathologies like 0*x + 0*y <= -b and makes results more stable across platforms.
-    halfspaces, old_to_new = _drop_degenerate_halfspaces_tracked(halfspaces)
+    try:
+        halfspaces, old_to_new = _drop_degenerate_halfspaces_tracked(halfspaces)
+    except DegenerateHalfspaceInfeasibility:
+        # Same conclusion as an infeasible Chebyshev LP: empty intersection.
+        return None, None
     zero_indices_eff = _remap_zero_indices(zero_indices, old_to_new)
 
     if zero_indices_eff is not None and len(zero_indices_eff) > 0:

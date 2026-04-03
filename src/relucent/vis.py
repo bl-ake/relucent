@@ -691,7 +691,13 @@ def _complex_figure_2d_cells(
         if label_regions and poly.center is not None:
             fig.add_trace(go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False))
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
-    interior_points = [np.max(np.abs(p.interior_point)) for p in cpx if p.interior_point is not None]
+    # Skip empty cells before touching ``interior_point`` (expensive / may raise). Duck-typed
+    # plot stubs may omit ``feasible``; treat those as feasible.
+    interior_points = [
+        np.max(np.abs(p.interior_point))
+        for p in cpx
+        if (not hasattr(p, "feasible") or p.feasible) and p.interior_point is not None
+    ]
     maxcoord = (
         min(float(np.median(interior_points)) * cfg.PLOT_MARGIN_FACTOR, bound)
         if len(interior_points) > 0
