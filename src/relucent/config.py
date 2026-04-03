@@ -53,6 +53,12 @@ VERTEX_TRUST_THRESHOLD: float = 1e-6
 # __contains__, and get_bounded_vertices.
 TOL_HALFSPACE_CONTAINMENT: float = 1e-6
 
+# After Chebyshev / interior LP (Gurobi), max halfspace violation allowed vs.
+# :func:`_drop_degenerate_halfspaces` rows — same set enforced in ``solve_radius``.
+# Slightly looser than :data:`TOL_HALFSPACE_CONTAINMENT` to absorb LP
+# FeasibilityTol and floating-point noise (often platform-dependent).
+TOL_INTERIOR_VERIFY: float = 1e-5
+
 # Threshold below which a ReLU is considered dead (always off).
 # Dead ReLUs have |constr_A| < TOL_DEAD_RELU along their column.
 TOL_DEAD_RELU: float = 1e-8
@@ -168,6 +174,7 @@ __all__ = [
     "QHULL_MODE",
     "TOL_DEAD_RELU",
     "TOL_HALFSPACE_CONTAINMENT",
+    "TOL_INTERIOR_VERIFY",
     "TOL_HALFSPACE_NORMAL",
     "TOL_NEARLY_VERTICAL",
     "TOL_SHI_HYPERPLANE",

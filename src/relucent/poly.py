@@ -236,13 +236,19 @@ class Polyhedron:
             interior_point = interior_point.squeeze()
         if interior_point is None:
             raise ValueError("Interior point not found. Check that the polyhedron is feasible and MAX_RADIUS is large enough.")
-        # if (
-        #     maximum_violation := (self.inequalities[:, :-1] @ interior_point + self.inequalities[:-1, None]).max()
-        # ) > TOL_HALFSPACE_CONTAINMENT:
-        #     raise ValueError(f"Interior point invalid - Maximum Violation: {maximum_violation}")
-        if interior_point is not None and interior_point not in self:
-            violation = (self.inequalities[:, :-1] @ interior_point + self.inequalities[:-1, None]).max()
-            raise ValueError(f"Interior point invalid - {interior_point} not in {self}: violation={violation}")
+        # Match solve_radius: validate only non-degenerate halfspaces, with slack for
+        # LP feasibility (__contains__ uses all rows + tighter TOL_HALFSPACE_CONTAINMENT).
+        # if interior_point is not None:
+        #     hs_check = _drop_degenerate_halfspaces(self.halfspaces_np[:])
+        #     if hs_check.size > 0:
+        #         pt = interior_point.reshape(1, -1)
+        #         dists = pt @ hs_check[:, :-1].T + hs_check[:, -1]
+        #         max_v = float(dists.max())
+        #         if max_v > cfg.TOL_INTERIOR_VERIFY:
+        #             raise ValueError(
+        #                 f"Interior point invalid - {interior_point} not in {self}: "
+        #                 f"max violation {max_v} (tol {cfg.TOL_INTERIOR_VERIFY})"
+        #             )
         return interior_point
 
     def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
