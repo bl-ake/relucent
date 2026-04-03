@@ -7,6 +7,7 @@ from relucent.calculations import (
     _drop_degenerate_halfspaces_tracked,
     _halfspaces_feasible,
     _remap_zero_indices,
+    solve_radius,
 )
 from relucent.utils import get_env
 
@@ -99,3 +100,27 @@ def test_halfspaces_feasible_with_zero_indices_equalities():
 
     assert _halfspaces_feasible(env, feasible, zero_indices=np.array([0], dtype=np.intp)) is True
     assert _halfspaces_feasible(env, infeasible, zero_indices=np.array([0], dtype=np.intp)) is False
+
+
+def test_solve_radius_raises_on_nonfinite_halfspaces():
+    """NaN/Inf in halfspaces must fail fast with a clear error (not passed to Gurobi)."""
+    env = get_env()
+    hs_nan = np.array(
+        [
+            [1.0, 0.0, -1.0],
+            [0.0, 1.0, -1.0],
+            [float("nan"), float("nan"), float("nan")],
+        ]
+    )
+    with pytest.raises(ValueError, match="Halfspaces contain NaN or Inf coefficients"):
+        solve_radius(env, hs_nan)
+
+    hs_inf = np.array(
+        [
+            [1.0, 0.0, -1.0],
+            [0.0, 1.0, -1.0],
+            [float("inf"), 0.0, -1.0],
+        ]
+    )
+    with pytest.raises(ValueError, match="Halfspaces contain NaN or Inf coefficients"):
+        solve_radius(env, hs_inf)
