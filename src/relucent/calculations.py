@@ -216,7 +216,7 @@ def solve_radius(
             # Relative inradius in that hull is infinite unless the hull is 0-dimensional.
             rnk = int(np.linalg.matrix_rank(A_eq))
             aff_dim = dim - rnk
-            if aff_dim <= 0:
+            if aff_dim <= 0:  ## TODO: Either this or avoid calling solve_radius by checking the poly's codimension
                 # Unique feasible point (affine hull is a single point).
                 return x_feas, 0.0
             if max_radius == GRB.INFINITY:
