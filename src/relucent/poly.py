@@ -608,21 +608,23 @@ class Polyhedron:
     def clean_data(self) -> None:
         """Clear cached data to reduce memory usage.
 
-        Removes large cached properties like halfspaces, W matrix, center,
-        and halfspace intersection data. Keeps small properties, the sign sequence,
-        and the interior point.
+        Drops large tensors (halfspaces, ``W``, ``b``) and Qhull-derived geometry
+        (``_hs``, vertices, hull, volume). Resets ``_attempted_compute_properties`` so
+        :func:`~relucent.calculations.compute_properties` can run again. Keeps the sign
+        sequence, interior-point cache, and lightweight Chebyshev classification
+        (``finite``, ``center``, ``inradius``, and related flags) so search/plotting
+        need not redo Gurobi Chebyshev solves after a cleanup pass.
         """
         self._halfspaces = None
         self._W = None
         self._b = None
-        self._center = None
         self._hs = None
-        # self._interior_point = None ## TODO: Does this slow down things?
         self._halfspaces_np = None
+        self._vertices = None
+        self._ch = None
+        self._volume = None
         self._attempted_compute_properties = False
-        self._finite_computed = False
-        self._finite = None
-        self._inradius = None
+        # self._interior_point = None ## TODO: Does this slow down things?
 
     """
     All of the following properties are computed on the fly and cached
@@ -893,6 +895,8 @@ class Polyhedron:
         if not hasattr(self, "_finite_computed"):
             # Legacy pickle: ``_finite`` was only True/False; None meant "not computed".
             self._finite_computed = self._finite is not None
+        if self._finite is True and self._center is None:
+            self._finite_computed = False
 
     def __getstate__(self) -> dict[str, Any]:
         return {
@@ -900,6 +904,7 @@ class Polyhedron:
             "_hash": self._hash,
             "_finite_computed": self._finite_computed,
             "_finite": self._finite,
+            "_center": self._center,  ## TODO: Does this slow down things? Careful when removing this!
             "_interior_point_norm": self._interior_point_norm,
             "_inradius": self._inradius,
             "_shis": self._shis,
