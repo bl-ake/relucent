@@ -164,6 +164,9 @@ def solve_radius(
     if isinstance(halfspaces, torch.Tensor):
         halfspaces = halfspaces.detach().cpu().numpy()
 
+    if not np.isfinite(halfspaces).all():
+        raise ValueError("Halfspaces contain NaN or Inf coefficients")
+
     # Remove degenerate constraints (near-zero normals) before building the model.
     # This prevents pathologies like 0*x + 0*y <= -b and makes results more stable across platforms.
     try:
@@ -186,6 +189,9 @@ def solve_radius(
         inequalities = halfspaces
         equalities = None
         norm_vector = np.reshape(np.linalg.norm(inequalities[:, :-1], axis=1), (inequalities[:, :-1].shape[0], 1))
+
+    if not np.isfinite(norm_vector).all():
+        raise ValueError("Norm vector contains NaN or Inf coefficients")
 
     model = Model("Interior Point", env)
     x = model.addMVar((halfspaces.shape[1] - 1, 1), lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="x")
