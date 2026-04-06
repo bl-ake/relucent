@@ -76,6 +76,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.get_boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_cells()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.get_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_complex()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#relucent.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
@@ -354,6 +355,15 @@ deeply as possible before backtracking. Uses a LIFO queue.</p>
 <dd class="field-odd"><p>dict</p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.Complex.get_betti_numbers">
+<span class="sig-name descname"><span class="pre">get_betti_numbers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Complex.get_betti_numbers" title="Link to this definition"></a></dt>
+<dd><p>Compute Betti numbers of the complex over GF(2).</p>
+<p>Uses <code class="docutils literal notranslate"><span class="pre">get_chain_complex()</span></code> to obtain k-cells by contracting from top-dimensional
+cells. The boundary operators are built from dual-graph incidences at each chain level,
+then Betti numbers are computed as <code class="docutils literal notranslate"><span class="pre">beta_k</span> <span class="pre">=</span> <span class="pre">dim(C_k)</span> <span class="pre">-</span> <span class="pre">rank(∂_k)</span> <span class="pre">-</span> <span class="pre">rank(∂_{k+1})</span></code>.</p>
 </dd></dl>
 
 <dl class="py method">
