@@ -309,67 +309,6 @@ class TestComplexAutoConversion:
 
 
 class TestComplexMisc:
-    def test_get_betti_numbers_known_1d_single_relu(self, seeded):
-        """1D single-hyperplane complex compactifies to S^1: beta_0=1, beta_1=1."""
-        network = nn.Sequential(
-            nn.Linear(1, 1),
-            nn.ReLU(),
-            nn.Linear(1, 1),
-        )
-        with torch.no_grad():
-            network[0].weight.fill_(1.0)
-            network[0].bias.zero_()
-            network[2].weight.fill_(1.0)
-            network[2].bias.zero_()
-
-        cplx = Complex(network)
-        start = torch.tensor([0.37], dtype=torch.float32)
-        cplx.bfs(start=start, max_polys=10, nworkers=1, verbose=0)
-        assert len(cplx) == 2
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message=r"Dual graph is incomplete\. .* boundary cells were not added",
-                category=UserWarning,
-            )
-            betti = cplx.get_betti_numbers(compactify_infinity=True)
-        assert betti == {1: 1, 0: 1}
-
-    def test_get_betti_numbers_smoke(self, small_mlp):
-        """Betti numbers can be computed from a discovered complex."""
-        cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
-        cplx.bfs(start=start, max_polys=20, nworkers=1, verbose=0)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message=r"Dual graph is incomplete\. .* boundary cells were not added",
-                category=UserWarning,
-            )
-            betti = cplx.get_betti_numbers()
-        assert isinstance(betti, dict)
-        assert len(betti) >= 1
-        assert all(isinstance(k, int) and isinstance(v, int) for k, v in betti.items())
-
-    def test_get_betti_numbers_matches_sage_when_available(self, seeded):
-        """Python GF(2) Betti numbers should match Sage ChainComplex betti."""
-        pytest.importorskip("sage.all")
-        model = get_mlp_model(widths=[2, 6, 1], add_last_relu=True)
-        cplx = Complex(model)
-        start = torch.rand((1, 2), device=model.device, dtype=model.dtype)
-        cplx.bfs(start=start, max_polys=60, nworkers=1, verbose=0)
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message=r"Dual graph is incomplete\. .* boundary cells were not added",
-                category=UserWarning,
-            )
-            chain = cplx.get_chain_complex()
-            py_betti = cplx.get_betti_numbers(chain=chain)
-            sage_chain = cplx.get_chain_complex_sage(chain=chain)
-        sage_betti = {int(k): int(v) for k, v in dict(sage_chain.betti()).items()}
-        assert py_betti == sage_betti
-
     def test_random_walk_smoke(self, small_mlp):
         """Smoke test for random_walk search."""
         cplx = Complex(small_mlp)

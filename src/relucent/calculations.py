@@ -629,7 +629,7 @@ def get_shis(
         i = subset.pop()
         if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
             continue
-        if (A[i] == 0).all():
+        if (A[i, :-1] == 0).all():
             continue
         # model.update()
         pbar.set_postfix_str(f"#shis: {len(shis)}")

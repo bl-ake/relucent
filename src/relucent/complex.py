@@ -737,178 +737,78 @@ class Complex:
 
     @staticmethod
     def _gf2_rank(matrix: np.ndarray) -> int:
-        """Compute rank over GF(2) via row-reduction."""
+        """Compute matrix rank over GF(2) via Gaussian elimination."""
         if matrix.size == 0:
             return 0
-        # Work mod 2 (everything is 0/1).
-        a = (matrix.copy() & 1).astype(np.uint8, copy=False)
-        n_rows, n_cols = a.shape
+        A = (matrix.astype(np.uint8, copy=True) & 1)
+        nrows, ncols = A.shape
         rank = 0
-        for col in range(n_cols):
-            if rank >= n_rows:
+        for col in range(ncols):
+            if rank >= nrows:
                 break
-            # Find a pivot row at or below the current rank row.
-            pivots = np.flatnonzero(a[rank:, col])
-            if pivots.size == 0:
+            pivot_rows = np.flatnonzero(A[rank:, col]) + rank
+            if pivot_rows.size == 0:
                 continue
-            pivot = rank + int(pivots[0])
+            pivot = int(pivot_rows[0])
             if pivot != rank:
-                # Move pivot into place.
-                a[[rank, pivot]] = a[[pivot, rank]]
-            # Clear this column everywhere else using XOR.
-            rows = np.flatnonzero(a[:, col])
-            rows = rows[rows != rank]
-            if rows.size > 0:
-                a[rows] ^= a[rank]
-            # One more independent row found.
+                A[[rank, pivot], :] = A[[pivot, rank], :]
+            eliminate_rows = np.flatnonzero(A[:, col])
+            eliminate_rows = eliminate_rows[eliminate_rows != rank]
+            if eliminate_rows.size > 0:
+                A[eliminate_rows, :] ^= A[rank, :]
             rank += 1
         return rank
 
-    @staticmethod
-    def _ss_key(ss: np.ndarray) -> bytes:
-        return ss.astype(np.int8, copy=False).tobytes()
+    def get_betti_numbers(self) -> dict[int, int]:
+        """Compute Betti numbers of the complex over GF(2).
 
-    def _boundary_matrices(
-        self,
-        chain: list["Complex"],
-        compactify_infinity: bool = True,
-    ) -> tuple[list[np.ndarray], list[int], list[int]]:
-        """Build GF(2) boundary matrices from a chain of complexes.
-
-        Returns:
-            tuple:
-                - boundaries: list of matrices for maps ``C_k -> C_{k-1}``
-                  following the order of ``chain`` (i.e. ``chain[i]`` to ``chain[i+1]``).
-                - dims: dimensions of ``chain`` entries.
-                - sizes: number of cells in each ``chain`` entry.
-        """
-        if len(chain) == 0:
-            return [], [], []
-        if any(len(level) == 0 for level in chain):
-            raise ValueError("Each chain level must contain at least one polyhedron.")
-
-        dims = [int(level.index2poly[0].dim) for level in chain]
-        sizes = [len(level) for level in chain]
-        boundaries: list[np.ndarray] = []
-
-        # Build one boundary matrix per adjacent pair of chain levels.
-        for i in range(len(chain) - 1):
-            high = chain[i]
-            low = chain[i + 1]
-            # Quick lookup: face sign-sequence -> row index.
-            low_lookup = {self._ss_key(poly.ss_np): j for j, poly in enumerate(low)}
-            # Rows are lower-dim cells, cols are higher-dim cells.
-            boundary = np.zeros((len(low), len(high)), dtype=np.uint8)
-
-            for col, poly in enumerate(high):
-                ss = poly.ss_np
-                # Try each codim-1 face by zeroing one active sign.
-                for idx in np.flatnonzero(ss[0] != 0):
-                    face_ss = ss.copy()
-                    face_ss[0, idx] = 0
-                    low_idx = low_lookup.get(self._ss_key(face_ss))
-                    if low_idx is not None:
-                        # Over GF(2), incidence is just a bit flip.
-                        boundary[low_idx, col] ^= 1
-            boundaries.append(boundary)
-
-        # Optional one-point compactification for unbounded 1-cells.
-        if compactify_infinity:
-            for i, (kdim, lowdim) in enumerate(zip(dims[:-1], dims[1:], strict=True)):
-                # Only the 1->0 boundary needs the extra infinity vertex.
-                if kdim == 1 and lowdim == 0:
-                    b1 = boundaries[i]
-                    if b1.shape[0] == 0:
-                        break
-                    # Odd endpoint count means this edge is "open" on one side.
-                    odd = (b1.sum(axis=0) % 2).astype(np.uint8)
-                    if np.any(odd):
-                        # Add one new row: incidence to the point at infinity.
-                        inf_row = odd.reshape(1, -1)
-                        boundaries[i] = np.vstack([b1, inf_row]).astype(np.uint8, copy=False)
-                        # Keep C_0 size in sync with the added row.
-                        sizes[i + 1] += 1
-                    break
-
-        return boundaries, dims, sizes
-
-    def get_chain_complex_sage(
-        self,
-        chain: list["Complex"] | None = None,
-        compactify_infinity: bool = True,
-        field_order: int = 2,
-    ) -> Any:
-        """Build a Sage ``ChainComplex`` from this complex.
-
-        This is primarily for validating the pure-Python homology computation.
-        Requires Sage to be installed in the runtime environment.
-        """
-        try:
-            import importlib
-
-            sage_all = importlib.import_module("sage.all")
-            ChainComplex = sage_all.ChainComplex
-            GF = sage_all.GF
-            matrix = sage_all.matrix
-        except Exception as exc:
-            raise ImportError("Sage is required for get_chain_complex_sage().") from exc
-
-        chain = chain if chain is not None else self.get_chain_complex()
-        boundaries, dims, _ = self._boundary_matrices(chain, compactify_infinity=compactify_infinity)
-        if len(dims) == 0:
-            return ChainComplex({}, degree=-1)
-
-        field = GF(field_order)
-        sage_maps: dict[int, Any] = {}
-        # Convert each NumPy boundary matrix into Sage's sparse matrix type.
-        for i, boundary in enumerate(boundaries):
-            high_dim = dims[i]
-            if boundary.size == 0:
-                rows, cols = boundary.shape
-                sage_maps[high_dim] = matrix(field, rows, cols, sparse=True)
-            else:
-                sage_maps[high_dim] = matrix(field, boundary.astype(int).tolist(), sparse=True)
-        # Hand maps to Sage; Sage does homology/betti from here.
-        return ChainComplex(sage_maps, degree=-1)
-
-    def get_betti_numbers(
-        self,
-        chain: list["Complex"] | None = None,
-        compactify_infinity: bool = True,
-    ) -> dict[int, int]:
-        """Compute Betti numbers of the cell complex over ``Z/2Z``.
-
-        The boundary incidence is inferred combinatorially from sign sequences:
-        a ``k``-cell contributes to a ``(k-1)``-cell boundary when setting one
-        active supporting-hyperplane sign entry to ``0`` matches a cell in the
-        next chain level.
-
-        Args:
-            chain: Optional precomputed chain returned by ``get_chain_complex()``.
-                If ``None``, the chain is computed from this complex.
-            compactify_infinity: If True, adds a point at infinity for unbounded
-                1-cells (matching the Sage/reference behavior).
-
-        Returns:
-            dict[int, int]: Mapping ``dimension -> Betti number``.
+        Uses ``get_chain_complex()`` to obtain k-cells by contracting from top-dimensional
+        cells. The boundary operators are built from dual-graph incidences at each chain level,
+        then Betti numbers are computed as ``beta_k = dim(C_k) - rank(∂_k) - rank(∂_{k+1})``.
         """
         if len(self) == 0:
             return {}
-        chain = chain if chain is not None else self.get_chain_complex()
-        boundaries, dims, sizes = self._boundary_matrices(chain, compactify_infinity=compactify_infinity)
-        if len(dims) == 0:
-            return {}
-        # Rank of each boundary map d_k.
-        boundary_ranks = [self._gf2_rank(boundary) for boundary in boundaries]
 
-        betti: dict[int, int] = {}
-        # beta_k = (#k-cells) - rank(d_k) - rank(d_{k+1}).
-        for i, (kdim, nk) in enumerate(zip(dims, sizes, strict=True)):
-            rank_out = boundary_ranks[i] if i < len(boundary_ranks) else 0
-            rank_in = boundary_ranks[i - 1] if i > 0 else 0
-            betti_k = nk - rank_out - rank_in
-            betti[int(kdim)] = int(betti_k)
-        return betti
+        chain = self.get_chain_complex()
+        dim2complex = {int(c.index2poly[0].dim): c for c in chain if len(c) > 0}
+        dims = sorted(dim2complex.keys())
+        ncells = {k: len(dim2complex[k]) for k in dims}
+
+        boundary_rank: dict[int, int] = {}
+
+        for i, c_k in enumerate(chain):
+            k = int(c_k.index2poly[0].dim)
+            if i == len(chain) - 1:
+                # Lowest-dimensional chain group has zero outgoing boundary map.
+                boundary_rank[k] = 0
+                continue
+
+            c_km1 = chain[i + 1]
+            boundary = np.zeros((len(c_km1), len(c_k)), dtype=np.uint8)
+
+            # In this contraction-based chain construction, (k-1)-cells correspond to
+            # edges of the dual graph of k-cells. Over GF(2), each such edge is incident
+            # to its two endpoint k-cells.
+            G = c_k.get_dual_graph()
+            for p1, p2, shi in G.edges(data="shi"):
+                p1 = cast(Polyhedron, p1)
+                p2 = cast(Polyhedron, p2)
+                face_ss = p1.ss_np.copy()
+                face_ss[0, shi] = 0
+                if face_ss not in c_km1:
+                    continue
+                row = c_km1.ssm[face_ss]
+                col1 = c_k.ssm[p1.ss_np]
+                col2 = c_k.ssm[p2.ss_np]
+                boundary[row, col1] ^= 1
+                boundary[row, col2] ^= 1
+
+            boundary_rank[k] = self._gf2_rank(boundary)
+
+        return {
+            k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0))
+            for k in dims
+        }
 
     @property
     def G(self) -> nx.Graph:
@@ -977,7 +877,7 @@ class Complex:
                     missing.append((ss, shi))
                 ss[0, shi] *= -1
 
-        if len(missing) > 0:
+        if len(missing) > 0 and max_dim == self.dim:
             warnings.warn(
                 f"Dual graph is incomplete. {len(missing)} boundary cells were not added to the complex."
                 "Set auto_add=True to add them.",
