@@ -740,7 +740,7 @@ class Complex:
         """Compute matrix rank over GF(2) via Gaussian elimination."""
         if matrix.size == 0:
             return 0
-        A = (matrix.astype(np.uint8, copy=True) & 1)
+        A = matrix.astype(np.uint8, copy=True) & 1
         nrows, ncols = A.shape
         rank = 0
         for col in range(ncols):
@@ -805,10 +805,7 @@ class Complex:
 
             boundary_rank[k] = self._gf2_rank(boundary)
 
-        return {
-            k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0))
-            for k in dims
-        }
+        return {k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0)) for k in dims}
 
     @property
     def G(self) -> nx.Graph:
