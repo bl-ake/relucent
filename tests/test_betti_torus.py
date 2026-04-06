@@ -108,10 +108,7 @@ def _model_with_db_relu(model: torch.nn.Module) -> torch.nn.Module:
 
 @pytest.mark.skipif(
     os.environ.get("RELUCENT_RUN_TORUS_TEST", "0") != "1",
-    reason=(
-        "Integration test is opt-in. Set RELUCENT_RUN_TORUS_TEST=1 "
-        "(uses bundled checkpoint by default)."
-    ),
+    reason=("Integration test is opt-in. Set RELUCENT_RUN_TORUS_TEST=1 (uses bundled checkpoint by default)."),
 )
 def test_torus_decision_boundary_betti_numbers(seeded):
     """Torus decision boundary should have Betti numbers [1, 2, 1]."""
