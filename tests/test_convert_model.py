@@ -12,6 +12,7 @@ from relucent.model import NN, get_mlp_model
 
 class TestCombineLinearLayers:
     def test_two_linears_combined(self, seeded):
+        assert seeded is not None
         a = nn.Linear(4, 6)
         b = nn.Linear(6, 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("a", a), ("b", b)])
@@ -23,6 +24,7 @@ class TestCombineLinearLayers:
         assert layer.in_features == 4 and layer.out_features == 2
 
     def test_linear_relu_linear_not_merged(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(3, 5)),
@@ -34,6 +36,7 @@ class TestCombineLinearLayers:
         assert len(merged) == 3
 
     def test_forward_preserved(self, seeded):
+        assert seeded is not None
         a = nn.Linear(4, 6)
         b = nn.Linear(6, 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("a", a), ("b", b)])
@@ -45,6 +48,7 @@ class TestCombineLinearLayers:
         assert torch.allclose(y_orig, y_merged)
 
     def test_three_linears_combined(self, seeded):
+        assert seeded is not None
         a = nn.Linear(4, 6)
         b = nn.Linear(6, 5)
         c = nn.Linear(5, 2)
@@ -57,6 +61,7 @@ class TestCombineLinearLayers:
         assert torch.allclose(c(b(a(x))), m(x), atol=1e-5)
 
     def test_single_linear_passes_through(self, seeded):
+        assert seeded is not None
         a = nn.Linear(4, 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("a", a)])
         merged = combine_linear_layers(layers)
@@ -65,11 +70,13 @@ class TestCombineLinearLayers:
         assert m.in_features == 4 and m.out_features == 2
 
     def test_non_linear_only_preserved(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict([("relu0", nn.ReLU())])
         merged = combine_linear_layers(layers)
         assert list(merged.keys()) == ["relu0"]
 
     def test_combined_name_uses_plus(self, seeded):
+        assert seeded is not None
         a = nn.Linear(4, 6)
         b = nn.Linear(6, 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("fc0", a), ("fc1", b)])
@@ -77,6 +84,7 @@ class TestCombineLinearLayers:
         assert next(iter(merged)) == "fc0+fc1"
 
     def test_linear_relu_ordering_preserved(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(3, 5)),
@@ -92,23 +100,27 @@ class TestCombineLinearLayers:
 
 class TestTorchConvLayerToAffine:
     def test_returns_linear(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(1, 4, kernel_size=3, padding=1)
         fc = torch_conv_layer_to_affine(conv, (1, 8, 8))
         assert isinstance(fc, nn.Linear)
 
     def test_feature_counts_with_same_padding(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(1, 4, kernel_size=3, padding=1)
         fc = torch_conv_layer_to_affine(conv, (1, 8, 8))
         assert fc.in_features == 1 * 8 * 8
         assert fc.out_features == 4 * 8 * 8
 
     def test_feature_counts_without_padding(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(1, 2, kernel_size=3, padding=0)
         fc = torch_conv_layer_to_affine(conv, (1, 8, 8))
         assert fc.in_features == 1 * 8 * 8
         assert fc.out_features == 2 * 6 * 6
 
     def test_numerical_equivalence_with_padding(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(2, 3, kernel_size=3, padding=1)
         input_size = (2, 6, 6)
         fc = torch_conv_layer_to_affine(conv, input_size)
@@ -116,6 +128,7 @@ class TestTorchConvLayerToAffine:
         assert torch.allclose(conv(x).reshape(-1), fc(x.reshape(-1)), atol=1e-5)
 
     def test_numerical_equivalence_no_padding(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(1, 2, kernel_size=3, padding=0)
         input_size = (1, 8, 8)
         fc = torch_conv_layer_to_affine(conv, input_size)
@@ -123,6 +136,7 @@ class TestTorchConvLayerToAffine:
         assert torch.allclose(conv(x).reshape(-1), fc(x.reshape(-1)), atol=1e-5)
 
     def test_numerical_equivalence_with_stride(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(1, 2, kernel_size=2, stride=2, padding=0)
         input_size = (1, 8, 8)
         fc = torch_conv_layer_to_affine(conv, input_size)
@@ -130,6 +144,7 @@ class TestTorchConvLayerToAffine:
         assert torch.allclose(conv(x).reshape(-1), fc(x.reshape(-1)), atol=1e-5)
 
     def test_numerical_equivalence_multichannel(self, seeded):
+        assert seeded is not None
         conv = nn.Conv2d(3, 8, kernel_size=3, padding=1)
         input_size = (3, 6, 6)
         fc = torch_conv_layer_to_affine(conv, input_size)
@@ -139,17 +154,20 @@ class TestTorchConvLayerToAffine:
 
 class TestAvgPool2dToAffine:
     def test_returns_linear(self, seeded):
+        assert seeded is not None
         pool = nn.AvgPool2d(kernel_size=2, stride=2)
         fc = avgpool2d_to_affine(pool, (1, 8, 8))
         assert isinstance(fc, nn.Linear)
 
     def test_feature_counts(self, seeded):
+        assert seeded is not None
         pool = nn.AvgPool2d(kernel_size=2, stride=2)
         fc = avgpool2d_to_affine(pool, (1, 8, 8))
         assert fc.in_features == 1 * 8 * 8
         assert fc.out_features == 1 * 4 * 4
 
     def test_numerical_equivalence_int_kernel(self, seeded):
+        assert seeded is not None
         pool = nn.AvgPool2d(kernel_size=2, stride=2)
         input_size = (2, 8, 8)
         fc = avgpool2d_to_affine(pool, input_size)
@@ -157,6 +175,7 @@ class TestAvgPool2dToAffine:
         assert torch.allclose(pool(x).reshape(-1), fc(x.reshape(-1)), atol=1e-5)
 
     def test_numerical_equivalence_tuple_kernel(self, seeded):
+        assert seeded is not None
         pool = nn.AvgPool2d(kernel_size=(2, 2), stride=(2, 2))
         input_size = (1, 8, 8)
         fc = avgpool2d_to_affine(pool, input_size)
@@ -164,6 +183,7 @@ class TestAvgPool2dToAffine:
         assert torch.allclose(pool(x).reshape(-1), fc(x.reshape(-1)), atol=1e-5)
 
     def test_numerical_equivalence_multichannel(self, seeded):
+        assert seeded is not None
         pool = nn.AvgPool2d(kernel_size=2, stride=2)
         input_size = (4, 8, 8)
         fc = avgpool2d_to_affine(pool, input_size)
@@ -173,6 +193,7 @@ class TestAvgPool2dToAffine:
 
 class TestConvert:
     def test_mlp_roundtrip(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 3])
         canonical = convert(net)
         assert isinstance(canonical, NN)
@@ -183,6 +204,7 @@ class TestConvert:
         assert torch.allclose(y_orig, y_can, atol=1e-5)
 
     def test_conv2d_model_roundtrip(self, seeded):
+        assert seeded is not None
         C, H, W = 1, 8, 8
         conv = nn.Conv2d(C, 4, kernel_size=3, padding=1)
         relu = nn.ReLU()
@@ -198,6 +220,7 @@ class TestConvert:
         assert torch.allclose(y_orig, y_can, atol=1e-4)
 
     def test_avgpool2d_model_roundtrip(self, seeded):
+        assert seeded is not None
         C, H, W = 1, 8, 8
         pool = nn.AvgPool2d(kernel_size=2, stride=2)
         flatten = nn.Flatten()
@@ -212,6 +235,7 @@ class TestConvert:
         assert torch.allclose(y_orig, y_can, atol=1e-4)
 
     def test_dropout_is_stripped(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(4, 8)),
@@ -225,6 +249,7 @@ class TestConvert:
         assert not any(isinstance(layer, nn.Dropout) for layer in canonical.layers.values())
 
     def test_logsoftmax_stops_conversion(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(4, 8)),
@@ -239,6 +264,7 @@ class TestConvert:
         assert any(isinstance(layer, nn.Linear) and layer.out_features == 3 for layer in canonical.layers.values())
 
     def test_unsupported_layer_raises(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(4, 4)),
@@ -250,12 +276,14 @@ class TestConvert:
             convert(model)
 
     def test_output_is_linear_relu_only(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 3])
         canonical = convert(net)
         for layer in canonical.layers.values():
             assert isinstance(layer, (nn.Linear, nn.ReLU, nn.Flatten))
 
     def test_consecutive_linears_are_merged(self, seeded):
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(4, 8)),

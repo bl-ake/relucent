@@ -16,6 +16,7 @@ from relucent.model import NN
 
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
     """BFS/DFS equivalence, conversion to dual graph."""
+    assert seeded is not None
     model = get_mlp_model(widths=[4, 8], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = torch.rand((1, 4), device=model.device, dtype=model.dtype)
@@ -34,6 +35,7 @@ def test_bfs_dfs_dual_graph_isomorphic(seeded):
 
 def test_recover_from_dual_graph(seeded):
     """Recovery of full complex from dual graph."""
+    assert seeded is not None
     model = get_mlp_model(widths=[5, 9], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = torch.rand((1, 5), device=model.device, dtype=model.dtype)
@@ -50,6 +52,7 @@ def test_recover_from_dual_graph(seeded):
 
 def test_bfs_polyhedron_affine_and_membership(seeded):
     """BFS with larger network, point2poly, affine map, max_polys."""
+    assert seeded is not None
     model = get_mlp_model(widths=[16, 64, 64, 64, 10])
     cplx = Complex(model)
     start = torch.rand(16, device=model.device, dtype=model.dtype)
@@ -68,6 +71,7 @@ def test_bfs_polyhedron_affine_and_membership(seeded):
 
 def test_dfs_max_depth_and_shis(seeded):
     """DFS with max_depth and nworkers=1."""
+    assert seeded is not None
     model = get_mlp_model(widths=[6, 8, 10])
     cplx = Complex(model)
     result = cplx.dfs(max_depth=2, nworkers=1)
@@ -77,6 +81,7 @@ def test_dfs_max_depth_and_shis(seeded):
 
 def test_hamming_astar_path(seeded):
     """Pathfinding between two polyhedra via Hamming A*."""
+    assert seeded is not None
     model = get_mlp_model(widths=[16, 32, 32, 1])
     cplx = Complex(model)
     start = torch.rand(16, device=model.device, dtype=model.dtype)
@@ -93,6 +98,7 @@ def test_hamming_astar_path(seeded):
 
 def test_plot_and_dual_graph_smoke(seeded):
     """Test starter code from the readme."""
+    assert seeded is not None
     with warnings.catch_warnings():
         warnings.filterwarnings(
             "ignore",
@@ -253,6 +259,7 @@ class TestComplexAdjacent:
 class TestComplexAutoConversion:
     def test_sequential_is_accepted(self, seeded):
         """Complex accepts a plain nn.Sequential and auto-converts it."""
+        assert seeded is not None
         sequential = nn.Sequential(
             nn.Linear(4, 8),
             nn.ReLU(),
@@ -263,6 +270,7 @@ class TestComplexAutoConversion:
 
     def test_module_dict_is_accepted(self, seeded):
         """Complex accepts an OrderedDict of layers and auto-converts it."""
+        assert seeded is not None
         layers: OrderedDict[str, nn.Module] = OrderedDict(
             [
                 ("fc0", nn.Linear(4, 8)),
@@ -275,6 +283,7 @@ class TestComplexAutoConversion:
 
     def test_auto_converted_dim_and_n(self, seeded):
         """Auto-converted sequential has correct input dim and neuron count."""
+        assert seeded is not None
         sequential = nn.Sequential(
             nn.Linear(4, 8),
             nn.ReLU(),
@@ -286,6 +295,7 @@ class TestComplexAutoConversion:
 
     def test_auto_converted_matches_explicit_nn(self, seeded):
         """Auto-converting a Sequential gives the same complex as the explicit NN."""
+        assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 2])
         # Build an equivalent Sequential sharing the same weight tensors
         sequential = nn.Sequential(
@@ -305,6 +315,7 @@ class TestComplexAutoConversion:
 
     def test_nn_module_passed_directly_unchanged(self, seeded):
         """An NN instance is not re-wrapped; cplx.net is the same object."""
+        assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 2])
         cplx = Complex(net)
         assert cplx.net is net
