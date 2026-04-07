@@ -2,8 +2,8 @@
 
 import random
 import warnings
-from collections import defaultdict
-from collections.abc import Iterable
+from collections import defaultdict, deque
+from collections.abc import Callable, Iterable
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
@@ -385,7 +385,11 @@ def searcher(
     if verbose:
         print(f"Running on {nworkers} workers")
     if queue is None:
-        queue = BlockingQueue()
+        queue = BlockingQueue(
+            queue_class=deque,
+            pop=cast(Callable[[deque[object]], object], deque.pop),
+            push=cast(Callable[[deque[object], object], None], deque.append),
+        )
     if start is None:
         start = cx.add_point(torch.zeros(cx.net.input_shape, device=cx.net.device, dtype=cx.net.dtype))
     elif isinstance(start, Polyhedron):
@@ -699,7 +703,6 @@ def hamming_astar(
     )
     pbar.update(n=1)
 
-    unprocessed = len(openSet)
     depth = 0
     neighbor: Polyhedron | ValueError | None = None
     min_dist = float("inf")
@@ -726,7 +729,6 @@ def hamming_astar(
             if len(item) >= 2 and isinstance(item[1], Exception):
                 bad_shi_computations.append(item)
                 continue
-            unprocessed -= 1
 
             assert len(item) > 0  ## TODO: Simplify
             p = cast(Polyhedron, item[0])
@@ -770,17 +772,17 @@ def hamming_astar(
                         neighbor_hamming = int((neighbor.ss_np != end_poly.ss_np).sum())
                         lower_bound_optimal_length = min(lower_bound_optimal_length, int(tentative_gScore) + neighbor_hamming)
                         openSet.push((neighbor,), fScore[neighbor])
-                        unprocessed += 1
 
             pbar.update(n=len(cameFrom) - pbar.n)
+            open_len = len(openSet)
             pbar.set_postfix_str(
                 f"LB*: {lower_bound_optimal_length} MinHeuristic: {min_dist:.3f} BestHam: {best_seen_hamming} "
-                f"Depth: {depth} Open Set: {unprocessed} "
+                f"Depth: {depth} Open Set: {open_len} "
                 f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
                 refresh=False,
             )
 
-            if unprocessed == 0 or len(cameFrom) >= max_polys:
+            if open_len == 0 or len(cameFrom) >= max_polys:
                 break
     except Exception:
         raise
@@ -807,7 +809,7 @@ def hamming_astar(
         path = None
         if len(cameFrom) >= max_polys:
             termination = "max_polys"
-        elif unprocessed == 0:
+        elif len(openSet) == 0:
             termination = "exhausted"
         else:
             termination = "stopped"
