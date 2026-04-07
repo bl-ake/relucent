@@ -746,15 +746,18 @@ class Complex:
         for col in range(ncols):
             if rank >= nrows:
                 break
+            # Find the first usable pivot in this column (at/under current rank row).
             pivot_rows = np.flatnonzero(A[rank:, col]) + rank
             if pivot_rows.size == 0:
                 continue
             pivot = int(pivot_rows[0])
             if pivot != rank:
+                # Put the pivot where we want it before XOR elimination.
                 A[[rank, pivot], :] = A[[pivot, rank], :]
             eliminate_rows = np.flatnonzero(A[:, col])
             eliminate_rows = eliminate_rows[eliminate_rows != rank]
             if eliminate_rows.size > 0:
+                # Over GF(2), subtraction is XOR, so this zeroes the column quickly.
                 A[eliminate_rows, :] ^= A[rank, :]
             rank += 1
         return rank
@@ -793,18 +796,22 @@ class Complex:
             for p1, p2, shi in G.edges(data="shi"):
                 p1 = cast(Polyhedron, p1)
                 p2 = cast(Polyhedron, p2)
+                # Recover the contracted face SS by turning the crossing SHI into 0.
                 face_ss = p1.ss_np.copy()
                 face_ss[0, shi] = 0
                 if face_ss not in c_km1:
+                    # If the face is missing in this chain level, just skip it.
                     continue
                 row = c_km1.ssm[face_ss]
                 col1 = c_k.ssm[p1.ss_np]
                 col2 = c_k.ssm[p2.ss_np]
+                # Each dual edge contributes the two endpoint incidences mod 2.
                 boundary[row, col1] ^= 1
                 boundary[row, col2] ^= 1
 
             boundary_rank[k] = self._gf2_rank(boundary)
 
+        # Standard beta_k = dim C_k - rank(d_k) - rank(d_{k+1}).
         return {k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0)) for k in dims}
 
     @property
