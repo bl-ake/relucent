@@ -1,12 +1,23 @@
-try:
-    from torch import __version__
-    from torchvision import __version__  # noqa
-except ImportError as e:
-    raise ImportError(
-        "Relucent requires PyTorch to be installed manually. "
-        "Please install the version compatible with your system from: "
-        "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
-    ) from e
+def _require_torch() -> None:
+    """Import torch/torchvision or raise a friendly error.
+
+    This is intentionally wrapped in a function so the exception binding
+    doesn’t leak a module-level name into the public interface.
+    """
+
+    try:
+        from torch import __version__ as _torch_version  # noqa: F401
+        from torchvision import __version__ as _torchvision_version  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "Relucent requires PyTorch to be installed manually. "
+            "Please install the version compatible with your system from: "
+            "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
+        ) from exc
+
+
+_require_torch()
+del _require_torch
 
 from . import config
 from .complex import Complex
