@@ -52,6 +52,10 @@ def get_mp_context() -> BaseContext:
     module must use the standard ``if __name__ == "__main__":`` guard to
     prevent worker processes from re-executing top-level code.
 
+    The environment variable ``RELUCENT_MP_START_METHOD`` can be set to force
+    a specific start method (e.g. ``spawn``) for debugging and CI parity
+    testing across platforms.
+
     ``forkserver`` is intentionally avoided: it uses OS semaphores for
     inter-process coordination that are not always released before Python's
     resource tracker runs at shutdown, producing spurious leaked-semaphore
@@ -61,6 +65,9 @@ def get_mp_context() -> BaseContext:
         A multiprocessing context object whose ``.Pool(...)`` method can be
         used to create a process pool.
     """
+    forced = os.environ.get("RELUCENT_MP_START_METHOD")
+    if forced:
+        return mp.get_context(forced)
     available = mp.get_all_start_methods()
     if sys.platform == "darwin":
         return mp.get_context("spawn")
