@@ -17,21 +17,11 @@ import relucent.config as cfg
 from relucent.convert_model import convert
 from relucent.model import NN
 from relucent.poly import Polyhedron
-from relucent.search import (
-    greedy_path as _greedy_path_fn,
-)
-from relucent.search import (
-    hamming_astar as _hamming_astar_fn,
-)
-from relucent.search import (
-    parallel_add as _parallel_add_fn,
-)
-from relucent.search import (
-    parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn,
-)
-from relucent.search import (
-    searcher as _searcher_fn,
-)
+from relucent.search import greedy_path as _greedy_path_fn
+from relucent.search import hamming_astar as _hamming_astar_fn
+from relucent.search import parallel_add as _parallel_add_fn
+from relucent.search import parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn
+from relucent.search import searcher as _searcher_fn
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
@@ -115,6 +105,13 @@ class Complex:
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
         self._G = None
+
+    def __repr__(self) -> str:
+        net_name = type(self.net).__name__ if getattr(self, "_net", None) is not None else "None"
+        return f"Complex(dim={self.dim}, n={self.n}, n_polyhedra={len(self.index2poly)}, net={net_name}@{id(self.net):#x})"
+
+    def __str__(self) -> str:
+        return f"Complex(n_polyhedra={len(self)})"
 
     # def __del__(self) -> None:
     #     close_env()
@@ -623,7 +620,7 @@ class Complex:
         show_pbar: bool = True,
         num_threads: int = 1,
         **kwargs: Any,
-    ) -> list[Polyhedron] | None:
+    ) -> dict[str, Any]:
         """Find a path between two data polyhedra using the A* search algorithm.
 
         Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -643,8 +640,8 @@ class Complex:
             **kwargs: Additional arguments passed to get_shis().
 
         Returns:
-            list or None: A list of Polyhedron objects representing the path
-                from start to end, or None if no path is found.
+            dict[str, Any]: Dictionary containing the path (if found) and
+                additional diagnostics/bounds.
 
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
