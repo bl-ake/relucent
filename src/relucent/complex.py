@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import os
 import pickle
 import random
 import warnings
 from collections.abc import Generator, Iterable, Iterator
-from typing import Any, cast
+from typing import Any, Literal, overload
 
 import networkx as nx
 import numpy as np
@@ -192,7 +194,7 @@ class Complex:
             pickle.dump(state, f)
 
     @staticmethod
-    def load(filename: str | os.PathLike[str]) -> "Complex":
+    def load(filename: str | os.PathLike[str]) -> Complex:
         """Load a Complex from a pickle file.
 
         Intended to be called as Complex.load(filename). The file must have been
@@ -708,7 +710,7 @@ class Complex:
             faces.add(self.ss2poly(ss, check_exists=False))
         return faces
 
-    def get_boundary_complex(self, i: int, verbose: bool = False) -> "Complex":
+    def get_boundary_complex(self, i: int, verbose: bool = False) -> Complex:
         """Get the boundary complex of neuron i."""
         cplx = Complex(self.net)
         for poly in tqdm(
@@ -717,20 +719,18 @@ class Complex:
             cplx.add_polyhedron(poly, check_exists=False)
         return cplx
 
-    def contract(self, verbose: bool = False) -> "Complex":
+    def contract(self, verbose: bool = False) -> Complex:
         """Contract the maximal cells in the complex."""
         G = self.get_dual_graph(verbose=verbose)
         new_complex = Complex(self.net)
-        for e1, e2, shi in G.edges(data="shi"):
-            p1 = cast(Polyhedron, e1)
-            p2 = cast(Polyhedron, e2)
+        for p1, p2, shi in G.edges(data="shi"):
             new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
             new_complex.add_ss(new_ss, halfspaces=p1.halfspaces, shis=list(set(p1.shis) & set(p2.shis) - {shi}))
 
         return new_complex
 
-    def get_chain_complex(self, verbose: bool = False) -> list["Complex"]:
+    def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
         """Get the chain complex of the complex."""
         chain: list[Complex] = [self]
         while True:
@@ -805,8 +805,6 @@ class Complex:
             # to its two endpoint k-cells.
             G = c_k.get_dual_graph()
             for p1, p2, shi in G.edges(data="shi"):
-                p1 = cast(Polyhedron, p1)
-                p2 = cast(Polyhedron, p2)
                 # Recover the contracted face SS by turning the crossing SHI into 0.
                 face_ss = p1.ss_np.copy()
                 face_ss[0, shi] = 0
@@ -826,15 +824,48 @@ class Complex:
         return {k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0)) for k in dims}
 
     @property
-    def G(self) -> nx.Graph:
+    def G(self) -> nx.Graph[Polyhedron]:
         """The adjacency graph of top-dimensional cells in the complex."""
         if self._G is None:
             self._G = self.get_dual_graph()
         return self._G
 
+    @overload
     def get_dual_graph(
         self,
         auto_add: bool = False,
+        *,
+        relabel: Literal[False] = False,
+        plot: bool = False,
+        node_color: str | None = None,
+        node_size: str | None = None,
+        cmap: str = "viridis",
+        match_locations: bool = False,
+        show_node_labels: bool = False,
+        show_edge_labels: bool = False,
+        verbose: bool = False,
+    ) -> nx.Graph[Polyhedron]: ...
+
+    @overload
+    def get_dual_graph(
+        self,
+        auto_add: bool = False,
+        *,
+        relabel: Literal[True],
+        plot: bool = False,
+        node_color: str | None = None,
+        node_size: str | None = None,
+        cmap: str = "viridis",
+        match_locations: bool = False,
+        show_node_labels: bool = False,
+        show_edge_labels: bool = False,
+        verbose: bool = False,
+    ) -> nx.Graph[int]: ...
+
+    def get_dual_graph(
+        self,
+        auto_add: bool = False,
+        *,
         relabel: bool = False,
         plot: bool = False,
         node_color: str | None = None,
@@ -844,7 +875,7 @@ class Complex:
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
         verbose: bool = False,
-    ) -> nx.Graph:
+    ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
         """Construct the dual graph of the complex.
 
         The dual graph represents the connectivity structure of the complex,
@@ -954,7 +985,7 @@ class Complex:
 
     def recover_from_dual_graph(
         self,
-        G: nx.Graph,
+        G: nx.Graph[int],
         initial_ss: np.ndarray | torch.Tensor,
         source: int,
         copy: bool = False,
