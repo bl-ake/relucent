@@ -1,0 +1,8 @@
+{
+    "typeCheckingMode": "recommended",
+    "pythonVersion": "3.13",
+    "venvPath": "/home/bbg16101/micromamba/envs",
+    "venv": "poly",
+    "include": ["src/relucent", "tests"],
+    "exclude": ["**/site-packages/**"]
+}
