@@ -28,7 +28,7 @@ readme = "README.md"
 
 [project.optional-dependencies]
 vis = ["pyvis>=0.3", "kaleido"]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "ruff", "basedpyright"]
 docs = ["sphinx", "sphinx-rtd-theme"]
 
 [project.urls]
@@ -50,6 +50,6 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.isort]
 known-first-party = ["relucent"]
 
-[tool.pyright]
-typeCheckingMode = "basic"
+[tool.basedpyright]
+typeCheckingMode = "recommended"
 include = ["src"]
