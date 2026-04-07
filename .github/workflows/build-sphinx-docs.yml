@@ -1,9 +1,9 @@
 name: Deploy Sphinx Docs to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main # Or your primary branch name
+  release:
+    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -34,7 +34,6 @@ jobs:
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
-      if: ${{ github.ref == 'refs/heads/main' }}
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: docs/_build/html
