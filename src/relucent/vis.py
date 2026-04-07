@@ -1,6 +1,6 @@
 import warnings
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast, overload
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -26,6 +26,14 @@ __all__ = [
     "plot_complex",
     "plot_polyhedron",
 ]
+
+
+class _PyvisNetwork(Protocol):
+    def __init__(self, *, height: str, width: str) -> None: ...
+    def from_nx(self, graph: nx.Graph[object]) -> None: ...
+    def show_buttons(self) -> None: ...
+    def toggle_physics(self, enabled: bool) -> None: ...
+    def save_graph(self, name: str) -> None: ...
 
 
 def get_colors(data: Sequence[float], cmap: str = "viridis", **kwargs: Any) -> list[str]:
@@ -60,8 +68,16 @@ def data_graph(
     save_file: str | None = None,
 ) -> None:
     """Create an interactive pyvis graph from dataframes of nodes and edges."""
+    import importlib
 
-    from pyvis.network import Network  # type: ignore
+    try:
+        pyvis_network = importlib.import_module("pyvis.network")
+        Network = cast(type[_PyvisNetwork], pyvis_network.Network)
+    except Exception as e:
+        raise ImportError(
+            "`data_graph` requires the optional dependency `pyvis` to render an interactive graph. "
+            + "Install it (e.g. `pip install pyvis`) or skip calling `data_graph`."
+        ) from e
 
     if max_images is None:
         max_images = cfg.MAX_IMAGES_PYVIS
@@ -74,7 +90,7 @@ def data_graph(
     if class_labels is True and dataset is not None:
         class_labels_list = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
 
-    G = nx.Graph()
+    G: nx.Graph[object] = nx.Graph()
     bar = tqdm(node_df.iterrows(), total=len(node_df), desc="Adding Nodes")
     for i, row in bar:
         if i < max_images:
