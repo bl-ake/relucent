@@ -53,3 +53,4 @@ known-first-party = ["relucent"]
 [tool.basedpyright]
 typeCheckingMode = "recommended"
 include = ["src"]
+pythonVersion = "3.14"
