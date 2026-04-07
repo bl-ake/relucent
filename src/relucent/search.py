@@ -1,5 +1,6 @@
 """Search and pathfinding over a polyhedral complex."""
 
+import os
 import random
 import warnings
 from collections import defaultdict, deque
@@ -729,6 +730,10 @@ def hamming_astar(
             pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
             if len(item) >= 2 and isinstance(item[1], Exception):
+                # Useful when debugging spawn-related issues on macOS/Windows.
+                if os.environ.get("RELUCENT_DEBUG_ASTAR"):
+                    err = item[1]
+                    print(f"A* SHI computation failed: {type(err).__name__}: {err}")
                 bad_shi_computations.append(item)
                 continue
 
