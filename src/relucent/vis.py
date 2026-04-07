@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast, overload
@@ -152,7 +154,7 @@ def data_graph(
 # --- Polyhedron geometry & traces (used by ``Polyhedron`` methods) -----------------
 
 
-def bounded_plot_geometry(poly: "Polyhedron", bound: float) -> tuple[str, np.ndarray] | None:
+def bounded_plot_geometry(poly: Polyhedron, bound: float) -> tuple[str, np.ndarray] | None:
     """Classify bounded 2D geometry for plotting as polygon, segment, or point."""
     vertices = poly.get_bounded_vertices(bound)
     if vertices is None or vertices.size == 0:
@@ -203,7 +205,7 @@ def bounded_plot_geometry(poly: "Polyhedron", bound: float) -> tuple[str, np.nda
 
 
 def _poly_traces_3d_complex(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     showlegend: bool = False,
     bound: float | None = None,
     filled: bool = False,
@@ -392,7 +394,7 @@ def _poly_traces_3d_complex(
 
 
 def _poly_traces_2d_complex(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     fill: str = "toself",
     showlegend: bool = False,
     bound: float | None = None,
@@ -459,7 +461,7 @@ def _poly_traces_2d_complex(
 
 
 def _poly_traces_2d_graph(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     fill: str = "toself",
     showlegend: bool = False,
     bound: float | None = None,
@@ -535,7 +537,7 @@ def _poly_traces_2d_graph(
 
 @overload
 def plot_polyhedron(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     *,
     plot_mode: Literal["cells"],
     **kwargs: Any,
@@ -544,7 +546,7 @@ def plot_polyhedron(
 
 @overload
 def plot_polyhedron(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     *,
     plot_mode: Literal["graph"],
     **kwargs: Any,
@@ -552,7 +554,7 @@ def plot_polyhedron(
 
 
 def plot_polyhedron(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     *,
     plot_mode: Literal["cells", "graph"],
     **kwargs: Any,
@@ -614,7 +616,7 @@ def _equitable_colors(
         return [color_scheme[i % len(color_scheme)] for i in range(n)]
 
 
-def _per_poly_colors(cpx: "Complex", polys: list[Any], color: str | None, *, remap_equitable: bool) -> list[str]:
+def _per_poly_colors(cpx: Complex, polys: list[Polyhedron], color: str | None, *, remap_equitable: bool) -> list[str]:
     if color == "Wl2":
         return get_colors([poly.Wl2 for poly in polys])
     return _equitable_colors(cpx.get_dual_graph(), polys, remap=remap_equitable)
@@ -662,7 +664,7 @@ def _poly_intersects_plot_bound(poly: Any, bound: float) -> bool:
 
 
 def _complex_figure_2d_cells(
-    cpx: "Complex",
+    cpx: Complex,
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -738,7 +740,7 @@ def _complex_figure_2d_cells(
 
 
 def _complex_figure_3d_cells(
-    cpx: "Complex",
+    cpx: Complex,
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -796,7 +798,7 @@ def _complex_figure_3d_cells(
 
 
 def _complex_figure_graph(
-    cpx: "Complex",
+    cpx: Complex,
     *,
     label_regions: bool = False,
     color: str | None = None,
@@ -889,7 +891,7 @@ def _complex_figure_graph(
 
 
 def plot_complex(
-    cpx: "Complex",
+    cpx: Complex,
     *,
     plot_mode: Literal["cells", "graph"],
     **kwargs: Any,
