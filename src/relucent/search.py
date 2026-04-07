@@ -573,7 +573,7 @@ def hamming_astar(
     bound: float | None = None,
     max_polys: float = float("inf"),
     show_pbar: bool = True,
-    num_threads: int = None,  ## TODO: Any benefits from using multiple threads here?
+    num_threads: int | None = None,  ## TODO: Any benefits from using multiple threads here?
     **kwargs: Any,
 ) -> list[Polyhedron] | None:
     """Find a path between two data polyhedra using the A* search algorithm.
