@@ -83,8 +83,12 @@ class NN(nn.Module):
         """
         for layer in self.layers.values():
             if isinstance(layer, nn.Linear):
-                object.__setattr__(layer, "weight_cpu", layer.weight.detach().cpu().numpy())
-                object.__setattr__(layer, "bias_cpu", layer.bias.detach().cpu().numpy().reshape(1, -1))
+                # NOTE: .numpy() can share memory with the underlying Tensor storage.
+                # Under multiprocessing with "spawn" (macOS/Windows), pickling the model
+                # can re-materialize or move parameter storage, invalidating any existing
+                # NumPy views. Use a copy so these cached arrays remain stable.
+                object.__setattr__(layer, "weight_cpu", layer.weight.detach().cpu().numpy().copy())
+                object.__setattr__(layer, "bias_cpu", layer.bias.detach().cpu().numpy().reshape(1, -1).copy())
 
     @property
     def device(self) -> torch.device:
