@@ -695,7 +695,7 @@ class Complex:
         for edge in tqdm(self.get_boundary_edges(i), desc="Getting Boundary Cells"):
             ss = edge[0].ss_np.copy()
             ss[0, self.G.edges[edge]["shi"]] *= 0
-            faces.add(self.ss2poly(ss))
+            faces.add(self.ss2poly(ss, check_exists=False))
         return faces
 
     def get_boundary_complex(self, i: int) -> "Complex":
