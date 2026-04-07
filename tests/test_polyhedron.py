@@ -14,6 +14,7 @@ class TestPolyhedronBasics:
     """Creation, affine map, tag, equality, hashing."""
 
     def test_create_from_ss(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
@@ -23,6 +24,7 @@ class TestPolyhedronBasics:
         assert np.array_equal(ss_to_numpy(p.ss), ss_to_numpy(ss))
 
     def test_affine_map_matches_forward(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
@@ -35,6 +37,7 @@ class TestPolyhedronBasics:
         assert torch.allclose(y_affine, y_net, atol=1e-5)
 
     def test_tag_stable(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -45,6 +48,7 @@ class TestPolyhedronBasics:
         assert p.tag == t
 
     def test_eq_hash(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -54,6 +58,7 @@ class TestPolyhedronBasics:
         assert hash(p1) == hash(p2)
 
     def test_neq(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -64,6 +69,7 @@ class TestPolyhedronBasics:
             assert hash(p1) != hash(p2)
 
     def test_eq_other_type_raises(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -85,6 +91,7 @@ class TestPolyhedronBasics:
 
 class TestPolyhedronContainment:
     def test_interior_point_in_polyhedron(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
@@ -94,6 +101,7 @@ class TestPolyhedronContainment:
         assert np.asarray(pt).reshape(1, -1) in p
 
     def test_point_containment_tensor(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -104,6 +112,7 @@ class TestPolyhedronContainment:
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
 class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 1], add_last_relu=True)
         net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype)
         net.layers["fc0"].bias.data = torch.tensor([0.0], device=net.device, dtype=net.dtype)
@@ -118,6 +127,7 @@ class TestPolyhedronBoundedVertices:
         assert np.isclose(np.min(verts[:, 1]), -1.0, atol=1e-4)
 
     def test_bounded_vertices_supports_point_polyhedron(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 2], add_last_relu=True)
         net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype)
         net.layers["fc0"].bias.data = torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype)
@@ -132,6 +142,7 @@ class TestPolyhedronBoundedVertices:
 
 class TestPolyhedronOps:
     def test_nflips(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -145,6 +156,7 @@ class TestPolyhedronOps:
 
 class TestPolyhedronCleanData:
     def test_clean_data_clears_caches(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
@@ -162,6 +174,7 @@ class TestPolyhedronPickle:
     """Pickle roundtrip (from original test_save_load)."""
 
     def test_pickle_roundtrip(self, seeded):
+        assert seeded is not None
         net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)

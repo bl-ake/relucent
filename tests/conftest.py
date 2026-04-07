@@ -21,16 +21,19 @@ def seeded(seed):
 @pytest.fixture
 def small_mlp(seeded):
     """Small MLP [4, 8] with ReLU on last layer, for fast complex/search tests."""
+    assert seeded is not None
     return get_mlp_model(widths=[4, 8], add_last_relu=True)
 
 
 @pytest.fixture
 def tiny_mlp(seeded):
     """Tiny MLP [2, 4, 2] with last ReLU, for quick sanity checks."""
+    assert seeded is not None
     return get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
 
 
 @pytest.fixture
 def mlp_2d(seeded):
     """2D input MLP [2, 10, 5, 1] for plotting and 2D-specific tests."""
+    assert seeded is not None
     return get_mlp_model(widths=[2, 10, 5, 1])
