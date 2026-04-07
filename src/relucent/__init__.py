@@ -10,8 +10,8 @@ def _require_torch() -> None:
     except ImportError as exc:
         raise ImportError(
             "Relucent requires PyTorch to be installed manually. "
-            "Please install the version compatible with your system from: "
-            "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
+            + "Please install the version compatible with your system from: "
+            + "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
         ) from exc
 
 
