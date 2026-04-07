@@ -108,7 +108,7 @@ class TestUpdatablePriorityQueue:
         pq = UpdatablePriorityQueue()
         pq.push(("x", 1), priority=10)
         pq.push(("y", 2), priority=5)
-        pq.push(("x", 1), priority=0)  # same tail (1,) -> update
+        pq.push(("x", 1), priority=0)  # same task -> update
         assert pq.pop() == ("x", 1)
         assert pq.pop() == ("y", 2)
 
@@ -116,7 +116,7 @@ class TestUpdatablePriorityQueue:
         pq = UpdatablePriorityQueue()
         pq.push(("a", 1), priority=1)
         pq.push(("b", 2), priority=2)
-        pq.remove_task((2,))
+        pq.remove_task(("b", 2))
         assert pq.pop() == ("a", 1)
         with pytest.raises(KeyError):
             pq.pop()
@@ -128,6 +128,14 @@ class TestUpdatablePriorityQueue:
         assert len(pq) == 1
         pq.push(("a", 1), priority=1)
         assert len(pq) == 1
+
+    def test_hashable_non_tuple_tasks(self):
+        pq = UpdatablePriorityQueue()
+        pq.push("alpha", priority=2)
+        pq.push("beta", priority=1)
+        pq.push("alpha", priority=0)  # update existing task
+        assert pq.pop() == "alpha"
+        assert pq.pop() == "beta"
 
 
 class TestGetColors:

@@ -10,7 +10,7 @@ import os
 import random
 import sys
 from collections import OrderedDict, deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Hashable, Iterator
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
 from threading import Condition
@@ -258,61 +258,60 @@ class BlockingQueue:
 class UpdatablePriorityQueue:
     """Priority queue that supports updating task priorities and removing tasks.
 
-    Tasks are tuples (head, *tail). The tail is used as the identity key for
-    updates: pushing a task with the same tail replaces the previous entry.
+    Tasks are hashable objects. The full task object is used as the identity
+    key for updates: pushing a task that is equal to an existing task replaces
+    the previous entry.
     Lower priority value means higher priority.
 
     Based on the heapq implementation from Python docs.
     Reference: https://docs.python.org/3/library/heapq.html
     """
 
-    REMOVED = "<removed-task>"  # placeholder for a removed task
+    REMOVED = object()  # unique placeholder for a removed task
 
     def __init__(self) -> None:
         self.pq: list[list[Any]] = []  # list of entries arranged in a heap
-        self.entry_finder: dict[tuple[Any, ...], list[Any]] = {}  # mapping of tail -> entry
+        self.entry_finder: dict[Hashable, list[Any]] = {}  # mapping of task -> entry
         self.counter: int = 0
 
-    def push(self, task: tuple[Any, ...], priority: float = 0) -> None:
+    def push(self, task: Hashable, priority: float = 0) -> None:
         """Add a new task or update the priority of an existing task.
 
         Args:
-            task: A tuple (head, *tail). Tasks with the same tail are
-                considered the same for updates.
+            task: A hashable task object. Equal tasks are considered the same
+                for updates.
             priority: The priority value (lower = higher priority). Defaults to 0.
         """
-        head, *tail = task
-        tail = tuple(tail)
-        if tail in self.entry_finder:
-            self.remove_task(tail)
-        entry = [priority, self.counter, head, tail]
-        self.entry_finder[tail] = entry
+        if task in self.entry_finder:
+            self.remove_task(task)
+        entry = [priority, self.counter, task]
+        self.entry_finder[task] = entry
         heappush(self.pq, entry)
         self.counter += 1
 
-    def remove_task(self, task_tail: tuple[Any, ...]) -> None:
+    def remove_task(self, task: Hashable) -> None:
         """Mark an existing task as REMOVED. Raise KeyError if not found.
 
         Args:
-            task_tail: The tail of the task to remove (i.e. task[1:]).
+            task: The full task object to remove.
         """
-        entry = self.entry_finder.pop(task_tail)
+        entry = self.entry_finder.pop(task)
         entry[-1] = self.REMOVED
 
-    def pop(self) -> tuple[Any, ...]:
+    def pop(self) -> Hashable:
         """Remove and return the lowest-priority task.
 
         Returns:
-            tuple: The full task (head, *tail).
+            The full task object.
 
         Raises:
             KeyError: If the queue is empty.
         """
         while self.pq:
-            _, _, head, tail = heappop(self.pq)
-            if tail is not self.REMOVED:
-                del self.entry_finder[tail]
-                return (head, *tail)
+            _, _, task = heappop(self.pq)
+            if task is not self.REMOVED:
+                del self.entry_finder[task]
+                return task
         raise KeyError("pop from an empty priority queue")
 
     def __len__(self) -> int:
