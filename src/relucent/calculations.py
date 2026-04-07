@@ -562,6 +562,34 @@ def _get_hs_numpy(
     return halfspaces, current_A, current_b, num_dead_relus
 
 
+@overload
+def get_shis(
+    poly: "Polyhedron",
+    collect_info: Literal[False] = False,
+    bound: float = GRB.INFINITY,
+    subset: Iterable[int] | None = None,
+    tol: float | None = None,
+    new_method: bool = False,
+    env: Any = None,
+    shi_pbar: bool = False,
+    push_size: float = 1.0,
+) -> list[int]: ...
+
+
+@overload
+def get_shis(
+    poly: "Polyhedron",
+    collect_info: Literal[True] | Literal["All"],
+    bound: float = GRB.INFINITY,
+    subset: Iterable[int] | None = None,
+    tol: float | None = None,
+    new_method: bool = False,
+    env: Any = None,
+    shi_pbar: bool = False,
+    push_size: float = 1.0,
+) -> tuple[list[int], list[dict[str, Any]]]: ...
+
+
 def get_shis(
     poly: "Polyhedron",
     collect_info: bool | str = False,
@@ -572,7 +600,7 @@ def get_shis(
     env: Any = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-) -> list[int] | tuple[list[int], list]:
+) -> list[int] | tuple[list[int], list[dict[str, Any]]]:
     """Supporting halfspace indices (SHIs) for ``poly``.
 
     Indices of non-redundant halfspaces on the boundary (neurons whose BHs are
@@ -624,7 +652,7 @@ def get_shis(
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
     if collect_info:
-        poly_info = []
+        poly_info: list[dict[str, Any]] = []
     while subset:
         i = subset.pop()
         if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
