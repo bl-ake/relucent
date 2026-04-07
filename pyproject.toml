@@ -54,3 +54,4 @@ known-first-party = ["relucent"]
 typeCheckingMode = "recommended"
 include = ["src/relucent", "tests"]
 exclude = ["**/site-packages/**"]
+pythonVersion = "3.13"
