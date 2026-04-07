@@ -431,11 +431,11 @@ def searcher(
         try:
             for p, shi, depth, node_index in pool.imap_unordered(partial(search_calculations, bound=bound, **kwargs), queue):
                 unprocessed -= 1
-                node = cx.index2poly[node_index]
+                node = cast(Polyhedron, cx.index2poly[node_index])
                 if not isinstance(p, Polyhedron):
                     bad_shi_computations.append((node, shi, depth, str(p)))
-                    node._shis.remove(shi)
-                    if len(node._shis) < min(cx.dim, cx.n):
+                    node.remove_shi(shi)
+                    if node.num_shis < min(cx.dim, cx.n):
                         warnings.warn(
                             RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
                             stacklevel=2,
@@ -718,11 +718,7 @@ def hamming_astar(
     def d(p1: Polyhedron, p2: Polyhedron) -> int:
         return 1
 
-    pool = (
-        get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
-        if nworkers > 1
-        else None
-    )
+    pool = None
     try:
         set_globals(cx.net)
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
@@ -731,23 +727,24 @@ def hamming_astar(
                 continue
             unprocessed -= 1
 
-            assert len(item) > 0
-            p = item[0]
+            assert len(item) > 0  ## TODO: Simplify
+            p = cast(Polyhedron, item[0])
             expanded += 1
             depth = int(gScore[p])
             p_hamming = int((p.ss_np != end_poly.ss_np).sum())
             best_seen_hamming = min(best_seen_hamming, p_hamming)
             lower_bound_optimal_length = min(lower_bound_optimal_length, int(gScore[p]) + p_hamming)
 
-            # A* optimality condition: stop when the goal is selected for expansion
-            # (popped as best frontier node), not when first generated.
             if p == end_poly:
                 neighbor = end_poly
                 break
 
             if nworkers == 1:
                 neighbor_iter = map(partial(get_ip, p), p.shis)
-            elif pool is not None:
+            else:
+                if nworkers <= 1:
+                    raise ValueError(f"nworkers must be >= 2 for multiprocessing, got {nworkers}")
+                pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
                 neighbor_iter = pool.imap_unordered(
                     partial(get_ip, p),
                     p.shis,
@@ -756,7 +753,7 @@ def hamming_astar(
 
             for neighbor, neighbor_shi in neighbor_iter:
                 if not isinstance(neighbor, Polyhedron):
-                    p._shis.remove(neighbor_shi)
+                    p.remove_shi(neighbor_shi)
                 else:
                     generated += 1
                     tentative_gScore = gScore[p] + d(p, neighbor)
