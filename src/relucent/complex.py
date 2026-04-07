@@ -104,7 +104,7 @@ class Complex:
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
-        self._G = None
+        self._G: nx.Graph[Polyhedron] | None = None
 
     def __repr__(self) -> str:
         net_name = type(self.net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -380,18 +380,21 @@ class Complex:
         if not check_exists:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
+            self._G = None
             return p
 
         p_exists = p in self
 
         if p_exists and overwrite:
             self.index2poly[self.ssm[p.ss_np]] = p
+            self._G = None
             return p
         elif p_exists:
             return self[p]
         else:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
+            self._G = None
             return p
 
     def add_point(
@@ -678,36 +681,45 @@ class Complex:
         self.compute_geometric_properties()  ## TODO: Specify which attributes to compute
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
-    def get_boundary_edges(self, i: int) -> set[tuple[Polyhedron, Polyhedron]]:
+    def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
         """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
         assert 0 <= i < self.n, "Neuron index out of range"
-        return {(a, b) for a, b, shi in tqdm(self.G.edges(data="shi"), desc="Getting Boundary Edges") if shi == i}
+        return {
+            (a, b)
+            for a, b, shi in tqdm(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1, disable=not verbose)
+            if shi == i
+        }
 
-    def get_boundary_graph(self, i: int) -> nx.Graph:
+    def get_boundary_graph(self, i: int, verbose: bool = False) -> nx.Graph[Polyhedron]:
         """Get the induced subgraph of neuron i's BH."""
         return self.G.subgraph(
-            [edge[0] for edge in self.get_boundary_edges(i)] + [edge[1] for edge in self.get_boundary_edges(i)]
+            [edge[0] for edge in self.get_boundary_edges(i, verbose=verbose)]
+            + [edge[1] for edge in self.get_boundary_edges(i, verbose=verbose)]
         )
 
-    def get_boundary_cells(self, i: int) -> set[Polyhedron]:
+    def get_boundary_cells(self, i: int, verbose: bool = False) -> set[Polyhedron]:
         """Get all (d-1)-cells in neuron i's BH."""
         faces = set()
-        for edge in tqdm(self.get_boundary_edges(i), desc="Getting Boundary Cells"):
+        for edge in tqdm(
+            self.get_boundary_edges(i, verbose=verbose), desc="Getting Boundary Cells", delay=1, disable=not verbose
+        ):
             ss = edge[0].ss_np.copy()
             ss[0, self.G.edges[edge]["shi"]] *= 0
             faces.add(self.ss2poly(ss, check_exists=False))
         return faces
 
-    def get_boundary_complex(self, i: int) -> "Complex":
+    def get_boundary_complex(self, i: int, verbose: bool = False) -> "Complex":
         """Get the boundary complex of neuron i."""
         cplx = Complex(self.net)
-        for poly in tqdm(self.get_boundary_cells(i), desc="Getting Boundary Complex"):
+        for poly in tqdm(
+            self.get_boundary_cells(i, verbose=verbose), desc="Getting Boundary Complex", delay=1, disable=not verbose
+        ):
             cplx.add_polyhedron(poly, check_exists=False)
         return cplx
 
-    def contract(self) -> "Complex":
+    def contract(self, verbose: bool = False) -> "Complex":
         """Contract the maximal cells in the complex."""
-        G = self.get_dual_graph()
+        G = self.get_dual_graph(verbose=verbose)
         new_complex = Complex(self.net)
         for e1, e2, shi in G.edges(data="shi"):
             p1 = cast(Polyhedron, e1)
@@ -718,18 +730,20 @@ class Complex:
 
         return new_complex
 
-    def get_chain_complex(self) -> list["Complex"]:
+    def get_chain_complex(self, verbose: bool = False) -> list["Complex"]:
         """Get the chain complex of the complex."""
         chain: list[Complex] = [self]
         while True:
-            new_complex = chain[-1].contract()
+            new_complex = chain[-1].contract(verbose=verbose)
             if len(new_complex) == 0:
                 break
             chain.append(new_complex)
-            print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]) + ", ... ", end="\r")
+            if verbose:
+                print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]) + ", ... ", end="\r")
             if new_complex.index2poly[0].dim == 0:
                 break
-        print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
+        if verbose:
+            print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
     @staticmethod
@@ -814,7 +828,9 @@ class Complex:
     @property
     def G(self) -> nx.Graph:
         """The adjacency graph of top-dimensional cells in the complex."""
-        return self.get_dual_graph()
+        if self._G is None:
+            self._G = self.get_dual_graph()
+        return self._G
 
     def get_dual_graph(
         self,
@@ -827,6 +843,7 @@ class Complex:
         match_locations: bool = False,
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
+        verbose: bool = False,
     ) -> nx.Graph:
         """Construct the dual graph of the complex.
 
@@ -851,6 +868,7 @@ class Complex:
                 of their polyhedra (only works for 2D complexes). Defaults to False.
             show_node_labels: If True, show node labels in the graph. Defaults to False.
             show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
+            verbose: If True, print progress messages. Defaults to True.
 
         Returns:
             networkx.Graph: The dual graph of the complex. Nodes are polyhedra
@@ -867,7 +885,7 @@ class Complex:
             if poly.dim == max_dim:
                 G.add_node(poly, label=str(poly))
         missing = []
-        for poly in tqdm(G.nodes(), desc="Creating Dual Graph", leave=False):
+        for poly in tqdm(G.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
             ss = poly.ss_np.copy()
             for shi in poly.shis:
                 assert ss[0, shi] != 0
