@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import TYPE_CHECKING, Any, Literal, Protocol, cast, overload
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any, Literal, overload
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
 from matplotlib import colormaps
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-from PIL import Image
 from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
 
@@ -23,19 +20,10 @@ if TYPE_CHECKING:
     from relucent.poly import Polyhedron
 
 __all__ = [
-    "data_graph",
     "get_colors",
     "plot_complex",
     "plot_polyhedron",
 ]
-
-
-class _PyvisNetwork(Protocol):
-    def __init__(self, *, height: str, width: str) -> None: ...
-    def from_nx(self, graph: nx.Graph[object]) -> None: ...
-    def show_buttons(self) -> None: ...
-    def toggle_physics(self, enabled: bool) -> None: ...
-    def save_graph(self, name: str) -> None: ...
 
 
 def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
@@ -49,106 +37,6 @@ def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
     a = colormaps[cmap](a)
     a = (a * 255).astype(int)
     return [f"#{x[0]:02x}{x[1]:02x}{x[2]:02x}" for x in a]
-
-
-def data_graph(
-    node_df: Any,
-    edge_df: Any,
-    dataset: Any | None = None,
-    draw_function: Callable[..., Any] = lambda x, **__: x,
-    class_labels: bool | None = True,
-    node_title_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: (
-        row["title"] if "title" in row else str(row)
-    ),
-    node_label_formatter: Callable[[int, Mapping[str, Any]], str] = lambda i, row: row["label"] if "label" in row else str(i),
-    node_size_formatter: Callable[[Mapping[str, Any]], int] = lambda row: row.get("size", 10),
-    edge_title_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("title", ""),
-    edge_label_formatter: Callable[[Mapping[str, Any]], str] = lambda row: row.get("label", ""),
-    edge_value_formatter: Callable[[Mapping[str, Any]], float | int] = lambda row: row.get("value", 1),
-    max_images: int | None = None,
-    max_num_examples: int | None = None,
-    save_file: str | None = None,
-) -> None:
-    """Create an interactive pyvis graph from dataframes of nodes and edges."""
-    import importlib
-
-    try:
-        pyvis_network = importlib.import_module("pyvis.network")
-        Network = cast(type[_PyvisNetwork], pyvis_network.Network)
-    except Exception as e:
-        raise ImportError(
-            "`data_graph` requires the optional dependency `pyvis` to render an interactive graph. "
-            + "Install it (e.g. `pip install pyvis`) or skip calling `data_graph`."
-        ) from e
-
-    if max_images is None:
-        max_images = cfg.MAX_IMAGES_PYVIS
-    if max_num_examples is None:
-        max_num_examples = cfg.MAX_NUM_EXAMPLES_PYVIS
-    if save_file is None:
-        save_file = cfg.DEFAULT_PYVIS_SAVE_FILE
-
-    class_labels_list: list = []
-    if class_labels is True and dataset is not None:
-        class_labels_list = torch.unique(torch.tensor([dataset[i][1] for i in range(len(dataset))])).tolist()
-
-    G: nx.Graph[object] = nx.Graph()
-    bar = tqdm(node_df.iterrows(), total=len(node_df), desc="Adding Nodes")
-    for i, row in bar:
-        if i < max_images:
-            num_examples = min(len(row["data"]), max_num_examples) + (class_labels is not False)
-            num_rows = np.ceil(np.sqrt(num_examples)).astype(int)
-            num_cols = num_examples // num_rows
-            fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 10))
-            axs = axs.ravel() if isinstance(axs, np.ndarray) and num_rows > 1 else [axs]
-            for j, ax in enumerate(axs[:-1]):
-                ax.axis("equal")
-                ax.set_axis_off()
-                if j <= num_examples:
-                    data = row["data"][j]
-                    draw_function(data=data, ax=ax)
-
-            if class_labels and "class_proportions" in row:
-                axs[-1].pie(
-                    row["class_proportions"],
-                    labeldistance=cfg.PIE_LABEL_DISTANCE,
-                    labels=class_labels_list,
-                )
-            axs[-1].axis("equal")
-            axs[-1].set_axis_off()
-
-            canvas = FigureCanvasAgg(fig)
-            canvas.draw()
-            img = Image.frombytes("RGBA", canvas.get_width_height(), bytes(canvas.buffer_rgba()))
-            plt.close(fig)
-            img.convert("RGB").save(f"images/{i}.png")
-
-        G.add_node(
-            i,
-            title=node_title_formatter(i, row),
-            label=node_label_formatter(i, row),
-            image=f"images/{i}.png",
-            shape="image",
-            size=node_size_formatter(row),
-            **{k: str(v) for k, v in row.items() if k not in ["label", "title", "size", "image", "data"]},
-        )
-    pbar = tqdm(edge_df.iterrows(), total=len(edge_df), desc="Adding Edges")
-    for (A, B), row in pbar:
-        G.add_edge(
-            A,
-            B,
-            title=edge_title_formatter(row),
-            label=edge_label_formatter(row),
-            value=edge_value_formatter(row),
-        )
-        bar.set_postfix({"Nodes": G.number_of_nodes(), "Edges": G.number_of_edges()})
-    print(f"Number of Nodes: {G.number_of_nodes()}\nNumber of Edges: {G.number_of_edges()}")
-
-    nt = Network(height="1000px", width="100%")
-    nt.from_nx(G)
-    nt.show_buttons()
-    nt.toggle_physics(False)
-    nt.save_graph(save_file)
 
 
 # --- Polyhedron geometry & traces (used by ``Polyhedron`` methods) -----------------

@@ -154,11 +154,11 @@ Utilities and visualization
    * - ``MAX_IMAGES_PYVIS``
      - ``int``
      - ``3000``
-     - Maximum node images generated in :func:`~relucent.vis.data_graph`.
+     - Maximum node images generated when rendering pyvis node thumbnails.
    * - ``MAX_NUM_EXAMPLES_PYVIS``
      - ``int``
      - ``3``
-     - Examples per node in ``data_graph``.
+     - Examples per node when rendering pyvis node thumbnails.
    * - ``DEFAULT_PYVIS_SAVE_FILE``
      - ``str``
      - ``"./graph.html"``
