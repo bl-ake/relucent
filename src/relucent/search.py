@@ -575,7 +575,7 @@ def hamming_astar(
     show_pbar: bool = True,
     num_threads: int | None = None,  ## TODO: Any benefits from using multiple threads here?
     **kwargs: Any,
-) -> list[Polyhedron] | None:
+) -> dict[str, Any]:
     """Find a path between two data polyhedra using the A* search algorithm.
 
     Uses the A* pathfinding algorithm with a heuristic based on Hamming
@@ -596,8 +596,37 @@ def hamming_astar(
         **kwargs: Additional arguments passed to get_shis().
 
     Returns:
-        list or None: A list of Polyhedron objects representing the path
-            from start to end, or None if no path is found.
+        dict[str, Any]: A dictionary with the following keys:
+
+            - ``"path"`` (``list[Polyhedron] | None``): The found path from ``start`` to
+              ``end`` as a list of adjacent polyhedra (inclusive endpoints), or ``None``
+              if no path was found before termination.
+            - ``"succeeded"`` (``bool``): True iff a path to ``end`` was found.
+            - ``"termination"`` (``str``): Why the search ended. One of:
+              ``"found"``, ``"same_region"``, ``"max_polys"``, ``"exhausted"``, ``"stopped"``.
+
+            - ``"start"`` (``Polyhedron``): The start polyhedron used for the search.
+            - ``"goal"`` (``Polyhedron``): The goal polyhedron used for the search.
+
+            - ``"explored"`` (``int``): Number of unique polyhedra recorded in the
+              predecessor map (approximately ``len(cameFrom) + 1``).
+            - ``"expanded"`` (``int``): Number of times a node was popped and expanded
+              (i.e., processed to generate neighbors).
+            - ``"generated"`` (``int``): Number of neighbor candidates generated.
+            - ``"bad_shi_computations"`` (``int``): Count of SHI/neighbor computations that
+              raised/returned an error and were skipped.
+
+            - ``"hamming_start_goal"`` (``int``): Hamming distance between the start and
+              goal sign sequences.
+            - ``"best_seen_hamming"`` (``int``): Minimum Hamming distance to the goal seen
+              among expanded/considered nodes.
+            - ``"best_seen_heuristic"`` (``float``): Minimum heuristic value
+              ``ham(p, goal) + bias(p, goal)`` seen during search.
+
+            - ``"lower_bound_optimal_length"`` (``int``): A running lower bound on the
+              optimal path length, computed as ``min_p (g(p) + ham(p, goal))``.
+            - ``"best_path_length"`` (``int | None``): If ``path`` is not ``None``,
+              equals ``len(path) - 1``; otherwise ``None``.
 
     Raises:
         ValueError: If the start point lies exactly on a neuron's boundary.
@@ -609,13 +638,29 @@ def hamming_astar(
 
     start_poly = cx.add_polyhedron(start) if isinstance(start, Polyhedron) else cx.add_point(start)
     end_poly = cx.add_polyhedron(end) if isinstance(end, Polyhedron) else cx.add_point(end)
+    hamming_start_goal = int((start_poly.ss_np != end_poly.ss_np).sum())
     if start_poly == end_poly:
         print("Start and end points are in the same region")
         _ = start_poly.finite
 
         start_poly._interior_point = start_poly.get_interior_point()
         start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))
-        return [start_poly]
+        return {
+            "path": [start_poly],
+            "succeeded": True,
+            "termination": "same_region",
+            "start": start_poly,
+            "goal": end_poly,
+            "explored": 1,
+            "expanded": 0,
+            "generated": 0,
+            "bad_shi_computations": 0,
+            "hamming_start_goal": hamming_start_goal,
+            "best_seen_hamming": 0,
+            "best_seen_heuristic": 0.0,
+            "lower_bound_optimal_length": 0,
+            "best_path_length": 0,
+        }
 
     if (start_poly.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
@@ -635,13 +680,13 @@ def hamming_astar(
     )
 
     gScore[start_poly] = 0
-    fScore[start_poly] = (start_poly.ss_np != end_poly.ss_np).sum()
+    fScore[start_poly] = hamming_start_goal
 
     result = get_shis(start_poly, bound=bound, **kwargs)
     assert isinstance(result, list)
     start_poly._shis = result
 
-    openSet.push((start_poly, None, 0), 0)
+    openSet.push((start_poly,), fScore[start_poly])
 
     bad_shi_computations = []
     pbar = tqdm(
@@ -657,9 +702,12 @@ def hamming_astar(
     depth = 0
     neighbor: Polyhedron | ValueError | None = None
     min_dist = float("inf")
-    min_p = start_poly
+    best_seen_hamming = hamming_start_goal
+    lower_bound_optimal_length = hamming_start_goal
+    expanded = 0
+    generated = 0
 
-    def heuristic(p: Polyhedron, depth: int, shi: int) -> float:
+    def heuristic(p: Polyhedron) -> float:
         hamming = (p.ss_np != end_poly.ss_np).sum()
         if p.interior_point is None or end_poly.interior_point is None:
             raise ValueError("Interior point not found")
@@ -678,19 +726,30 @@ def hamming_astar(
     try:
         set_globals(cx.net)
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
-            if isinstance(item[1], Exception):
+            if len(item) >= 2 and isinstance(item[1], Exception):
                 bad_shi_computations.append(item)
                 continue
             unprocessed -= 1
 
-            p, shi, depth = item
+            p = item[0]
+            expanded += 1
+            depth = int(gScore[p])
+            p_hamming = int((p.ss_np != end_poly.ss_np).sum())
+            best_seen_hamming = min(best_seen_hamming, p_hamming)
+            lower_bound_optimal_length = min(lower_bound_optimal_length, int(gScore[p]) + p_hamming)
+
+            # A* optimality condition: stop when the goal is selected for expansion
+            # (popped as best frontier node), not when first generated.
+            if p == end_poly:
+                neighbor = end_poly
+                break
 
             if nworkers == 1:
-                neighbor_iter = map(partial(get_ip, p), (i for i in p.shis if i != shi))
+                neighbor_iter = map(partial(get_ip, p), p.shis)
             elif pool is not None:
                 neighbor_iter = pool.imap_unordered(
                     partial(get_ip, p),
-                    (i for i in p.shis if i != shi),
+                    p.shis,
                     chunksize=max(nhs // nworkers, 1),
                 )
 
@@ -698,41 +757,29 @@ def hamming_astar(
                 if not isinstance(neighbor, Polyhedron):
                     p._shis.remove(neighbor_shi)
                 else:
+                    generated += 1
                     tentative_gScore = gScore[p] + d(p, neighbor)
                     if neighbor.net is None:
                         neighbor.net = cx.net
                     if tentative_gScore < gScore[neighbor]:
                         cameFrom[neighbor] = p
                         gScore[neighbor] = tentative_gScore
-                        dist = heuristic(neighbor, depth, shi)
+                        dist = heuristic(neighbor)
                         fScore[neighbor] = tentative_gScore + dist
                         if dist < min_dist:
                             min_dist = dist
-                            min_p = neighbor
-                        openSet.push((neighbor, neighbor_shi, depth + 1), fScore[neighbor])
+                        neighbor_hamming = int((neighbor.ss_np != end_poly.ss_np).sum())
+                        lower_bound_optimal_length = min(lower_bound_optimal_length, int(tentative_gScore) + neighbor_hamming)
+                        openSet.push((neighbor,), fScore[neighbor])
                         unprocessed += 1
-                        if neighbor == end_poly:
-                            break
-                if neighbor == end_poly:
-                    break
 
             pbar.update(n=len(cameFrom) - pbar.n)
             pbar.set_postfix_str(
-                f"Min Distance: {min_dist:.3f} Depth: {depth} Open Set: {unprocessed} "
+                f"LB*: {lower_bound_optimal_length} MinHeuristic: {min_dist:.3f} BestHam: {best_seen_hamming} "
+                f"Depth: {depth} Open Set: {unprocessed} "
                 f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
                 refresh=False,
             )
-
-            if min_dist < 1:
-                if min_dist > 0:
-                    last_shi = np.argwhere((min_p.ss_np != end_poly.ss_np).ravel()).item()
-                    if last_shi in min_p.shis:
-                        cameFrom[end_poly] = min_p
-                        neighbor = end_poly
-                        break
-                else:
-                    neighbor = end_poly
-                    break
 
             if unprocessed == 0 or len(cameFrom) >= max_polys:
                 break
@@ -747,12 +794,39 @@ def hamming_astar(
         openSet.close()
         tqdm.get_lock().locks = []
         pbar.close()
-    if neighbor == end_poly:
+    succeeded = neighbor == end_poly
+    path: list[Polyhedron] | None
+    termination: str
+    if succeeded:
+        termination = "found"
         path = [end_poly]
         while path[-1] != start_poly:
             assert cameFrom[path[-1]] not in path, path
             path.append(cameFrom[path[-1]])
         path.reverse()
-        return path
     else:
-        return None
+        path = None
+        if len(cameFrom) >= max_polys:
+            termination = "max_polys"
+        elif unprocessed == 0:
+            termination = "exhausted"
+        else:
+            termination = "stopped"
+
+    best_path_length = (len(path) - 1) if path is not None else None
+    return {
+        "path": path,
+        "succeeded": succeeded,
+        "termination": termination,
+        "start": start_poly,
+        "goal": end_poly,
+        "explored": len(cameFrom) + 1,
+        "expanded": expanded,
+        "generated": generated,
+        "bad_shi_computations": len(bad_shi_computations),
+        "hamming_start_goal": hamming_start_goal,
+        "best_seen_hamming": best_seen_hamming,
+        "best_seen_heuristic": min_dist,
+        "lower_bound_optimal_length": int(lower_bound_optimal_length),
+        "best_path_length": best_path_length,
+    }
