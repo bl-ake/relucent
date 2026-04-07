@@ -24,22 +24,6 @@
                     "endColumn": 0,
                     "lineCount": 1
                 }
-            },
-            {
-                "code": "reportMissingTypeStubs",
-                "range": {
-                    "startColumn": 9,
-                    "endColumn": 20,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportImplicitStringConcatenation",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 88,
-                    "lineCount": 3
-                }
             }
         ],
         "./src/relucent/calculations.py": [
