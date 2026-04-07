@@ -725,6 +725,8 @@ def hamming_astar(
     pool = None
     try:
         set_globals(cx.net)
+        if nworkers > 1:
+            pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
             if len(item) >= 2 and isinstance(item[1], Exception):
                 bad_shi_computations.append(item)
@@ -745,9 +747,7 @@ def hamming_astar(
             if nworkers == 1:
                 neighbor_iter = map(partial(get_ip, p), p.shis)
             else:
-                if nworkers <= 1:
-                    raise ValueError(f"nworkers must be >= 2 for multiprocessing, got {nworkers}")
-                pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
+                assert pool is not None
                 neighbor_iter = pool.imap_unordered(
                     partial(get_ip, p),
                     p.shis,
