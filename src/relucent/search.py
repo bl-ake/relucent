@@ -163,7 +163,6 @@ def parallel_add(
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float | None = None,
-    **kwargs: Any,
 ) -> list[Polyhedron | None]:
     """Add multiple polyhedra from data points using parallel processing.
 
@@ -177,7 +176,6 @@ def parallel_add(
             of CPU cores. Defaults to None.
         bound: Constraint radius for numerical stability when computing halfspaces.
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
-        **kwargs: Additional arguments passed to search_calculations() and get_shis().
 
     Returns:
         list: A list of Polyhedron objects (or None for failed computations)
@@ -720,9 +718,6 @@ def hamming_astar(
         bias = -1 / (1 + dist)
         return hamming + cfg.ASTAR_BIAS_WEIGHT * bias
 
-    def d(p1: Polyhedron, p2: Polyhedron) -> int:
-        return 1
-
     pool = None
     try:
         set_globals(cx.net)
@@ -764,7 +759,7 @@ def hamming_astar(
                     p.remove_shi(neighbor_shi)
                 else:
                     generated += 1
-                    tentative_gScore = gScore[p] + d(p, neighbor)
+                    tentative_gScore = gScore[p] + 1  ## The hamming distance between two adjacent polyhedra is always 1
                     if neighbor.net is None:
                         neighbor.net = cx.net
                     if tentative_gScore < gScore[neighbor]:
