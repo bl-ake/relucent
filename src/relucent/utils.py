@@ -14,7 +14,7 @@ from collections.abc import Callable, Hashable, Iterator
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
 from threading import Condition
-from typing import Any
+from typing import Any, TypeVar, cast, overload
 
 import numpy as np
 import torch
@@ -150,16 +150,56 @@ def close_env() -> None:
     _env = None
 
 
+T = TypeVar("T")
+Q = TypeVar("Q")
+
+
+def _deque_pop(q: deque[object]) -> object:
+    return q.pop()
+
+
+def _deque_append(q: deque[object], x: object) -> None:
+    q.append(x)
+
+
+def _new_deque() -> deque[object]:
+    return deque()
+
+
 class NonBlockingQueue:
     """Just a normal queue"""
 
     stopFlag = "<stop>"
 
+    @overload
     def __init__(
         self,
-        queue_class: Callable[[], Any] = deque,
-        pop: Callable[..., Any] = lambda q: q.pop(),
-        push: Callable[..., Any] = lambda q, x: q.append(x),
+        queue_class: Callable[[], deque[object]] = _new_deque,
+        pop: Callable[[deque[object]], object] = _deque_pop,
+        push: Callable[[deque[object], object], None] = _deque_append,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        queue_class: Callable[[], Q],
+        pop: Callable[[Q], T],
+        push: Callable[[Q, T, float], None],
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        queue_class: Callable[[], Q],
+        pop: Callable[[Q], T],
+        push: Callable[[Q, T], None],
+    ) -> None: ...
+
+    def __init__(
+        self,
+        queue_class: Callable[[], Any] = _new_deque,
+        pop: Callable[..., Any] = _deque_pop,
+        push: Callable[..., Any] = _deque_append,
     ) -> None:
         """Initialize a non-blocking queue.
 
@@ -177,7 +217,12 @@ class NonBlockingQueue:
 
     def __iter__(self) -> Iterator[Any]:
         while True:
-            task = self.pop()
+            try:
+                task = cast(object, self.pop())
+            except (IndexError, KeyError):
+                # Some queue backends (e.g. list/deque) raise IndexError when empty,
+                # while others (e.g. UpdatablePriorityQueue) raise KeyError.
+                return
             if task == self.stopFlag:
                 return
             yield task
@@ -201,11 +246,35 @@ class BlockingQueue:
 
     stopFlag = "<stop>"
 
+    @overload
     def __init__(
         self,
-        queue_class: Callable[[], Any] = deque,
-        pop: Callable[..., Any] = lambda q: q.pop(),
-        push: Callable[..., Any] = lambda q, x: q.append(x),
+        queue_class: Callable[[], deque[object]] = _new_deque,
+        pop: Callable[[deque[object]], object] = _deque_pop,
+        push: Callable[[deque[object], object], None] = _deque_append,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        queue_class: Callable[[], Q],
+        pop: Callable[[Q], T],
+        push: Callable[[Q, T, float], None],
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        queue_class: Callable[[], Q],
+        pop: Callable[[Q], T],
+        push: Callable[[Q, T], None],
+    ) -> None: ...
+
+    def __init__(
+        self,
+        queue_class: Callable[[], Any] = _new_deque,
+        pop: Callable[..., Any] = _deque_pop,
+        push: Callable[..., Any] = _deque_append,
     ) -> None:
         """Create a blocking queue.
 
@@ -228,7 +297,10 @@ class BlockingQueue:
 
     def __iter__(self) -> Iterator[Any]:
         while True:
-            task = self.pop()
+            try:
+                task = cast(object, self.pop())
+            except (IndexError, KeyError):
+                return
             if task == self.stopFlag:
                 return
             yield task
