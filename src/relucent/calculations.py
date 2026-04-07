@@ -307,7 +307,7 @@ def adjacent_polyhedra(
     Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
     array to the corresponding :class:`Polyhedron` (e.g. ``Complex.ss2poly``).
     """
-    ps: "set[Polyhedron]" = set()  # noqa: UP037 — Polyhedron is TYPE_CHECKING-only
+    ps: set[Polyhedron] = set()
     for shi in poly.shis:
         if poly.ss_np[0, shi] == 0:
             continue
@@ -321,6 +321,7 @@ def adjacent_polyhedra(
 def get_hs(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: Literal[False] = False,
     force_numpy: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
@@ -330,7 +331,8 @@ def get_hs(
 def get_hs(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
-    get_all_Ab: Literal[True] = True,
+    *,
+    get_all_Ab: Literal[True],
     force_numpy: bool = False,
 ) -> list[dict[str, Any]]: ...
 
@@ -338,6 +340,7 @@ def get_hs(
 def get_hs(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: bool = False,
     force_numpy: bool = False,
 ) -> (
@@ -360,14 +363,15 @@ def get_hs(
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
     if isinstance(poly._ss, torch.Tensor) and not force_numpy:
-        return _get_hs_torch(poly, data, get_all_Ab)
-    return _get_hs_numpy(poly, data, get_all_Ab)
+        return _get_hs_torch(poly, data, get_all_Ab=get_all_Ab)
+    return _get_hs_numpy(poly, data, get_all_Ab=get_all_Ab)
 
 
 @overload
 def _get_hs_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: Literal[False] = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]: ...
 
@@ -376,7 +380,8 @@ def _get_hs_torch(
 def _get_hs_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
-    get_all_Ab: Literal[True] = True,
+    *,
+    get_all_Ab: Literal[True],
 ) -> list[dict[str, Any]]: ...
 
 
@@ -384,28 +389,31 @@ def _get_hs_torch(
 def _get_hs_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, Any]]:
     assert isinstance(poly._ss, torch.Tensor)
     constr_A, constr_b = None, None
     current_A, current_b = None, None
-    A, b = None, None
+    layer_W, layer_b = None, None
     if data is not None:
-        outs = poly.net.get_all_layer_outputs(data)
+        outs: dict[str, torch.Tensor] | None = poly.net.get_all_layer_outputs(data)
+    else:
+        outs = None
     all_Ab = []
     current_mask_index = 0
     for name, layer in poly.net.layers.items():
         if isinstance(layer, nn.Linear):
-            A = layer.weight
-            b = layer.bias[None, :]
+            layer_W = layer.weight
+            layer_b = layer.bias[None, :]
             if current_A is None or current_b is None:
-                constr_A = torch.empty((A.shape[1], 0), device=poly.net.device, dtype=poly.net.dtype)
+                constr_A = torch.empty((layer_W.shape[1], 0), device=poly.net.device, dtype=poly.net.dtype)
                 constr_b = torch.empty((1, 0), device=poly.net.device, dtype=poly.net.dtype)
-                current_A = torch.eye(A.shape[1], device=poly.net.device, dtype=poly.net.dtype)
-                current_b = torch.zeros((1, A.shape[1]), device=poly.net.device, dtype=poly.net.dtype)
+                current_A = torch.eye(layer_W.shape[1], device=poly.net.device, dtype=poly.net.dtype)
+                current_b = torch.zeros((1, layer_W.shape[1]), device=poly.net.device, dtype=poly.net.dtype)
 
-            current_A = current_A @ A.T
-            current_b = current_b @ A.T + b
+            current_A = current_A @ layer_W.T
+            current_b = current_b @ layer_W.T + layer_b
         elif isinstance(layer, nn.ReLU):
             assert current_A is not None
             assert current_b is not None
@@ -440,6 +448,7 @@ def _get_hs_torch(
         if data is not None:
             assert isinstance(current_A, torch.Tensor)
             assert isinstance(current_b, torch.Tensor)
+            assert outs is not None
             assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
         if get_all_Ab:
             assert current_A is not None
@@ -468,6 +477,7 @@ def _get_hs_torch(
 def _get_hs_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: Literal[False] = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
 
@@ -476,7 +486,8 @@ def _get_hs_numpy(
 def _get_hs_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
-    get_all_Ab: Literal[True] = True,
+    *,
+    get_all_Ab: Literal[True],
 ) -> list[dict[str, Any]]: ...
 
 
@@ -484,31 +495,34 @@ def _get_hs_numpy(
 def _get_hs_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
+    *,
     get_all_Ab: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, Any]]:
     constr_A, constr_b = None, None
     current_A, current_b = None, None
-    A, b = None, None
+    layer_W, layer_b = None, None
     if data is not None:
-        outs = poly.net.get_all_layer_outputs(data)
+        outs: dict[str, torch.Tensor] | None = poly.net.get_all_layer_outputs(data)
+    else:
+        outs = None
     all_Ab = []
     current_mask_index = 0
     for name, layer in poly.net.layers.items():
         if isinstance(layer, nn.Linear):
-            A = layer.weight_cpu
-            b = layer.bias_cpu
+            layer_W = layer.weight_cpu
+            layer_b = layer.bias_cpu
 
-            assert isinstance(A, np.ndarray)
-            assert isinstance(b, np.ndarray)
+            assert isinstance(layer_W, np.ndarray)
+            assert isinstance(layer_b, np.ndarray)
 
             if current_A is None or current_b is None:
-                constr_A = np.empty((A.shape[1], 0))
+                constr_A = np.empty((layer_W.shape[1], 0))
                 constr_b = np.empty((1, 0))
-                current_A = np.eye(A.shape[1])
-                current_b = np.zeros((1, A.shape[1]))
+                current_A = np.eye(layer_W.shape[1])
+                current_b = np.zeros((1, layer_W.shape[1]))
 
-            current_A = current_A @ A.T
-            current_b = current_b @ A.T + b
+            current_A = current_A @ layer_W.T
+            current_b = current_b @ layer_W.T + layer_b
         elif isinstance(layer, nn.ReLU):
             if current_A is None:
                 raise ValueError("ReLU layer must follow a linear layer")
@@ -540,7 +554,12 @@ def _get_hs_numpy(
         if data is not None:
             assert isinstance(current_A, np.ndarray)
             assert isinstance(current_b, np.ndarray)
-            assert np.allclose(outs[name].detach().cpu().numpy(), (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
+            assert outs is not None
+            assert np.allclose(
+                outs[name].detach().cpu().numpy(),
+                (data @ current_A) + current_b,
+                atol=cfg.TOL_VERIFY_AB_ATOL,
+            )
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -651,8 +670,7 @@ def get_shis(
     subset = set(subset)
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
-    if collect_info:
-        poly_info: list[dict[str, Any]] = []
+    poly_info: list[dict[str, Any]] | None = [] if collect_info else None
     while subset:
         i = subset.pop()
         if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
@@ -720,6 +738,7 @@ def get_shis(
             raise ValueError(f"Model status: {model.status}")
 
         if collect_info:
+            assert poly_info is not None
             poly_info.append(
                 {
                     "Objective Value": model.objVal,
@@ -746,6 +765,7 @@ def get_shis(
         pbar.update(A.shape[0] - len(subset) - pbar.n)
     model.close()
     if collect_info:
+        assert poly_info is not None
         return shis, poly_info
     return shis
 
@@ -768,9 +788,9 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
 
     if poly.net.input_shape[0] > 6:
         raise ValueError("Input shape too large to compute extra properties")
+    # Filter degenerate constraints before calling Qhull (also used by retry paths below).
+    halfspaces = _drop_degenerate_halfspaces(poly.halfspaces_np)
     try:
-        # Filter degenerate constraints before calling Qhull.
-        halfspaces = _drop_degenerate_halfspaces(poly.halfspaces_np)
         if poly.interior_point is None:
             raise ValueError("Interior point not found")
         with warnings.catch_warnings(record=True) as w:

@@ -12,7 +12,8 @@ import torch
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent.poly import Polyhedron, get_hs, get_shis
+from relucent.calculations import get_hs, get_shis
+from relucent.poly import Polyhedron
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
