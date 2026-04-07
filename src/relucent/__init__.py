@@ -26,7 +26,7 @@ from .model import NN, get_mlp_model  # noqa: E402
 from .poly import Polyhedron  # noqa: E402
 from .ss import SSManager  # noqa: E402
 from .utils import get_env, set_seeds, split_sequential  # noqa: E402
-from .vis import data_graph, get_colors, plot_complex, plot_polyhedron  # noqa: E402
+from .vis import get_colors, plot_complex, plot_polyhedron  # noqa: E402
 
 __all__ = [
     "Complex",
@@ -36,7 +36,6 @@ __all__ = [
     "config",
     "update_settings",
     "convert",
-    "data_graph",
     "get_colors",
     "get_env",
     "get_mlp_model",
