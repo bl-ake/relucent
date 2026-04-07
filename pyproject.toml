@@ -28,7 +28,7 @@ readme = "README.md"
 
 [project.optional-dependencies]
 vis = ["pyvis>=0.3", "kaleido"]
-dev = ["pytest", "ruff", "basedpyright"]
+dev = ["pytest", "ruff", "basedpyright>=1.39.0"]
 docs = ["sphinx", "sphinx-rtd-theme"]
 
 [project.urls]
@@ -52,5 +52,5 @@ known-first-party = ["relucent"]
 
 [tool.basedpyright]
 typeCheckingMode = "recommended"
-include = ["src"]
-pythonVersion = "3.14"
+include = ["src/relucent", "tests"]
+exclude = ["**/site-packages/**"]
