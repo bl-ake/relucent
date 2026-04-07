@@ -830,10 +830,20 @@ class Polyhedron:
     def shis(self) -> list[int]:
         """Supporting halfspace indices (SHIs)."""
         if self._shis is None:
-            result = get_shis(self)
-            self._shis = result[0] if isinstance(result, tuple) else result
+            self._shis = get_shis(self)
         assert isinstance(self._shis, list)
         return self._shis
+
+    def remove_shi(self, shi: int) -> None:
+        """Remove a supporting halfspace index from the cached SHI list.
+
+        Raises:
+            ValueError: If ``shi`` is not present in the cached list.
+        """
+        shis = self.shis  # ensure cache is initialized
+        if shi not in shis:
+            raise ValueError(f"Cannot remove SHI {shi}: not present in Polyhedron {self!r} (num_shis={len(shis)})")
+        shis.remove(shi)
 
     @property
     def num_shis(self) -> int:
