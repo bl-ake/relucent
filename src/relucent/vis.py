@@ -38,7 +38,7 @@ class _PyvisNetwork(Protocol):
     def save_graph(self, name: str) -> None: ...
 
 
-def get_colors(data: Sequence[float], cmap: str = "viridis", **kwargs: Any) -> list[str]:
+def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
     """Map numeric values to hex color strings via a colormap."""
     if not data:
         return []
@@ -495,13 +495,21 @@ def _poly_traces_2d_graph(
             x_closed = x + [x[0]]
             y_closed = y + [y[0]]
             z_closed = z + [z[0]]
-            mesh = go.Mesh3d(x=x_closed, y=y_closed, z=z_closed, alphahull=-1, lighting=dict(ambient=1), **kwargs)
+            mesh = go.Mesh3d(
+                x=x_closed,
+                y=y_closed,
+                z=z_closed,
+                alphahull=-1,
+                lighting=dict(ambient=1),
+                showlegend=showlegend,
+                **kwargs,
+            )
             scatter = go.Scatter3d(
                 x=x_closed,
                 y=y_closed,
                 z=z_closed,
                 mode="lines",
-                showlegend=False,
+                showlegend=showlegend,
                 line=dict(width=5, color="black"),
                 visible=False,
             )
