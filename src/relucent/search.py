@@ -731,6 +731,7 @@ def hamming_astar(
                 continue
             unprocessed -= 1
 
+            assert len(item) > 0
             p = item[0]
             expanded += 1
             depth = int(gScore[p])
