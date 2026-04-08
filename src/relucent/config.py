@@ -132,42 +132,17 @@ BLOCKING_QUEUE_WAIT_TIMEOUT: float = 0.5
 # Pie chart label distance in pyvis graph (matplotlib pie).
 PIE_LABEL_DISTANCE: float = 0.6
 
-# create_pyvis_graph: max number of node images to generate.
-MAX_IMAGES_PYVIS: int = 3000
-
-# create_pyvis_graph: max number of data examples to show per node.
-MAX_NUM_EXAMPLES_PYVIS: int = 3
-
-# create_pyvis_graph: default path for saving the HTML graph.
-DEFAULT_PYVIS_SAVE_FILE: str = "./graph.html"
-
-# -----------------------------------------------------------------------------
-# Model / grid
-# -----------------------------------------------------------------------------
-
-# get_grid / output_grid: default half-width of the grid (span is [-bounds, bounds]).
-DEFAULT_GRID_BOUNDS: float = 2
-
-# get_grid / output_grid: default resolution (points per dimension).
-DEFAULT_GRID_RES: int = 100
-
-
 __all__ = [
     "ASTAR_BIAS_WEIGHT",
     "BLOCKING_QUEUE_WAIT_TIMEOUT",
     "DEFAULT_COMPLEX_PLOT_BOUND",
-    "DEFAULT_GRID_BOUNDS",
-    "DEFAULT_GRID_RES",
     "DEFAULT_PARALLEL_ADD_BOUND",
     "DEFAULT_PLOT_BOUND",
-    "DEFAULT_PYVIS_SAVE_FILE",
     "DEFAULT_SEARCH_BOUND",
     "GUROBI_SHI_BEST_BD_STOP",
     "GUROBI_SHI_BEST_OBJ_STOP",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
-    "MAX_IMAGES_PYVIS",
     "MAX_RADIUS",
-    "MAX_NUM_EXAMPLES_PYVIS",
     "PIE_LABEL_DISTANCE",
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",

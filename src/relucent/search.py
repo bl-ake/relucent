@@ -89,7 +89,7 @@ def geometric_calculations(
     try:
         halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], get_hs(p, get_all_Ab=False))
         p._halfspaces = halfspaces
-        p._W = W
+        p._w = W
         p._b = b
         p._num_dead_relus = cast(int, num_dead_relus)
 
@@ -115,7 +115,7 @@ def geometric_calculations(
     # Keep computed scalar geometry caches while dropping heavy matrices.
     p._halfspaces = None
     p._halfspaces_np = None
-    p._W = None
+    p._w = None
     p._b = None
     return (p, poly_index, *rest)
 
@@ -679,8 +679,9 @@ def hamming_astar(
 
     openSet = NonBlockingQueue(
         queue_class=UpdatablePriorityQueue,
-        push=lambda pq, task, priority: pq.push(task, priority=priority),
         pop=lambda pq: pq.pop(),
+        push=lambda pq, task: pq.push(task, priority=0.0),
+        push_with_priority=lambda pq, task, priority: pq.push(task, priority=priority),
     )
 
     gScore[start_poly] = 0

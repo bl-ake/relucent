@@ -10,11 +10,11 @@ import os
 import random
 import sys
 from collections import OrderedDict, deque
-from collections.abc import Callable, Hashable, Iterator
+from collections.abc import Callable, Hashable, Iterator, Sized
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
 from threading import Condition
-from typing import Any, TypeVar, cast, overload
+from typing import Generic, TypeVar
 
 import numpy as np
 import torch
@@ -89,7 +89,8 @@ def process_aware_cpu_count() -> int | None:
     """Return process CPU count when available, else system CPU count."""
     fn = getattr(os, "process_cpu_count", None)
     if callable(fn):
-        return fn()  # type: ignore[return-value]
+        count = fn()
+        return count if isinstance(count, int) else None
     return os.cpu_count()
 
 
@@ -158,7 +159,7 @@ def close_env() -> None:
 
 
 T = TypeVar("T")
-Q = TypeVar("Q")
+Q = TypeVar("Q", bound=Sized)
 
 
 def _deque_pop(q: deque[object]) -> object:
@@ -173,40 +174,16 @@ def _new_deque() -> deque[object]:
     return deque()
 
 
-class NonBlockingQueue:
+class NonBlockingQueue(Generic[T, Q]):
     """Just a normal queue"""
 
-    stopFlag = "<stop>"
-
-    @overload
     def __init__(
         self,
-        queue_class: Callable[[], deque[object]] = _new_deque,
-        pop: Callable[[deque[object]], object] = _deque_pop,
-        push: Callable[[deque[object], object], None] = _deque_append,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        queue_class: Callable[[], Q],
-        pop: Callable[[Q], T],
-        push: Callable[[Q, T, float], None],
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        queue_class: Callable[[], Q],
-        pop: Callable[[Q], T],
-        push: Callable[[Q, T], None],
-    ) -> None: ...
-
-    def __init__(
-        self,
-        queue_class: Callable[[], Any] = _new_deque,
-        pop: Callable[..., Any] = _deque_pop,
-        push: Callable[..., Any] = _deque_append,
+        queue_class: Callable[[], Q] = _new_deque,
+        *,
+        pop: Callable[[Q], T] = _deque_pop,
+        push: Callable[[Q, T], None] = _deque_append,
+        push_with_priority: Callable[[Q, T, float], None] | None = None,
     ) -> None:
         """Initialize a non-blocking queue.
 
@@ -216,72 +193,49 @@ class NonBlockingQueue:
             pop: Function to pop an element from the queue. Defaults to deque.pop().
             push: Function to push an element to the queue. Defaults to deque.append().
         """
-        self.deque: Any = queue_class()
-        self.pop_element: Callable[..., Any] = pop
-        self.push_element: Callable[..., Any] = push
+        self.deque: Q = queue_class()
+        self._pop_element: Callable[[Q], T] = pop
+        self._push_element: Callable[[Q, T], None] = push
+        self._push_with_priority: Callable[[Q, T, float], None] | None = push_with_priority
 
         self.closed: bool = False
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[T]:
         while True:
             try:
-                task = cast(object, self.pop())
+                task = self.pop()
             except (IndexError, KeyError):
                 # Some queue backends (e.g. list/deque) raise IndexError when empty,
                 # while others (e.g. UpdatablePriorityQueue) raise KeyError.
                 return
-            if task == self.stopFlag:
-                return
             yield task
 
-    def pop(self, *args: Any, **kwargs: Any) -> Any:
-        return self.pop_element(self.deque, *args, **kwargs)
+    def pop(self) -> T:
+        return self._pop_element(self.deque)
 
-    def push(self, element: Any, *args: Any, **kwargs: Any) -> None:
-        self.push_element(self.deque, element, *args, **kwargs)
+    def push(self, element: T, priority: float | None = None) -> None:
+        if priority is None or self._push_with_priority is None:
+            self._push_element(self.deque, element)
+        else:
+            self._push_with_priority(self.deque, element, priority)
 
     def close(self) -> None:
         self.closed = True
-        self.pop = lambda q: self.stopFlag
 
     def __len__(self) -> int:
         return len(self.deque)
 
 
-class BlockingQueue:
+class BlockingQueue(Generic[T, Q]):
     """Queue that patiently waits for new elements if you pop() while it's empty"""
 
-    stopFlag = "<stop>"
-
-    @overload
     def __init__(
         self,
-        queue_class: Callable[[], deque[object]] = _new_deque,
-        pop: Callable[[deque[object]], object] = _deque_pop,
-        push: Callable[[deque[object], object], None] = _deque_append,
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        queue_class: Callable[[], Q],
-        pop: Callable[[Q], T],
-        push: Callable[[Q, T, float], None],
-    ) -> None: ...
-
-    @overload
-    def __init__(
-        self,
-        queue_class: Callable[[], Q],
-        pop: Callable[[Q], T],
-        push: Callable[[Q, T], None],
-    ) -> None: ...
-
-    def __init__(
-        self,
-        queue_class: Callable[[], Any] = _new_deque,
-        pop: Callable[..., Any] = _deque_pop,
-        push: Callable[..., Any] = _deque_append,
+        queue_class: Callable[[], Q] = _new_deque,
+        *,
+        pop: Callable[[Q], T] = _deque_pop,
+        push: Callable[[Q, T], None] = _deque_append,
+        push_with_priority: Callable[[Q, T, float], None] | None = None,
     ) -> None:
         """Create a blocking queue.
 
@@ -295,38 +249,41 @@ class BlockingQueue:
             pop and push can both be functions with kwargs; the corresponding
             methods in this class will pass their arguments along.
         """
-        self.deque: Any = queue_class()
-        self.pop_element: Callable[..., Any] = pop
-        self.push_element: Callable[..., Any] = push
+        self.deque: Q = queue_class()
+        self._pop_element: Callable[[Q], T] = pop
+        self._push_element: Callable[[Q, T], None] = push
+        self._push_with_priority: Callable[[Q, T, float], None] | None = push_with_priority
 
         self.lock: Condition = Condition()
         self.closed: bool = False
 
-    def __iter__(self) -> Iterator[Any]:
+    def __iter__(self) -> Iterator[T]:
         while True:
             try:
-                task = cast(object, self.pop())
+                task = self.pop()
             except (IndexError, KeyError):
-                return
-            if task == self.stopFlag:
                 return
             yield task
 
-    def pop(self, *args: Any, **kwargs: Any) -> Any:
+    def pop(self) -> T:
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
                 self.lock.wait(timeout=cfg.BLOCKING_QUEUE_WAIT_TIMEOUT)
-            return self.pop_element(self.deque, *args, **kwargs)
+            if self.closed and len(self.deque) == 0:
+                raise IndexError("Queue closed")
+            return self._pop_element(self.deque)
 
-    def push(self, element: Any, *args: Any, **kwargs: Any) -> None:
+    def push(self, element: T, priority: float | None = None) -> None:
         with self.lock:
-            self.push_element(self.deque, element, *args, **kwargs)
+            if priority is None or self._push_with_priority is None:
+                self._push_element(self.deque, element)
+            else:
+                self._push_with_priority(self.deque, element, priority)
             self.lock.notify()
 
     def close(self) -> None:
         self.closed = True
         with self.lock:
-            self.pop = lambda q: self.stopFlag
             self.lock.notify()
 
     def __len__(self) -> int:
@@ -346,11 +303,13 @@ class UpdatablePriorityQueue:
     Reference: https://docs.python.org/3/library/heapq.html
     """
 
-    REMOVED = object()  # unique placeholder for a removed task
+    REMOVED: Hashable = "<removed>"  # placeholder for a removed task (must be hashable for heap entry typing)
+    _EntryItem = float | int | Hashable
+    _Entry = list[_EntryItem]
 
     def __init__(self) -> None:
-        self.pq: list[list[Any]] = []  # list of entries arranged in a heap
-        self.entry_finder: dict[Hashable, list[Any]] = {}  # mapping of task -> entry
+        self.pq: list[UpdatablePriorityQueue._Entry] = []  # list of entries arranged in a heap
+        self.entry_finder: dict[Hashable, UpdatablePriorityQueue._Entry] = {}  # mapping of task -> entry
         self.counter: int = 0
 
     def push(self, task: Hashable, priority: float = 0) -> None:

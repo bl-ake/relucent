@@ -6,12 +6,12 @@ Functions here take a :class:`~relucent.poly.Polyhedron` instance; the class liv
 
 import warnings
 from collections.abc import Callable, Iterable
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 import numpy as np
 import torch
 import torch.nn as nn
-from gurobipy import GRB, Model
+from gurobipy import GRB, Env, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
@@ -100,7 +100,7 @@ def _remap_zero_indices(zero_indices: np.ndarray | None, old_to_new: np.ndarray)
 
 
 def _halfspaces_feasible(
-    env: Any,
+    env: Env,
     halfspaces: np.ndarray,
     zero_indices: np.ndarray | None,
 ) -> bool:
@@ -133,7 +133,7 @@ def _halfspaces_feasible(
 
 
 def solve_radius(
-    env: Any,
+    env: Env,
     halfspaces: np.ndarray | torch.Tensor,
     max_radius: float = GRB.INFINITY,
     zero_indices: np.ndarray | None = None,
@@ -334,7 +334,7 @@ def get_hs(
     *,
     get_all_Ab: Literal[True],
     force_numpy: bool = False,
-) -> list[dict[str, Any]]: ...
+) -> list[dict[str, object]]: ...
 
 
 def get_hs(
@@ -346,7 +346,7 @@ def get_hs(
 ) -> (
     tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]
     | tuple[np.ndarray, np.ndarray, np.ndarray, int]
-    | list[dict[str, Any]]
+    | list[dict[str, object]]
 ):
     """Halfspace representation of ``poly`` from all neurons in the network.
 
@@ -382,7 +382,7 @@ def _get_hs_torch(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: Literal[True],
-) -> list[dict[str, Any]]: ...
+) -> list[dict[str, object]]: ...
 
 
 @torch.no_grad()
@@ -391,7 +391,7 @@ def _get_hs_torch(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, Any]]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, object]]:
     assert isinstance(poly._ss, torch.Tensor)
     constr_A, constr_b = None, None
     current_A, current_b = None, None
@@ -488,7 +488,7 @@ def _get_hs_numpy(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: Literal[True],
-) -> list[dict[str, Any]]: ...
+) -> list[dict[str, object]]: ...
 
 
 @torch.no_grad()
@@ -497,7 +497,7 @@ def _get_hs_numpy(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, Any]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, object]]:
     constr_A, constr_b = None, None
     current_A, current_b = None, None
     layer_W, layer_b = None, None
@@ -589,7 +589,7 @@ def get_shis(
     subset: Iterable[int] | None = None,
     tol: float | None = None,
     new_method: bool = False,
-    env: Any = None,
+    env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
 ) -> list[int]: ...
@@ -603,10 +603,10 @@ def get_shis(
     subset: Iterable[int] | None = None,
     tol: float | None = None,
     new_method: bool = False,
-    env: Any = None,
+    env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-) -> tuple[list[int], list[dict[str, Any]]]: ...
+) -> tuple[list[int], list[dict[str, object]]]: ...
 
 
 def get_shis(
@@ -616,10 +616,10 @@ def get_shis(
     subset: Iterable[int] | None = None,
     tol: float | None = None,
     new_method: bool = False,
-    env: Any = None,
+    env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-) -> list[int] | tuple[list[int], list[dict[str, Any]]]:
+) -> list[int] | tuple[list[int], list[dict[str, object]]]:
     """Supporting halfspace indices (SHIs) for ``poly``.
 
     Indices of non-redundant halfspaces on the boundary (neurons whose BHs are
@@ -670,7 +670,7 @@ def get_shis(
     subset = set(subset)
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
-    poly_info: list[dict[str, Any]] | None = [] if collect_info else None
+    poly_info: list[dict[str, object]] | None = [] if collect_info else None
     while subset:
         i = subset.pop()
         if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:

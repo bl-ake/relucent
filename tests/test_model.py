@@ -73,22 +73,6 @@ class TestNN:
         for _n, t in outs.items():
             assert isinstance(t, torch.Tensor)
 
-    def test_get_grid(self, seeded):
-        assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1])
-        x, y, pts = net.get_grid(bounds=2, res=10)
-        assert x.shape == (10,)
-        assert y.shape == (10,)
-        assert pts.shape == (100, 2)
-
-    def test_output_grid(self, seeded):
-        assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1])
-        x, y, outs = net.output_grid(bounds=2, res=5)
-        assert len(outs) == len(net.layers)
-        last_name = list(outs.keys())[-1]
-        assert outs[last_name].shape == (25, 1)
-
     def test_shi2weights_return_tensor(self, seeded):
         assert seeded is not None
         net = get_mlp_model(widths=[4, 8, 2])

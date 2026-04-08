@@ -106,7 +106,7 @@ class Complex:
                 for neuron_idx in range(layer.out_features):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
-        self._G: nx.Graph[Polyhedron] | None = None
+        self._dual_graph: nx.Graph[Polyhedron] | None = None
 
     def __repr__(self) -> str:
         net_name = type(self.net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -382,21 +382,21 @@ class Complex:
         if not check_exists:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
-            self._G = None
+            self._dual_graph = None
             return p
 
         p_exists = p in self
 
         if p_exists and overwrite:
             self.index2poly[self.ssm[p.ss_np]] = p
-            self._G = None
+            self._dual_graph = None
             return p
         elif p_exists:
             return self[p]
         else:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
-            self._G = None
+            self._dual_graph = None
             return p
 
     def add_point(
@@ -826,9 +826,9 @@ class Complex:
     @property
     def G(self) -> nx.Graph[Polyhedron]:
         """The adjacency graph of top-dimensional cells in the complex."""
-        if self._G is None:
-            self._G = self.get_dual_graph()
-        return self._G
+        if self._dual_graph is None:
+            self._dual_graph = self.get_dual_graph()
+        return self._dual_graph
 
     @overload
     def get_dual_graph(
@@ -911,20 +911,20 @@ class Complex:
             ValueError: If match_locations is True and the complex is not 2D.
         """
         max_dim = max(poly.dim for poly in self)
-        G = nx.Graph()
+        graph = nx.Graph()
         for poly in self:
             if poly.dim == max_dim:
-                G.add_node(poly, label=str(poly))
-        missing = []
-        for poly in tqdm(G.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
+                graph.add_node(poly, label=str(poly))
+        missing: list[tuple[np.ndarray, int, Polyhedron]] = []
+        for poly in tqdm(graph.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
             ss = poly.ss_np.copy()
             for shi in poly.shis:
                 assert ss[0, shi] != 0
                 ss[0, shi] *= -1
                 try:
-                    G.add_edge(poly, self[ss], shi=shi)
+                    graph.add_edge(poly, self[ss], shi=shi)
                 except KeyError:
-                    missing.append((ss, shi))
+                    missing.append((ss.copy(), shi, poly))
                 ss[0, shi] *= -1
 
         if len(missing) > 0 and max_dim == self.dim:
@@ -934,58 +934,58 @@ class Complex:
                 stacklevel=2,
             )
         if auto_add:
-            for ss, shi in missing:
+            for ss, shi, source_poly in missing:
                 neighbor = self.ss2poly(ss, check_exists=False)
                 if neighbor.feasible:
                     self.add_polyhedron(neighbor, check_exists=False)
-                    G.add_edge(poly, neighbor, shi=shi)
+                    graph.add_edge(source_poly, neighbor, shi=shi)
         if plot:
             if match_locations:
                 if self.dim != 2:
                     raise ValueError("Polyhedra must be 2D to match locations")
 
-                nx.set_node_attributes(G, values=False, name="physics")  # type: ignore
+                nx.set_node_attributes(graph, {node: False for node in graph.nodes}, "physics")
                 nx.set_node_attributes(
-                    G,
-                    {poly: poly.interior_point[0].item() * 10 for poly in G.nodes},
+                    graph,
+                    {poly: poly.interior_point[0].item() * 10 for poly in graph.nodes},
                     "x",
                 )
                 nx.set_node_attributes(
-                    G,
-                    {poly: poly.interior_point[1].item() * 10 for poly in G.nodes},
+                    graph,
+                    {poly: poly.interior_point[1].item() * 10 for poly in graph.nodes},
                     "y",
                 )
 
             if node_color == "Wl2":
-                colors = get_colors([poly.Wl2 for poly in G.nodes], cmap=cmap)
-                for c, poly in zip(colors, G.nodes, strict=True):
-                    G.nodes[poly]["color"] = c
+                colors = get_colors([poly.Wl2 for poly in graph.nodes], cmap=cmap)
+                for c, poly in zip(colors, graph.nodes, strict=True):
+                    graph.nodes[poly]["color"] = c
             elif node_color == "volume":
-                colors = get_colors([poly.ch.volume for poly in G.nodes], cmap=cmap)
-                for c, poly in zip(colors, G.nodes, strict=True):
-                    G.nodes[poly]["color"] = c
+                colors = get_colors([poly.ch.volume for poly in graph.nodes], cmap=cmap)
+                for c, poly in zip(colors, graph.nodes, strict=True):
+                    graph.nodes[poly]["color"] = c
 
             if node_size == "volume":
-                sizes = [poly.ch.volume for poly in G.nodes]
+                sizes = [poly.ch.volume for poly in graph.nodes]
                 maxsize = max(sizes)
-                for size, poly in zip(sizes, G.nodes, strict=True):
-                    G.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
+                for size, poly in zip(sizes, graph.nodes, strict=True):
+                    graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
             else:
-                nx.set_node_attributes(G, values=4, name="size")  # type: ignore
+                nx.set_node_attributes(graph, {node: 4 for node in graph.nodes}, "size")
 
-            for node in G.nodes:
-                G.nodes[node]["label"] = str(node) if show_node_labels else ""
-                G.nodes[node]["title"] = str(node)
-            for edge in G.edges:
-                G.edges[edge]["label"] = str(G.edges[edge]["shi"]) if show_edge_labels else ""
-                G.edges[edge]["title"] = str(G.edges[edge]["shi"])
+            for node in graph.nodes:
+                graph.nodes[node]["label"] = str(node) if show_node_labels else ""
+                graph.nodes[node]["title"] = str(node)
+            for edge in graph.edges:
+                graph.edges[edge]["label"] = str(graph.edges[edge]["shi"]) if show_edge_labels else ""
+                graph.edges[edge]["title"] = str(graph.edges[edge]["shi"])
         if plot or relabel:
-            G = nx.relabel_nodes(G, {poly: i for i, poly in enumerate(self)})
-        return G
+            graph = nx.relabel_nodes(graph, {poly: i for i, poly in enumerate(self)})
+        return graph
 
     def recover_from_dual_graph(
         self,
-        G: nx.Graph[int],
+        graph: nx.Graph[int],
         initial_ss: np.ndarray | torch.Tensor,
         source: int,
         copy: bool = False,
@@ -1012,12 +1012,16 @@ class Complex:
                 attributes under the "poly" key.
         """
         if copy:
-            G = G.copy()
+            graph = graph.copy()
         initial_p = self.add_ss(initial_ss)
         initial_p._shis = []
-        G.nodes[source]["poly"] = initial_p
-        for edge in tqdm(nx.bfs_edges(G, source=source), desc="Recovering Polyhedra", total=G.number_of_edges()):
-            poly1, shi = G.nodes[edge[0]]["poly"], G.edges[edge]["shi"]
+        graph.nodes[source]["poly"] = initial_p
+        for edge in tqdm(
+            nx.bfs_edges(graph, source=source),
+            desc="Recovering Polyhedra",
+            total=graph.number_of_edges(),
+        ):
+            poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
             poly2_ss = poly1.ss_np.copy()
             assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
@@ -1027,10 +1031,10 @@ class Complex:
                 poly1._shis.append(shi)
             poly2._shis = [shi]
 
-            G.nodes[edge[1]]["poly"] = poly2
+            graph.nodes[edge[1]]["poly"] = poly2
 
-        for node in G:
-            self[G.nodes[node]["poly"]]._shis = [G.edges[edge]["shi"] for edge in G.edges(node)]
+        for node in graph:
+            self[graph.nodes[node]["poly"]]._shis = [graph.edges[edge]["shi"] for edge in graph.edges(node)]
 
     def plot_cells(
         self,

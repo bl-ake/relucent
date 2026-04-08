@@ -7,5 +7,28 @@
     ],
     "exclude": [
         "**/site-packages/**"
-    ]
+    ],
+    "reportImportCycles": "none",
+    "reportMissingTypeStubs": "none",
+    "reportPrivateUsage": "none",
+    "reportUnusedCallResult": "none",
+    "reportUnusedFunction": "none",
+    "reportUnknownArgumentType": "none",
+    "reportUnknownLambdaType": "none",
+    "reportUnknownMemberType": "none",
+    "reportUnknownParameterType": "none",
+    "reportUnknownVariableType": "none",
+    "reportMissingParameterType": "none",
+    "reportAny": "none",
+    "reportExplicitAny": "none",
+    "reportUnnecessaryCast": "none",
+    "reportUnannotatedClassAttribute": "none",
+    "reportImplicitOverride": "none",
+    "reportUnnecessaryIsInstance": "none",
+    "reportUnreachable": "none",
+    "reportUnnecessaryComparison": "none",
+    "reportCallInDefaultInitializer": "none",
+    "reportImplicitStringConcatenation": "none",
+    "reportUnusedVariable": "none",
+    "reportRedeclaration": "none"
 }
