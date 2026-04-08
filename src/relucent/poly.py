@@ -307,8 +307,8 @@ class Polyhedron:
             if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
                 bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
                 raise ValueError(
-                        "Degenerate halfspace(s) imply infeasibility after bounding; "
-                        + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
+                    "Degenerate halfspace(s) imply infeasibility after bounding; "
+                    + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
                 )
             halfspaces = halfspaces[~deg]
         env = env or get_env()
