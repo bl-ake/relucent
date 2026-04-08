@@ -28,5 +28,4 @@
     "reportUnreachable": "none",
     "reportUnnecessaryComparison": "none",
     "reportCallInDefaultInitializer": "none",
-    "reportImplicitStringConcatenation": "none",
 }

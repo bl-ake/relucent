@@ -57,7 +57,7 @@ class NN(nn.Module):
         else:
             raise ValueError(
                 f"Unsupported layers type: {type(layers)}."
-                "Must be a Mapping of str -> nn.Module or an Iterable of nn.Module objects."
+                + "Must be a Mapping of str -> nn.Module or an Iterable of nn.Module objects."
             )
 
         if input_shape is not None:

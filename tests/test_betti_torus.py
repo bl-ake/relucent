@@ -128,8 +128,8 @@ def test_torus_decision_boundary_betti_numbers(seeded):
     else:
         pytest.skip(
             "No torus checkpoint found and training disabled. "
-            "Restore bundled checkpoint, provide RELUCENT_TORUS_CHECKPOINT, "
-            "or set RELUCENT_TORUS_TRAIN=1."
+            + "Restore bundled checkpoint, provide RELUCENT_TORUS_CHECKPOINT, "
+            + "or set RELUCENT_TORUS_TRAIN=1."
         )
 
     topo_model = _model_with_db_relu(model)

@@ -535,7 +535,7 @@ def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) ->
     if plotted < minimum_required:
         raise RuntimeError(
             f"Unable to plot at least half of polyhedra for {context}: "
-            f"plotted {plotted} of {total} intersecting the plot bounds (minimum required {minimum_required})."
+            + f"plotted {plotted} of {total} intersecting the plot bounds (minimum required {minimum_required})."
         )
 
 

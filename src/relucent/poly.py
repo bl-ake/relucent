@@ -307,8 +307,8 @@ class Polyhedron:
             if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
                 bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
                 raise ValueError(
-                    "Degenerate halfspace(s) imply infeasibility after bounding; "
-                    f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
+                        "Degenerate halfspace(s) imply infeasibility after bounding; "
+                        + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
                 )
             halfspaces = halfspaces[~deg]
         env = env or get_env()
@@ -495,13 +495,13 @@ class Polyhedron:
                 if tiny.size > 0:
                     print(
                         "[relucent] DEBUG: near-zero halfspace normals detected before HalfspaceIntersection\n"
-                        f"  poly={self}\n"
-                        f"  bound={bound}\n"
-                        f"  int_point={np.asarray(int_point).ravel()}\n"
-                        f"  tiny_indices={tiny.tolist()}\n"
-                        f"  tiny_rows={bounded_halfspaces[tiny].tolist()}\n"
-                        f"  normal_norms: min={float(normal_norms.min()):.3e}, "
-                        f"median={float(np.median(normal_norms)):.3e}, max={float(normal_norms.max()):.3e}"
+                        + f"  poly={self}\n"
+                        + f"  bound={bound}\n"
+                        + f"  int_point={np.asarray(int_point).ravel()}\n"
+                        + f"  tiny_indices={tiny.tolist()}\n"
+                        + f"  tiny_rows={bounded_halfspaces[tiny].tolist()}\n"
+                        + f"  normal_norms: min={float(normal_norms.min()):.3e}, "
+                        + f"median={float(np.median(normal_norms)):.3e}, max={float(normal_norms.max()):.3e}"
                     )
             except Exception:
                 # Never fail geometry due to debug printing.

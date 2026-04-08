@@ -471,8 +471,8 @@ def searcher(
                 assert isinstance(p._shis, list)
                 pbar.set_postfix_str(
                     f"Depth: {depth}  Unprocessed: {unprocessed}  Faces: {len(p._shis)}  Avg: {rolling_average:.2f} "
-                    f"IP Norm: {p._interior_point_norm or -1:.2f}  Finite: {p._finite} "
-                    f"Mistakes: {len(bad_shi_computations)}",
+                    + f"IP Norm: {p._interior_point_norm or -1:.2f}  Finite: {p._finite} "
+                    + f"Mistakes: {len(bad_shi_computations)}",
                     refresh=False,
                 )
 
@@ -768,8 +768,8 @@ def hamming_astar(
             open_len = len(openSet)
             pbar.set_postfix_str(
                 f"LB*: {lower_bound_optimal_length} MinHeuristic: {min_dist:.3f} BestHam: {best_seen_hamming} "
-                f"Depth: {depth} Open Set: {open_len} "
-                f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
+                + f"Depth: {depth} Open Set: {open_len} "
+                + f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
                 refresh=False,
             )
 
