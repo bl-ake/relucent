@@ -340,7 +340,7 @@ class TestComplexMisc:
         _ = p.W
         cplx.clean_data()
         assert p._halfspaces is None
-        assert p._W is None
+        assert p._w is None
 
     def test_ss_iterator(self, small_mlp):
         """ss_iterator yields sign sequences per ReLU layer."""

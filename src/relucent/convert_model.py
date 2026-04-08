@@ -55,8 +55,8 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
             res.append(x % shape[i])
             x //= shape[i]
 
-        # We know shape has length 3, so this cast is safe.
-        return tuple(reversed(res))  # type: ignore[return-value]
+        rev = list(reversed(res))
+        return rev[0], rev[1], rev[2]
 
     nfeatures, w, h = input_size
 
@@ -266,8 +266,8 @@ def convert(
 
     has_logsoftmax = any(isinstance(m, nn.LogSoftmax) for m in model.layers.values())
     if not has_logsoftmax:
+        was_training = model.training
         try:
-            was_training = model.training
             model.eval()
             new_model.eval()
             x = torch.randn(input_shape, dtype=params.dtype, device=params.device)

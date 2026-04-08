@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# pyright: reportExplicitAny=false
 import warnings
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -452,7 +453,7 @@ def plot_polyhedron(
 def plot_polyhedron(
     poly: Polyhedron,
     *,
-    plot_mode: Literal["cells", "graph"],
+    plot_mode: str,
     **kwargs: Any,
 ) -> list[go.Mesh3d | go.Scatter3d] | list[go.Scatter] | dict[str, go.Mesh3d | go.Scatter3d] | None:
     """Build plotly traces for one polyhedron.
@@ -490,8 +491,8 @@ _POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade", "fill"
 
 
 def _equitable_colors(
-    dual: nx.Graph,
-    polys: list[Any],
+    dual: nx.Graph[Polyhedron],
+    polys: Sequence[object],
     *,
     remap: bool,
 ) -> list[str]:
@@ -518,7 +519,7 @@ def _per_poly_colors(cpx: Complex, polys: list[Polyhedron], color: str | None, *
     return _equitable_colors(cpx.get_dual_graph(), polys, remap=remap_equitable)
 
 
-def _highlight(c: str, poly: Any, highlight_regions: Iterable[Any] | None) -> str:
+def _highlight(c: str, poly: object, highlight_regions: Iterable[object] | None) -> str:
     if highlight_regions is None:
         return c
     if poly in highlight_regions or str(poly) in highlight_regions:
@@ -538,7 +539,7 @@ def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) ->
         )
 
 
-def _poly_intersects_plot_bound(poly: Any, bound: float) -> bool:
+def _poly_intersects_plot_bound(poly: object, bound: float) -> bool:
     """True if ``poly`` intersects the axis-aligned bounding hypercube of half-width ``bound``.
 
     Matches the feasibility check used before ``get_bounded_vertices`` / cell plotting: polyhedra
@@ -555,8 +556,11 @@ def _poly_intersects_plot_bound(poly: Any, bound: float) -> bool:
             return True
         except ValueError:
             return False
-    verts = poly.get_bounded_vertices(bound)
-    return verts is not None and getattr(verts, "size", 0) > 0
+    get_verts = getattr(poly, "get_bounded_vertices", None)
+    if callable(get_verts):
+        verts = get_verts(bound)
+        return verts is not None and getattr(verts, "size", 0) > 0
+    return False
 
 
 def _complex_figure_2d_cells(
@@ -564,7 +568,7 @@ def _complex_figure_2d_cells(
     *,
     label_regions: bool = False,
     color: str | None = None,
-    highlight_regions: Iterable[Any] | None = None,
+    highlight_regions: Iterable[object] | None = None,
     ss_name: bool = False,
     bound: float | None = None,
     **kwargs: Any,
@@ -640,7 +644,7 @@ def _complex_figure_3d_cells(
     *,
     label_regions: bool = False,
     color: str | None = None,
-    highlight_regions: Iterable[Any] | None = None,
+    highlight_regions: Iterable[object] | None = None,
     show_axes: bool = False,
     fill_mode: str = "wireframe",
     **kwargs: Any,
@@ -698,9 +702,9 @@ def _complex_figure_graph(
     *,
     label_regions: bool = False,
     color: str | None = None,
-    highlight_regions: Iterable[Any] | None = None,
+    highlight_regions: Iterable[object] | None = None,
     show_axes: bool = False,
-    project: Any = True,
+    project: float | None = None,
     **kwargs: Any,
 ) -> go.Figure:
     bound_effective = kwargs.get("bound", cfg.DEFAULT_PLOT_BOUND)
@@ -789,7 +793,7 @@ def _complex_figure_graph(
 def plot_complex(
     cpx: Complex,
     *,
-    plot_mode: Literal["cells", "graph"],
+    plot_mode: str,
     **kwargs: Any,
 ) -> go.Figure:
     """Plot an entire ``Complex`` as one Plotly figure.

@@ -11,11 +11,8 @@ from collections import OrderedDict
 from collections.abc import Container, Iterable, Mapping
 from typing import cast
 
-import numpy as np
 import torch
 import torch.nn as nn
-
-import relucent.config as cfg
 
 __all__ = ["NN", "get_mlp_model"]
 
@@ -133,52 +130,6 @@ class NN(nn.Module):
             if layers is None or name in layers:
                 outputs.append((name, x))
         return OrderedDict(outputs)
-
-    def get_grid(self, bounds: float | None = None, res: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Generate a 2D grid of input points.
-
-        Creates a regular grid of points in 2D space. Only works for 2D input spaces.
-
-        Args:
-            bounds: Half-width of the grid (grid spans [-bounds, bounds]).
-                Defaults to config.DEFAULT_GRID_BOUNDS.
-            res: Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.
-
-        Returns:
-            tuple: (x_coords, y_coords, input_points) where input_points is an
-                array of shape (res*res, 2).
-        """
-        bounds = bounds if bounds is not None else cfg.DEFAULT_GRID_BOUNDS
-        res = res if res is not None else cfg.DEFAULT_GRID_RES
-        x = np.linspace(-bounds, bounds, res)
-        y = np.copy(x)
-
-        X, Y = np.meshgrid(x, y)
-
-        X = np.reshape(X, -1)
-        Y = np.reshape(Y, -1)
-
-        input_val = np.vstack((X, Y)).T
-        return x, y, input_val
-
-    def output_grid(
-        self, bounds: float | None = None, res: int | None = None
-    ) -> tuple[np.ndarray, np.ndarray, OrderedDict[str, torch.Tensor]]:
-        """Generate a grid and compute network outputs for all points.
-
-        Args:
-            bounds: Half-width of the grid. Defaults to config.DEFAULT_GRID_BOUNDS.
-            res: Resolution (number of points per dimension). Defaults to config.DEFAULT_GRID_RES.
-
-        Returns:
-            tuple: (x_coords, y_coords, layer_outputs) where layer_outputs is
-                an OrderedDict mapping layer names to outputs.
-        """
-        x, y, input_val = self.get_grid(bounds, res)
-
-        outs = self.get_all_layer_outputs(torch.Tensor(input_val).to(self.device, self.dtype))
-
-        return x, y, outs
 
     def shi2weights(self, shi: int, return_idx: bool = False) -> torch.Tensor | tuple[str, int]:
         """Get weights corresponding to a neuron index.

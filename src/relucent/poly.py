@@ -51,7 +51,7 @@ class Polyhedron:
         self._ss = self._coerce_ss_to_int(ss)
         self._halfspaces: torch.Tensor | np.ndarray | None = halfspaces
         self._halfspaces_np: np.ndarray | None = None
-        self._W: torch.Tensor | np.ndarray | None = W
+        self._w: torch.Tensor | np.ndarray | None = W
         self._b: torch.Tensor | np.ndarray | None = b
         self._Wl2: float | None = None
         self._interior_point: np.ndarray | None = None
@@ -625,7 +625,7 @@ class Polyhedron:
         need not redo Gurobi Chebyshev solves after a cleanup pass.
         """
         self._halfspaces = None
-        self._W = None
+        self._w = None
         self._b = None
         self._hs = None
         self._halfspaces_np = None
@@ -702,7 +702,7 @@ class Polyhedron:
 
             halfspaces, W, b, num_dead_relus = get_hs(self)
             self._halfspaces = halfspaces
-            self._W = W
+            self._w = W
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
@@ -733,19 +733,19 @@ class Polyhedron:
         Returns:
             torch.Tensor or np.ndarray: Transformation matrix.
         """
-        if self._W is None:
+        if self._w is None:
             from relucent.calculations import get_hs
 
             halfspaces, W, b, num_dead_relus = get_hs(self)
             self._halfspaces = halfspaces
-            self._W = W
+            self._w = W
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-            assert isinstance(self._W, (torch.Tensor, np.ndarray))
-            return self._W
+            assert isinstance(self._w, (torch.Tensor, np.ndarray))
+            return self._w
         else:
-            return self._W
+            return self._w
 
     @property
     def b(self) -> torch.Tensor | np.ndarray:
@@ -759,7 +759,7 @@ class Polyhedron:
 
             halfspaces, W, b, num_dead_relus = get_hs(self)
             self._halfspaces = halfspaces
-            self._W = W
+            self._w = W
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
@@ -779,7 +779,7 @@ class Polyhedron:
 
             halfspaces, W, b, num_dead_relus = get_hs(self, force_numpy=force_numpy)
             self._halfspaces = halfspaces
-            self._W = W
+            self._w = W
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus

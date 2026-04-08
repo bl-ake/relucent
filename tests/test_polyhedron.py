@@ -166,7 +166,7 @@ class TestPolyhedronCleanData:
         _ = p.b
         p.clean_data()
         assert p._halfspaces is None
-        assert p._W is None
+        assert p._w is None
         assert p._b is None
 
 
