@@ -58,7 +58,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
         rev = list(reversed(res))
         return rev[0], rev[1], rev[2]
 
-    nfeatures, w, h = input_size
+    _, w, h = input_size
 
     # Formula from the Torch docs:
     # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html

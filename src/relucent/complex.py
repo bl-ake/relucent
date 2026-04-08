@@ -92,11 +92,7 @@ class Complex:
         self.index2poly: list[Polyhedron] = []
 
         net_layers = list(net.layers.values())
-        self.ss_layers = [
-            i
-            for i, (layer, next_layer) in enumerate(zip(net_layers[:-1], net_layers[1:], strict=True))
-            if isinstance(next_layer, nn.ReLU)
-        ]
+        self.ss_layers = [i for i, next_layer in enumerate(net_layers[1:]) if isinstance(next_layer, nn.ReLU)]
 
         # Build mapping from global sign-sequence indices to (layer_index, neuron_index)
         self.ssi2maski = []
