@@ -227,7 +227,7 @@ def convert(
     else:
         raise ValueError(
             f"Unsupported input type: {type(input)}."
-            "Must be an NN object, an Iterable of nn.Module objects, or a Mapping of str -> nn.Module."
+            + "Must be an NN object, an Iterable of nn.Module objects, or a Mapping of str -> nn.Module."
         )
 
     params = next(model.parameters())

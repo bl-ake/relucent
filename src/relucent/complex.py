@@ -926,7 +926,7 @@ class Complex:
         if len(missing) > 0 and max_dim == self.dim:
             warnings.warn(
                 f"Dual graph is incomplete. {len(missing)} boundary cells were not added to the complex."
-                "Set auto_add=True to add them.",
+                + "Set auto_add=True to add them.",
                 stacklevel=2,
             )
         if auto_add:
