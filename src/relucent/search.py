@@ -60,13 +60,8 @@ def search_calculations(
 
     try:
         if p._shis is None:
-            if "collect_info" in kwargs:
-                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
-                assert isinstance(shis, list)
-                p._shis = shis
-            else:
-                result = get_shis(p, env=cx.env, **kwargs)
-                p._shis = result[0] if isinstance(result, tuple) else result
+            result = get_shis(p, env=cx.env, **kwargs)
+            p._shis = result[0] if isinstance(result, tuple) else result
     except ValueError as error:
         return error, *rest
 
@@ -251,7 +246,7 @@ def astar_calculations(
         task: Either a Polyhedron object or a tuple containing (Polyhedron, ...)
             with additional data to be passed through.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`, such as
-            'collect_info' or 'bound'.
+            'bound'.
 
     Returns:
         tuple: If successful, returns (Polyhedron, *rest). If an exception occurs
@@ -272,13 +267,8 @@ def astar_calculations(
 
     try:
         if p._shis is None:
-            if "collect_info" in kwargs:
-                shis, shi_info = get_shis(p, env=cx.env, **kwargs)
-                assert isinstance(shis, list)
-                p._shis = shis
-            else:
-                result = get_shis(p, env=cx.env, **kwargs)
-                p._shis = result[0] if isinstance(result, tuple) else result
+            result = get_shis(p, env=cx.env, **kwargs)
+            p._shis = result[0] if isinstance(result, tuple) else result
     except Exception as error:
         return p, error, *rest
     p.clean_data()
