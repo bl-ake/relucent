@@ -54,7 +54,6 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#utilities-and-visualization">Utilities and visualization</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#model-and-grid">Model and grid</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#api">API</a><ul>
@@ -159,8 +158,6 @@
 <li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.forward"><code class="docutils literal notranslate"><span class="pre">NN.forward()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_grid"><code class="docutils literal notranslate"><span class="pre">NN.get_grid()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.output_grid"><code class="docutils literal notranslate"><span class="pre">NN.output_grid()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
@@ -391,51 +388,6 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0.6</span></code></p></td>
 <td><p>Matplotlib pie <code class="docutils literal notranslate"><span class="pre">labeldistance</span></code> in pyvis node thumbnails.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_IMAGES_PYVIS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">3000</span></code></p></td>
-<td><p>Maximum node images generated in <code class="xref py py-func docutils literal notranslate"><span class="pre">data_graph()</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_NUM_EXAMPLES_PYVIS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
-<td><p>Examples per node in <code class="docutils literal notranslate"><span class="pre">data_graph</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PYVIS_SAVE_FILE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">&quot;./graph.html&quot;</span></code></p></td>
-<td><p>Default output path for the HTML graph.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="model-and-grid">
-<h3>Model and grid<a class="headerlink" href="#model-and-grid" title="Link to this heading"></a></h3>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_GRID_BOUNDS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">2</span></code></p></td>
-<td><p>Half-width of the default 2D input grid for <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_grid()</span></code> / <code class="xref py py-meth docutils literal notranslate"><span class="pre">output_grid()</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_GRID_RES</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
-<td><p>Points per axis for that grid.</p></td>
 </tr>
 </tbody>
 </table>
