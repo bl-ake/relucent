@@ -582,17 +582,18 @@ class Polyhedron:
         """
         if bound is None:
             bound = cfg.DEFAULT_PLOT_BOUND
-        return plot_polyhedron(
-            self,
-            plot_mode="cells",
-            fill=fill,
+        plot_kwargs: dict[str, Any] = dict(
             showlegend=showlegend,
             bound=bound,
             filled=filled,
-            plot_halfspaces=plot_halfspaces,
-            halfspace_shade=halfspace_shade,
             **kwargs,
         )
+        # 2D-only controls must not be forwarded to 3D plotting paths.
+        if self.ambient_dim == 2:
+            plot_kwargs["fill"] = fill
+            plot_kwargs["plot_halfspaces"] = plot_halfspaces
+            plot_kwargs["halfspace_shade"] = halfspace_shade
+        return plot_polyhedron(self, plot_mode="cells", **plot_kwargs)
 
     def plot_graph(
         self,

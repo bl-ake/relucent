@@ -1032,49 +1032,59 @@ class Complex:
         for node in graph:
             self[graph.nodes[node]["poly"]]._shis = [graph.edges[edge]["shi"] for edge in graph.edges(node)]
 
-    def plot_cells(
+    def plot(
         self,
+        *,
+        plot_mode: Literal["cells", "graph", "1-skeleton"] = "cells",
         label_regions: bool = False,
         color: Any = None,
         highlight_regions: Any = None,
         ss_name: bool = False,
         bound: float | None = None,
         show_axes: bool = False,
-        fill_mode: str = "wireframe",
+        project: float | None = None,
         **kwargs: Any,
     ) -> go.Figure:
-        """Plot all cells in input space; 2D vs 3D is chosen from :attr:`dim`."""
+        """Unified plotting entrypoint for all complex visualizations.
+
+        Args:
+            plot_mode: Visualization type:
+                - ``"cells"``: top-dimensional cells in input space.
+                - ``"graph"``: lifted 2D cells in graph/output space.
+                - ``"1-skeleton"``: 1-cells from ``get_chain_complex()``.
+            label_regions: If True, annotate region centers with ``str(poly)`` when
+                supported by the selected mode.
+            color: Coloring strategy or explicit color accepted by plotting backends.
+            highlight_regions: Iterable of region identifiers (poly objects or names)
+                to highlight in red where supported.
+            ss_name: 2D ``"cells"`` mode only. Use sign-sequence labels for traces.
+            bound: Plot bound in input coordinates.
+            show_axes: If True, show axis lines/ticks.
+            project: ``"graph"`` mode only; optional z-value for projected copies.
+            **kwargs: Additional mode-specific Plotly kwargs forwarded to
+                :func:`relucent.vis.plot_complex`.
+
+        Returns:
+            Plotly figure for the selected visualization.
+        """
         if bound is None:
             bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND
-        return plot_complex(
-            self,
-            plot_mode="cells",
+        plot_kwargs: dict[str, Any] = dict(
             label_regions=label_regions,
             color=color,
             highlight_regions=highlight_regions,
-            ss_name=ss_name,
             bound=bound,
             show_axes=show_axes,
-            fill_mode=fill_mode,
             **kwargs,
         )
+        if plot_mode == "cells":
+            plot_kwargs["ss_name"] = ss_name
+            plot_kwargs["fill_mode"] = "filled"
+        elif plot_mode == "graph":
+            plot_kwargs["project"] = project
 
-    def plot_graph(
-        self,
-        label_regions: bool = False,
-        color: Any = None,
-        highlight_regions: Any = None,
-        show_axes: bool = False,
-        project: bool = True,
-        **kwargs: Any,
-    ) -> go.Figure:
         return plot_complex(
             self,
-            plot_mode="graph",
-            label_regions=label_regions,
-            color=color,
-            highlight_regions=highlight_regions,
-            show_axes=show_axes,
-            project=project,
-            **kwargs,
+            plot_mode=plot_mode,
+            **plot_kwargs,
         )

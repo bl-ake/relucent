@@ -23,7 +23,7 @@ def test_readme():
     cplx.bfs()
 
     ## Plotting functions return Plotly figures
-    _ = cplx.plot_cells()
+    _ = cplx.plot()
 
     assert len(cplx) > 0
     assert sum(len(p.shis) for p in cplx) / len(cplx) > 0

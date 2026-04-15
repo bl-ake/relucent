@@ -47,7 +47,7 @@ if __name__ == '__main__':
     cplx.bfs()
 
     ## Plotting functions return Plotly figures
-    fig = cplx.plot_cells()
+    fig = cplx.plot()
     fig.show()
 ```
 

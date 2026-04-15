@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 import networkx as nx
 import numpy as np
+import plotly.express as px
 import plotly.graph_objects as go
 import pytest
 import torch
@@ -243,17 +244,153 @@ def test_color_helpers_and_highlight(monkeypatch):
     wl2_colors = vis._per_poly_colors(cpx, [p1, p2], color="Wl2", remap_equitable=True)
     assert len(wl2_colors) == 2
 
-    monkeypatch.setattr(
-        nx.algorithms.coloring, "equitable_color", lambda *_args, **_kwargs: (_ for _ in ()).throw(Exception("x"))
-    )
-    fallback = vis._equitable_colors(nx.Graph(), [0, 1, 2], remap=False)
-    assert len(fallback) == 3
-
     assert vis._highlight("blue", "a", None) == "blue"
     assert vis._highlight("blue", "a", {"a"}) == "red"
 
 
+def test_equitable_colors_uses_plotly_scheme_for_degree_at_most_10(monkeypatch):
+    nodes = list(range(6))
+    dual = nx.Graph()
+    dual.add_nodes_from(nodes)
+    # Star graph: max degree is 5 -> should use Plotly qualitative scheme.
+    dual.add_edges_from((0, i) for i in range(1, 6))
+    seen: dict[str, int] = {}
+
+    def fake_equitable_color(graph: nx.Graph[object], num_colors: int) -> dict[object, int]:
+        seen["num_colors"] = num_colors
+        return {node: i % num_colors for i, node in enumerate(graph.nodes)}
+
+    monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fake_equitable_color)
+    colors = vis._equitable_colors(dual, nodes, remap=False)
+    assert seen["num_colors"] == min(len(px.colors.qualitative.Plotly), len(nodes))
+    assert len(colors) == len(nodes)
+    assert all(c in px.colors.qualitative.Plotly for c in colors)
+
+
+def test_equitable_colors_uses_light24_without_red_for_degree_11_to_23(monkeypatch):
+    nodes = list(range(13))
+    dual = nx.Graph()
+    dual.add_nodes_from(nodes)
+    # Star graph: max degree is 12 -> should use Light24 minus the first color.
+    dual.add_edges_from((0, i) for i in range(1, 13))
+    seen: dict[str, int] = {}
+
+    def fake_equitable_color(graph: nx.Graph[object], num_colors: int) -> dict[object, int]:
+        seen["num_colors"] = num_colors
+        return {node: i % num_colors for i, node in enumerate(graph.nodes)}
+
+    monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fake_equitable_color)
+    colors = vis._equitable_colors(dual, nodes, remap=False)
+    light24_without_red = px.colors.qualitative.Light24[1:]
+    assert seen["num_colors"] == min(len(light24_without_red), len(nodes))
+    assert len(colors) == len(nodes)
+    assert all(c in light24_without_red for c in colors)
+    assert px.colors.qualitative.Light24[0] not in colors
+
+
+def test_equitable_colors_falls_back_to_scheme_for_degree_above_23():
+    nodes = list(range(25))
+    dual = nx.Graph()
+    dual.add_nodes_from(nodes)
+    # Star graph: max degree is 24 -> fallback branch.
+    dual.add_edges_from((0, i) for i in range(1, 25))
+
+    colors = vis._equitable_colors(dual, nodes, remap=False)
+    assert len(colors) == len(nodes)
+    assert all(c in px.colors.qualitative.Plotly for c in colors)
+
+def test_equitable_colors_falls_back_to_random_scheme_when_equitable_fails(monkeypatch):
+    nodes = list(range(6))
+    dual = nx.Graph()
+    dual.add_nodes_from(nodes)
+    dual.add_edges_from((0, i) for i in range(1, 6))
+
+    def fail_equitable_color(*_args: object, **_kwargs: object) -> dict[object, int]:
+        raise nx.NetworkXAlgorithmError("equitable coloring failed")
+
+    monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fail_equitable_color)
+    colors = vis._equitable_colors(dual, nodes, remap=False)
+    assert len(colors) == len(nodes)
+    assert all(c in px.colors.qualitative.Plotly for c in colors)
+
+
+def test_plot_polyhedron_hide_unbounded_flag(monkeypatch):
+    poly = _poly_with_vertices(
+        ambient_dim=2,
+        ss_np=np.array([[1]]),
+        verts=np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]),
+        net=_tiny_nn(2),
+    )
+    poly._finite = False
+    poly._finite_computed = True
+
+    # Ensure no plotting backend gets called when hide_unbounded=True.
+    monkeypatch.setattr(
+        vis,
+        "_poly_traces_2d_complex",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("called")),
+    )
+    monkeypatch.setattr(
+        vis,
+        "_poly_traces_2d_graph",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("called")),
+    )
+
+    assert vis.plot_polyhedron(poly, plot_mode="cells", hide_unbounded=True) == []
+    assert vis.plot_polyhedron(poly, plot_mode="graph", hide_unbounded=True) is None
+
+
+def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
+    p_bounded = _poly_with_vertices(
+        ambient_dim=2,
+        ss_np=np.array([[1, 0]]),
+        verts=np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]),
+        interior_point=np.array([0.1, 0.1]),
+        net=_tiny_nn(2),
+    )
+    p_bounded._finite = True
+    p_bounded._finite_computed = True
+
+    p_unbounded = _poly_with_vertices(
+        ambient_dim=2,
+        ss_np=np.array([[0, 1]]),
+        verts=np.array([[1.0, 1.0], [2.0, 1.0], [1.0, 2.0]]),
+        net=_tiny_nn(2),
+    )
+    p_unbounded._finite = False
+    p_unbounded._finite_computed = True
+
+    c2 = _complex_with_polys(2, [p_bounded, p_unbounded])
+    c2.get_dual_graph = MethodType(  # type: ignore[method-assign]
+        lambda _self, **_kwargs: nx.Graph([(p_bounded, p_unbounded)]),
+        c2,
+    )
+
+    # Keep this test isolated from bound-intersection internals and expensive plotting.
+    monkeypatch.setattr(vis, "_poly_intersects_plot_bound", lambda *_args, **_kwargs: True)
+
+    def fake_plot_cells(self: Polyhedron, **_kwargs: object) -> list[go.Scatter]:
+        return [go.Scatter(x=[0.0, 1.0], y=[0.0, 1.0], mode="lines")]
+
+    p_bounded.plot_cells = MethodType(fake_plot_cells, p_bounded)  # type: ignore[method-assign]
+    p_unbounded.plot_cells = MethodType(fake_plot_cells, p_unbounded)  # type: ignore[method-assign]
+
+    fig_default = vis.plot_complex(c2, plot_mode="cells", bound=10.0)
+    fig_hidden = vis.plot_complex(c2, plot_mode="cells", hide_unbounded=True, bound=10.0)
+    assert len(fig_default.data) == 2
+    assert len(fig_hidden.data) == 1
+
+
 def test_complex_figure_builders_and_plot_complex_dispatch():
+    def _assert_equitable_warning_policy(
+        rec: list[warnings.WarningMessage],
+        dual_graph: nx.Graph[object],
+    ) -> None:
+        max_degree = max((deg for _, deg in dual_graph.degree()), default=0)
+        saw_equitable_warning = any("Equitable coloring could not be found" in str(w.message) for w in rec)
+        if saw_equitable_warning and max_degree > 23:
+            pytest.fail("Unexpected equitable-coloring warning for a high-degree dual graph " + f"(max degree {max_degree}).")
+
     p1 = _poly_with_vertices(
         ambient_dim=2,
         ss_np=np.array([[1, 0]]),
@@ -276,7 +413,11 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
         lambda _self, **_kwargs: nx.Graph([(p1, p2)]),
         c2,
     )
-    fig2 = vis._complex_figure_2d_cells(c2, label_regions=True, highlight_regions={p1})
+    c2_graph = c2.get_dual_graph()
+    with warnings.catch_warnings(record=True) as rec2:
+        warnings.simplefilter("always")
+        fig2 = vis._complex_figure_2d_cells(c2, label_regions=True, highlight_regions={p1})
+    _assert_equitable_warning_policy(rec2, c2_graph)
     assert isinstance(fig2, go.Figure)
     data2 = fig2.data
     assert isinstance(data2, tuple)
@@ -295,7 +436,11 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
         lambda _self, **_kwargs: nx.Graph([(p3, p3)]),
         c3,
     )
-    fig3 = vis._complex_figure_3d_cells(c3, label_regions=True, fill_mode="filled")
+    c3_graph = c3.get_dual_graph()
+    with warnings.catch_warnings(record=True) as rec3:
+        warnings.simplefilter("always")
+        fig3 = vis._complex_figure_3d_cells(c3, label_regions=True, fill_mode="filled")
+    _assert_equitable_warning_policy(rec3, c3_graph)
     assert isinstance(fig3, go.Figure)
     data3 = fig3.data
     assert isinstance(data3, tuple)
@@ -309,14 +454,23 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
         lambda _self, **_kwargs: {"mesh": go.Mesh3d(x=[0, 1, 0], y=[0, 0, 1], z=[0, 0, 0], i=[0], j=[1], k=[2])},
         p2,
     )
-    figg = vis._complex_figure_graph(c2, project=None)
+    with warnings.catch_warnings(record=True) as recg:
+        warnings.simplefilter("always")
+        figg = vis._complex_figure_graph(c2, project=None)
+    _assert_equitable_warning_policy(recg, c2_graph)
     assert isinstance(figg, go.Figure)
     datag = figg.data
     assert isinstance(datag, tuple)
     assert len(datag) >= 2
 
-    out_cells = vis.plot_complex(c2, plot_mode="cells")
-    out_graph = vis.plot_complex(c2, plot_mode="graph")
+    with warnings.catch_warnings(record=True) as rec_cells:
+        warnings.simplefilter("always")
+        out_cells = vis.plot_complex(c2, plot_mode="cells")
+    _assert_equitable_warning_policy(rec_cells, c2_graph)
+    with warnings.catch_warnings(record=True) as rec_graph:
+        warnings.simplefilter("always")
+        out_graph = vis.plot_complex(c2, plot_mode="graph")
+    _assert_equitable_warning_policy(rec_graph, c2_graph)
     assert isinstance(out_cells, go.Figure)
     assert isinstance(out_graph, go.Figure)
     with pytest.raises(ValueError):
