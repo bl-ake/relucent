@@ -119,7 +119,7 @@ def test_plot_and_dual_graph_smoke(seeded):
         )
         cplx = Complex(network)
         cplx.bfs()
-        fig = cplx.plot_cells(bound=10000)
+        fig = cplx.plot(plot_mode="cells", bound=10000)
         assert fig is not None
         _ = sum(len(p.shis) for p in cplx) / len(cplx)
         x = np.random.random(cplx.net.input_shape).astype(np.float32)

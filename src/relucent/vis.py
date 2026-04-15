@@ -3,6 +3,7 @@ from __future__ import annotations
 # pyright: reportExplicitAny=false
 import warnings
 from collections.abc import Iterable, Sequence
+from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import networkx as nx
@@ -106,6 +107,8 @@ def _poly_traces_3d_complex(
         raise ValueError("Polyhedron must have ambient dimension 3 to plot 3D complex")
     base_kwargs: dict[str, Any] = dict(kwargs)
     line_color = base_kwargs.pop("color", None)
+    outline_width = float(base_kwargs.pop("outline_width", 0.0))
+    show_outline = outline_width > 0
     traces: list[go.Mesh3d | go.Scatter3d] = []
     vertices = poly.get_bounded_vertices(bound)
     if vertices is None or vertices.size == 0 or vertices.shape[1] != 3:
@@ -144,10 +147,7 @@ def _poly_traces_3d_complex(
         p_max = vertices[np.argmax(t)]
         seg = np.stack([p_min, p_max], axis=0)
         line_kwargs = dict(base_kwargs)
-        if line_color is not None:
-            line = dict(line_kwargs.get("line", {}))
-            line.setdefault("color", line_color)
-            line_kwargs["line"] = line
+        # outline_width only styles maximal cells; segments render regardless of outline width.
         traces.append(
             go.Scatter3d(
                 x=seg[:, 0],
@@ -176,10 +176,10 @@ def _poly_traces_3d_complex(
         y = ordered[:, 1].tolist() + [ordered[0, 1]]
         z = ordered[:, 2].tolist() + [ordered[0, 2]]
         face_line_kwargs = dict(base_kwargs)
-        if line_color is not None:
-            line = dict(face_line_kwargs.get("line", {}))
-            line.setdefault("color", line_color)
-            face_line_kwargs["line"] = line
+        line = dict(face_line_kwargs.get("line", {}))
+        line["color"] = "black"
+        line["width"] = outline_width
+        face_line_kwargs["line"] = line
         if filled and line_color is not None:
             n = len(ordered)
             i_vals = [0] * (n - 2)
@@ -195,13 +195,16 @@ def _poly_traces_3d_complex(
                     j=j_vals,
                     k=k_vals,
                     color=line_color,
-                    opacity=0.7,
+                    opacity=1,
                     showlegend=showlegend,
                     **mesh_kwargs,
                 )
             )
+            if show_outline:
+                traces.append(go.Scatter3d(x=x, y=y, z=z, mode="lines", showlegend=False, **face_line_kwargs))
         else:
-            traces.append(go.Scatter3d(x=x, y=y, z=z, mode="lines", showlegend=showlegend, **face_line_kwargs))
+            if show_outline:
+                traces.append(go.Scatter3d(x=x, y=y, z=z, mode="lines", showlegend=showlegend, **face_line_kwargs))
         return traces
 
     if poly.dim < 2:
@@ -245,6 +248,21 @@ def _poly_traces_3d_complex(
             if not facets_coplanar(facet_indices):
                 edges.add(edge)
 
+        edge_line_kwargs = dict(base_kwargs)
+        line = dict(edge_line_kwargs.get("line", {}))
+        line["color"] = "black"
+        line["width"] = outline_width
+        edge_line_kwargs["line"] = line
+
+        xs: list[float] = []
+        ys: list[float] = []
+        zs: list[float] = []
+        for edge_u, edge_v in edges:
+            seg = vertices[[edge_u, edge_v]]
+            xs.extend([float(seg[0, 0]), float(seg[1, 0]), float("nan")])
+            ys.extend([float(seg[0, 1]), float(seg[1, 1]), float("nan")])
+            zs.extend([float(seg[0, 2]), float(seg[1, 2]), float("nan")])
+
         if filled and line_color is not None:
             mesh_kwargs = {k: v for k, v in base_kwargs.items() if k not in ("line", "marker")}
             traces.append(
@@ -256,27 +274,17 @@ def _poly_traces_3d_complex(
                     j=hull.simplices[:, 1].tolist(),
                     k=hull.simplices[:, 2].tolist(),
                     color=line_color,
-                    opacity=0.7,
+                    opacity=1,
+                    flatshading=True,
                     showlegend=showlegend,
                     **mesh_kwargs,
                 )
             )
+            if show_outline:
+                traces.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines", showlegend=False, **edge_line_kwargs))
         else:
-            edge_line_kwargs = dict(base_kwargs)
-            if line_color is not None:
-                line = dict(edge_line_kwargs.get("line", {}))
-                line.setdefault("color", line_color)
-                edge_line_kwargs["line"] = line
-
-            xs: list[float] = []
-            ys: list[float] = []
-            zs: list[float] = []
-            for edge_u, edge_v in edges:
-                seg = vertices[[edge_u, edge_v]]
-                xs.extend([float(seg[0, 0]), float(seg[1, 0]), float("nan")])
-                ys.extend([float(seg[0, 1]), float(seg[1, 1]), float("nan")])
-                zs.extend([float(seg[0, 2]), float(seg[1, 2]), float("nan")])
-            traces.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines", showlegend=showlegend, **edge_line_kwargs))
+            if show_outline:
+                traces.append(go.Scatter3d(x=xs, y=ys, z=zs, mode="lines", showlegend=showlegend, **edge_line_kwargs))
     except Exception as e:
         warnings.warn(f"Error while computing 3D mesh for polyhedron {poly}: {e}", stacklevel=2)
     return traces
@@ -295,6 +303,10 @@ def _poly_traces_2d_complex(
         bound = cfg.DEFAULT_PLOT_BOUND
     if poly.W.shape[0] != 2:
         raise ValueError("Polyhedron must be 2D to plot")
+    base_kwargs: dict[str, Any] = dict(kwargs)
+    base_kwargs.pop("filled", None)
+    outline_width = float(base_kwargs.pop("outline_width", 0.0))
+    show_outline = outline_width > 0
     traces: list[go.Scatter] = []
     geom = poly._get_bounded_plot_geometry(bound)
     if geom is not None:
@@ -302,16 +314,23 @@ def _poly_traces_2d_complex(
         if kind == "polygon":
             x = verts[:, 0].tolist() + [verts[0, 0]]
             y = verts[:, 1].tolist() + [verts[0, 1]]
-            traces.append(go.Scatter(x=x, y=y, fill=fill, showlegend=showlegend, **kwargs))
+            poly_kwargs = {k: v for k, v in base_kwargs.items() if k != "mode"}
+            line = dict(poly_kwargs.get("line", {}))
+            line["color"] = "black"
+            line["width"] = outline_width
+            poly_kwargs["line"] = line
+            mode = "lines" if show_outline else "none"
+            traces.append(go.Scatter(x=x, y=y, fill=fill, mode=mode, showlegend=showlegend, **poly_kwargs))
         elif kind == "segment":
             x = verts[:, 0].tolist()
             y = verts[:, 1].tolist()
-            seg_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+            seg_kwargs = {k: v for k, v in base_kwargs.items() if k != "mode"}
+            # outline_width only styles maximal cells; segments keep their default styling.
             traces.append(go.Scatter(x=x, y=y, mode="lines", fill=None, showlegend=showlegend, **seg_kwargs))
         elif kind == "point":
             x = verts[:, 0].tolist()
             y = verts[:, 1].tolist()
-            point_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+            point_kwargs = {k: v for k, v in base_kwargs.items() if k != "mode"}
             traces.append(go.Scatter(x=x, y=y, mode="markers", fill=None, showlegend=showlegend, **point_kwargs))
 
     if plot_halfspaces:
@@ -437,6 +456,7 @@ def plot_polyhedron(
     poly: Polyhedron,
     *,
     plot_mode: Literal["cells"],
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d]: ...
 
@@ -446,6 +466,7 @@ def plot_polyhedron(
     poly: Polyhedron,
     *,
     plot_mode: Literal["graph"],
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> dict[str, go.Mesh3d | go.Scatter3d] | None: ...
 
@@ -453,7 +474,8 @@ def plot_polyhedron(
 def plot_polyhedron(
     poly: Polyhedron,
     *,
-    plot_mode: str,
+    plot_mode: str = "cells",
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> list[go.Mesh3d | go.Scatter3d] | list[go.Scatter] | dict[str, go.Mesh3d | go.Scatter3d] | None:
     """Build plotly traces for one polyhedron.
@@ -464,14 +486,26 @@ def plot_polyhedron(
 
     Uses ``plot_mode`` (keyword-only) so Plotly kwargs such as ``mode=\"lines\"`` are not ambiguous.
     """
+    if hide_unbounded and getattr(poly, "finite", True) is False:
+        return [] if plot_mode == "cells" else None
     if plot_mode == "cells":
         ad = poly.ambient_dim
         if ad == 2:
-            kw2 = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_2D_EXCLUDE}
-            return _poly_traces_2d_complex(poly, **kw2)
+            unsupported = sorted(set(kwargs) & _POLY_CELLS_2D_EXCLUDE)
+            if unsupported:
+                raise TypeError(
+                    "plot_polyhedron(..., plot_mode='cells') got unsupported kwargs for ambient_dim=2: "
+                    + ", ".join(unsupported)
+                )
+            return _poly_traces_2d_complex(poly, **kwargs)
         if ad == 3:
-            kw3 = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_3D_EXCLUDE}
-            return _poly_traces_3d_complex(poly, **kw3)
+            unsupported = sorted(set(kwargs) & _POLY_CELLS_3D_EXCLUDE)
+            if unsupported:
+                raise TypeError(
+                    "plot_polyhedron(..., plot_mode='cells') got unsupported kwargs for ambient_dim=3: "
+                    + ", ".join(unsupported)
+                )
+            return _poly_traces_3d_complex(poly, **kwargs)
         raise ValueError(f"plot_polyhedron(..., plot_mode='cells') supports ambient_dim 2 or 3, got {ad}")
     if plot_mode == "graph":
         return _poly_traces_2d_graph(poly, **kwargs)
@@ -485,7 +519,7 @@ _CELLS_3D_ONLY_KEYS = frozenset({"fill_mode", "show_axes", "filled"})
 _CELLS_2D_ONLY_KEYS = frozenset({"ss_name"})
 
 # Polyhedron.plot_cells forwards both 2D- and 3D-only kwargs; strip before each trace builder.
-_POLY_CELLS_2D_EXCLUDE = frozenset({"filled"})
+_POLY_CELLS_2D_EXCLUDE = frozenset()
 # 2D go.Scatter only; invalid on go.Scatter3d / go.Mesh3d (see Polyhedron.plot_cells default fill=...).
 _POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade", "fill", "fillcolor", "ss_name"})
 
@@ -496,21 +530,35 @@ def _equitable_colors(
     *,
     remap: bool,
 ) -> list[str]:
-    color_scheme = px.colors.qualitative.Plotly
-    n = len(polys)
-    try:
-        coloring = nx.algorithms.coloring.equitable_color(dual, min(len(color_scheme), n))
+    def _color_with_mapping(mapping: dict[object, int], palette: Sequence[str]) -> list[str]:
         if remap:
             remap_d: dict[int, int] = {}
             idx = 0
             for p in polys:
-                if coloring[p] not in remap_d:
-                    remap_d[coloring[p]] = idx
+                cls = mapping[p]
+                if cls not in remap_d:
+                    remap_d[cls] = idx
                     idx += 1
-            return [color_scheme[remap_d[coloring[i]]] for i in polys]
-        return [color_scheme[coloring[i]] for i in polys]
+            return [palette[remap_d[mapping[p]]] for p in polys]
+        return [palette[mapping[p]] for p in polys]
+
+    n = len(polys)
+    if n == 0:
+        return []
+
+    max_degree = max((deg for _, deg in dual.degree()), default=0)
+    if max_degree <= 10:
+        color_scheme = list(px.colors.qualitative.Plotly)
+    elif max_degree <= 23:
+        color_scheme = list(px.colors.qualitative.Light24[1:])
+    else:
+        color_scheme = list(px.colors.qualitative.Plotly)
+
+    try:
+        coloring = nx.algorithms.coloring.equitable_color(dual, min(len(color_scheme), n))
+        return _color_with_mapping(coloring, color_scheme)
     except Exception:
-        return [color_scheme[i % len(color_scheme)] for i in range(n)]
+        return list(np.random.choice(color_scheme, size=n, replace=True))
 
 
 def _per_poly_colors(cpx: Complex, polys: list[Polyhedron], color: str | None, *, remap_equitable: bool) -> list[str]:
@@ -527,6 +575,17 @@ def _highlight(c: str, poly: object, highlight_regions: Iterable[object] | None)
     return c
 
 
+def _poly_trace_name(poly: object) -> str:
+    return f"Polyhedron {str(poly)}"
+
+
+def _apply_poly_trace_label(trace: go.BaseTraceType, poly: object) -> None:
+    name = _poly_trace_name(poly)
+    trace.name = name
+    trace.hovertext = name
+    trace.hoverinfo = "text"
+
+
 def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) -> None:
     if total == 0:
         return
@@ -537,6 +596,34 @@ def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) ->
             f"Unable to plot at least half of polyhedra for {context}: "
             + f"plotted {plotted} of {total} intersecting the plot bounds (minimum required {minimum_required})."
         )
+
+
+def _expand_boundary_ss_to_top_cells(poly: Polyhedron, top_complex: Complex) -> list[str]:
+    """Enumerate neighboring top-cells by replacing 0s with +/-1 and resolving in the complex."""
+    base = poly.ss_np.ravel().astype(int)
+    zero_indices = np.flatnonzero(base == 0)
+    neighbors: set[str] = set()
+
+    if zero_indices.size == 0:
+        ss_candidate = base.copy().reshape(1, -1)
+        if ss_candidate in top_complex:
+            neighbors.add(str(top_complex[ss_candidate]))
+    else:
+        for replacement in product((-1, 1), repeat=int(zero_indices.size)):
+            candidate = base.copy()
+            candidate[zero_indices] = np.asarray(replacement, dtype=int)
+            ss_candidate = candidate.reshape(1, -1)
+            if ss_candidate in top_complex:
+                neighbors.add(str(top_complex[ss_candidate]))
+
+    return sorted(neighbors)
+
+
+def _boundary_label(poly: Polyhedron, top_complex: Complex) -> str:
+    neighbors = _expand_boundary_ss_to_top_cells(poly, top_complex)
+    if len(neighbors) == 0:
+        return "Boundary between <no top-dimensional neighbors>"
+    return "Boundary between " + ", ".join(neighbors)
 
 
 def _poly_intersects_plot_bound(poly: object, bound: float) -> bool:
@@ -563,6 +650,95 @@ def _poly_intersects_plot_bound(poly: object, bound: float) -> bool:
     return False
 
 
+def _complex_figure_1_skeleton(
+    cpx: Complex,
+    *,
+    color: str = "black",
+    show_axes: bool = False,
+    hide_unbounded: bool = False,
+    bound: float | None = None,
+    **kwargs: Any,
+) -> go.Figure:
+    """Plot the 1-skeleton from the chain complex and label 1-cells by adjacent top cells."""
+    if cpx.dim not in (2, 3):
+        raise ValueError(f"1-skeleton plot requires complex.dim in {{2, 3}}, got {cpx.dim}")
+    if bound is None:
+        bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND if cpx.dim == 2 else cfg.DEFAULT_PLOT_BOUND
+
+    chain = cpx.get_chain_complex()
+    skeleton_complex: Complex | None = None
+    for level in chain:
+        if len(level) > 0 and level.index2poly[0].dim == 1:
+            skeleton_complex = level
+            break
+    if skeleton_complex is None:
+        raise RuntimeError("Could not construct 1-skeleton: no 1-dimensional chain level found.")
+
+    fig = go.Figure()
+    excluded_poly_kwargs = {"label_regions", "highlight_regions", "ss_name", "fill_mode"}
+    poly_plot_kwargs = {k: v for k, v in kwargs.items() if k not in excluded_poly_kwargs}
+    eligible_polys = 0
+    plotted_polys = 0
+    for poly in tqdm(skeleton_complex, desc="Plotting 1-skeleton", total=len(skeleton_complex), delay=1):
+        if not _poly_intersects_plot_bound(poly, bound):
+            continue
+        if hide_unbounded and getattr(poly, "finite", True) is False:
+            continue
+        eligible_polys += 1
+        name = _boundary_label(poly, cpx)
+        try:
+            traces = poly.plot_cells(color=color, line_color=color, bound=bound, **poly_plot_kwargs)
+        except Exception as e:
+            warnings.warn(f"Error while plotting 1-cell {poly}: {e}", stacklevel=2)
+            continue
+        if len(traces) == 0:
+            warnings.warn(f"No traces generated while plotting 1-cell {poly}.", stacklevel=2)
+            continue
+        plotted_polys += 1
+        for trace in traces:
+            trace.name = name
+            trace.hovertext = name
+            trace.hoverinfo = "text"
+            fig.add_trace(trace)
+
+    _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "1-skeleton plot")
+
+    if cpx.dim == 3:
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(visible=show_axes),
+                yaxis=dict(visible=show_axes),
+                zaxis=dict(visible=show_axes),
+            ),
+        )
+        return fig
+
+    polys = list(cpx)
+    interior_points: list[float] = []
+    for p in polys[:100]:
+        finite = getattr(p, "finite", True)
+        if not finite:
+            continue
+        ip = getattr(p, "_interior_point", None)
+        if ip is None:
+            ip = getattr(p, "interior_point", None)
+        if ip is not None:
+            interior_points.append(float(np.max(np.abs(ip))))
+    maxcoord = (
+        min(float(np.median(interior_points)) * cfg.PLOT_MARGIN_FACTOR, bound)
+        if len(interior_points) > 0
+        else min(cfg.PLOT_DEFAULT_MAXCOORD, bound if bound else cfg.PLOT_DEFAULT_MAXCOORD)
+    )
+    fig.update_layout(
+        showlegend=True,
+        plot_bgcolor="white",
+        xaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
+        yaxis_scaleanchor="x",
+        yaxis=dict(range=(-maxcoord, maxcoord), visible=show_axes),
+    )
+    return fig
+
+
 def _complex_figure_2d_cells(
     cpx: Complex,
     *,
@@ -570,6 +746,7 @@ def _complex_figure_2d_cells(
     color: str | None = None,
     highlight_regions: Iterable[object] | None = None,
     ss_name: bool = False,
+    hide_unbounded: bool = False,
     bound: float | None = None,
     **kwargs: Any,
 ) -> go.Figure:
@@ -585,9 +762,11 @@ def _complex_figure_2d_cells(
     for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound):
             continue
+        if hide_unbounded and getattr(poly, "finite", True) is False:
+            continue
         eligible_polys += 1
         c = _highlight(c, poly, highlight_regions)
-        name = f"{poly.ss_np.ravel().astype(int).tolist()}" if ss_name else f"{poly}"
+        name = _poly_trace_name(poly)
         try:
             traces = poly.plot_cells(
                 name=name,
@@ -605,6 +784,7 @@ def _complex_figure_2d_cells(
             continue
         plotted_polys += 1
         for trace in traces:
+            _apply_poly_trace_label(trace, poly)
             fig.add_trace(trace)
         if label_regions and poly.center is not None:
             fig.add_trace(go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False))
@@ -646,7 +826,8 @@ def _complex_figure_3d_cells(
     color: str | None = None,
     highlight_regions: Iterable[object] | None = None,
     show_axes: bool = False,
-    fill_mode: str = "wireframe",
+    fill_mode: str = "filled",
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> go.Figure:
     if cpx.dim != 3:
@@ -659,6 +840,8 @@ def _complex_figure_3d_cells(
     plotted_polys = 0
     for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
+            continue
+        if hide_unbounded and getattr(poly, "finite", True) is False:
             continue
         eligible_polys += 1
         is_highlighted = highlight_regions is not None and (poly in highlight_regions or str(poly) in highlight_regions)
@@ -674,6 +857,7 @@ def _complex_figure_3d_cells(
             continue
         plotted_polys += 1
         for trace in traces:
+            _apply_poly_trace_label(trace, poly)
             fig.add_trace(trace)
         if label_regions and poly.center is not None and poly.center.shape[0] >= 3:
             fig.add_trace(
@@ -705,6 +889,7 @@ def _complex_figure_graph(
     highlight_regions: Iterable[object] | None = None,
     show_axes: bool = False,
     project: float | None = None,
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> go.Figure:
     bound_effective = kwargs.get("bound", cfg.DEFAULT_PLOT_BOUND)
@@ -718,33 +903,41 @@ def _complex_figure_graph(
     for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
             continue
+        if hide_unbounded and getattr(poly, "finite", True) is False:
+            continue
         eligible_polys += 1
         c = _highlight(c, poly, highlight_regions)
         poly_plotted = False
         try:
-            p_plot = poly.plot_graph(name=f"{poly}", color=c, **kwargs)
+            p_plot = poly.plot_graph(name=_poly_trace_name(poly), color=c, **kwargs)
             if p_plot is not None:
                 if isinstance(p_plot, dict):
                     if "mesh" in p_plot:
+                        _apply_poly_trace_label(p_plot["mesh"], poly)
                         meshes.append(p_plot["mesh"])
                         poly_plotted = True
                     if "outline" in p_plot:
+                        _apply_poly_trace_label(p_plot["outline"], poly)
                         outlines.append(p_plot["outline"])
                         poly_plotted = True
                 else:
+                    _apply_poly_trace_label(p_plot, poly)
                     fig.add_trace(p_plot)
                     poly_plotted = True
             if project is not None:
-                p_plot = poly.plot_graph(name=f"{poly}", color=c, project=project, **kwargs)
+                p_plot = poly.plot_graph(name=_poly_trace_name(poly), color=c, project=project, **kwargs)
                 if p_plot is not None:
                     if isinstance(p_plot, dict):
                         if "mesh" in p_plot:
+                            _apply_poly_trace_label(p_plot["mesh"], poly)
                             meshes.append(p_plot["mesh"])
                             poly_plotted = True
                         if "outline" in p_plot:
+                            _apply_poly_trace_label(p_plot["outline"], poly)
                             outlines.append(p_plot["outline"])
                             poly_plotted = True
                     else:
+                        _apply_poly_trace_label(p_plot, poly)
                         fig.add_trace(p_plot)
                         poly_plotted = True
         except Exception as e:
@@ -794,23 +987,29 @@ def plot_complex(
     cpx: Complex,
     *,
     plot_mode: str,
+    hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> go.Figure:
-    """Plot an entire ``Complex`` as one Plotly figure.
+    """Plot an entire ``Complex`` as one Plotly figure. Each polyhedron is plotted as a separate trace.
 
     * ``cells`` — cells in input space; 2D vs 3D layout is chosen from ``cpx.dim`` (network input
       dimension), which must be 2 or 3.
     * ``graph`` — 2D cells with third coordinate from the network (optional projected copy).
+    * ``1-skeleton`` — 1-cells obtained from ``Complex.get_chain_complex()``; each trace hover
+      label reports adjacent top-dimensional sign sequences.
+    * ``hide_unbounded`` — if True, skip unbounded cells/regions in all modes.
     """
     if plot_mode == "cells":
         d = cpx.dim
         if d == 2:
             kw2 = {k: v for k, v in kwargs.items() if k not in _CELLS_3D_ONLY_KEYS}
-            return _complex_figure_2d_cells(cpx, **kw2)
+            return _complex_figure_2d_cells(cpx, hide_unbounded=hide_unbounded, **kw2)
         if d == 3:
             kw3 = {k: v for k, v in kwargs.items() if k not in _CELLS_2D_ONLY_KEYS}
-            return _complex_figure_3d_cells(cpx, **kw3)
+            return _complex_figure_3d_cells(cpx, hide_unbounded=hide_unbounded, **kw3)
         raise ValueError(f"plot_complex(..., plot_mode='cells') supports complex.dim 2 or 3, got {d}")
     if plot_mode == "graph":
-        return _complex_figure_graph(cpx, **kwargs)
-    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells' or 'graph'.")
+        return _complex_figure_graph(cpx, hide_unbounded=hide_unbounded, **kwargs)
+    if plot_mode == "1-skeleton":
+        return _complex_figure_1_skeleton(cpx, hide_unbounded=hide_unbounded, **kwargs)
+    raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells', 'graph', or '1-skeleton'.")
