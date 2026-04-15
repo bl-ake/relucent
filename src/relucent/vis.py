@@ -579,7 +579,7 @@ def _poly_trace_name(poly: object) -> str:
     return f"Polyhedron {str(poly)}"
 
 
-def _apply_poly_trace_label(trace: go.BaseTraceType, poly: object) -> None:
+def _apply_poly_trace_label(trace: Any, poly: object) -> None:
     name = _poly_trace_name(poly)
     trace.name = name
     trace.hovertext = name
@@ -750,6 +750,7 @@ def _complex_figure_2d_cells(
     bound: float | None = None,
     **kwargs: Any,
 ) -> go.Figure:
+    _ = ss_name
     if bound is None:
         bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND
     if cpx.dim != 2:
