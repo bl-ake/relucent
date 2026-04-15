@@ -227,7 +227,7 @@ def test_plot_polyhedron_dispatch_and_validation():
         vis.plot_polyhedron(poly2, plot_mode="unknown")  # pyright: ignore[reportCallIssue,reportArgumentType]
 
 
-def test_color_helpers_and_highlight(monkeypatch):
+def test_color_helpers_and_highlight():
     p1 = _poly_with_vertices(
         ambient_dim=2,
         ss_np=np.array([[1]]),
@@ -299,6 +299,7 @@ def test_equitable_colors_falls_back_to_scheme_for_degree_above_23():
     assert len(colors) == len(nodes)
     assert all(c in px.colors.qualitative.Plotly for c in colors)
 
+
 def test_equitable_colors_falls_back_to_random_scheme_when_equitable_fails(monkeypatch):
     nodes = list(range(6))
     dual = nx.Graph()
@@ -369,22 +370,24 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
     # Keep this test isolated from bound-intersection internals and expensive plotting.
     monkeypatch.setattr(vis, "_poly_intersects_plot_bound", lambda *_args, **_kwargs: True)
 
-    def fake_plot_cells(self: Polyhedron, **_kwargs: object) -> list[go.Scatter]:
+    def fake_plot_cells(_self: Polyhedron, **_kwargs: object) -> list[go.Scatter]:
         return [go.Scatter(x=[0.0, 1.0], y=[0.0, 1.0], mode="lines")]
 
     p_bounded.plot_cells = MethodType(fake_plot_cells, p_bounded)  # type: ignore[method-assign]
     p_unbounded.plot_cells = MethodType(fake_plot_cells, p_unbounded)  # type: ignore[method-assign]
 
-    fig_default = vis.plot_complex(c2, plot_mode="cells", bound=10.0)
-    fig_hidden = vis.plot_complex(c2, plot_mode="cells", hide_unbounded=True, bound=10.0)
-    assert len(fig_default.data) == 2
-    assert len(fig_hidden.data) == 1
+    fig_default = cast(go.Figure, vis.plot_complex(c2, plot_mode="cells", bound=10.0))
+    fig_hidden = cast(go.Figure, vis.plot_complex(c2, plot_mode="cells", hide_unbounded=True, bound=10.0))
+    default_data = cast(tuple[Any, ...], fig_default.data)
+    hidden_data = cast(tuple[Any, ...], fig_hidden.data)
+    assert len(default_data) == 2
+    assert len(hidden_data) == 1
 
 
 def test_complex_figure_builders_and_plot_complex_dispatch():
     def _assert_equitable_warning_policy(
         rec: list[warnings.WarningMessage],
-        dual_graph: nx.Graph[object],
+        dual_graph: nx.Graph[Polyhedron],
     ) -> None:
         max_degree = max((deg for _, deg in dual_graph.degree()), default=0)
         saw_equitable_warning = any("Equitable coloring could not be found" in str(w.message) for w in rec)
