@@ -21,6 +21,17 @@ def _require_torch() -> None:
 _require_torch()
 del _require_torch
 
+import tomllib  # noqa: E402
+from importlib.metadata import PackageNotFoundError, version  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+try:
+    __version__ = version("relucent")
+except PackageNotFoundError:
+    _pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    with _pyproject.open("rb") as _fp:
+        __version__ = tomllib.load(_fp)["project"]["version"]
+
 from . import config  # noqa: E402
 from .complex import Complex  # noqa: E402
 from .config import update_settings  # noqa: E402
@@ -31,6 +42,7 @@ from .utils import get_env, mlp, set_seeds, split_sequential  # noqa: E402
 from .vis import get_colors, plot_complex, plot_polyhedron  # noqa: E402
 
 __all__ = [
+    "__version__",
     "Complex",
     "Polyhedron",
     "SSManager",
