@@ -6,7 +6,10 @@ def _require_torch() -> None:
     """
 
     try:
-        from torch import __version__ as _torch_version  # noqa: F401  # pyright: ignore[reportUnusedImport]
+        import torch
+
+        if not hasattr(torch, "Tensor"):
+            raise ImportError("PyTorch import is incomplete.")
     except ImportError as exc:
         raise ImportError(
             "Relucent requires PyTorch to be installed manually. "

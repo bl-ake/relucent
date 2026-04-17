@@ -50,9 +50,3 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["relucent"]
-
-[tool.basedpyright]
-typeCheckingMode = "recommended"
-include = ["src/relucent", "tests"]
-exclude = ["**/site-packages/**"]
-pythonVersion = "3.13"
