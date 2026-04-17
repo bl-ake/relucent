@@ -1569,7 +1569,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3" },
     { name = "pillow", specifier = ">=12.1" },
     { name = "plotly", specifier = ">=6.3" },
-    { name = "pulp", specifier = ">=2.8" },
+    { name = "pulp", specifier = ">=3.3.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pyvis", marker = "extra == 'vis'", specifier = ">=0.3" },
     { name = "ruff", marker = "extra == 'dev'" },
