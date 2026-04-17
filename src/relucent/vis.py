@@ -3,15 +3,15 @@ from __future__ import annotations
 # pyright: reportExplicitAny=false
 import warnings
 from collections.abc import Iterable, Sequence
+from importlib import import_module
 from itertools import product
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import networkx as nx
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import torch
-from matplotlib import colormaps
 from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
 
@@ -20,6 +20,11 @@ import relucent.config as cfg
 if TYPE_CHECKING:
     from relucent.complex import Complex
     from relucent.poly import Polyhedron
+
+try:
+    mpl_colormaps = import_module("matplotlib").colormaps
+except ImportError:
+    mpl_colormaps = None
 
 __all__ = [
     "get_colors",
@@ -36,9 +41,11 @@ def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
     a = a - np.min(a)
     am = np.max(a)
     a = a / (am if am > 0 else 1)
-    a = colormaps[cmap](a)
-    a = (a * 255).astype(int)
-    return [f"#{x[0]:02x}{x[1]:02x}{x[2]:02x}" for x in a]
+    if mpl_colormaps is not None:
+        rgba = mpl_colormaps[cmap](a)
+        rgba = (rgba * 255).astype(int)
+        return [f"#{x[0]:02x}{x[1]:02x}{x[2]:02x}" for x in rgba]
+    return cast(list[str], px.colors.sample_colorscale(cmap, a.tolist()))
 
 
 # --- Polyhedron geometry & traces (used by ``Polyhedron`` methods) -----------------
