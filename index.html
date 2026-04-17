@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent &mdash; relucent  documentation</title>
+  <title>Relucent Documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -20,7 +20,9 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Configuration" href="configuration.html" /> 
+    <link rel="next" title="Quick Start" href="quickstart.html" />
+   
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -44,8 +46,30 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#search-and-geometry-guide">Search and Geometry Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#working-with-regions">Working With Regions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#keep-heavy-caches-after-worker-transfer">Keep heavy caches after worker transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#environment-variables">Environment variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#settings-reference">Settings reference</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="configuration.html#polyhedron-and-halfspace-geometry">Polyhedron and halfspace geometry</a></li>
 </ul>
@@ -58,6 +82,7 @@
 <li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#search-time-cache-controls">Search-time cache controls</a></li>
 </ul>
 </li>
 </ul>
@@ -85,8 +110,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_cells"><code class="docutils literal notranslate"><span class="pre">Complex.plot_cells()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_graph"><code class="docutils literal notranslate"><span class="pre">Complex.plot_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
@@ -99,7 +123,6 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -110,6 +133,7 @@
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_vertices()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_geometry"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_geometry()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
@@ -152,21 +176,6 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="nn.html">Neural Network Models</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.forward"><code class="docutils literal notranslate"><span class="pre">NN.forward()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.dtype"><code class="docutils literal notranslate"><span class="pre">NN.dtype</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.num_relus"><code class="docutils literal notranslate"><span class="pre">NN.num_relus</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.get_mlp_model"><code class="docutils literal notranslate"><span class="pre">get_mlp_model()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
-</ul>
-</li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
@@ -188,7 +197,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Relucent</li>
+      <li class="breadcrumb-item active">Relucent Documentation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -198,12 +207,25 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="relucent">
-<h1>Relucent<a class="headerlink" href="#relucent" title="Link to this heading"></a></h1>
-<p>Welcome to the Relucent documentation!</p>
+  <a class="reference internal image-reference" href="_images/title.svg"><img alt="Relucent" class="align-center" src="_images/title.svg" style="width: 420px;" />
+</a>
+<div style="margin-bottom: 1.25rem;"></div><p>Relucent computes and visualizes the polyhedral structure induced by ReLU neural
+networks. It helps you explore activation regions (linear regions), extract
+region-level geometry, and analyze connectivity through dual-graph views of a
+network’s piecewise-linear partition.</p>
+<p>Core capabilities include:</p>
+<ul class="simple">
+<li><p>Distributed local-search routines for discovering activation regions.</p></li>
+<li><p>Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).</p></li>
+<li><p>Complex-level analyses and graph-based views of region adjacency.</p></li>
+<li><p>2D and 3D visualizations using Plotly and matplotlib-backed utilities.</p></li>
+<li><p>Compatibility with PyTorch models (including sequential MLP workflows).</p></li>
+</ul>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a></li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
 </ul>
 </div>
@@ -212,11 +234,9 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a></li>
 <li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a></li>
-<li class="toctree-l1"><a class="reference internal" href="nn.html">Neural Network Models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
 </ul>
 </div>
-</section>
 <section id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
 <ul class="simple">
@@ -229,7 +249,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="configuration.html" class="btn btn-neutral float-right" title="Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

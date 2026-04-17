@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Configuration &mdash; relucent  documentation</title>
+  <title>Relucent Documentation: Configuration</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -22,7 +22,9 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Complex" href="complex.html" />
-    <link rel="prev" title="Relucent" href="index.html" /> 
+    <link rel="prev" title="Search Geometry and Cache Strategy" href="search_geometry.html" />
+   
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,8 +48,30 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#search-and-geometry-guide">Search and Geometry Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#working-with-regions">Working With Regions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#keep-heavy-caches-after-worker-transfer">Keep heavy caches after worker transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
+</ul>
+</li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#settings-reference">Settings reference</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#polyhedron-and-halfspace-geometry">Polyhedron and halfspace geometry</a></li>
 </ul>
@@ -60,6 +84,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#search-time-cache-controls">Search-time cache controls</a></li>
 </ul>
 </li>
 </ul>
@@ -87,8 +112,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_cells"><code class="docutils literal notranslate"><span class="pre">Complex.plot_cells()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot_graph"><code class="docutils literal notranslate"><span class="pre">Complex.plot_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
@@ -101,7 +125,6 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -112,6 +135,7 @@
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_vertices()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_geometry"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_geometry()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
@@ -152,21 +176,6 @@
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
 </ul>
 </li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="nn.html">Neural Network Models</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.NN"><code class="docutils literal notranslate"><span class="pre">NN</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.forward"><code class="docutils literal notranslate"><span class="pre">NN.forward()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.get_all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">NN.get_all_layer_outputs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.save_numpy_weights"><code class="docutils literal notranslate"><span class="pre">NN.save_numpy_weights()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.shi2weights"><code class="docutils literal notranslate"><span class="pre">NN.shi2weights()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.device"><code class="docutils literal notranslate"><span class="pre">NN.device</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.dtype"><code class="docutils literal notranslate"><span class="pre">NN.dtype</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="nn.html#relucent.NN.num_relus"><code class="docutils literal notranslate"><span class="pre">NN.num_relus</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.get_mlp_model"><code class="docutils literal notranslate"><span class="pre">get_mlp_model()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="nn.html#relucent.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
@@ -223,6 +232,26 @@ can tune behavior for your model or hardware without editing source files.</p>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">update_settings</span></code> only accepts names listed under <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>
 (excluding the helper itself). Unknown keys raise <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
+</section>
+<section id="environment-variables">
+<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
+<p>All public config settings can also be controlled with environment variables.
+The naming convention is:</p>
+<p><code class="docutils literal notranslate"><span class="pre">RELUCENT_&lt;SETTING_NAME&gt;</span></code></p>
+<p>For example, to override <code class="docutils literal notranslate"><span class="pre">MAX_RADIUS</span></code> and <code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_MAX_RADIUS</span><span class="o">=</span><span class="m">500</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_TOL_HALFSPACE_CONTAINMENT</span><span class="o">=</span>1e-7
+</pre></div>
+</div>
+<p>Read values are parsed at import time of <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>, so set
+environment variables before importing <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code> accepts either comma-separated values or a
+bracketed comma-separated form:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="m">0</span>.01,0.1,1,10,100
+<span class="c1"># or:</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="s1">&#39;[0.01, 0.1, 1, 10, 100]&#39;</span>
+</pre></div>
+</div>
 <p><strong>Defaults in function signatures:</strong> Parameters documented as “defaults to
 <code class="docutils literal notranslate"><span class="pre">relucent.config.X</span></code>” resolve that value <strong>when the function runs</strong>, not when
 Python first imports the package. If you pass an argument explicitly, it always
@@ -384,11 +413,6 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
 <td><p>Seconds to wait on <code class="docutils literal notranslate"><span class="pre">Condition.wait</span></code> when polling a <code class="xref py py-class docutils literal notranslate"><span class="pre">BlockingQueue</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PIE_LABEL_DISTANCE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.6</span></code></p></td>
-<td><p>Matplotlib pie <code class="docutils literal notranslate"><span class="pre">labeldistance</span></code> in pyvis node thumbnails.</p></td>
-</tr>
 </tbody>
 </table>
 </section>
@@ -415,13 +439,48 @@ constants.</p>
 <p>Valid keys for <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a> are the names listed in
 <code class="docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>, except <code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself.</p>
 </section>
+<section id="search-time-cache-controls">
+<h2>Search-time cache controls<a class="headerlink" href="#search-time-cache-controls" title="Link to this heading"></a></h2>
+<p>Search and post-processing APIs now accept explicit cache/property lists, so you
+can control exactly what gets computed:</p>
+<ul class="simple">
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.searcher()</span></code> takes <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> and
+<code class="docutils literal notranslate"><span class="pre">keep_caches</span></code>.</p></li>
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.compute_geometric_properties()</span></code> takes
+<code class="docutils literal notranslate"><span class="pre">properties</span></code> and <code class="docutils literal notranslate"><span class="pre">keep_caches</span></code>.</p></li>
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.get_poly_attrs()</span></code> precomputes only the
+attributes requested in <code class="docutils literal notranslate"><span class="pre">attrs</span></code>.</p></li>
+</ul>
+<p>Common property names include <code class="docutils literal notranslate"><span class="pre">&quot;halfspaces&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;b&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;num_dead_relus&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;finite&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;center&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;inradius&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;interior_point&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;interior_point_norm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;vertices&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;hs&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ch&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code>.</p>
+<p>Examples:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Topology-only search (default): SHIs + feasibility only</span>
+<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+
+<span class="c1"># Compute only finite/interior-point info during search</span>
+<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span>
+    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;finite&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point_norm&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="c1"># Keep heavy caches (halfspaces/W/b) when workers return polyhedra</span>
+<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span>
+    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;halfspaces&quot;</span><span class="p">,</span> <span class="s2">&quot;W&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;finite&quot;</span><span class="p">],</span>
+    <span class="n">keep_caches</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Relucent" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="search_geometry.html" class="btn btn-neutral float-left" title="Search Geometry and Cache Strategy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="complex.html" class="btn btn-neutral float-right" title="Complex" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

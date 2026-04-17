@@ -3,14 +3,14 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation: Search</title>
+  <title>Relucent Documentation: Search Geometry and Cache Strategy</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
-    
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
@@ -18,10 +18,10 @@
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/custom.js?v=add1a637"></script>
     <script src="_static/js/theme.js"></script>
-    <script src="_static/searchtools.js"></script>
-    <script src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="#" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Configuration" href="configuration.html" />
+    <link rel="prev" title="Quick Start" href="quickstart.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -38,7 +38,7 @@
             relucent
           </a>
 <div role="search">
-  <form id="rtd-search-form" class="wy-form" action="#" method="get">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
@@ -46,7 +46,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
@@ -55,17 +55,17 @@
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#keep-heavy-caches-after-worker-transfer">Keep heavy caches after worker transfer</a></li>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Search Geometry and Cache Strategy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#important-tradeoff">Important tradeoff</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-workflows">Common workflows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#topology-only-search">Topology-only search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#keep-heavy-caches-after-worker-transfer">Keep heavy caches after worker transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#useful-property-names">Useful property names</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
@@ -198,8 +198,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Search</li>
+      <li class="breadcrumb-item active">Search Geometry and Cache Strategy</li>
       <li class="wy-breadcrumbs-aside">
+            <a href="_sources/search_geometry.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -207,22 +208,99 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <noscript>
-  <div id="fallback" class="admonition warning">
-    <p class="last">
-      Please activate JavaScript to enable the search functionality.
-    </p>
-  </div>
-  </noscript>
+  <section id="search-geometry-and-cache-strategy">
+<h1>Search Geometry and Cache Strategy<a class="headerlink" href="#search-geometry-and-cache-strategy" title="Link to this heading"></a></h1>
+<p>Relucent separates <strong>topology discovery</strong> from <strong>geometric cache computation</strong> so
+you can control runtime and memory for your workload.</p>
+<section id="why-these-options-exist">
+<h2>Why these options exist<a class="headerlink" href="#why-these-options-exist" title="Link to this heading"></a></h2>
+<p>During search, relucent must discover adjacency (via SHIs) and feasibility.
+Many geometric quantities (for example <code class="docutils literal notranslate"><span class="pre">interior_point</span></code>, <code class="docutils literal notranslate"><span class="pre">Wl2</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">volume</span></code>) are optional and can be expensive. In large searches, computing every
+property for every region can dominate runtime and memory.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> and <code class="docutils literal notranslate"><span class="pre">keep_caches</span></code> options let you choose between:</p>
+<ol class="arabic simple">
+<li><p><strong>Faster/lighter topology-first search</strong> (minimal work per discovered region).</p></li>
+<li><p><strong>Richer per-region data during search</strong> (more work per region, but ready-to-use).</p></li>
+<li><p><strong>Two-phase pipelines</strong> (topology first, then targeted geometry pass).</p></li>
+</ol>
+</section>
+<section id="important-tradeoff">
+<h2>Important tradeoff<a class="headerlink" href="#important-tradeoff" title="Link to this heading"></a></h2>
+<p>A common assumption is that topology-first search is always fastest overall. That
+is not always true:</p>
+<ul class="simple">
+<li><p>If you will later need geometry for <em>most</em> regions, doing a second pass can be
+slower end-to-end because each region may incur additional recomputation (e.g. getting its h-representation).</p></li>
+<li><p>If you only need topology (or geometry for a small subset), delaying geometry
+usually saves substantial time and memory.</p></li>
+</ul>
+<p>In practice:</p>
+<ul class="simple">
+<li><p>Use <strong>topology-first</strong> for exploration and large frontier growth.</p></li>
+<li><p>Use <strong>in-search geometry</strong> when downstream steps immediately need those values.</p></li>
+<li><p>Keep <code class="docutils literal notranslate"><span class="pre">keep_caches=False</span></code> unless repeated heavy cache reuse clearly outweighs
+memory/serialization cost.</p></li>
+</ul>
+</section>
+<section id="common-workflows">
+<h2>Common workflows<a class="headerlink" href="#common-workflows" title="Link to this heading"></a></h2>
+<section id="topology-only-search">
+<h3>Topology-only search<a class="headerlink" href="#topology-only-search" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># SHIs + feasibility only (disable default geometry computation)</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[])</span>
+</pre></div>
+</div>
+</section>
+<section id="compute-selected-geometry-during-search">
+<h3>Compute selected geometry during search<a class="headerlink" href="#compute-selected-geometry-during-search" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span>
+    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;finite&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point_norm&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="keep-heavy-caches-after-worker-transfer">
+<h3>Keep heavy caches after worker transfer<a class="headerlink" href="#keep-heavy-caches-after-worker-transfer" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span>
+    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;halfspaces&quot;</span><span class="p">,</span> <span class="s2">&quot;W&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;finite&quot;</span><span class="p">],</span>
+    <span class="n">keep_caches</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="two-phase-approach-topology-first-geometry-later">
+<h3>Two-phase approach: topology first, geometry later<a class="headerlink" href="#two-phase-approach-topology-first-geometry-later" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>  <span class="c1"># fast discovery</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">compute_geometric_properties</span><span class="p">(</span>
+    <span class="n">properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;finite&quot;</span><span class="p">,</span> <span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="s2">&quot;inradius&quot;</span><span class="p">,</span> <span class="s2">&quot;Wl2&quot;</span><span class="p">],</span>
+    <span class="n">keep_caches</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="useful-property-names">
+<h2>Useful property names<a class="headerlink" href="#useful-property-names" title="Link to this heading"></a></h2>
+<p>Examples of valid names for <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> / <code class="docutils literal notranslate"><span class="pre">properties</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;halfspaces&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;halfspaces_np&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;b&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;num_dead_relus&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;finite&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;center&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;inradius&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;interior_point&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;interior_point_norm&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;vertices&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;hs&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ch&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code></p></li>
+</ul>
+</section>
+</section>
 
-  
-  <div id="search-results">
-  
-  </div>
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quick Start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="configuration.html" class="btn btn-neutral float-right" title="Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 
@@ -244,14 +322,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-  <script>
-    jQuery(function() { Search.loadIndex("searchindex.js"); });
-  </script>
-  
-  <script id="searchindexloader"></script>
-   
-
+  </script> 
 
 </body>
 </html>

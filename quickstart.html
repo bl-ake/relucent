@@ -3,25 +3,26 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation: Search</title>
+  <title>Relucent Documentation: Quick Start</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
-    
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
       <script src="_static/custom.js?v=add1a637"></script>
     <script src="_static/js/theme.js"></script>
-    <script src="_static/searchtools.js"></script>
-    <script src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="#" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Search Geometry and Cache Strategy" href="search_geometry.html" />
+    <link rel="prev" title="Indices and tables" href="index.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -38,7 +39,7 @@
             relucent
           </a>
 <div role="search">
-  <form id="rtd-search-form" class="wy-form" action="#" method="get">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
@@ -46,13 +47,13 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#search-and-geometry-guide">Search and Geometry Guide</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#working-with-regions">Working With Regions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#first-run-example">First Run Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#search-and-geometry-guide">Search and Geometry Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#working-with-regions">Working With Regions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#gurobi-license-note">Gurobi License Note</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
@@ -198,8 +199,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Search</li>
+      <li class="breadcrumb-item active">Quick Start</li>
       <li class="wy-breadcrumbs-aside">
+            <a href="_sources/quickstart.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -207,22 +209,101 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <noscript>
-  <div id="fallback" class="admonition warning">
-    <p class="last">
-      Please activate JavaScript to enable the search functionality.
-    </p>
-  </div>
-  </noscript>
+  <section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading"></a></h1>
+<p>This guide mirrors the setup and first-use flow from <code class="docutils literal notranslate"><span class="pre">relucent/README.md</span></code> so
+you can get a working run quickly.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p>Install Python 3.11 or newer.</p></li>
+<li><p>Install PyTorch (see the <a class="reference external" href="https://pytorch.org/get-started/locally/">PyTorch install guide</a>).</p></li>
+<li><p>Install relucent:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>relucent
+</pre></div>
+</div>
+</section>
+<section id="first-run-example">
+<h2>First Run Example<a class="headerlink" href="#first-run-example" title="Link to this heading"></a></h2>
+<p>The following script builds a small random ReLU MLP, computes activation
+regions with local search, and opens a Plotly figure of the resulting complex.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
 
-  
-  <div id="search-results">
-  
-  </div>
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># Create model</span>
+    <span class="n">network</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="p">)</span>  <span class="c1"># or relucent.mlp(widths=[2, 10, 5, 1])</span>
+
+    <span class="c1"># Initialize a Complex to track calculations</span>
+    <span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">network</span><span class="p">)</span>
+
+    <span class="c1"># Calculate activation regions via local search</span>
+    <span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">()</span>
+
+    <span class="c1"># Plotting functions return Plotly figures</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">cplx</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="search-and-geometry-guide">
+<h2>Search and Geometry Guide<a class="headerlink" href="#search-and-geometry-guide" title="Link to this heading"></a></h2>
+<p>For detailed guidance on search-time geometry computation and caching strategy,
+see <a class="reference internal" href="search_geometry.html"><span class="doc">Search Geometry and Cache Strategy</span></a>.</p>
+</section>
+<section id="working-with-regions">
+<h2>Working With Regions<a class="headerlink" href="#working-with-regions" title="Link to this heading"></a></h2>
+<p>Get a minimal H-representation for the region containing an input point:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">input_point</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">cplx</span><span class="o">.</span><span class="n">point2poly</span><span class="p">(</span><span class="n">input_point</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">halfspaces</span><span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">shis</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Useful lazily computed attributes include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">p.halfspaces</span></code>: halfspaces of the form <span class="math notranslate nohighlight">\(Ax + b \le 0\)</span>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">p.shis</span></code>: indices of non-redundant supporting halfspaces.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">p.center</span></code>: Chebyshev center.</p></li>
+</ul>
+<p>Two additional quick checks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Average number of faces over computed polyhedra</span>
+<span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">shis</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">cplx</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">cplx</span><span class="p">)</span>
+
+<span class="c1"># Adjacency graph of top-dimensional cells in the complex</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cplx</span><span class="o">.</span><span class="n">get_dual_graph</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
+<section id="gurobi-license-note">
+<h2>Gurobi License Note<a class="headerlink" href="#gurobi-license-note" title="Link to this heading"></a></h2>
+<p>Relucent works for many tasks without a Gurobi license, but larger models may
+hit solver feature/size limits. For academic users, a typical path is:</p>
+<ol class="arabic simple">
+<li><p>Create a fresh Conda environment.</p></li>
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">gurobi</span></code> (for example, <code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">install</span> <span class="pre">-c</span> <span class="pre">gurobi</span> <span class="pre">gurobi</span></code>).</p></li>
+<li><p>Obtain a license key from Gurobi.</p></li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">grbgetkey</span></code> in that environment.</p></li>
+</ol>
+<p>For detailed and current license instructions, see the
+<a class="reference external" href="https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license">Gurobi setup documentation</a>.</p>
+</section>
+</section>
+
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Indices and tables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="search_geometry.html" class="btn btn-neutral float-right" title="Search Geometry and Cache Strategy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 
@@ -244,14 +325,7 @@
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-  <script>
-    jQuery(function() { Search.loadIndex("searchindex.js"); });
-  </script>
-  
-  <script id="searchindexloader"></script>
-   
-
+  </script> 
 
 </body>
 </html>
