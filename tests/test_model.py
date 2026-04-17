@@ -1,18 +1,18 @@
-"""Tests for relucent.model (NN, get_mlp_model)."""
+"""Tests for relucent.model and relucent.utils.mlp."""
 
 import pytest
 import torch
 import torch.nn as nn
 
-from relucent.model import get_mlp_model
+from relucent.utils import mlp
 
 
-class TestGetMlpModel:
-    """Tests for get_mlp_model."""
+class TestMlp:
+    """Tests for mlp."""
 
     def test_widths_and_add_last_relu(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[3, 5, 2], add_last_relu=True)
+        net = mlp(widths=[3, 5, 2], add_last_relu=True)
         assert net.input_shape == (3,)
         assert len([lyr for lyr in net.layers.values() if isinstance(lyr, nn.Linear)]) == 2
         assert len([lyr for lyr in net.layers.values() if isinstance(lyr, nn.ReLU)]) == 2
@@ -20,19 +20,19 @@ class TestGetMlpModel:
 
     def test_no_last_relu(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1], add_last_relu=False)
+        net = mlp(widths=[2, 4, 1], add_last_relu=False)
         assert net.input_shape == (2,)
         assert len([lyr for lyr in net.layers.values() if isinstance(lyr, nn.ReLU)]) == 1
 
     def test_single_hidden(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8], add_last_relu=True)
+        net = mlp(widths=[4, 8], add_last_relu=True)
         assert net.input_shape == (4,)
         assert net.num_relus == 1
 
     def test_forward_shape(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[5, 10, 3], add_last_relu=False)
+        net = mlp(widths=[5, 10, 3], add_last_relu=False)
         x = torch.randn(2, 5, device=net.device, dtype=net.dtype)
         y = net(x)
         assert y.shape == (2, 3)
@@ -43,7 +43,7 @@ class TestNN:
 
     def test_save_numpy_weights(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1])
+        net = mlp(widths=[2, 4, 1])
         net.save_numpy_weights()
         for layer in net.layers.values():
             if isinstance(layer, nn.Linear):
@@ -53,18 +53,18 @@ class TestNN:
 
     def test_device_dtype(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1])
+        net = mlp(widths=[2, 4, 1])
         assert net.device == next(net.parameters()).device
         assert net.dtype == next(net.parameters()).dtype
 
     def test_num_relus(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 6, 4, 1], add_last_relu=True)
+        net = mlp(widths=[2, 6, 4, 1], add_last_relu=True)
         assert net.num_relus == 3
 
     def test_get_all_layer_outputs(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[3, 5, 2])
+        net = mlp(widths=[3, 5, 2])
         x = torch.randn(4, 3, device=net.device, dtype=net.dtype)
         outs = net.get_all_layer_outputs(x)
         assert isinstance(outs, dict)
@@ -75,7 +75,7 @@ class TestNN:
 
     def test_shi2weights_return_tensor(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2])
+        net = mlp(widths=[4, 8, 2])
         net.save_numpy_weights()
         w = net.shi2weights(0, return_idx=False)
         assert isinstance(w, torch.Tensor)
@@ -83,7 +83,7 @@ class TestNN:
 
     def test_shi2weights_return_idx(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2])
+        net = mlp(widths=[4, 8, 2])
         name, idx = net.shi2weights(3, return_idx=True)
         assert isinstance(name, str)
         assert isinstance(idx, int)
@@ -91,6 +91,6 @@ class TestNN:
 
     def test_shi2weights_invalid_raises(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2])
+        net = mlp(widths=[4, 8, 2])
         with pytest.raises(ValueError, match="Invalid Neuron Index"):
             net.shi2weights(1000, return_idx=False)

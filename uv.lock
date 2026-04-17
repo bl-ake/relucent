@@ -1433,15 +1433,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pulp"
-version = "3.3.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/1c/d880b739b841a8aa81143091c9bdda5e72e226a660aa13178cb312d4b27f/pulp-3.3.0.tar.gz", hash = "sha256:7eb99b9ce7beeb8bbb7ea9d1c919f02f003ab7867e0d1e322f2f2c26dd31c8ba", size = 16301847, upload-time = "2025-09-18T08:14:57.552Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/99/6c/64cafaceea3f99927e84b38a362ec6a8f24f33061c90bda77dfe1cd4c3c6/pulp-3.3.0-py3-none-any.whl", hash = "sha256:dd6ad2d63f196d1254eddf9dcff5cd224912c1f046120cb7c143c5b0eda63fae", size = 16387700, upload-time = "2025-09-18T08:14:53.368Z" },
-]
-
-[[package]]
 name = "pure-eval"
 version = "0.2.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1525,7 +1516,7 @@ wheels = [
 
 [[package]]
 name = "relucent"
-version = "0.7.2"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "gurobipy" },
@@ -1535,9 +1526,11 @@ dependencies = [
     { name = "pandas" },
     { name = "pillow" },
     { name = "plotly" },
-    { name = "pulp" },
+    { name = "pytest" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "torch" },
     { name = "tqdm" },
 ]
@@ -1561,24 +1554,25 @@ vis = [
 [package.metadata]
 requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.39.0" },
-    { name = "gurobipy", specifier = ">=12.0" },
+    { name = "gurobipy", specifier = ">=12.0.1" },
     { name = "kaleido", marker = "extra == 'vis'" },
     { name = "matplotlib", specifier = ">=3.10" },
     { name = "networkx", specifier = ">=3.6" },
-    { name = "numpy", specifier = ">=2.4" },
+    { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.3" },
-    { name = "pillow", specifier = ">=12.1" },
+    { name = "pillow", specifier = ">=12.1.0" },
     { name = "plotly", specifier = ">=6.3" },
-    { name = "pulp", specifier = ">=3.3.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pyvis", marker = "extra == 'vis'", specifier = ">=0.3" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scikit-learn", specifier = ">=1.8" },
-    { name = "scipy", specifier = ">=1.17" },
+    { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "scipy", specifier = ">=1.17.0" },
+    { name = "sphinx", specifier = ">=9.0.4" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
-    { name = "torch", specifier = ">=2.3" },
-    { name = "tqdm", specifier = ">=4.67" },
+    { name = "torch", specifier = ">=2.5.0" },
+    { name = "tqdm", specifier = ">=4.67.0" },
 ]
 provides-extras = ["vis", "dev", "docs"]
 

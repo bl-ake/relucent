@@ -397,20 +397,22 @@ def _get_hs_torch(
     current_A, current_b = None, None
     layer_W, layer_b = None, None
     if data is not None:
-        outs: dict[str, torch.Tensor] | None = poly.net.get_all_layer_outputs(data)
+        assert poly._net is not None
+        outs: dict[str, torch.Tensor] | None = poly._net.get_all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []
     current_mask_index = 0
-    for name, layer in poly.net.layers.items():
+    assert poly._net is not None
+    for name, layer in poly._net.layers.items():
         if isinstance(layer, nn.Linear):
             layer_W = layer.weight
             layer_b = layer.bias[None, :]
             if current_A is None or current_b is None:
-                constr_A = torch.empty((layer_W.shape[1], 0), device=poly.net.device, dtype=poly.net.dtype)
-                constr_b = torch.empty((1, 0), device=poly.net.device, dtype=poly.net.dtype)
-                current_A = torch.eye(layer_W.shape[1], device=poly.net.device, dtype=poly.net.dtype)
-                current_b = torch.zeros((1, layer_W.shape[1]), device=poly.net.device, dtype=poly.net.dtype)
+                constr_A = torch.empty((layer_W.shape[1], 0), device=poly._net.device, dtype=poly._net.dtype)
+                constr_b = torch.empty((1, 0), device=poly._net.device, dtype=poly._net.dtype)
+                current_A = torch.eye(layer_W.shape[1], device=poly._net.device, dtype=poly._net.dtype)
+                current_b = torch.zeros((1, layer_W.shape[1]), device=poly._net.device, dtype=poly._net.dtype)
 
             current_A = current_A @ layer_W.T
             current_b = current_b @ layer_W.T + layer_b
@@ -502,12 +504,14 @@ def _get_hs_numpy(
     current_A, current_b = None, None
     layer_W, layer_b = None, None
     if data is not None:
-        outs: dict[str, torch.Tensor] | None = poly.net.get_all_layer_outputs(data)
+        assert poly._net is not None
+        outs: dict[str, torch.Tensor] | None = poly._net.get_all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []
     current_mask_index = 0
-    for name, layer in poly.net.layers.items():
+    assert poly._net is not None
+    for name, layer in poly._net.layers.items():
         if isinstance(layer, nn.Linear):
             layer_W = layer.weight_cpu
             layer_b = layer.bias_cpu
@@ -786,7 +790,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
         return
     poly._attempted_compute_properties = True
 
-    if poly.net.input_shape[0] > 6:
+    assert poly._net is not None
+    if poly._net.input_shape[0] > 6:
         raise ValueError("Input shape too large to compute extra properties")
     # Filter degenerate constraints before calling Qhull (also used by retry paths below).
     halfspaces = _drop_degenerate_halfspaces(poly.halfspaces_np)

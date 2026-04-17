@@ -22,23 +22,21 @@ from . import config  # noqa: E402
 from .complex import Complex  # noqa: E402
 from .config import update_settings  # noqa: E402
 from .convert_model import convert  # noqa: E402
-from .model import NN, get_mlp_model  # noqa: E402
 from .poly import Polyhedron  # noqa: E402
 from .ss import SSManager  # noqa: E402
-from .utils import get_env, set_seeds, split_sequential  # noqa: E402
+from .utils import get_env, mlp, set_seeds, split_sequential  # noqa: E402
 from .vis import get_colors, plot_complex, plot_polyhedron  # noqa: E402
 
 __all__ = [
     "Complex",
     "Polyhedron",
-    "NN",
     "SSManager",
     "config",
     "update_settings",
     "convert",
     "get_colors",
     "get_env",
-    "get_mlp_model",
+    "mlp",
     "plot_complex",
     "plot_polyhedron",
     "set_seeds",

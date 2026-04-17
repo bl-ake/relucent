@@ -35,7 +35,7 @@ __all__ = ["Complex"]
 
 # Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
-net: NN | None = None
+_net: NN | None = None
 dim: int = 0
 get_vol_calc: bool = True
 
@@ -60,11 +60,11 @@ def set_globals(get_net: NN, get_volumes: bool = True, num_threads: int | None =
     """
     global env
     env = get_env(num_threads=num_threads)
-    global net
-    net = get_net
-    net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
+    global _net
+    _net = get_net
+    _net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
     global dim
-    dim = int(np.prod(net.input_shape))
+    dim = int(np.prod(_net.input_shape))
     global get_vol_calc
     get_vol_calc = get_volumes
 
@@ -83,20 +83,22 @@ class Complex:
             net: The nn.Module instance whose polyhedral complex
                 is to be built and queried.
         """
+        original_net = net
         if not isinstance(net, NN):
             net = convert(net)
+        self.net = original_net
         self._net = net
-        self.net.save_numpy_weights()
+        self._net.save_numpy_weights()
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
 
-        net_layers = list(net.layers.values())
+        net_layers = list(self._net.layers.values())
         self.ss_layers = [i for i, next_layer in enumerate(net_layers[1:]) if isinstance(next_layer, nn.ReLU)]
 
         # Build mapping from global sign-sequence indices to (layer_index, neuron_index)
         self.ssi2maski = []
-        for i, layer in enumerate(self.net.layers.values()):
+        for i, layer in enumerate(self._net.layers.values()):
             if i in self.ss_layers:
                 assert isinstance(layer, nn.Linear), "Only linear layers should be before ReLU layers"
                 for neuron_idx in range(layer.out_features):
@@ -105,8 +107,8 @@ class Complex:
         self._dual_graph: nx.Graph[Polyhedron] | None = None
 
     def __repr__(self) -> str:
-        net_name = type(self.net).__name__ if getattr(self, "_net", None) is not None else "None"
-        return f"Complex(dim={self.dim}, n={self.n}, n_polyhedra={len(self.index2poly)}, net={net_name}@{id(self.net):#x})"
+        net_name = type(self._net).__name__ if getattr(self, "_net", None) is not None else "None"
+        return f"Complex(dim={self.dim}, n={self.n}, n_polyhedra={len(self.index2poly)}, net={net_name}@{id(self._net):#x})"
 
     def __str__(self) -> str:
         return f"Complex(n_polyhedra={len(self)})"
@@ -212,10 +214,13 @@ class Complex:
         return {
             "index2poly": self.index2poly,
             "net": self.net,
+            "_net": self._net,
         }
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        self.__init__(state["net"])
+        self.__init__(state.get("net", state["_net"]))
+        if "_net" in state:
+            self._net = state["_net"]
         self.index2poly = state["index2poly"]
         if "ssm" in state:
             self.ssm = state["ssm"]
@@ -223,23 +228,12 @@ class Complex:
             for p in self.index2poly:
                 self.ssm.add(p.ss_np)
         for p in self.index2poly:
-            p.net = self.net
-
-    @property
-    def net(self) -> NN:
-        """The neural network. May only be set once."""
-        return self._net
-
-    @net.setter
-    def net(self, value: NN) -> None:
-        if self._net is not None:
-            raise ValueError("The net attribute cannot be set when it already has a non-None value")
-        self._net = value
+            p._net = self._net
 
     @property
     def dim(self) -> int:
         """The input dimension of the network."""
-        return int(np.prod(self.net.input_shape))
+        return int(np.prod(self._net.input_shape))
 
     @property
     def n(self) -> int:
@@ -259,8 +253,8 @@ class Complex:
                 the network, indicating the activation pattern of that layer.
         """
         x = batch if isinstance(batch, torch.Tensor) else torch.as_tensor(batch)
-        x = x.to(device=self.net.device, dtype=self.net.dtype).reshape((-1, *self.net.input_shape))
-        for i, layer in enumerate(self.net.layers.values()):
+        x = x.to(device=self._net.device, dtype=self._net.dtype).reshape((-1, *self._net.input_shape))
+        for i, layer in enumerate(self._net.layers.values()):
             x = layer(x)
             if i in self.ss_layers:
                 yield torch.sign(x)  # * (torch.abs(x) < 1e-12)
@@ -332,7 +326,7 @@ class Complex:
         if check_exists and ss in self:
             return self[ss]
         else:
-            return Polyhedron(self.net, ss, **kwargs)
+            return Polyhedron(self._net, ss, **kwargs)
 
     def add_ss(
         self,
@@ -469,6 +463,8 @@ class Complex:
         verbose: int = 1,
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
+        geometry_properties: Iterable[str] | None = None,
+        keep_caches: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Search for polyhedra in the complex by discovering neighbors.
@@ -495,6 +491,13 @@ class Complex:
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
             verbose: Whether to print progress information. Defaults to 1.
+            geometry_properties: Iterable of polyhedron cache/property names to
+                compute for each discovered polyhedron during search. If None,
+                uses the default non-SciPy geometry set. Pass an empty iterable
+                for topology-only search.
+            keep_caches: If True, keep caches such as ``halfspaces``,
+                ``W``, and ``b`` when polyhedra are returned from worker
+                processes. Defaults to False.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -521,23 +524,35 @@ class Complex:
             verbose=verbose,
             cube_radius=cube_radius,
             cube_mode=cube_mode,
+            geometry_properties=geometry_properties,
+            keep_caches=keep_caches,
             **kwargs,
         )
 
     def compute_geometric_properties(
         self,
         nworkers: int | None = None,
-        get_volumes: bool = True,
+        properties: Iterable[str] | None = None,
+        keep_caches: bool = False,
         verbose: int = 1,
     ) -> dict[str, Any]:
-        """Compute geometric caches (center/inradius/interior-point/etc.) in parallel.
+        """Compute selected polyhedron caches in parallel.
 
         This is intended to run after a topology-only search pass.
+
+        Args:
+            nworkers: Number of worker processes (defaults to CPU count).
+            properties: Iterable of cache/property names to compute. If None,
+                uses relucent's default non-SciPy geometric set.
+            keep_caches: If True, retain heavy caches (halfspaces/W/b) after
+                worker transfer; otherwise they are cleaned to reduce memory.
+            verbose: Whether to print progress information.
         """
         return _parallel_compute_geometric_properties_fn(
             self,
             nworkers=nworkers,
-            get_volumes=get_volumes,
+            geometry_properties=properties,
+            keep_caches=keep_caches,
             verbose=verbose,
         )
 
@@ -676,7 +691,8 @@ class Complex:
                 values, with one value per polyhedron in the complex based on the order
                 they were added.
         """
-        self.compute_geometric_properties()  ## TODO: Specify which attributes to compute
+        attrs = list(attrs)
+        self.compute_geometric_properties(properties=attrs)
         return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
 
     def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:

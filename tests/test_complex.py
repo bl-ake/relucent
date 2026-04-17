@@ -2,6 +2,7 @@
 
 import warnings
 from collections import OrderedDict
+from copy import deepcopy
 
 import networkx as nx
 import numpy as np
@@ -9,7 +10,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from relucent import Complex, get_mlp_model
+from relucent import Complex, mlp
 from relucent.calculations import adjacent_polyhedra
 from relucent.model import NN
 
@@ -17,7 +18,7 @@ from relucent.model import NN
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
     """BFS/DFS equivalence, conversion to dual graph."""
     assert seeded is not None
-    model = get_mlp_model(widths=[4, 8], add_last_relu=True)
+    model = mlp(widths=[4, 8], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = torch.rand((1, 4), device=model.device, dtype=model.dtype)
     cplx1.bfs(start=start1)
@@ -36,7 +37,7 @@ def test_bfs_dfs_dual_graph_isomorphic(seeded):
 def test_recover_from_dual_graph(seeded):
     """Recovery of full complex from dual graph."""
     assert seeded is not None
-    model = get_mlp_model(widths=[5, 9], add_last_relu=True)
+    model = mlp(widths=[5, 9], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = torch.rand((1, 5), device=model.device, dtype=model.dtype)
     cplx1.bfs(start=start1)
@@ -53,7 +54,7 @@ def test_recover_from_dual_graph(seeded):
 def test_bfs_polyhedron_affine_and_membership(seeded):
     """BFS with larger network, point2poly, affine map, max_polys."""
     assert seeded is not None
-    model = get_mlp_model(widths=[16, 64, 64, 64, 10])
+    model = mlp(widths=[16, 64, 64, 64, 10])
     cplx = Complex(model)
     start = torch.rand(16, device=model.device, dtype=model.dtype)
     p = cplx.point2poly(start)
@@ -72,7 +73,7 @@ def test_bfs_polyhedron_affine_and_membership(seeded):
 def test_dfs_max_depth_and_shis(seeded):
     """DFS with max_depth and nworkers=1."""
     assert seeded is not None
-    model = get_mlp_model(widths=[6, 8, 10])
+    model = mlp(widths=[6, 8, 10])
     cplx = Complex(model)
     result = cplx.dfs(max_depth=2, nworkers=1)
     assert result["Search Depth"] == 2
@@ -82,7 +83,7 @@ def test_dfs_max_depth_and_shis(seeded):
 def test_hamming_astar_path(seeded):
     """Pathfinding between two polyhedra via Hamming A*."""
     assert seeded is not None
-    model = get_mlp_model(widths=[16, 32, 32, 1])
+    model = mlp(widths=[16, 32, 32, 1])
     cplx = Complex(model)
     start = torch.rand(16, device=model.device, dtype=model.dtype)
     end = torch.rand(16, device=model.device, dtype=model.dtype)
@@ -122,7 +123,7 @@ def test_plot_and_dual_graph_smoke(seeded):
         fig = cplx.plot(plot_mode="cells", bound=10000)
         assert fig is not None
         _ = sum(len(p.shis) for p in cplx) / len(cplx)
-        x = np.random.random(cplx.net.input_shape).astype(np.float32)
+        x = np.random.random(cplx._net.input_shape).astype(np.float32)
         p = cplx.point2poly(x)
         _ = p.halfspaces[p.shis, :]
         _ = p.W
@@ -266,7 +267,8 @@ class TestComplexAutoConversion:
             nn.Linear(8, 2),
         )
         cplx = Complex(sequential)
-        assert isinstance(cplx.net, NN)
+        assert cplx.net is sequential
+        assert isinstance(cplx._net, NN)
 
     def test_module_dict_is_accepted(self, seeded):
         """Complex accepts an OrderedDict of layers and auto-converts it."""
@@ -278,8 +280,8 @@ class TestComplexAutoConversion:
                 ("fc1", nn.Linear(8, 2)),
             ]
         )
-        cplx = Complex(NN(layers=layers))
-        assert isinstance(cplx.net, NN)
+        cplx = Complex(nn.Sequential(layers))
+        assert isinstance(cplx._net, NN)
 
     def test_auto_converted_dim_and_n(self, seeded):
         """Auto-converted sequential has correct input dim and neuron count."""
@@ -296,7 +298,7 @@ class TestComplexAutoConversion:
     def test_auto_converted_matches_explicit_nn(self, seeded):
         """Auto-converting a Sequential gives the same complex as the explicit NN."""
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2])
+        net = mlp(widths=[4, 8, 2])
         # Build an equivalent Sequential sharing the same weight tensors
         sequential = nn.Sequential(
             net.layers["fc0"],
@@ -316,9 +318,90 @@ class TestComplexAutoConversion:
     def test_nn_module_passed_directly_unchanged(self, seeded):
         """An NN instance is not re-wrapped; cplx.net is the same object."""
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2])
+        net = mlp(widths=[4, 8, 2])
         cplx = Complex(net)
         assert cplx.net is net
+
+
+def _exercise_complex_for_model(model: nn.Module) -> None:
+    """Run a minimal end-to-end Complex usage flow for a model."""
+    cplx = Complex(model)
+    x = torch.randn((1, cplx.dim), device=cplx._net.device, dtype=cplx._net.dtype)
+    y = cplx._net(x)
+    ss = cplx.point2ss(x)
+    p = cplx.add_point(x)
+    q = cplx.point2poly(x, check_exists=True)
+    assert y.shape[0] == 1
+    assert ss.shape[1] == cplx.n
+    assert p is q
+    assert p in cplx
+
+
+def _build_canonical_nn() -> nn.Module:
+    return mlp(widths=[4, 8, 2], add_last_relu=False)
+
+
+def _build_plain_sequential() -> nn.Module:
+    return nn.Sequential(
+        nn.Linear(4, 8),
+        nn.ReLU(),
+        nn.Linear(8, 2),
+    )
+
+
+def _build_ordered_sequential() -> nn.Module:
+    return nn.Sequential(
+        OrderedDict(
+            [
+                ("fc0", nn.Linear(4, 8)),
+                ("relu0", nn.ReLU()),
+                ("fc1", nn.Linear(8, 2)),
+            ]
+        )
+    )
+
+
+def _build_module_list() -> nn.Module:
+    return nn.ModuleList(
+        [
+            nn.Linear(4, 8),
+            nn.ReLU(),
+            nn.Linear(8, 2),
+        ]
+    )
+
+
+def _build_deepcopy_sequential() -> nn.Module:
+    return deepcopy(_build_plain_sequential())
+
+
+def _build_state_dict_clone() -> nn.Module:
+    source = _build_plain_sequential()
+    cloned = _build_plain_sequential()
+    cloned.load_state_dict(source.state_dict())
+    return cloned
+
+
+class TestComplexPytorchCompatibility:
+    @pytest.mark.parametrize(
+        ("builder_name", "builder"),
+        [
+            ("canonical_nn", _build_canonical_nn),
+            ("plain_sequential", _build_plain_sequential),
+            ("ordered_sequential", _build_ordered_sequential),
+            ("module_list", _build_module_list),
+            ("deepcopy_sequential", _build_deepcopy_sequential),
+            ("state_dict_clone", _build_state_dict_clone),
+        ],
+    )
+    def test_complex_handles_common_pytorch_model_creation_paths(self, seeded, builder_name, builder):
+        """Complex can be created and used across common PyTorch model construction paths."""
+        assert seeded is not None
+        model = builder()
+        try:
+            _exercise_complex_for_model(model)
+        except Exception as exc:  # pragma: no cover - failure path aid
+            pytest.fail(f"Complex failed for model builder '{builder_name}': {exc!r}")
 
 
 class TestComplexMisc:

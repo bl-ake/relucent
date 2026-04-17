@@ -14,7 +14,7 @@ def test_readme():
         nn.Linear(10, 5),
         nn.ReLU(),
         nn.Linear(5, 1),
-    )  ## or conveniently, relucent.get_mlp_model(widths=[2, 10, 5, 1])
+    )  ## or conveniently, relucent.mlp(widths=[2, 10, 5, 1])
 
     ## Initialize a Complex to track calculations
     cplx = relucent.Complex(network)

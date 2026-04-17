@@ -13,7 +13,7 @@ import torch
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent.calculations import get_hs, get_shis
+from relucent.calculations import get_shis
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager
 from relucent.utils import (
@@ -38,9 +38,30 @@ __all__ = [
     "searcher",
 ]
 
+DEFAULT_GEOMETRY_PROPERTIES: tuple[str, ...] = (
+    "halfspaces",
+    "W",
+    "b",
+    "num_dead_relus",
+    "finite",
+    "center",
+    "inradius",
+    "interior_point",
+    "interior_point_norm",
+    "Wl2",
+)
+
+
+def _normalize_geometry_properties(properties: Iterable[str] | None) -> tuple[str, ...]:
+    if properties is None:
+        return DEFAULT_GEOMETRY_PROPERTIES
+    return tuple(dict.fromkeys(str(p).strip() for p in properties if str(p).strip()))
+
 
 def search_calculations(
     task: np.ndarray | torch.Tensor | tuple[Any, ...],
+    geometry_properties: Iterable[str] | None = None,
+    keep_caches: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, ...]:
     """Worker function for neighbor enumeration in search.
@@ -50,10 +71,10 @@ def search_calculations(
     """
     from relucent import complex as cx
 
-    assert cx.net is not None, "set_globals must be used as pool initializer"
+    assert cx._net is not None, "set_globals must be used as pool initializer"
     ss = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
-    p = Polyhedron(cx.net, ss)
+    p = Polyhedron(cx._net, ss)
 
     if not p.feasible:
         return "Polyhedron is infeasible (empty).", *rest
@@ -65,7 +86,17 @@ def search_calculations(
     except ValueError as error:
         return error, *rest
 
-    p.clean_data()
+    props = _normalize_geometry_properties(geometry_properties)
+    if props:
+        try:
+            p.get_geometry(props, env=cx.env)
+        except ValueError as error:
+            return error, *rest
+
+    if keep_caches:
+        p._preserve_cache_on_pickle = True
+    else:
+        p.clean_data()
     if isinstance(p._shis, list):
         random.shuffle(p._shis)
     return (p, *rest)
@@ -73,55 +104,45 @@ def search_calculations(
 
 def geometric_calculations(
     task: tuple[np.ndarray, list[int] | None, int] | tuple[Any, ...],
-    compute_volumes: bool = True,
+    geometry_properties: Iterable[str] | None = None,
+    keep_caches: bool = False,
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
     from relucent import complex as cx
 
-    assert cx.net is not None, "set_globals must be used as pool initializer"
+    assert cx._net is not None, "set_globals must be used as pool initializer"
     ss, shis, poly_index, *rest = task
-    p = Polyhedron(cx.net, ss, shis=shis)
+    p = Polyhedron(cx._net, ss, shis=shis)
+    props = _normalize_geometry_properties(geometry_properties)
     try:
-        halfspaces, W, b, num_dead_relus = cast(tuple[Any, Any, Any, int], get_hs(p, get_all_Ab=False))
-        p._halfspaces = halfspaces
-        p._w = W
-        p._b = b
-        p._num_dead_relus = cast(int, num_dead_relus)
-
-        _ = p.finite
-        if p._finite is None:
-            raise ValueError("Polyhedron is infeasible (empty).")
-
-        p._interior_point = p.get_interior_point(env=cx.env)
-        if p.interior_point is not None:
-            p._interior_point_norm = np.linalg.norm(p.interior_point).item()
-        else:
-            p._interior_point_norm = float("inf")
-        if isinstance(p.W, torch.Tensor):
-            p._Wl2 = torch.linalg.norm(p.W).item()
-        else:
-            p._Wl2 = np.linalg.norm(p.W).item()
-
-        if compute_volumes and cx.dim <= 6:
-            _ = p.volume
+        p.get_geometry(props, env=cx.env)
     except ValueError as error:
         return error, poly_index, *rest
 
-    # Keep computed scalar geometry caches while dropping heavy matrices.
-    p._halfspaces = None
-    p._halfspaces_np = None
-    p._w = None
-    p._b = None
+    if keep_caches:
+        p._preserve_cache_on_pickle = True
+    else:
+        p.clean_data()
     return (p, poly_index, *rest)
 
 
 def parallel_compute_geometric_properties(
     cx: "Complex",
     nworkers: int | None = None,
-    get_volumes: bool = True,
+    geometry_properties: Iterable[str] | None = None,
+    keep_caches: bool = False,
     verbose: int = 1,
 ) -> dict[str, Any]:
-    """Compute geometric properties for all existing polyhedra in parallel."""
+    """Compute selected properties for all existing polyhedra in parallel.
+
+    Args:
+        cx: Complex whose polyhedra should be updated.
+        nworkers: Number of worker processes to use.
+        geometry_properties: Iterable of cache/property names to compute.
+            If None, defaults to :data:`DEFAULT_GEOMETRY_PROPERTIES`.
+        keep_caches: If True, keep heavy caches during worker serialization.
+        verbose: Whether to print progress.
+    """
     from relucent.complex import set_globals
 
     if len(cx) == 0:
@@ -134,9 +155,16 @@ def parallel_compute_geometric_properties(
     tasks = [(poly.ss_np, poly._shis, i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
     computed = 0
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, get_volumes)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
         for result in tqdm(
-            pool.imap_unordered(partial(geometric_calculations, compute_volumes=get_volumes), tasks),
+            pool.imap_unordered(
+                partial(
+                    geometric_calculations,
+                    geometry_properties=geometry_properties,
+                    keep_caches=keep_caches,
+                ),
+                tasks,
+            ),
             total=len(tasks),
             desc="Computing Geometry",
             mininterval=5,
@@ -144,8 +172,8 @@ def parallel_compute_geometric_properties(
         ):
             poly_or_error, poly_index, *_ = result
             if isinstance(poly_or_error, Polyhedron):
-                if poly_or_error.net is None:
-                    poly_or_error.net = cx.net
+                if poly_or_error._net is None:
+                    poly_or_error._net = cx._net
                 cx.index2poly[poly_index] = poly_or_error
                 computed += 1
             else:
@@ -187,8 +215,15 @@ def parallel_add(
         s = cx.point2ss(p)
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net,)) as pool:
-        ps = pool.map(partial(geometric_calculations, compute_volumes=False), tqdm(sss, desc="Adding Polys", mininterval=5))
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net,)) as pool:
+        ps = pool.map(
+            partial(
+                geometric_calculations,
+                geometry_properties=DEFAULT_GEOMETRY_PROPERTIES,
+                keep_caches=False,
+            ),
+            tqdm(sss, desc="Adding Polys", mininterval=5),
+        )
         ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
         for p in ps:
             if p is not None:
@@ -220,8 +255,8 @@ def get_ip(
     try:
         ss = p.ss_np.copy()
         ss[0, shi] = -ss[0, shi]
-        assert cx.net is not None, "set_globals must be used as pool initializer"
-        n = Polyhedron(cx.net, ss)
+        assert cx._net is not None, "set_globals must be used as pool initializer"
+        n = Polyhedron(cx._net, ss)
         for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
             try:
                 n._interior_point = n.get_interior_point(env=cx.env, max_radius=max_radius)
@@ -256,9 +291,9 @@ def astar_calculations(
 
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
-    if p.net is None:
-        assert cx.net is not None, "set_globals must be used as pool initializer"
-        p.net = cx.net
+    if p._net is None:
+        assert cx._net is not None, "set_globals must be used as pool initializer"
+        p._net = cx._net
 
     if p.finite is None:
         raise ValueError("Polyhedron is infeasible (empty).")
@@ -288,6 +323,8 @@ def searcher(
     verbose=1,
     cube_radius: float | None = None,
     cube_mode: str = "unrestricted",
+    geometry_properties: Iterable[str] | None = None,
+    keep_caches: bool = False,
     **kwargs,
 ):
     """Search for polyhedra in the complex by discovering neighbors.
@@ -314,6 +351,13 @@ def searcher(
         nworkers: Number of worker processes for parallel computation. If None,
             uses the number of CPU cores. Defaults to None.
         verbose: Whether to print progress information. Defaults to 1.
+        geometry_properties: Iterable of polyhedron cache/property names to
+            compute for each discovered polyhedron. Defaults to
+            :data:`DEFAULT_GEOMETRY_PROPERTIES` (all non-SciPy geometry caches).
+            Pass an empty iterable for topology-only search.
+        keep_caches: If True, retain heavy caches (such as
+            ``halfspaces``, ``W``, and ``b``) when worker polyhedra are sent
+            back to the parent process. Defaults to False.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
     Returns:
@@ -380,7 +424,7 @@ def searcher(
             push=cast(Callable[[deque[object], object], None], deque.append),
         )
     if start is None:
-        start = cx.add_point(torch.zeros(cx.net.input_shape, device=cx.net.device, dtype=cx.net.dtype))
+        start = cx.add_point(torch.zeros(cx._net.input_shape, device=cx._net.device, dtype=cx._net.dtype))
     elif isinstance(start, Polyhedron):
         start = cx.add_polyhedron(start)
     else:
@@ -421,9 +465,18 @@ def searcher(
     unprocessed = len(queue)
     depth = 0
 
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
         try:
-            for p, shi, depth, node_index in pool.imap_unordered(partial(search_calculations, bound=bound, **kwargs), queue):
+            for p, shi, depth, node_index in pool.imap_unordered(
+                partial(
+                    search_calculations,
+                    bound=bound,
+                    geometry_properties=geometry_properties,
+                    keep_caches=keep_caches,
+                    **kwargs,
+                ),
+                queue,
+            ):
                 unprocessed -= 1
                 node = cast(Polyhedron, cx.index2poly[node_index])
                 if not isinstance(p, Polyhedron):
@@ -438,8 +491,8 @@ def searcher(
                         break
                     continue
 
-                if p.net is None:
-                    p.net = cx.net
+                if p._net is None:
+                    p._net = cx._net
 
                 if cube_mode != "unrestricted" and not _apply_cube_filter(p):
                     if unprocessed == 0 or len(cx) >= max_polys:
@@ -711,9 +764,9 @@ def hamming_astar(
 
     pool = None
     try:
-        set_globals(cx.net)
+        set_globals(cx._net)
         if nworkers > 1:
-            pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx.net, False, num_threads))
+            pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False, num_threads))
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
             if len(item) >= 2 and isinstance(item[1], Exception):
                 # Useful when debugging spawn-related issues on macOS/Windows.
@@ -751,8 +804,8 @@ def hamming_astar(
                 else:
                     generated += 1
                     tentative_gScore = gScore[p] + 1  ## The hamming distance between two adjacent polyhedra is always 1
-                    if neighbor.net is None:
-                        neighbor.net = cx.net
+                    if neighbor._net is None:
+                        neighbor._net = cx._net
                     if tentative_gScore < gScore[neighbor]:
                         cameFrom[neighbor] = p
                         gScore[neighbor] = tentative_gScore

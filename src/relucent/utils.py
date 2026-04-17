@@ -10,7 +10,7 @@ import os
 import random
 import sys
 from collections import OrderedDict, deque
-from collections.abc import Callable, Hashable, Iterator, Sized
+from collections.abc import Callable, Hashable, Iterable, Iterator, Sized
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
 from threading import Condition
@@ -18,6 +18,7 @@ from typing import Generic, TypeVar
 
 import numpy as np
 import torch
+import torch.nn as nn
 from gurobipy import Env, disposeDefaultEnv
 
 import relucent.config as cfg
@@ -31,6 +32,7 @@ __all__ = [
     "encode_ss",
     "get_env",
     "get_mp_context",
+    "mlp",
     "normalize_weights",
     "process_aware_cpu_count",
     "set_seeds",
@@ -39,6 +41,28 @@ __all__ = [
 
 _env: Env | None = None
 _default_env_disposed: bool = False
+
+
+def mlp(widths: Iterable[int], add_last_relu: bool = False) -> NN:
+    """Create a standard fully connected ReLU MLP wrapped as :class:`NN`.
+
+    Args:
+        widths: Layer widths including input and output widths.
+            For example, ``[2, 10, 5, 1]``.
+        add_last_relu: If ``True``, append a ReLU after the final Linear layer.
+
+    Returns:
+        An :class:`NN` instance with named Linear/ReLU layers.
+    """
+    widths = list(widths)
+    layers: list[tuple[str, nn.Module]] = []
+    for i in range(len(widths) - 1):
+        layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))
+        if i < len(widths) - 2 or add_last_relu:
+            layers.append((f"relu{i}", nn.ReLU()))
+    net = NN(layers=OrderedDict(layers))
+    object.__setattr__(net, "widths", widths)
+    return net
 
 
 def get_mp_context() -> BaseContext:

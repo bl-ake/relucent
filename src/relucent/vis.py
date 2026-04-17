@@ -388,14 +388,9 @@ def _poly_traces_2d_graph(
     try:
         x = verts[:, 0].tolist()
         y = verts[:, 1].tolist()
+        net = poly.net
         z = (
-            (
-                poly.net(torch.tensor([x, y], device=poly.net.device, dtype=poly.net.dtype).T)
-                .detach()
-                .cpu()
-                .numpy()
-                .squeeze()[:, 1]
-            )
+            (net(torch.tensor([x, y], device=net.device, dtype=net.dtype).T).detach().cpu().numpy().squeeze()[:, 1])
             if project is None
             else [project] * len(x)
         )
@@ -954,7 +949,7 @@ def _complex_figure_graph(
                     x=[poly.center[0]],
                     y=[poly.center[1]],
                     z=[
-                        cpx.net(torch.tensor(poly.center, device=cpx.net.device, dtype=cpx.net.dtype).T)
+                        cpx._net(torch.tensor(poly.center, device=cpx._net.device, dtype=cpx._net.dtype).T)
                         .detach()
                         .cpu()
                         .numpy()

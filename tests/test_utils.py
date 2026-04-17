@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import get_mlp_model
+from relucent import mlp
 from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
@@ -156,7 +156,7 @@ class TestGetColors:
 class TestSplitSequential:
     def test_split(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 6, 2])
+        net = mlp(widths=[4, 8, 6, 2])
         nn1, nn2 = split_sequential(net, "relu0")
         x = torch.zeros((1, 4), device=net.device, dtype=net.dtype)
         y1 = nn1(x)
@@ -166,7 +166,7 @@ class TestSplitSequential:
 
     def test_split_layer_in_first(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 2])
+        net = mlp(widths=[2, 4, 2])
         nn1, nn2 = split_sequential(net, "fc0")
         assert "fc0" in nn1.layers
         assert "fc1" in nn2.layers or "relu0" in nn2.layers
@@ -176,7 +176,7 @@ class TestNormalizeWeights:
     @pytest.mark.parametrize("widths", ([2, 4, 2], [4, 8, 6, 2]))
     def test_function_invariant(self, seeded, widths):
         assert seeded is not None
-        net = get_mlp_model(widths=widths)
+        net = mlp(widths=widths)
         original = copy.deepcopy(net)
 
         x = torch.randn(32, widths[0], device=net.device, dtype=net.dtype)

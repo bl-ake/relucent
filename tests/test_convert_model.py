@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 
 from relucent.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
-from relucent.model import NN, get_mlp_model
+from relucent.model import NN
+from relucent.utils import mlp
 
 
 class TestCombineLinearLayers:
@@ -194,7 +195,7 @@ class TestAvgPool2dToAffine:
 class TestConvert:
     def test_mlp_roundtrip(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 3])
+        net = mlp(widths=[4, 8, 3])
         canonical = convert(net)
         assert isinstance(canonical, NN)
         assert canonical.input_shape == (4,)
@@ -277,7 +278,7 @@ class TestConvert:
 
     def test_output_is_linear_relu_only(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 3])
+        net = mlp(widths=[4, 8, 3])
         canonical = convert(net)
         for layer in canonical.layers.values():
             assert isinstance(layer, (nn.Linear, nn.ReLU, nn.Flatten))
