@@ -10,9 +10,8 @@
    <div style="margin-bottom: 1.25rem;"></div>
 
 Relucent computes and visualizes the polyhedral structure induced by ReLU neural
-networks. It helps you explore activation regions (linear regions), extract
-region-level geometry, and analyze connectivity through dual-graph views of a
-network's piecewise-linear partition.
+networks. It helps you explore activation regions, compute
+their geometric properties, and analyze how they are connected to each other.
 
 Core capabilities include:
 
@@ -20,7 +19,7 @@ Core capabilities include:
 * Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).
 * Complex-level analyses and graph-based views of region adjacency.
 * 2D and 3D visualizations using Plotly and matplotlib-backed utilities.
-* Compatibility with PyTorch models (including sequential MLP workflows).
+* Native compatibility with PyTorch models
 
 .. toctree::
    :maxdepth: 1
