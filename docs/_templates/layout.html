@@ -1,0 +1,16 @@
+{% extends "!layout.html" %}
+
+{%- block htmltitle %}
+  <title>
+    {%- if pagename == master_doc -%}
+      {{ docstitle|striptags|e }}
+    {%- else -%}
+      {{ docstitle|striptags|e }}: {{ title|striptags|e }}
+    {%- endif -%}
+  </title>
+{%- endblock %}
+
+{%- block extrahead %}
+  {{ super() }}
+  <link rel="icon" type="image/svg+xml" href="{{ pathto('icon.svg', 1) }}" />
+{%- endblock %}
