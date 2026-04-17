@@ -1,6 +1,3 @@
-- fix config.py
-- fix problems with 3d vis
 - different CPWL activations
 - maxout layers (max layers)
 - ensure vis works on windows
-- simplify search helper functions

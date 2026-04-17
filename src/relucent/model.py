@@ -3,8 +3,7 @@
 Provides the :class:`NN` class, a thin :class:`torch.nn.Module` subclass that
 stores layer weights in a named :class:`~torch.nn.ModuleDict` and exposes
 helpers for grid generation, layer-output inspection, and weight access by
-neuron index.  Also provides :func:`get_mlp_model` for constructing standard
-ReLU MLPs.
+neuron index.
 """
 
 from collections import OrderedDict
@@ -14,7 +13,7 @@ from typing import cast
 import torch
 import torch.nn as nn
 
-__all__ = ["NN", "get_mlp_model"]
+__all__ = ["NN"]
 
 
 class NN(nn.Module):
@@ -157,30 +156,3 @@ class NN(nn.Module):
                 else:
                     remaining_rows -= layer.weight.shape[0]
         raise ValueError(f"Invalid Neuron Index: {shi}")
-
-
-def get_mlp_model(widths: Iterable[int], add_last_relu: bool = False) -> NN:
-    """Create an NN object for a multi-layer perceptron (MLP).
-
-    Constructs a fully connected neural network with the specified layer widths.
-    Each layer (except optionally the last) is followed by a ReLU activation.
-
-    Args:
-        widths: List of integers specifying the number of neurons in each layer,
-            including the input layer. For example, [2, 10, 5, 1] creates a
-            network with input dimension 2, two hidden layers with 10 and 5 neurons,
-            and output dimension 1.
-        add_last_relu: If True, adds a ReLU after the last layer. Defaults to False.
-
-    Returns:
-        NN: A configured neural network object.
-    """
-    widths = list(widths)
-    layers = []
-    for i in range(len(widths) - 1):
-        layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))
-        if i < len(widths) - 2 or add_last_relu:
-            layers.append((f"relu{i}", nn.ReLU()))
-    net = NN(layers=OrderedDict(layers))
-    object.__setattr__(net, "widths", widths)
-    return net

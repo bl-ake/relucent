@@ -11,6 +11,7 @@
     "reportImportCycles": "none",
     "reportMissingTypeStubs": "none",
     "reportPrivateUsage": "none",
+    "reportPrivateImportUsage": "none",
     "reportUnusedCallResult": "none",
     "reportUnusedFunction": "none",
     "reportUnknownArgumentType": "none",

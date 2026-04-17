@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import Complex, Polyhedron, get_mlp_model
+from relucent import Complex, Polyhedron, mlp
 from tests.helpers import ss_to_numpy
 
 
@@ -15,17 +15,17 @@ class TestPolyhedronBasics:
 
     def test_create_from_ss(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
+        net = mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
         p = Polyhedron(net, ss)
-        assert p.net is net
+        assert p._net is net
         assert np.array_equal(ss_to_numpy(p.ss), ss_to_numpy(ss))
 
     def test_affine_map_matches_forward(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[4, 8, 2], add_last_relu=True)
+        net = mlp(widths=[4, 8, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -38,7 +38,7 @@ class TestPolyhedronBasics:
 
     def test_tag_stable(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
+        net = mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -49,7 +49,7 @@ class TestPolyhedronBasics:
 
     def test_eq_hash(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
+        net = mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p1 = cplx.add_point(x)
@@ -59,7 +59,7 @@ class TestPolyhedronBasics:
 
     def test_neq(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
+        net = mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         x2 = x1 + 0.1
@@ -70,7 +70,7 @@ class TestPolyhedronBasics:
 
     def test_eq_other_type_raises(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
+        net = mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -80,7 +80,7 @@ class TestPolyhedronBasics:
     def test_volume(self):
         W = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]])
         b = torch.tensor([1, 1, 1, 1])
-        net = get_mlp_model(widths=[2, 4], add_last_relu=True)
+        net = mlp(widths=[2, 4], add_last_relu=True)
         net.layers["fc0"].weight.data = W.to(net.device, net.dtype)
         net.layers["fc0"].bias.data = b.to(net.device, net.dtype)
         cplx = Complex(net)
@@ -92,7 +92,7 @@ class TestPolyhedronBasics:
 class TestPolyhedronContainment:
     def test_interior_point_in_polyhedron(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
+        net = mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -102,7 +102,7 @@ class TestPolyhedronContainment:
 
     def test_point_containment_tensor(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 1], add_last_relu=True)
+        net = mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -113,7 +113,7 @@ class TestPolyhedronContainment:
 class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 1], add_last_relu=True)
+        net = mlp(widths=[2, 1], add_last_relu=True)
         net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype)
         net.layers["fc0"].bias.data = torch.tensor([0.0], device=net.device, dtype=net.dtype)
         net.save_numpy_weights()
@@ -128,7 +128,7 @@ class TestPolyhedronBoundedVertices:
 
     def test_bounded_vertices_supports_point_polyhedron(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 2], add_last_relu=True)
+        net = mlp(widths=[2, 2], add_last_relu=True)
         net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype)
         net.layers["fc0"].bias.data = torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype)
         net.save_numpy_weights()
@@ -143,7 +143,7 @@ class TestPolyhedronBoundedVertices:
 class TestPolyhedronOps:
     def test_nflips(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
+        net = mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         x2 = x1 + 0.2
@@ -157,7 +157,7 @@ class TestPolyhedronOps:
 class TestPolyhedronCleanData:
     def test_clean_data_clears_caches(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[2, 4, 2], add_last_relu=True)
+        net = mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -175,7 +175,7 @@ class TestPolyhedronPickle:
 
     def test_pickle_roundtrip(self, seeded):
         assert seeded is not None
-        net = get_mlp_model(widths=[3, 6, 2], add_last_relu=True)
+        net = mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -188,12 +188,12 @@ class TestPolyhedronPickle:
         blob = pickle.dumps(p)
         p2 = pickle.loads(blob)
 
-        assert p2.net is None
+        assert p2._net is None
         assert isinstance(p2.ss, (np.ndarray, torch.Tensor))
         assert np.array_equal(ss_to_numpy(p2.ss), ss_to_numpy(p.ss))
         assert p2.tag == p.tag
 
-        p2.net = net
+        p2._net = net
         W2 = torch.as_tensor(p2.W, device=net.device, dtype=net.dtype)
         b2 = torch.as_tensor(p2.b, device=net.device, dtype=net.dtype)
         y2 = x @ W2 + b2

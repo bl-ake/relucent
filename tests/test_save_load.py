@@ -3,13 +3,13 @@
 import numpy as np
 import torch
 
-from relucent import Complex, get_mlp_model
+from relucent import Complex, mlp
 from tests.helpers import ss_to_numpy
 
 
 def test_complex_save_load_roundtrip_with_ssm(tmp_path, seeded):
     assert seeded is not None
-    net = get_mlp_model(widths=[4, 7, 3], add_last_relu=True)
+    net = mlp(widths=[4, 7, 3], add_last_relu=True)
     cplx = Complex(net)
     points = [torch.rand((1, 4), device=net.device, dtype=net.dtype) for _ in range(3)]
     for pt in points:
@@ -20,19 +20,19 @@ def test_complex_save_load_roundtrip_with_ssm(tmp_path, seeded):
     loaded_with_ssm = Complex.load(path_with_ssm)
 
     assert len(loaded_with_ssm) == len(cplx)
-    assert all(p.net is loaded_with_ssm.net for p in loaded_with_ssm)
+    assert all(p._net is loaded_with_ssm._net for p in loaded_with_ssm)
 
     for p in cplx:
         assert p.ss in loaded_with_ssm
         assert np.array_equal(ss_to_numpy(loaded_with_ssm[p.ss].ss), ss_to_numpy(p.ss))
 
     x = torch.rand((2, 4), device=net.device, dtype=net.dtype)
-    assert torch.allclose(loaded_with_ssm.net(x), net(x))
+    assert torch.allclose(loaded_with_ssm._net(x), net(x))
 
 
 def test_complex_save_load_roundtrip_no_ssm(tmp_path, seeded):
     assert seeded is not None
-    net = get_mlp_model(widths=[4, 7, 3], add_last_relu=True)
+    net = mlp(widths=[4, 7, 3], add_last_relu=True)
     cplx = Complex(net)
     points = [torch.rand((1, 4), device=net.device, dtype=net.dtype) for _ in range(3)]
     for pt in points:

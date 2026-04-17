@@ -5,21 +5,23 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "0.7.2"
+version = "0.8.0"
 requires-python = ">= 3.11"
 
 dependencies = [
     "pandas>=2.3",
-    "gurobipy>=12.0",
+    "gurobipy>=12.0.1",
     "networkx>=3.6",
     "matplotlib>=3.10",
-    "numpy>=2.4",
-    "Pillow>=12.1",
+    "numpy>=2.4.1",
+    "Pillow>=12.1.0",
     "plotly>=6.3",
-    "scikit_learn>=1.8",
-    "scipy>=1.17",
-    "tqdm>=4.67",
-    "torch>=2.3",
+    "scikit_learn>=1.8.0",
+    "scipy>=1.17.0",
+    "tqdm>=4.67.0",
+    "torch>=2.5.0",
+    "sphinx>=9.0.4",
+    "pytest>=9.0.2",
 ]
 authors = [{ name = "Blake B. Gaines" }]
 license = "AGPL-3.0-or-later"

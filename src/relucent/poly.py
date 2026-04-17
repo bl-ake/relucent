@@ -1,5 +1,6 @@
 import hashlib
 import warnings
+from collections.abc import Iterable
 from functools import cached_property
 from typing import Any, cast
 
@@ -19,11 +20,7 @@ __all__ = ["Polyhedron"]
 class Polyhedron:
     """Represents a polyhedron (linear region) in d-dimensional space.
 
-    Several methods use Gurobi environments for optimization. If one is not
-    provided, an environment will be created automatically.
-
-    Interior-point search radius follows :data:`relucent.config.MAX_RADIUS`
-    unless overridden per call.
+    Instances of this class should be created by the :func:`relucent.Complex.add_point` method.
     """
 
     def __init__(
@@ -40,7 +37,7 @@ class Polyhedron:
         """Create a Polyhedron object.
 
         Args:
-            net: Instance of the NN class from the "model" module.
+            net: Internal canonical NN class instance used for geometry calculations.
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
 
         The kwargs can be used to supply precomputed values for various properties.
@@ -78,6 +75,7 @@ class Polyhedron:
         self._ss_np: np.ndarray | None = None
 
         self._attempted_compute_properties: bool = False
+        self._preserve_cache_on_pickle: bool = False
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -103,6 +101,8 @@ class Polyhedron:
     @property
     def net(self) -> NN:
         """The neural network I belong to"""
+        if self._net is None:
+            raise ValueError("Polyhedron has no associated network.")
         return self._net
 
     @net.setter
@@ -351,7 +351,7 @@ class Polyhedron:
         if ss[0, shi] == 0:
             raise ValueError(f"SHI {shi} contains the polyhedron, cannot get neighbor")
         ss[0, shi] = -ss[0, shi]
-        return Polyhedron(self.net, ss)
+        return Polyhedron(self._net, ss)
 
     def nflips(self, other: "Polyhedron") -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
@@ -636,6 +636,54 @@ class Polyhedron:
         self._attempted_compute_properties = False
         # self._interior_point = None ## TODO: Does this slow down things?
 
+    def get_geometry(
+        self,
+        properties: Iterable[str],
+        env: Any = None,
+    ) -> None:
+        """Compute selected cached properties.
+
+        Args:
+            properties: Iterable of cache/property names to ensure are computed.
+                Supported names include ``"halfspaces"``, ``"W"``, ``"b"``,
+                ``"num_dead_relus"``, ``"finite"``, ``"center"``,
+                ``"inradius"``, ``"interior_point"``, ``"interior_point_norm"``,
+                ``"Wl2"``, ``"volume"``, ``"vertices"``, ``"ch"``, and ``"hs"``.
+            env: Optional Gurobi environment used for interior-point/feasibility
+                solves when relevant.
+        """
+        requested = {name.strip() for name in properties}
+        if not requested:
+            return
+
+        geometry_aliases = {"hs", "vertices", "ch", "volume"}
+        if "halfspaces_np" in requested:
+            requested.add("halfspaces")
+        if requested & geometry_aliases:
+            requested.add("interior_point")
+
+        if requested & {"halfspaces", "W", "b", "num_dead_relus"}:
+            _ = self.halfspaces
+        if "finite" in requested or "center" in requested or "inradius" in requested:
+            _ = self.finite
+        if "interior_point" in requested and self._interior_point is None:
+            self._interior_point = self.get_interior_point(env=env)
+        if "interior_point_norm" in requested:
+            if self.interior_point is not None:
+                self._interior_point_norm = np.linalg.norm(self.interior_point).item()
+            else:
+                self._interior_point_norm = float("inf")
+        if "Wl2" in requested:
+            _ = self.Wl2
+        if requested & geometry_aliases:
+            self._compute_qhull_geometry()
+
+    def _compute_qhull_geometry(self, qhull_mode: str | None = None) -> None:
+        """Compute Qhull-derived geometry caches (hs/vertices/ch/volume)."""
+        from relucent.calculations import compute_properties
+
+        compute_properties(self, qhull_mode=qhull_mode)
+
     """
     All of the following properties are computed on the fly and cached
     """
@@ -644,18 +692,14 @@ class Polyhedron:
     def vertices(self) -> np.ndarray | None:
         """Vertices of the polyhedron (not always reliable)."""
         if not self._attempted_compute_properties:
-            from relucent.calculations import compute_properties
-
-            compute_properties(self)
+            self._compute_qhull_geometry()
         return self._vertices
 
     @property
     def hs(self) -> HalfspaceIntersection:
         """Halfspace intersection object from scipy."""
         if not self._attempted_compute_properties:
-            from relucent.calculations import compute_properties
-
-            compute_properties(self)
+            self._compute_qhull_geometry()
         assert isinstance(self._hs, HalfspaceIntersection)
         return self._hs
 
@@ -663,9 +707,7 @@ class Polyhedron:
     def ch(self) -> ConvexHull | None:
         """Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails."""
         if not self._attempted_compute_properties and self.finite:
-            from relucent.calculations import compute_properties
-
-            compute_properties(self)
+            self._compute_qhull_geometry()
         return self._ch
 
     @property
@@ -677,9 +719,7 @@ class Polyhedron:
         elif fin is None:
             self._volume = -1.0
         elif not self._attempted_compute_properties:
-            from relucent.calculations import compute_properties
-
-            compute_properties(self)
+            self._compute_qhull_geometry()
         return self._volume if self._volume is not None else -1.0
 
     @cached_property  ## !! See if this works
@@ -924,12 +964,13 @@ class Polyhedron:
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
-        return Polyhedron(self.net, self.ss + other.ss * (self.ss == 0))
+        return Polyhedron(self._net, self.ss + other.ss * (self.ss == 0))
 
     """The following methods are used for pickling"""
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
+        self._preserve_cache_on_pickle = False
         if not hasattr(self, "_finite_computed"):
             # Legacy pickle: ``_finite`` was only True/False; None meant "not computed".
             self._finite_computed = self._finite is not None
@@ -937,7 +978,7 @@ class Polyhedron:
             self._finite_computed = False
 
     def __getstate__(self) -> dict[str, Any]:
-        return {
+        state: dict[str, Any] = {
             "_tag": self.tag,
             "_hash": self._hash,
             "_finite_computed": self._finite_computed,
@@ -953,6 +994,16 @@ class Polyhedron:
             "_attempted_compute_properties": self._attempted_compute_properties,
             "warnings": self.warnings,
         }
+        if self._preserve_cache_on_pickle:
+            state.update(
+                {
+                    "_halfspaces": self._halfspaces,
+                    "_halfspaces_np": self._halfspaces_np,
+                    "_w": self._w,
+                    "_b": self._b,
+                }
+            )
+        return state
 
     def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
         return (
