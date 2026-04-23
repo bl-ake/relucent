@@ -32,6 +32,7 @@ from relucent.utils import (
 from relucent.vis import get_colors, plot_complex
 
 __all__ = ["Complex"]
+RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
 # Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
@@ -626,6 +627,22 @@ class Complex:
         """
         return _greedy_path_fn(self, start, end)
 
+    @staticmethod
+    def _warn_research_use(method_name: str) -> None:
+        """Emit a collaboration warning unless disabled by environment variable."""
+        disable_warning = os.getenv(RESEARCH_WARNING_DISABLE_ENV_VAR, "").strip().lower()
+        if disable_warning in {"1", "true", "yes", "on"}:
+            return
+        warnings.warn(
+            (
+                f"Complex.{method_name}() is actively used by the package author in ongoing research. "
+                "If you'd like to collaborate, please reach out! My email is blake@uconn.edu"
+                + f"Set {RESEARCH_WARNING_DISABLE_ENV_VAR}=1 to silence this warning."
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
+
     def hamming_astar(
         self,
         start: torch.Tensor | np.ndarray | Polyhedron,
@@ -662,6 +679,7 @@ class Complex:
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
+        self._warn_research_use("hamming_astar")
         if bound is None:
             bound = cfg.DEFAULT_SEARCH_BOUND
         return _hamming_astar_fn(
@@ -792,6 +810,7 @@ class Complex:
         cells. The boundary operators are built from dual-graph incidences at each chain level,
         then Betti numbers are computed as ``beta_k = dim(C_k) - rank(∂_k) - rank(∂_{k+1})``.
         """
+        self._warn_research_use("get_betti_numbers")
         if len(self) == 0:
             return {}
 
