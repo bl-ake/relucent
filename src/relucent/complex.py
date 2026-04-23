@@ -636,7 +636,7 @@ class Complex:
         warnings.warn(
             (
                 f"Complex.{method_name}() is actively used by the package author in ongoing research. "
-                "If you'd like to collaborate, please reach out! My email is blake@uconn.edu"
+                + "If you'd like to collaborate, please reach out! My email is blake@uconn.edu"
                 + f"Set {RESEARCH_WARNING_DISABLE_ENV_VAR}=1 to silence this warning."
             ),
             UserWarning,
