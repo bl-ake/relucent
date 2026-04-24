@@ -13,8 +13,8 @@ def _missing_torch(*_args: Any, **_kwargs: Any) -> Any:
 
 
 try:
-    import torch  # type: ignore[assignment]
-    import torch.nn as nn  # type: ignore[assignment]
+    import torch  # type: ignore[import, assignment]
+    import torch.nn as nn  # type: ignore[import, assignment]
 
     _torch_available = True
 except ImportError:
