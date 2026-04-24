@@ -5,21 +5,23 @@ Functions here take a :class:`~relucent.poly.Polyhedron` instance; the class liv
 """
 
 import warnings
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import TYPE_CHECKING, Literal, overload
 
 import numpy as np
-import torch
-import torch.nn as nn
 from gurobipy import GRB, Env, Model
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._torch_compat import TORCH_AVAILABLE, torch
+from relucent.model import FlattenLayer, LinearLayer, ReLULayer
 from relucent.utils import get_env
 
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
+
+HAS_TORCH = TORCH_AVAILABLE
 
 __all__ = [
     "adjacent_polyhedra",
@@ -362,7 +364,7 @@ def get_hs(
         If ``get_all_Ab`` is False: ``(halfspaces, W, b, num_dead_relus)``.
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
-    if isinstance(poly._ss, torch.Tensor) and not force_numpy:
+    if HAS_TORCH and isinstance(poly._ss, torch.Tensor) and not force_numpy:
         return _get_hs_torch(poly, data, get_all_Ab=get_all_Ab)
     return _get_hs_numpy(poly, data, get_all_Ab=get_all_Ab)
 
@@ -398,25 +400,25 @@ def _get_hs_torch(
     layer_W, layer_b = None, None
     if data is not None:
         assert poly._net is not None
-        outs: dict[str, torch.Tensor] | None = poly._net.get_all_layer_outputs(data)
+        outs: Mapping[str, object] | None = poly._net.get_all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []
     current_mask_index = 0
     assert poly._net is not None
     for name, layer in poly._net.layers.items():
-        if isinstance(layer, nn.Linear):
-            layer_W = layer.weight
-            layer_b = layer.bias[None, :]
+        if isinstance(layer, LinearLayer):
+            layer_W = torch.as_tensor(layer.weight, device=poly._ss.device, dtype=torch.float64)
+            layer_b = torch.as_tensor(layer.bias, device=poly._ss.device, dtype=torch.float64)
             if current_A is None or current_b is None:
-                constr_A = torch.empty((layer_W.shape[1], 0), device=poly._net.device, dtype=poly._net.dtype)
-                constr_b = torch.empty((1, 0), device=poly._net.device, dtype=poly._net.dtype)
-                current_A = torch.eye(layer_W.shape[1], device=poly._net.device, dtype=poly._net.dtype)
-                current_b = torch.zeros((1, layer_W.shape[1]), device=poly._net.device, dtype=poly._net.dtype)
+                constr_A = torch.empty((layer_W.shape[1], 0), device=poly._ss.device, dtype=torch.float64)
+                constr_b = torch.empty((1, 0), device=poly._ss.device, dtype=torch.float64)
+                current_A = torch.eye(layer_W.shape[1], device=poly._ss.device, dtype=torch.float64)
+                current_b = torch.zeros((1, layer_W.shape[1]), device=poly._ss.device, dtype=torch.float64)
 
             current_A = current_A @ layer_W.T
             current_b = current_b @ layer_W.T + layer_b
-        elif isinstance(layer, nn.ReLU):
+        elif isinstance(layer, ReLULayer):
             assert current_A is not None
             assert current_b is not None
 
@@ -440,7 +442,7 @@ def _get_hs_torch(
             current_A = current_A * (mask == 1)
             current_b = current_b * (mask == 1)
             current_mask_index += current_A.shape[1]
-        elif isinstance(layer, nn.Flatten):
+        elif isinstance(layer, FlattenLayer):
             if current_A is None:
                 pass
             else:
@@ -451,7 +453,7 @@ def _get_hs_torch(
             assert isinstance(current_A, torch.Tensor)
             assert isinstance(current_b, torch.Tensor)
             assert outs is not None
-            assert torch.allclose(outs[name], (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
+            assert torch.allclose(torch.as_tensor(outs[name]), (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -505,19 +507,16 @@ def _get_hs_numpy(
     layer_W, layer_b = None, None
     if data is not None:
         assert poly._net is not None
-        outs: dict[str, torch.Tensor] | None = poly._net.get_all_layer_outputs(data)
+        outs: Mapping[str, object] | None = poly._net.get_all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []
     current_mask_index = 0
     assert poly._net is not None
     for name, layer in poly._net.layers.items():
-        if isinstance(layer, nn.Linear):
-            layer_W = layer.weight_cpu
-            layer_b = layer.bias_cpu
-
-            assert isinstance(layer_W, np.ndarray)
-            assert isinstance(layer_b, np.ndarray)
+        if isinstance(layer, LinearLayer):
+            layer_W = layer.weight
+            layer_b = layer.bias
 
             if current_A is None or current_b is None:
                 constr_A = np.empty((layer_W.shape[1], 0))
@@ -527,7 +526,7 @@ def _get_hs_numpy(
 
             current_A = current_A @ layer_W.T
             current_b = current_b @ layer_W.T + layer_b
-        elif isinstance(layer, nn.ReLU):
+        elif isinstance(layer, ReLULayer):
             if current_A is None:
                 raise ValueError("ReLU layer must follow a linear layer")
             mask = poly.ss_np[0, current_mask_index : current_mask_index + current_A.shape[1]]
@@ -548,7 +547,7 @@ def _get_hs_numpy(
             current_A = current_A * (mask == 1)
             current_b = current_b * (mask == 1)
             current_mask_index += current_A.shape[1]
-        elif isinstance(layer, nn.Flatten):
+        elif isinstance(layer, FlattenLayer):
             if current_A is None:
                 pass
             else:
@@ -559,8 +558,12 @@ def _get_hs_numpy(
             assert isinstance(current_A, np.ndarray)
             assert isinstance(current_b, np.ndarray)
             assert outs is not None
+            expected = outs[name]
+            if isinstance(expected, torch.Tensor):
+                expected = expected.detach().cpu().numpy()
+            expected = np.asarray(expected)
             assert np.allclose(
-                outs[name].detach().cpu().numpy(),
+                expected,
                 (data @ current_A) + current_b,
                 atol=cfg.TOL_VERIFY_AB_ATOL,
             )
@@ -720,24 +723,42 @@ def get_shis(
             if new_method and basis_indices.sum() == A.shape[1]:
                 point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
                 others = poly.halfspaces[~basis_indices, :-1]  # (num_other_hyperplanes x d)
-                try:
-                    sols = torch.linalg.solve(point_shis, others.T)
-                except RuntimeError:
-                    warnings.warn(
-                        "SHI computation: failed to solve linear system for basis shortcut; falling back.",
-                        stacklevel=2,
-                    )
-                    sols = torch.zeros(others.T.shape, device=poly.halfspaces.device)
-                all_correct = (sols > 0).all(dim=0)
-                assert all_correct.shape[0] == others.shape[0]
-                correct_indices = torch.argwhere(all_correct).reshape(-1)
-                if correct_indices.shape[0] > 0:
-                    A_indices = torch.arange(A.shape[0], device=poly.halfspaces.device)[~basis_indices][all_correct]
-
-                    old_len = len(subset)
-                    subset -= set(A_indices.detach().cpu().numpy().ravel().tolist())
-                    new_len = len(subset)
-                    skip_size = old_len - new_len
+                if HAS_TORCH and isinstance(point_shis, torch.Tensor):
+                    try:
+                        sols = torch.linalg.solve(point_shis, others.T)
+                    except RuntimeError:
+                        warnings.warn(
+                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                            stacklevel=2,
+                        )
+                        sols = torch.zeros(others.T.shape, device=poly.halfspaces.device)
+                    all_correct = (sols > 0).all(dim=0)
+                    assert all_correct.shape[0] == others.shape[0]
+                    correct_indices = torch.argwhere(all_correct).reshape(-1)
+                    if correct_indices.shape[0] > 0:
+                        A_indices = torch.arange(A.shape[0], device=poly.halfspaces.device)[~basis_indices][all_correct]
+                        old_len = len(subset)
+                        subset -= set(A_indices.detach().cpu().numpy().ravel().tolist())
+                        new_len = len(subset)
+                        skip_size = old_len - new_len
+                else:
+                    point_shis_np = np.asarray(point_shis)
+                    others_np = np.asarray(others)
+                    try:
+                        sols_np = np.linalg.solve(point_shis_np, others_np.T)
+                    except np.linalg.LinAlgError:
+                        warnings.warn(
+                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                            stacklevel=2,
+                        )
+                        sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
+                    all_correct_np = (sols_np > 0).all(axis=0)
+                    if all_correct_np.any():
+                        A_indices_np = np.arange(A.shape[0])[~basis_indices][all_correct_np]
+                        old_len = len(subset)
+                        subset -= set(A_indices_np.ravel().tolist())
+                        new_len = len(subset)
+                        skip_size = old_len - new_len
         else:
             raise ValueError(f"Model status: {model.status}")
 

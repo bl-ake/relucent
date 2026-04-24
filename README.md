@@ -18,9 +18,14 @@ Relucent is a Python package for computing the polyhedra of ReLU networks! Its m
 - Various calculations for individual activation regions, decision boundaries, and affine splines
 
 ## Environment Setup 
-1. Install Python >= 3.11
-2. Install [PyTorch](https://pytorch.org/get-started/locally/)
-3. Run `pip install relucent`
+- Core package only (without PyTorch): `pip install relucent`
+- With PyTorch support: `pip install "relucent[torch]"`
+  - Note: Supports PyTorch `>=2.5.0` ([PyTorch install guide](https://pytorch.org/get-started/locally/))
+
+### Development Check Modes
+
+- With torch (full checks): `pip install ".[dev,torch]" && pytest`
+- Without torch (optional-dependency compatibility): `pip install ".[dev]" && pytest tests/test_no_torch.py`
 
 ## Getting Started
 To see if the installation has been successful, try plotting the complex of a randomly initialized network in 2 dimensions like this:

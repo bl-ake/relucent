@@ -1,29 +1,8 @@
-def _require_torch() -> None:
-    """Import torch or raise a friendly error.
-
-    This is intentionally wrapped in a function so the exception binding
-    doesn’t leak a module-level name into the public interface.
-    """
-
-    try:
-        import torch
-
-        if not hasattr(torch, "Tensor"):
-            raise ImportError("PyTorch import is incomplete.")
-    except ImportError as exc:
-        raise ImportError(
-            "Relucent requires PyTorch to be installed manually. "
-            + "Please install the version compatible with your system from: "
-            + "https://pytorch.org/get-started/previous-versions/#:~:text=org/whl/cpu-,v2.3.0"
-        ) from exc
-
-
-_require_torch()
-del _require_torch
-
 import tomllib  # noqa: E402
+from importlib import import_module  # noqa: E402
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
+from typing import TYPE_CHECKING  # noqa: E402
 
 try:
     __version__ = version("relucent")
@@ -33,13 +12,15 @@ except PackageNotFoundError:
         __version__ = tomllib.load(_fp)["project"]["version"]
 
 from . import config  # noqa: E402
-from .complex import Complex  # noqa: E402
 from .config import update_settings  # noqa: E402
-from .convert_model import convert  # noqa: E402
-from .poly import Polyhedron  # noqa: E402
-from .ss import SSManager  # noqa: E402
-from .utils import get_env, mlp, set_seeds, split_sequential  # noqa: E402
-from .vis import get_colors, plot_complex, plot_polyhedron  # noqa: E402
+
+if TYPE_CHECKING:
+    from .complex import Complex
+    from .convert_model import convert
+    from .poly import Polyhedron
+    from .ss import SSManager
+    from .utils import get_env, mlp, set_seeds, split_sequential
+    from .vis import get_colors, plot_complex, plot_polyhedron
 
 __all__ = [
     "__version__",
@@ -57,3 +38,31 @@ __all__ = [
     "set_seeds",
     "split_sequential",
 ]
+
+_LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "Complex": ("relucent.complex", "Complex"),
+    "Polyhedron": ("relucent.poly", "Polyhedron"),
+    "SSManager": ("relucent.ss", "SSManager"),
+    "convert": ("relucent.convert_model", "convert"),
+    "get_colors": ("relucent.vis", "get_colors"),
+    "get_env": ("relucent.utils", "get_env"),
+    "mlp": ("relucent.utils", "mlp"),
+    "plot_complex": ("relucent.vis", "plot_complex"),
+    "plot_polyhedron": ("relucent.vis", "plot_polyhedron"),
+    "set_seeds": ("relucent.utils", "set_seeds"),
+    "split_sequential": ("relucent.utils", "split_sequential"),
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = getattr(module, attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

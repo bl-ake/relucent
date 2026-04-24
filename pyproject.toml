@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "0.8.1"
+version = "0.9.0"
 requires-python = ">= 3.11"
 
 dependencies = [
@@ -19,7 +19,6 @@ dependencies = [
     "scikit_learn>=1.8.0",
     "scipy>=1.17.0",
     "tqdm>=4.67.0",
-    "torch>=2.5.0",
     "sphinx>=9.0.4",
     "pytest>=9.0.2",
 ]
@@ -28,6 +27,7 @@ license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 [project.optional-dependencies]
+torch = ["torch>=2.5.0"]
 vis = ["pyvis>=0.3", "kaleido"]
 dev = ["pytest", "ruff", "basedpyright>=1.39.0"]
 docs = ["sphinx", "sphinx-rtd-theme"]

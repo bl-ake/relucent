@@ -10,14 +10,13 @@ from typing import Any, Literal, overload
 import networkx as nx
 import numpy as np
 import plotly.graph_objects as go
-import torch
-import torch.nn as nn
 from gurobipy import Env
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._torch_compat import TORCH_AVAILABLE, torch
 from relucent.convert_model import convert
-from relucent.model import NN
+from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.poly import Polyhedron
 from relucent.search import greedy_path as _greedy_path_fn
 from relucent.search import hamming_astar as _hamming_astar_fn
@@ -36,12 +35,12 @@ RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
 # Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
-_net: NN | None = None
+_net: ReLUNetwork | None = None
 dim: int = 0
 get_vol_calc: bool = True
 
 
-def set_globals(get_net: NN, get_volumes: bool = True, num_threads: int | None = None) -> None:
+def set_globals(get_net: ReLUNetwork, get_volumes: bool = True, num_threads: int | None = None) -> None:
     """Initialize global variables for worker processes in multiprocessing.
 
     This function should only be used as an initializer for multiprocessing pools,
@@ -77,15 +76,15 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
-    def __init__(self, net: nn.Module) -> None:
+    def __init__(self, net: Any) -> None:
         """Initialize the complex for a given network.
 
         Args:
-            net: The nn.Module instance whose polyhedral complex
+            net: Any model convertible to relucent's canonical ``NN``.
                 is to be built and queried.
         """
         original_net = net
-        if not isinstance(net, NN):
+        if not isinstance(net, ReLUNetwork):
             net = convert(net)
         self.net = original_net
         self._net = net
@@ -95,14 +94,14 @@ class Complex:
         self.index2poly: list[Polyhedron] = []
 
         net_layers = list(self._net.layers.values())
-        self.ss_layers = [i for i, next_layer in enumerate(net_layers[1:]) if isinstance(next_layer, nn.ReLU)]
+        self.ss_layers = [i for i, next_layer in enumerate(net_layers[1:]) if isinstance(next_layer, ReLULayer)]
 
         # Build mapping from global sign-sequence indices to (layer_index, neuron_index)
         self.ssi2maski = []
         for i, layer in enumerate(self._net.layers.values()):
             if i in self.ss_layers:
-                assert isinstance(layer, nn.Linear), "Only linear layers should be before ReLU layers"
-                for neuron_idx in range(layer.out_features):
+                assert isinstance(layer, LinearLayer), "Only linear layers should be before ReLU layers"
+                for neuron_idx in range(layer.weight.shape[0]):
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
         self._dual_graph: nx.Graph[Polyhedron] | None = None
@@ -242,7 +241,7 @@ class Complex:
         return len(self.ssi2maski)
 
     @torch.no_grad()
-    def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor, None, None]:
+    def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor | np.ndarray, None, None]:
         """Generate sign sequences for each ReLU layer from a batch of data points.
 
         Args:
@@ -253,12 +252,19 @@ class Complex:
             torch.Tensor: Sign sequences for each ReLU layer in
                 the network, indicating the activation pattern of that layer.
         """
-        x = batch if isinstance(batch, torch.Tensor) else torch.as_tensor(batch)
-        x = x.to(device=self._net.device, dtype=self._net.dtype).reshape((-1, *self._net.input_shape))
+        if TORCH_AVAILABLE and isinstance(batch, torch.Tensor):
+            x: torch.Tensor | np.ndarray = batch.reshape((-1, *self._net.input_shape))
+            use_torch = True
+        else:
+            x = np.asarray(batch, dtype=np.float64).reshape((-1, *self._net.input_shape))
+            use_torch = False
         for i, layer in enumerate(self._net.layers.values()):
-            x = layer(x)
+            x = self._net._apply_layer(layer, x)
             if i in self.ss_layers:
-                yield torch.sign(x)  # * (torch.abs(x) < 1e-12)
+                if use_torch:
+                    yield torch.sign(torch.as_tensor(x))
+                else:
+                    yield np.sign(np.asarray(x))
                 if i == self.ss_layers[-1]:
                     break
 
@@ -277,10 +283,10 @@ class Complex:
                 torch.Tensor, otherwise a np.ndarray.
         """
         is_tensor = isinstance(batch, torch.Tensor)
-        result = torch.hstack(list(self.ss_iterator(batch)))
-        if is_tensor:
-            return result
-        return result.detach().cpu().numpy()
+        ss_parts = list(self.ss_iterator(batch))
+        if is_tensor and TORCH_AVAILABLE:
+            return torch.hstack([torch.as_tensor(s) for s in ss_parts])
+        return np.hstack([np.asarray(s) for s in ss_parts])
 
     def point2poly(
         self,

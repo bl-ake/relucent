@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from relucent.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
-from relucent.model import NN
+from relucent.model import ReLUNetwork, FlattenLayer, LinearLayer, ReLULayer
 from relucent.utils import mlp
 
 
@@ -197,12 +197,12 @@ class TestConvert:
         assert seeded is not None
         net = mlp(widths=[4, 8, 3])
         canonical = convert(net)
-        assert isinstance(canonical, NN)
+        assert isinstance(canonical, ReLUNetwork)
         assert canonical.input_shape == (4,)
-        x = torch.randn(2, 4, device=net.device, dtype=net.dtype)
+        x = torch.randn(2, 4, dtype=torch.float64)
         y_orig = net(x)
         y_can = canonical(x)
-        assert torch.allclose(y_orig, y_can, atol=1e-5)
+        assert torch.allclose(y_orig, torch.as_tensor(y_can, dtype=y_orig.dtype), atol=1e-5)
 
     def test_conv2d_model_roundtrip(self, seeded):
         assert seeded is not None
@@ -212,13 +212,12 @@ class TestConvert:
         flatten = nn.Flatten()
         fc = nn.Linear(4 * H * W, 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("conv", conv), ("relu", relu), ("flatten", flatten), ("fc", fc)])
-        model = NN(layers=layers, input_shape=(C, H, W))
-        canonical = convert(model)
-        assert isinstance(canonical, NN)
+        canonical = convert(layers, input_shape=(C, H, W))
+        assert isinstance(canonical, ReLUNetwork)
         x = torch.randn(1, C, H, W)
         y_orig = fc(flatten(relu(conv(x))))
         y_can = canonical(x.reshape(1, -1))
-        assert torch.allclose(y_orig, y_can, atol=1e-4)
+        assert torch.allclose(y_orig, torch.as_tensor(y_can, dtype=y_orig.dtype), atol=1e-4)
 
     def test_avgpool2d_model_roundtrip(self, seeded):
         assert seeded is not None
@@ -227,13 +226,12 @@ class TestConvert:
         flatten = nn.Flatten()
         fc = nn.Linear(C * (H // 2) * (W // 2), 2)
         layers: OrderedDict[str, nn.Module] = OrderedDict([("pool", pool), ("flatten", flatten), ("fc", fc)])
-        model = NN(layers=layers, input_shape=(C, H, W))
-        canonical = convert(model)
-        assert isinstance(canonical, NN)
+        canonical = convert(layers, input_shape=(C, H, W))
+        assert isinstance(canonical, ReLUNetwork)
         x = torch.randn(1, C, H, W)
         y_orig = fc(flatten(pool(x)))
         y_can = canonical(x.reshape(1, -1))
-        assert torch.allclose(y_orig, y_can, atol=1e-4)
+        assert torch.allclose(y_orig, torch.as_tensor(y_can, dtype=y_orig.dtype), atol=1e-4)
 
     def test_dropout_is_stripped(self, seeded):
         assert seeded is not None
@@ -245,8 +243,7 @@ class TestConvert:
                 ("fc1", nn.Linear(8, 2)),
             ]
         )
-        model = NN(layers=layers, input_shape=(4,))
-        canonical = convert(model)
+        canonical = convert(layers, input_shape=(4,))
         assert not any(isinstance(layer, nn.Dropout) for layer in canonical.layers.values())
 
     def test_logsoftmax_stops_conversion(self, seeded):
@@ -259,10 +256,9 @@ class TestConvert:
                 ("logsoftmax", nn.LogSoftmax(dim=1)),
             ]
         )
-        model = NN(layers=layers, input_shape=(4,))
-        canonical = convert(model)
+        canonical = convert(layers, input_shape=(4,))
         assert not any(isinstance(layer, nn.LogSoftmax) for layer in canonical.layers.values())
-        assert any(isinstance(layer, nn.Linear) and layer.out_features == 3 for layer in canonical.layers.values())
+        assert any(isinstance(layer, LinearLayer) and layer.weight.shape[0] == 3 for layer in canonical.layers.values())
 
     def test_unsupported_layer_raises(self, seeded):
         assert seeded is not None
@@ -272,16 +268,15 @@ class TestConvert:
                 ("sigmoid", nn.Sigmoid()),
             ]
         )
-        model = NN(layers=layers, input_shape=(4,))
         with pytest.raises(ValueError, match="not supported"):
-            convert(model)
+            convert(layers, input_shape=(4,))
 
     def test_output_is_linear_relu_only(self, seeded):
         assert seeded is not None
         net = mlp(widths=[4, 8, 3])
         canonical = convert(net)
         for layer in canonical.layers.values():
-            assert isinstance(layer, (nn.Linear, nn.ReLU, nn.Flatten))
+            assert isinstance(layer, (LinearLayer, ReLULayer, FlattenLayer))
 
     def test_consecutive_linears_are_merged(self, seeded):
         assert seeded is not None
@@ -291,9 +286,8 @@ class TestConvert:
                 ("fc1", nn.Linear(8, 3)),
             ]
         )
-        model = NN(layers=layers, input_shape=(4,))
-        canonical = convert(model)
-        linear_layers = [layer for layer in canonical.layers.values() if isinstance(layer, nn.Linear)]
+        canonical = convert(layers, input_shape=(4,))
+        linear_layers = [layer for layer in canonical.layers.values() if isinstance(layer, LinearLayer)]
         assert len(linear_layers) == 1
-        assert linear_layers[0].in_features == 4
-        assert linear_layers[0].out_features == 3
+        assert linear_layers[0].weight.shape[1] == 4
+        assert linear_layers[0].weight.shape[0] == 3

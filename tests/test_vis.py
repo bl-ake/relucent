@@ -14,32 +14,18 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import pytest
-import torch
-from torch import nn
 
 from relucent import vis
 from relucent.complex import Complex
-from relucent.model import NN
+from relucent.model import LinearLayer, ReLUNetwork
 from relucent.poly import Polyhedron
 
 
-class _ProjectModule(nn.Module):
-    """Tiny deterministic 2D -> 2D module for graph plotting tests."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        # Give the module a parameter so NN.device / NN.dtype are well-defined.
-        self._dummy = nn.Parameter(torch.zeros(()))
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: D401
-        # Returns (N, 2) so vis._poly_traces_2d_graph can index [:, 1].
-        return torch.stack((x[:, 0], x[:, 0] + x[:, 1]), dim=1)
-
-
-def _tiny_nn(input_dim: int) -> NN:
-    net = NN([_ProjectModule()], input_shape=(input_dim,), device=torch.device("cpu"), dtype=torch.float32)
-    net.save_numpy_weights()
-    return net
+def _tiny_nn(input_dim: int) -> ReLUNetwork:
+    # Identity map to keep graph plotting helpers simple and deterministic.
+    w = np.eye(input_dim, dtype=np.float64)
+    b = np.zeros((1, input_dim), dtype=np.float64)
+    return ReLUNetwork([LinearLayer(weight=w, bias=b)], input_shape=(input_dim,))
 
 
 def _poly_with_vertices(
@@ -51,7 +37,7 @@ def _poly_with_vertices(
     center: np.ndarray | None = None,
     interior_point: np.ndarray | None = None,
     Wl2: float = 1.0,
-    net: NN | None = None,
+    net: ReLUNetwork | None = None,
 ) -> Polyhedron:
     # Create a real Polyhedron with a dummy halfspace array of the right ambient dimension.
     dummy_hs = np.zeros((max(1, ss_np.shape[1]), ambient_dim + 1), dtype=float)

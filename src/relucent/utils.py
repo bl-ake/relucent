@@ -12,17 +12,17 @@ import sys
 from collections import OrderedDict, deque
 from collections.abc import Callable, Hashable, Iterable, Iterator, Sized
 from heapq import heappop, heappush
+from math import sqrt
 from multiprocessing.context import BaseContext
 from threading import Condition
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 import numpy as np
-import torch
-import torch.nn as nn
 from gurobipy import Env, disposeDefaultEnv
 
 import relucent.config as cfg
-from relucent.model import NN
+from relucent._torch_compat import TORCH_AVAILABLE, nn, torch
+from relucent.model import ReLUNetwork, FlattenLayer, LinearLayer, ReLULayer
 
 __all__ = [
     "BlockingQueue",
@@ -43,7 +43,37 @@ _env: Env | None = None
 _default_env_disposed: bool = False
 
 
-def mlp(widths: Iterable[int], add_last_relu: bool = False) -> NN:
+class TorchMLP(nn.Sequential):
+    """Sequential MLP with compatibility helpers used across relucent."""
+
+    def __init__(self, layers: OrderedDict[str, nn.Module], widths: list[int]) -> None:
+        super().__init__(layers)
+        self.widths = widths
+        self.input_shape = (widths[0],)
+
+    @property
+    def layers(self) -> OrderedDict[str, nn.Module]:
+        return cast(OrderedDict[str, nn.Module], self._modules)
+
+    @property
+    def device(self) -> str:
+        try:
+            return str(next(self.parameters()).device)
+        except StopIteration:
+            return "cpu"
+
+    @property
+    def dtype(self) -> torch.dtype:
+        try:
+            return next(self.parameters()).dtype
+        except StopIteration:
+            return torch.float64
+
+    def save_numpy_weights(self) -> None:
+        return
+
+
+def mlp(widths: Iterable[int], add_last_relu: bool = False) -> Any:
     """Create a standard fully connected ReLU MLP wrapped as :class:`NN`.
 
     Args:
@@ -55,14 +85,31 @@ def mlp(widths: Iterable[int], add_last_relu: bool = False) -> NN:
         An :class:`NN` instance with named Linear/ReLU layers.
     """
     widths = list(widths)
-    layers: list[tuple[str, nn.Module]] = []
-    for i in range(len(widths) - 1):
-        layers.append((f"fc{i}", nn.Linear(widths[i], widths[i + 1])))
-        if i < len(widths) - 2 or add_last_relu:
-            layers.append((f"relu{i}", nn.ReLU()))
-    net = NN(layers=OrderedDict(layers))
-    object.__setattr__(net, "widths", widths)
-    return net
+    try:
+        layers: list[tuple[str, nn.Module]] = []
+        for i in range(len(widths) - 1):
+            fc = nn.Linear(widths[i], widths[i + 1], dtype=torch.float64)
+            # Match torch's default Linear initialization explicitly so behavior is
+            # stable regardless of the module-construction path.
+            bound = 1.0 / sqrt(widths[i]) if widths[i] > 0 else 0.0
+            with torch.no_grad():
+                fc.weight.uniform_(-bound, bound)
+                fc.bias.uniform_(-bound, bound)
+            layers.append((f"fc{i}", fc))
+            if i < len(widths) - 2 or add_last_relu:
+                layers.append((f"relu{i}", nn.ReLU()))
+        return TorchMLP(OrderedDict(layers), widths)
+    except Exception:
+        layers_np: list[tuple[str, LinearLayer | ReLULayer]] = []
+        for i in range(len(widths) - 1):
+            weight = np.random.uniform(-1.0, 1.0, size=(widths[i + 1], widths[i])).astype(np.float64)
+            bias = np.random.uniform(-1.0, 1.0, size=(1, widths[i + 1])).astype(np.float64)
+            layers_np.append((f"fc{i}", LinearLayer(weight=weight, bias=bias)))
+            if i < len(widths) - 2 or add_last_relu:
+                layers_np.append((f"relu{i}", ReLULayer()))
+        net_np = ReLUNetwork(layers=OrderedDict(layers_np))
+        object.__setattr__(net_np, "widths", widths)
+        return net_np
 
 
 def get_mp_context() -> BaseContext:
@@ -104,7 +151,8 @@ def set_seeds(seed: int) -> None:
     Args:
         seed: Integer seed value.
     """
-    torch.manual_seed(seed)
+    if TORCH_AVAILABLE:
+        torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
@@ -380,15 +428,18 @@ class UpdatablePriorityQueue:
         return len(self.entry_finder)
 
 
-def split_sequential(model: NN, split_layer: str) -> tuple[NN, NN]:
+def split_sequential(
+    model: Any,
+    split_layer: str,
+) -> tuple[Any, Any]:
     """Split a neural network into two sequential parts.
 
-    Creates two separate NN objects by splitting the model at a specified layer.
+    Creates two separate canonical network objects by splitting the model at a specified layer.
     The first network contains layers up to and including split_layer, and the
     second contains all subsequent layers.
 
     Args:
-        model: The NN object to split.
+        model: The canonical network object to split.
         split_layer: Name of the layer at which to split (this layer goes to
             the first network).
 
@@ -396,71 +447,119 @@ def split_sequential(model: NN, split_layer: str) -> tuple[NN, NN]:
         tuple: (nn1, nn2) where nn1 contains layers up to split_layer and
             nn2 contains the remaining layers.
     """
-    layers1, layers2 = OrderedDict(), OrderedDict()
-    current_layers = layers1
+    if isinstance(model, TorchMLP):
+        def _infer_torch_widths(
+            layers: OrderedDict[str, nn.Module],
+            *,
+            fallback_input_width: int,
+        ) -> list[int]:
+            widths: list[int] = []
+            for layer in layers.values():
+                if isinstance(layer, nn.Linear):
+                    if not widths:
+                        widths.append(int(layer.in_features))
+                    widths.append(int(layer.out_features))
+            if widths:
+                return widths
+            return [int(fallback_input_width)]
+
+        layers1: OrderedDict[str, nn.Module] = OrderedDict()
+        layers2: OrderedDict[str, nn.Module] = OrderedDict()
+        current_layers = layers1
+        for name, layer in model.named_children():
+            current_layers[name] = layer
+            if name == split_layer:
+                current_layers = layers2
+        widths1 = _infer_torch_widths(layers1, fallback_input_width=int(model.widths[0]))
+        widths2 = _infer_torch_widths(layers2, fallback_input_width=int(widths1[-1]))
+        return TorchMLP(layers1, widths1), TorchMLP(layers2, widths2)
+
+    layers1_c: OrderedDict[str, LinearLayer | ReLULayer | FlattenLayer] = OrderedDict()
+    layers2_c: OrderedDict[str, LinearLayer | ReLULayer | FlattenLayer] = OrderedDict()
+    current_layers_c = layers1_c
     for name, layer in model.layers.items():
-        current_layers[name] = layer
+        current_layers_c[name] = layer
         if name == split_layer:
-            current_layers = layers2
-    nn1 = NN(layers1, input_shape=model.input_shape, device=model.device, dtype=model.dtype)
-    nn2 = NN(
-        layers2,
-        input_shape=nn1(torch.zeros((1,) + model.input_shape, device=model.device, dtype=model.dtype)).squeeze().shape,
-        device=model.device,
-        dtype=model.dtype,
+            current_layers_c = layers2_c
+    nn1 = ReLUNetwork(layers1_c, input_shape=model.input_shape)
+    nn2 = ReLUNetwork(
+        layers2_c,
+        input_shape=tuple(int(v) for v in nn1(np.zeros((1,) + model.input_shape, dtype=np.float64)).squeeze().shape),
     )
     return nn1, nn2
 
 
-def normalize_weights(model: NN) -> NN:
+def normalize_weights(model: Any) -> Any:
     """Normalize hidden neuron weights to unit norm without changing the network function.
 
     The incoming weights (and biases) of each Linear layer except the last one are rescaled so that each
     neuron's weight vector has unit ℓ2 norm.
 
     Args:
-        model: The NN object whose weights should be normalized in-place.
+        model: The canonical network object whose weights should be normalized in-place.
 
     Returns:
-        The same NN object with normalized hidden-layer weights.
+        The same canonical network object with normalized hidden-layer weights.
 
     Raises:
         ValueError: If the network contains layers other than Linear or ReLU.
     """
+    if isinstance(model, TorchMLP):
+        layers_torch = list(model.children())
+        for layer in layers_torch:
+            if not isinstance(layer, (nn.Linear, nn.ReLU)):
+                raise ValueError(f"Unsupported layer type: {type(layer)}")
+
+        linear_indices_torch = [i for i, layer in enumerate(layers_torch) if isinstance(layer, nn.Linear)]
+        with torch.no_grad():
+            for idx, lin_idx in enumerate(linear_indices_torch):
+                layer = layers_torch[lin_idx]
+                assert isinstance(layer, nn.Linear)
+                if idx == len(linear_indices_torch) - 1:
+                    continue
+                w = layer.weight.data
+                norms = w.norm(dim=1, keepdim=True)
+                safe_norms = torch.where(norms > 0, norms, torch.ones_like(norms))
+                layer.weight.data = w / safe_norms
+                layer.bias.data = layer.bias.data / safe_norms.squeeze(1)
+
+                next_linear = layers_torch[linear_indices_torch[idx + 1]]
+                assert isinstance(next_linear, nn.Linear)
+                next_linear.weight.data = next_linear.weight.data * safe_norms.squeeze(1)
+        return model
+
     layers = list(model.layers.values())
 
     # Ensure only supported layer types are present.
     for layer in layers:
-        if not isinstance(layer, (torch.nn.Linear, torch.nn.ReLU)):
+        if not isinstance(layer, (LinearLayer, ReLULayer)):
             raise ValueError(f"Unsupported layer type: {type(layer)}")
 
     # Indices of all Linear layers in order.
-    linear_indices = [i for i, layer in enumerate(layers) if isinstance(layer, torch.nn.Linear)]
+    linear_indices = [i for i, layer in enumerate(layers) if isinstance(layer, LinearLayer)]
 
     for idx, lin_idx in enumerate(linear_indices):
         layer = layers[lin_idx]
+        assert isinstance(layer, LinearLayer)
 
         # Do not modify the final Linear layer
         is_last_linear = idx == len(linear_indices) - 1
         if is_last_linear:
             continue
 
-        assert isinstance(layer.weight.data, torch.Tensor)
-        assert isinstance(layer.bias.data, torch.Tensor)
+        w = layer.weight
+        norms = np.linalg.norm(w, axis=1, keepdims=True)
+        safe_norms = np.where(norms > 0, norms, np.ones_like(norms))
 
-        w = layer.weight.data
-        norms = w.norm(dim=1, keepdim=True)
-        safe_norms = torch.where(norms > 0, norms, torch.ones_like(norms))
-
-        layer.weight.data = w / safe_norms
-        if layer.bias is not None:
-            layer.bias.data = layer.bias.data / safe_norms.squeeze(1)
+        layer.weight = w / safe_norms
+        # Bias is stored row-wise as shape (1, out_features), so divide by the
+        # transposed norms to avoid broadcasting to (out_features, out_features).
+        layer.bias = layer.bias / safe_norms.T
 
         next_linear = layers[linear_indices[idx + 1]]
-        assert isinstance(next_linear.weight.data, torch.Tensor)
-
-        next_w = next_linear.weight.data  # shape (out_next, out_current)
-        scale = safe_norms.squeeze(1)  # shape (out_current,)
-        next_linear.weight.data = next_w * scale
+        assert isinstance(next_linear, LinearLayer)
+        next_w = next_linear.weight
+        scale = safe_norms.squeeze(1)
+        next_linear.weight = next_w * scale
 
     return model

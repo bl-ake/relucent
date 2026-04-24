@@ -31,6 +31,7 @@ jobs:
       run: basedpyright
 
   test:
+    name: Test (with torch) - ${{ matrix.os }} py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -47,6 +48,30 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install ".[dev]"
+        python -m pip install ".[dev,torch]"
     - name: Test with pytest
       run: pytest
+
+  test-no-torch:
+    name: Test (no torch) - ubuntu py3.13
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Install dependencies (without torch extra)
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install ".[dev]"
+    - name: Verify torch is not installed
+      run: |
+        python - <<'PY'
+        import importlib.util
+        if importlib.util.find_spec("torch") is not None:
+            raise SystemExit("Expected no-torch environment, but torch is installed.")
+        print("torch not installed: OK")
+        PY
+    - name: Run no-torch compatibility checks
+      run: pytest tests/test_no_torch.py
