@@ -13,27 +13,27 @@ def seed():
 
 @pytest.fixture
 def seeded(seed):
-    """Set all RNG seeds before test. Use as: def test_foo(seeded): ..."""
+    """Set all RNG seeds before test."""
     set_seeds(seed)
     return seed
 
 
 @pytest.fixture
-def small_mlp(seeded):
+def small_mlp(seed):
     """Small MLP [4, 8] with ReLU on last layer, for fast complex/search tests."""
-    assert seeded is not None
+    set_seeds(seed)
     return mlp(widths=[4, 8], add_last_relu=True)
 
 
 @pytest.fixture
-def tiny_mlp(seeded):
+def tiny_mlp(seed):
     """Tiny MLP [2, 4, 2] with last ReLU, for quick sanity checks."""
-    assert seeded is not None
+    set_seeds(seed)
     return mlp(widths=[2, 4, 2], add_last_relu=True)
 
 
 @pytest.fixture
-def mlp_2d(seeded):
+def mlp_2d(seed):
     """2D input MLP [2, 10, 5, 1] for plotting and 2D-specific tests."""
-    assert seeded is not None
+    set_seeds(seed)
     return mlp(widths=[2, 10, 5, 1])

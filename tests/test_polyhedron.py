@@ -84,8 +84,8 @@ class TestPolyhedronBasics:
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
-        with pytest.raises(ValueError, match="Cannot compare Polyhedron"):
-            _ = p == 1
+        # Comparing with an unsupported type returns NotImplemented (Python falls back to identity check)
+        assert (p == 1) is False
 
     def test_volume(self):
         W = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]])
@@ -129,7 +129,6 @@ class TestPolyhedronBoundedVertices:
             torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype),
             torch.tensor([0.0], device=net.device, dtype=net.dtype),
         )
-        net.save_numpy_weights()
         p = Polyhedron(net, np.array([[0]], dtype=np.int8))
 
         verts = p.get_bounded_vertices(bound=1.0)
@@ -148,7 +147,6 @@ class TestPolyhedronBoundedVertices:
             torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype),
             torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype),
         )
-        net.save_numpy_weights()
         p = Polyhedron(net, np.array([[0, 0]], dtype=np.int8))
 
         verts = p.get_bounded_vertices(bound=1.0)

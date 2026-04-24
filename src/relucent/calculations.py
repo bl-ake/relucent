@@ -21,8 +21,6 @@ from relucent.utils import get_env
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
 
-HAS_TORCH = TORCH_AVAILABLE
-
 __all__ = [
     "adjacent_polyhedra",
     "compute_properties",
@@ -364,7 +362,7 @@ def get_hs(
         If ``get_all_Ab`` is False: ``(halfspaces, W, b, num_dead_relus)``.
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
-    if HAS_TORCH and isinstance(poly._ss, torch.Tensor) and not force_numpy:
+    if TORCH_AVAILABLE and isinstance(poly._ss, torch.Tensor) and not force_numpy:
         return _get_hs_torch(poly, data, get_all_Ab=get_all_Ab)
     return _get_hs_numpy(poly, data, get_all_Ab=get_all_Ab)
 
@@ -658,16 +656,6 @@ def get_shis(
     model = Model("SHIS", env)
     x = model.addMVar((poly.halfspaces_np.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
     constrs = model.addConstr(A @ x == -b, name="hyperplanes")
-    if model.status == GRB.INTERRUPTED:
-        model.close()
-        raise KeyboardInterrupt
-    elif model.status == GRB.OPTIMAL:
-        ## All Hyperplanes Intersect
-        shis = list(range(A.shape[0]))
-        if collect_info:
-            return shis, []
-        return shis
-
     constrs.setAttr("Sense", GRB.LESS_EQUAL)
     model.optimize()
     if model.status != GRB.OPTIMAL:
@@ -723,7 +711,7 @@ def get_shis(
             if new_method and basis_indices.sum() == A.shape[1]:
                 point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
                 others = poly.halfspaces[~basis_indices, :-1]  # (num_other_hyperplanes x d)
-                if HAS_TORCH and isinstance(point_shis, torch.Tensor):
+                if TORCH_AVAILABLE and isinstance(point_shis, torch.Tensor):
                     try:
                         sols = torch.linalg.solve(point_shis, others.T)
                     except RuntimeError:

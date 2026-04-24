@@ -14,6 +14,7 @@ from gurobipy import Env
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._logging import logger
 from relucent._torch_compat import TORCH_AVAILABLE, torch
 from relucent.convert_model import convert
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
@@ -62,7 +63,6 @@ def set_globals(get_net: ReLUNetwork, get_volumes: bool = True, num_threads: int
     env = get_env(num_threads=num_threads)
     global _net
     _net = get_net
-    _net.save_numpy_weights()  # Refresh weight_cpu after pickle; pickled net can have stale/corrupt weight_cpu
     global dim
     dim = int(np.prod(_net.input_shape))
     global get_vol_calc
@@ -88,7 +88,6 @@ class Complex:
             net = convert(net)
         self.net = original_net
         self._net = net
-        self._net.save_numpy_weights()
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
@@ -112,9 +111,6 @@ class Complex:
 
     def __str__(self) -> str:
         return f"Complex(n_polyhedra={len(self)})"
-
-    # def __del__(self) -> None:
-    #     close_env()
 
     def __getitem__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> Polyhedron:
         """Retrieve a Polyhedron from the complex by its key.
@@ -430,6 +426,7 @@ class Complex:
         points: Iterable[torch.Tensor | np.ndarray],
         nworkers: int | None = None,
         bound: float | None = None,
+        verbose: int | None = None,
         **kwargs: Any,
     ) -> list[Polyhedron | None]:
         """Add multiple polyhedra from data points using parallel processing.
@@ -443,6 +440,9 @@ class Complex:
                 of CPU cores. Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
                 Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
+            verbose: Controls progress output. ``0`` silences all output; ``1``
+                (default) shows worker count and progress bars.  When ``None``,
+                falls back to :data:`relucent.config.VERBOSE`.
             **kwargs: Additional arguments passed to poly_calculations() and get_shis().
 
         Returns:
@@ -456,6 +456,7 @@ class Complex:
             points,
             nworkers=nworkers,
             bound=bound,
+            verbose=verbose,
             **kwargs,
         )
 
@@ -467,7 +468,7 @@ class Complex:
         queue: Any = None,
         bound: float | None = None,
         nworkers: int | None = None,
-        verbose: int = 1,
+        verbose: int | None = None,
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
         geometry_properties: Iterable[str] | None = None,
@@ -497,7 +498,9 @@ class Complex:
                 Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
-            verbose: Whether to print progress information. Defaults to 1.
+            verbose: Controls progress output. ``0`` silences all output; ``1``
+                (default) shows worker count and a progress bar.  When ``None``,
+                falls back to :data:`relucent.config.VERBOSE`.
             geometry_properties: Iterable of polyhedron cache/property names to
                 compute for each discovered polyhedron during search. If None,
                 uses the default non-SciPy geometry set. Pass an empty iterable
@@ -541,7 +544,7 @@ class Complex:
         nworkers: int | None = None,
         properties: Iterable[str] | None = None,
         keep_caches: bool = False,
-        verbose: int = 1,
+        verbose: int | None = None,
     ) -> dict[str, Any]:
         """Compute selected polyhedron caches in parallel.
 
@@ -553,7 +556,9 @@ class Complex:
                 uses relucent's default non-SciPy geometric set.
             keep_caches: If True, retain heavy caches (halfspaces/W/b) after
                 worker transfer; otherwise they are cleaned to reduce memory.
-            verbose: Whether to print progress information.
+            verbose: Controls progress output. ``0`` silences all output; ``1``
+                (default) shows worker count and a progress bar.  When ``None``,
+                falls back to :data:`relucent.config.VERBOSE`.
         """
         return _parallel_compute_geometric_properties_fn(
             self,
@@ -589,7 +594,7 @@ class Complex:
         Returns:
             dict: Search information dictionary (see searcher() documentation).
         """
-        return self.searcher(queue=BlockingQueue(pop=lambda x: x.popleft()), **kwargs)
+        return self.searcher(queue=BlockingQueue(pop=lambda x: x.pop()), **kwargs)
 
     def random_walk(self, **kwargs: Any) -> dict[str, Any]:
         """Perform random walk search of the complex.
@@ -642,7 +647,7 @@ class Complex:
         warnings.warn(
             (
                 f"Complex.{method_name}() is actively used by the package author in ongoing research. "
-                + "If you'd like to collaborate, please reach out! My email is blake@uconn.edu"
+                + "If you'd like to collaborate, please reach out! My email is blake@uconn.edu. "
                 + f"Set {RESEARCH_WARNING_DISABLE_ENV_VAR}=1 to silence this warning."
             ),
             UserWarning,
@@ -775,11 +780,11 @@ class Complex:
                 break
             chain.append(new_complex)
             if verbose:
-                print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]) + ", ... ", end="\r")
+                logger.info("Chain: %s, ...", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
             if new_complex.index2poly[0].dim == 0:
                 break
         if verbose:
-            print("\rChain: " + ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
+            logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
     @staticmethod

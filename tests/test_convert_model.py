@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from relucent.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
-from relucent.model import ReLUNetwork, FlattenLayer, LinearLayer, ReLULayer
+from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.utils import mlp
 
 

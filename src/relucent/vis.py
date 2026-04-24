@@ -15,6 +15,7 @@ from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._logging import logger
 from relucent._torch_compat import TORCH_AVAILABLE, torch
 
 if TYPE_CHECKING:
@@ -398,7 +399,7 @@ def _poly_traces_2d_graph(
         net = poly.net
         if project is None:
             inputs = (
-                torch.tensor([x, y], device=net.device, dtype=net.dtype).T
+                torch.tensor(np.asarray([x, y], dtype=np.float64), dtype=torch.float64).T
                 if TORCH_AVAILABLE
                 else np.asarray([x, y], dtype=np.float64).T
             )
@@ -597,7 +598,7 @@ def _apply_poly_trace_label(trace: Any, poly: object) -> None:
 def _ensure_minimum_plotted_polyhedra(total: int, plotted: int, context: str) -> None:
     if total == 0:
         return
-    print(f"Plotted {plotted / total * 100:.2f}% of {total} polyhedra within the bounds")
+    logger.info("Plotted %.2f%% of %d polyhedra within the bounds", plotted / total * 100, total)
     minimum_required = (total + 1) // 2
     if plotted < minimum_required:
         raise RuntimeError(
@@ -958,7 +959,7 @@ def _complex_figure_graph(
             warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
         if label_regions and poly.center is not None:
             center_in = (
-                torch.tensor(poly.center, device=cpx._net.device, dtype=cpx._net.dtype).T
+                torch.tensor(np.asarray(poly.center, dtype=np.float64), dtype=torch.float64).T
                 if TORCH_AVAILABLE
                 else np.asarray(poly.center, dtype=np.float64).T
             )

@@ -57,9 +57,7 @@ def _canonical_from_affine_tuples(
         if b.ndim == 1:
             b = b.reshape(1, -1)
         if b.shape != (1, w.shape[0]):
-            raise ValueError(
-                f"Layer {i}: bias must have shape ({1}, {w.shape[0]}) or ({w.shape[0]},), got {b.shape}"
-            )
+            raise ValueError(f"Layer {i}: bias must have shape ({1}, {w.shape[0]}) or ({w.shape[0]},), got {b.shape}")
         canonical[f"fc{i}"] = LinearLayer(weight=w, bias=b)
         if i < len(layers) - 1:
             canonical[f"relu{i}"] = ReLULayer()
@@ -115,8 +113,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
 
-    if conv.bias is None:
-        conv.bias = nn.Parameter(torch.zeros(conv.out_channels, device=conv.weight.device))
+    bias = conv.bias if conv.bias is not None else torch.zeros(conv.out_channels, device=conv.weight.device)
 
     fc = nn.Linear(in_features=np.prod(in_shape).item(), out_features=np.prod(out_shape).item(), device=conv.weight.device)
     fc.weight.data.fill_(0.0)
@@ -136,14 +133,11 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
         for xd, yd in range2d(conv.kernel_size[0], conv.kernel_size[1]):
             # Output channel
             for co in range(conv.out_channels):
-                fc.bias[enc_tuple((co, xo, yo), out_shape)] = conv.bias[co]
+                fc.bias[enc_tuple((co, xo, yo), out_shape)] = bias[co]
                 for ci in range(conv.in_channels):
                     # Make sure we are within the input image (and not in the padding)
                     if 0 <= xi0 + xd < w and 0 <= yi0 + yd < h:
                         cw = conv.weight[co, ci, xd, yd]
-                        # Flatten the weight position to 1d in "canonical ordering",
-                        # i.e. guaranteeing that:
-                        # FC(img.reshape(-1)) == Conv(img).reshape(-1)
                         fc.weight[
                             enc_tuple((co, xo, yo), out_shape),
                             enc_tuple((ci, xi0 + xd, yi0 + yd), in_shape),
@@ -176,7 +170,7 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: tuple[int, int,
         kernel_size=avgpool.kernel_size,
         stride=avgpool.stride,
         padding=avgpool.padding,
-        bias=True,
+        bias=True,  # always create with bias so we can zero-fill it
     )
     conv2d.weight.data.fill_(0.0)
     kernel_size = avgpool.kernel_size
@@ -187,8 +181,7 @@ def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: tuple[int, int,
     scale = 1.0 / float(kernel_area)
     for i in range(input_size[0]):
         conv2d.weight.data[i, i, :, :].fill_(scale)
-    if conv2d.bias is None:
-        conv2d.bias = nn.Parameter(torch.zeros(input_size[0], device=conv2d.weight.device))
+    assert conv2d.bias is not None
     conv2d.bias.data.fill_(0.0)
     return torch_conv_layer_to_affine(conv2d, input_size)
 
@@ -321,9 +314,7 @@ def convert(
     layers = OrderedDict()
     assert "Flatten Input" not in source_layers
     layers["Flatten Input"] = nn.Flatten()
-    print("\nConverting model to canonical format")
     for name, module in list(source_layers.items()):
-        print("    Layer:", name)
         if isinstance(module, (nn.Linear, nn.ReLU)):
             layers[name] = module
         elif isinstance(module, (nn.Dropout, nn.Flatten)):

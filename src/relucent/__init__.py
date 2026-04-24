@@ -1,18 +1,23 @@
-import tomllib  # noqa: E402
-from importlib import import_module  # noqa: E402
-from importlib.metadata import PackageNotFoundError, version  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import TYPE_CHECKING  # noqa: E402
+import tomllib
+from importlib import import_module
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-try:
-    __version__ = version("relucent")
-except PackageNotFoundError:
-    _pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
-    with _pyproject.open("rb") as _fp:
-        __version__ = tomllib.load(_fp)["project"]["version"]
+from . import config
+from .config import update_settings
 
-from . import config  # noqa: E402
-from .config import update_settings  # noqa: E402
+
+def _read_version() -> str:
+    try:
+        return version("relucent")
+    except PackageNotFoundError:
+        _pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        with _pyproject.open("rb") as _fp:
+            return tomllib.load(_fp)["project"]["version"]
+
+
+__version__ = _read_version()
 
 if TYPE_CHECKING:
     from .complex import Complex

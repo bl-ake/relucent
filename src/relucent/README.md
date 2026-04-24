@@ -3,8 +3,8 @@ This folder contains the implementation of the `relucent` Python package.
 
 - **`__init__.py`**: Public API exports (what you can `from relucent import ...`)
 - **`config.py`**: Global configuration and numeric defaults
-- **`model.py`**: Internal `torch.nn.Module` wrappers/utilities used by relucent internals
-- **`convert_model.py`**: Utilities to convert supported `torch.nn` layers to linear layers
+- **`model.py`**: Canonical network representation (`ReLUNetwork`, `LinearLayer`, `ReLULayer`, `FlattenLayer`)
+- **`convert_model.py`**: Converts PyTorch models to the canonical format (handles Conv2d, AvgPool2d, etc.)
 - **`ss.py`**: Data structures for storing large numbers of sign-sequence vectors
 - **`poly.py`**: Polyhedron-level computations (e.g. boundaries, neighbors, volume)
 - **`complex.py`**: Polyhedral complex computations (e.g. search, connectivity/dual graph)
