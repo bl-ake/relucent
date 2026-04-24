@@ -26,6 +26,7 @@ Core capabilities include:
    :caption: User guide:
 
    quickstart
+   network_definitions
    search_geometry
    configuration
 

@@ -1460,7 +1460,7 @@ wheels = [
 
 [[package]]
 name = "relucent"
-version = "0.8.1"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "gurobipy" },
@@ -1475,7 +1475,6 @@ dependencies = [
     { name = "scipy" },
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "torch" },
     { name = "tqdm" },
 ]
 
@@ -1489,6 +1488,9 @@ docs = [
     { name = "sphinx", version = "9.0.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "sphinx", version = "9.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "sphinx-rtd-theme" },
+]
+torch = [
+    { name = "torch" },
 ]
 vis = [
     { name = "kaleido" },
@@ -1515,10 +1517,10 @@ requires-dist = [
     { name = "sphinx", specifier = ">=9.0.4" },
     { name = "sphinx", marker = "extra == 'docs'" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
-    { name = "torch", specifier = ">=2.5.0" },
+    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.5.0" },
     { name = "tqdm", specifier = ">=4.67.0" },
 ]
-provides-extras = ["vis", "dev", "docs"]
+provides-extras = ["torch", "vis", "dev", "docs"]
 
 [[package]]
 name = "requests"

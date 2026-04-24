@@ -27,7 +27,7 @@ def test_complex_save_load_roundtrip_with_ssm(tmp_path, seeded):
         assert np.array_equal(ss_to_numpy(loaded_with_ssm[p.ss].ss), ss_to_numpy(p.ss))
 
     x = torch.rand((2, 4), device=net.device, dtype=net.dtype)
-    assert torch.allclose(loaded_with_ssm._net(x), net(x))
+    assert torch.allclose(torch.as_tensor(loaded_with_ssm._net(x), dtype=x.dtype), torch.as_tensor(net(x), dtype=x.dtype))
 
 
 def test_complex_save_load_roundtrip_no_ssm(tmp_path, seeded):

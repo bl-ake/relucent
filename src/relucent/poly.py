@@ -6,11 +6,11 @@ from typing import Any, cast
 
 import numpy as np
 import plotly.graph_objects as go
-import torch
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 import relucent.config as cfg
-from relucent.model import NN
+from relucent._torch_compat import torch
+from relucent.model import ReLUNetwork
 from relucent.utils import encode_ss, get_env
 from relucent.vis import bounded_plot_geometry, plot_polyhedron
 
@@ -25,7 +25,7 @@ class Polyhedron:
 
     def __init__(
         self,
-        net: NN,
+        net: ReLUNetwork | Any,
         ss: np.ndarray | torch.Tensor,
         halfspaces: np.ndarray | torch.Tensor | None = None,
         W: np.ndarray | torch.Tensor | None = None,
@@ -42,6 +42,10 @@ class Polyhedron:
 
         The kwargs can be used to supply precomputed values for various properties.
         """
+        if net is not None and not isinstance(net, ReLUNetwork):
+            from relucent.convert_model import convert
+
+            net = convert(net)
         self._net = net
         # Store the sign sequence with an integer dtype to ensure consistent
         # semantics across NumPy and PyTorch backends.
@@ -99,14 +103,14 @@ class Polyhedron:
         raise TypeError(f"Unsupported ss type: {type(value)}")
 
     @property
-    def net(self) -> NN:
+    def net(self) -> ReLUNetwork:
         """The neural network I belong to"""
         if self._net is None:
             raise ValueError("Polyhedron has no associated network.")
         return self._net
 
     @net.setter
-    def net(self, value: NN):
+    def net(self, value: ReLUNetwork):
         if self._net is not None:
             raise ValueError("net cannot be changed after it has been set")
         self._net = value
@@ -374,6 +378,8 @@ class Polyhedron:
             bool: True if this polyhedron is a face of the other.
         """
         eq = (self * other).ss == other.ss
+        if isinstance(eq, np.ndarray):
+            return bool(eq.all())
         return bool(cast(torch.Tensor, eq).all())
 
     def get_bounded_vertices(self, bound: float, qhull_mode: str | None = None) -> np.ndarray | None:

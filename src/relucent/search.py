@@ -9,10 +9,10 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-import torch
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._torch_compat import torch
 from relucent.calculations import get_shis
 from relucent.poly import Polyhedron
 from relucent.ss import SSManager

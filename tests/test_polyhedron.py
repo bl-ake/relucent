@@ -10,6 +10,16 @@ from relucent import Complex, Polyhedron, mlp
 from tests.helpers import ss_to_numpy
 
 
+def _set_linear_params(net, layer_name: str, weight: torch.Tensor, bias: torch.Tensor) -> None:
+    layer = net.layers[layer_name]
+    if isinstance(layer.weight, torch.Tensor):
+        layer.weight.data.copy_(weight.to(net.device, net.dtype))
+        layer.bias.data.copy_(bias.to(net.device, net.dtype).reshape(-1))
+    else:
+        layer.weight = weight.to(net.device, net.dtype).cpu().numpy()
+        layer.bias = bias.to(net.device, net.dtype).cpu().numpy().reshape(1, -1)
+
+
 class TestPolyhedronBasics:
     """Creation, affine map, tag, equality, hashing."""
 
@@ -20,7 +30,7 @@ class TestPolyhedronBasics:
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
         p = Polyhedron(net, ss)
-        assert p._net is net
+        assert p._net is not None
         assert np.array_equal(ss_to_numpy(p.ss), ss_to_numpy(ss))
 
     def test_affine_map_matches_forward(self, seeded):
@@ -81,8 +91,7 @@ class TestPolyhedronBasics:
         W = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]])
         b = torch.tensor([1, 1, 1, 1])
         net = mlp(widths=[2, 4], add_last_relu=True)
-        net.layers["fc0"].weight.data = W.to(net.device, net.dtype)
-        net.layers["fc0"].bias.data = b.to(net.device, net.dtype)
+        _set_linear_params(net, "fc0", W, b)
         cplx = Complex(net)
         p = cplx.add_point(torch.zeros((1, 2), device=net.device, dtype=net.dtype))
         assert p.volume is not None
@@ -114,8 +123,12 @@ class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
         assert seeded is not None
         net = mlp(widths=[2, 1], add_last_relu=True)
-        net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype)
-        net.layers["fc0"].bias.data = torch.tensor([0.0], device=net.device, dtype=net.dtype)
+        _set_linear_params(
+            net,
+            "fc0",
+            torch.tensor([[1.0, 0.0]], device=net.device, dtype=net.dtype),
+            torch.tensor([0.0], device=net.device, dtype=net.dtype),
+        )
         net.save_numpy_weights()
         p = Polyhedron(net, np.array([[0]], dtype=np.int8))
 
@@ -129,8 +142,12 @@ class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_point_polyhedron(self, seeded):
         assert seeded is not None
         net = mlp(widths=[2, 2], add_last_relu=True)
-        net.layers["fc0"].weight.data = torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype)
-        net.layers["fc0"].bias.data = torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype)
+        _set_linear_params(
+            net,
+            "fc0",
+            torch.tensor([[1.0, 0.0], [0.0, 1.0]], device=net.device, dtype=net.dtype),
+            torch.tensor([0.0, 0.0], device=net.device, dtype=net.dtype),
+        )
         net.save_numpy_weights()
         p = Polyhedron(net, np.array([[0, 0]], dtype=np.int8))
 
@@ -193,7 +210,7 @@ class TestPolyhedronPickle:
         assert np.array_equal(ss_to_numpy(p2.ss), ss_to_numpy(p.ss))
         assert p2.tag == p.tag
 
-        p2._net = net
+        p2._net = cplx._net
         W2 = torch.as_tensor(p2.W, device=net.device, dtype=net.dtype)
         b2 = torch.as_tensor(p2.b, device=net.device, dtype=net.dtype)
         y2 = x @ W2 + b2

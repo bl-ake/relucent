@@ -8,8 +8,8 @@ testing and insertion via a bytes-encoded hash key.
 from collections.abc import Iterator
 
 import numpy as np
-import torch
 
+from relucent._torch_compat import torch
 from relucent.utils import encode_ss
 
 __all__ = ["SSManager"]

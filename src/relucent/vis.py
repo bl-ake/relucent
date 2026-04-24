@@ -11,11 +11,11 @@ import networkx as nx
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import torch
 from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._torch_compat import TORCH_AVAILABLE, torch
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -396,11 +396,17 @@ def _poly_traces_2d_graph(
         x = verts[:, 0].tolist()
         y = verts[:, 1].tolist()
         net = poly.net
-        z = (
-            (net(torch.tensor([x, y], device=net.device, dtype=net.dtype).T).detach().cpu().numpy().squeeze()[:, 1])
-            if project is None
-            else [project] * len(x)
-        )
+        if project is None:
+            inputs = (
+                torch.tensor([x, y], device=net.device, dtype=net.dtype).T
+                if TORCH_AVAILABLE
+                else np.asarray([x, y], dtype=np.float64).T
+            )
+            z_raw = net(inputs)
+            z_arr = z_raw.detach().cpu().numpy() if isinstance(z_raw, torch.Tensor) else np.asarray(z_raw)
+            z = z_arr.squeeze()[:, 1]
+        else:
+            z = [project] * len(x)
         if kind == "polygon":
             x_closed = x + [x[0]]
             y_closed = y + [y[0]]
@@ -951,18 +957,18 @@ def _complex_figure_graph(
         else:
             warnings.warn(f"No traces generated while plotting polyhedron {poly}.", stacklevel=2)
         if label_regions and poly.center is not None:
+            center_in = (
+                torch.tensor(poly.center, device=cpx._net.device, dtype=cpx._net.dtype).T
+                if TORCH_AVAILABLE
+                else np.asarray(poly.center, dtype=np.float64).T
+            )
+            center_out = cpx._net(center_in)
+            center_arr = center_out.detach().cpu().numpy() if isinstance(center_out, torch.Tensor) else np.asarray(center_out)
             fig.add_trace(
                 go.Scatter3d(
                     x=[poly.center[0]],
                     y=[poly.center[1]],
-                    z=[
-                        cpx._net(torch.tensor(poly.center, device=cpx._net.device, dtype=cpx._net.dtype).T)
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        .squeeze()
-                        .ravel()[:, 0]
-                    ],
+                    z=[center_arr.squeeze().ravel()[0]],
                     mode="text",
                     text=str(poly),
                     showlegend=False,

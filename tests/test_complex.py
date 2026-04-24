@@ -3,6 +3,7 @@
 import warnings
 from collections import OrderedDict
 from copy import deepcopy
+from typing import cast
 
 import networkx as nx
 import numpy as np
@@ -12,7 +13,11 @@ import torch.nn as nn
 
 from relucent import Complex, mlp
 from relucent.calculations import adjacent_polyhedra
-from relucent.model import NN
+from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
+
+
+def _rand_batch(dim: int, batch: int = 1) -> torch.Tensor:
+    return torch.rand((batch, dim), dtype=torch.float64)
 
 
 def test_bfs_dfs_dual_graph_isomorphic(seeded):
@@ -20,12 +25,12 @@ def test_bfs_dfs_dual_graph_isomorphic(seeded):
     assert seeded is not None
     model = mlp(widths=[4, 8], add_last_relu=True)
     cplx1 = Complex(model)
-    start1 = torch.rand((1, 4), device=model.device, dtype=model.dtype)
+    start1 = _rand_batch(4)
     cplx1.bfs(start=start1)
     G1 = cplx1.get_dual_graph()
 
     cplx2 = Complex(model)
-    start2 = torch.rand((1, 4), device=model.device, dtype=model.dtype)
+    start2 = _rand_batch(4)
     cplx2.dfs(start=start2)
     G2 = cplx2.get_dual_graph()
 
@@ -39,7 +44,7 @@ def test_recover_from_dual_graph(seeded):
     assert seeded is not None
     model = mlp(widths=[5, 9], add_last_relu=True)
     cplx1 = Complex(model)
-    start1 = torch.rand((1, 5), device=model.device, dtype=model.dtype)
+    start1 = _rand_batch(5)
     cplx1.bfs(start=start1)
     assert len(cplx1) == 382
 
@@ -56,7 +61,7 @@ def test_bfs_polyhedron_affine_and_membership(seeded):
     assert seeded is not None
     model = mlp(widths=[16, 64, 64, 64, 10])
     cplx = Complex(model)
-    start = torch.rand(16, device=model.device, dtype=model.dtype)
+    start = torch.rand(16, dtype=torch.float64)
     p = cplx.point2poly(start)
     assert len(p.halfspaces) == cplx.n
     assert p.ss_np.size == cplx.n
@@ -85,8 +90,8 @@ def test_hamming_astar_path(seeded):
     assert seeded is not None
     model = mlp(widths=[16, 32, 32, 1])
     cplx = Complex(model)
-    start = torch.rand(16, device=model.device, dtype=model.dtype)
-    end = torch.rand(16, device=model.device, dtype=model.dtype)
+    start = torch.rand(16, dtype=torch.float64)
+    end = torch.rand(16, dtype=torch.float64)
     result = cplx.hamming_astar(start=start, end=end)
     assert result["succeeded"], result
     assert result["path"] is not None, result
@@ -141,7 +146,7 @@ def test_plot_and_dual_graph_smoke(seeded):
 class TestComplexCreationAndIndexing:
     def test_len_iter(self, small_mlp):
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=20)
         assert len(cplx) == 20
         polys = list(cplx)
@@ -154,28 +159,28 @@ class TestComplexCreationAndIndexing:
 
     def test_getitem_by_ss(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         p = cplx.add_point(x)
         q = cplx[p.ss_np]
         assert q is p
 
     def test_getitem_by_polyhedron(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         p = cplx.add_point(x)
         q = cplx[p]
         assert q is p
 
     def test_contains(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         p = cplx.add_point(x)
         assert p.ss_np in cplx
         assert p in cplx
 
     def test_getitem_keyerror(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         p = cplx.add_point(x)
         bad_ss = p.ss_np.copy()
         bad_ss[0, 0] = -bad_ss[0, 0]  # flip one sign; neighbor not in complex yet
@@ -186,7 +191,7 @@ class TestComplexCreationAndIndexing:
 class TestComplexPointAndSS:
     def test_point2ss_tensor(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         ss = cplx.point2ss(x)
         assert isinstance(ss, torch.Tensor)
         assert ss.shape[1] == cplx.n
@@ -200,14 +205,14 @@ class TestComplexPointAndSS:
 
     def test_point2poly_check_exists(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         cplx.add_point(x)
         p = cplx.point2poly(x, check_exists=True)
         assert p in cplx
 
     def test_add_point_add_ss(self, small_mlp):
         cplx = Complex(small_mlp)
-        x = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4)
         ss = cplx.point2ss(x)
         p1 = cplx.add_point(x)
         p2 = cplx.add_ss(ss)
@@ -217,7 +222,7 @@ class TestComplexPointAndSS:
 class TestComplexDualGraph:
     def test_dual_graph_basic(self, small_mlp):
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=30)
         with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
             G = cplx.get_dual_graph()
@@ -227,7 +232,7 @@ class TestComplexDualGraph:
 
     def test_dual_graph_relabel(self, small_mlp):
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=15)
         with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
             G = cplx.get_dual_graph(relabel=True)
@@ -237,7 +242,7 @@ class TestComplexDualGraph:
 class TestComplexGetPolyAttrs:
     def test_get_poly_attrs(self, small_mlp):
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=10)
         attrs = cplx.get_poly_attrs(["finite", "Wl2"])
         assert "finite" in attrs
@@ -248,7 +253,7 @@ class TestComplexGetPolyAttrs:
 class TestComplexAdjacent:
     def test_adjacent_polyhedra(self, small_mlp):
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=25)
         p = next(iter(cplx))
         neighbors = adjacent_polyhedra(p, cplx.ss2poly)
@@ -268,7 +273,7 @@ class TestComplexAutoConversion:
         )
         cplx = Complex(sequential)
         assert cplx.net is sequential
-        assert isinstance(cplx._net, NN)
+        assert isinstance(cplx._net, ReLUNetwork)
 
     def test_module_dict_is_accepted(self, seeded):
         """Complex accepts an OrderedDict of layers and auto-converts it."""
@@ -281,7 +286,7 @@ class TestComplexAutoConversion:
             ]
         )
         cplx = Complex(nn.Sequential(layers))
-        assert isinstance(cplx._net, NN)
+        assert isinstance(cplx._net, ReLUNetwork)
 
     def test_auto_converted_dim_and_n(self, seeded):
         """Auto-converted sequential has correct input dim and neuron count."""
@@ -299,18 +304,20 @@ class TestComplexAutoConversion:
         """Auto-converting a Sequential gives the same complex as the explicit NN."""
         assert seeded is not None
         net = mlp(widths=[4, 8, 2])
-        # Build an equivalent Sequential sharing the same weight tensors
-        sequential = nn.Sequential(
-            net.layers["fc0"],
-            net.layers["relu0"],
-            net.layers["fc1"],
-        )
+        # Build an equivalent torch Sequential from canonical weights.
+        fc0 = nn.Linear(4, 8)
+        fc0.weight.data.copy_(torch.as_tensor(net.layers["fc0"].weight, dtype=torch.float64))
+        fc0.bias.data.copy_(torch.as_tensor(net.layers["fc0"].bias.reshape(-1), dtype=torch.float64))
+        fc1 = nn.Linear(8, 2)
+        fc1.weight.data.copy_(torch.as_tensor(net.layers["fc1"].weight, dtype=torch.float64))
+        fc1.bias.data.copy_(torch.as_tensor(net.layers["fc1"].bias.reshape(-1), dtype=torch.float64))
+        sequential = nn.Sequential(fc0, nn.ReLU(), fc1).to(dtype=torch.float64)
         cplx_nn = Complex(net)
         cplx_seq = Complex(sequential)
         assert cplx_nn.dim == cplx_seq.dim
         assert cplx_nn.n == cplx_seq.n
         # Both should compute the same polyhedron for the same input point
-        x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
+        x = _rand_batch(4)
         ss_nn = cplx_nn.point2ss(x)
         ss_seq = cplx_seq.point2ss(x)
         assert torch.equal(torch.as_tensor(ss_nn), torch.as_tensor(ss_seq))
@@ -323,10 +330,10 @@ class TestComplexAutoConversion:
         assert cplx.net is net
 
 
-def _exercise_complex_for_model(model: nn.Module) -> None:
+def _exercise_complex_for_model(model: nn.Module | ReLUNetwork) -> None:
     """Run a minimal end-to-end Complex usage flow for a model."""
     cplx = Complex(model)
-    x = torch.randn((1, cplx.dim), device=cplx._net.device, dtype=cplx._net.dtype)
+    x = torch.randn((1, cplx.dim), dtype=torch.float64)
     y = cplx._net(x)
     ss = cplx.point2ss(x)
     p = cplx.add_point(x)
@@ -337,7 +344,7 @@ def _exercise_complex_for_model(model: nn.Module) -> None:
     assert p in cplx
 
 
-def _build_canonical_nn() -> nn.Module:
+def _build_canonical_nn() -> ReLUNetwork:
     return mlp(widths=[4, 8, 2], add_last_relu=False)
 
 
@@ -408,7 +415,7 @@ class TestComplexMisc:
     def test_random_walk_smoke(self, small_mlp):
         """Smoke test for random_walk search."""
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         result = cplx.random_walk(start=start, max_polys=15, nworkers=1)
         assert "Search Depth" in result
         assert len(cplx) <= 15
@@ -416,7 +423,7 @@ class TestComplexMisc:
     def test_clean_data(self, small_mlp):
         """clean_data clears cached data on polyhedra."""
         cplx = Complex(small_mlp)
-        start = torch.rand((1, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=10)
         p = next(iter(cplx))
         _ = p.halfspaces
@@ -428,9 +435,58 @@ class TestComplexMisc:
     def test_ss_iterator(self, small_mlp):
         """ss_iterator yields sign sequences per ReLU layer."""
         cplx = Complex(small_mlp)
-        x = torch.rand((2, 4), device=small_mlp.device, dtype=small_mlp.dtype)
+        x = _rand_batch(4, batch=2)
         layers = list(cplx.ss_iterator(x))
         assert len(layers) == len(cplx.ss_layers)
         for ss in layers:
             assert ss.shape[0] == 2
             assert ss.shape[1] == 8
+
+
+class TestComplexNumpyCanonicalNetworks:
+    def test_build_complex_from_numpy_defined_network(self, seeded):
+        assert seeded is not None
+        layers = OrderedDict(
+            [
+                ("fc0", LinearLayer(weight=np.random.randn(6, 4), bias=np.random.randn(1, 6))),
+                ("relu0", ReLULayer()),
+                ("fc1", LinearLayer(weight=np.random.randn(3, 6), bias=np.random.randn(1, 3))),
+                ("relu1", ReLULayer()),
+            ]
+        )
+        net = ReLUNetwork(layers=cast(dict[str, Layer], layers), input_shape=(4,))
+        cplx = Complex(net)
+        p = cplx.add_point(np.random.randn(1, 4))
+        assert cplx.dim == 4
+        assert cplx.n == 9
+        assert p in cplx
+
+    def test_numpy_and_torch_inputs_match_sign_sequence(self, seeded):
+        assert seeded is not None
+        layers = OrderedDict(
+            [
+                ("fc0", LinearLayer(weight=np.random.randn(5, 4), bias=np.random.randn(1, 5))),
+                ("relu0", ReLULayer()),
+                ("fc1", LinearLayer(weight=np.random.randn(2, 5), bias=np.random.randn(1, 2))),
+                ("relu1", ReLULayer()),
+            ]
+        )
+        cplx = Complex(ReLUNetwork(layers=cast(dict[str, Layer], layers), input_shape=(4,)))
+        x_np = np.random.randn(2, 4)
+        x_torch = torch.as_tensor(x_np, dtype=torch.float64)
+        ss_np = cplx.point2ss(x_np)
+        ss_torch = cplx.point2ss(x_torch)
+        ss_torch_np = ss_torch.detach().cpu().numpy() if isinstance(ss_torch, torch.Tensor) else np.asarray(ss_torch)
+        assert np.array_equal(ss_np, ss_torch_np)
+
+    def test_build_complex_from_affine_tuple_sequence(self, seeded):
+        assert seeded is not None
+        w0 = np.random.randn(6, 4)
+        b0 = np.random.randn(6)
+        w1 = np.random.randn(3, 6)
+        b1 = np.random.randn(3)
+        cplx = Complex([(w0, b0), (w1, b1)])
+        p = cplx.add_point(np.random.randn(1, 4))
+        assert cplx.dim == 4
+        assert cplx.n == 6
+        assert p in cplx

@@ -6,16 +6,64 @@ which consists of Linear and ReLU layers only.
 """
 
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 
 import numpy as np
-import torch
-import torch.nn as nn
 from tqdm.auto import tqdm
 
-from relucent.model import NN
+from relucent._torch_compat import nn, torch
+from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
 __all__ = ["convert"]
+
+AffineLayerTuple = tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]
+
+
+def _canonicalize_layer(layer: object) -> LinearLayer | ReLULayer | FlattenLayer:
+    if isinstance(layer, (LinearLayer, ReLULayer, FlattenLayer)):
+        return layer
+    kind = type(layer).__name__.lower()
+    if isinstance(layer, nn.Linear):
+        weight = np.asarray(layer.weight.detach().cpu().numpy(), dtype=np.float64)
+        if layer.bias is None:
+            bias = np.zeros((1, weight.shape[0]), dtype=weight.dtype)
+        else:
+            bias = np.asarray(layer.bias.detach().cpu().numpy(), dtype=weight.dtype).reshape(1, -1)
+        return LinearLayer(weight=weight, bias=bias)
+    if isinstance(layer, nn.ReLU) or "relu" in kind:
+        return ReLULayer()
+    if isinstance(layer, nn.Flatten) or "flatten" in kind:
+        return FlattenLayer()
+    raise ValueError(f"Unsupported layer type: {type(layer)}")
+
+
+def _canonicalize_named_layers(layers: Mapping[str, object]) -> OrderedDict[str, LinearLayer | ReLULayer | FlattenLayer]:
+    return OrderedDict((name, _canonicalize_layer(layer)) for name, layer in layers.items())
+
+
+def _is_affine_tuple_layer(item: object) -> bool:
+    return isinstance(item, tuple) and len(item) == 2
+
+
+def _canonical_from_affine_tuples(
+    layers: Sequence[AffineLayerTuple],
+) -> OrderedDict[str, LinearLayer | ReLULayer]:
+    canonical: OrderedDict[str, LinearLayer | ReLULayer] = OrderedDict()
+    for i, (w_raw, b_raw) in enumerate(layers):
+        w = np.asarray(w_raw, dtype=np.float64)
+        b = np.asarray(b_raw, dtype=np.float64)
+        if w.ndim != 2:
+            raise ValueError(f"Layer {i}: weight matrix must be 2D, got shape {w.shape}")
+        if b.ndim == 1:
+            b = b.reshape(1, -1)
+        if b.shape != (1, w.shape[0]):
+            raise ValueError(
+                f"Layer {i}: bias must have shape ({1}, {w.shape[0]}) or ({w.shape[0]},), got {b.shape}"
+            )
+        canonical[f"fc{i}"] = LinearLayer(weight=w, bias=b)
+        if i < len(layers) - 1:
+            canonical[f"relu{i}"] = ReLULayer()
+    return canonical
 
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
@@ -190,8 +238,9 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
 
 @torch.no_grad()
 def convert(
-    input: nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module], input_shape: tuple[int, ...] | None = None
-) -> NN:
+    input: nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerTuple],
+    input_shape: tuple[int, ...] | None = None,
+) -> ReLUNetwork:
     """Convert a PyTorch model to canonical NN format.
 
     Converts various PyTorch layer types (Conv2d, AvgPool2d, etc.) into the
@@ -206,7 +255,8 @@ def convert(
         - LogSoftmax: Stops conversion (output layer)
 
     Args:
-        input: An torch.nn.Module, a ModuleList, or a ModuleDict.
+        input: A torch.nn.Module, a ModuleList, a ModuleDict, or an iterable of
+            affine layer tuples ``(W_i, b_i)``.
         input_shape: Shape of the input data (excluding batch dimension).
             If None, infers from the input model. Defaults to None.
     Returns:
@@ -216,30 +266,63 @@ def convert(
         ValueError: If an unsupported layer type is encountered or the model
         does not define an input_shape attribute.
     """
-    if isinstance(input, NN):
-        model = input
+    if isinstance(input, ReLUNetwork):
         if input_shape is not None:
-            model.input_shape = input_shape
-    elif isinstance(input, nn.Module):
-        model = NN(layers=input.children(), input_shape=input_shape)
-    elif isinstance(input, (Iterable, Mapping)):
-        model = NN(layers=input, input_shape=input_shape)
+            input.input_shape = input_shape
+        return input
+
+    if isinstance(input, Sequence) and len(input) > 0 and all(_is_affine_tuple_layer(layer) for layer in input):
+        affine_layers = [layer for layer in input if isinstance(layer, tuple)]
+        canonical_layers = _canonical_from_affine_tuples(affine_layers)
+        if input_shape is None:
+            first_linear = next((m for m in canonical_layers.values() if isinstance(m, LinearLayer)), None)
+            if first_linear is None:
+                raise ValueError("Model must define input_shape for conversion.")
+            input_shape = (int(first_linear.weight.shape[1]),)
+        return ReLUNetwork(layers=canonical_layers, input_shape=input_shape)
+
+    if isinstance(input, nn.Module):
+        source_layers: OrderedDict[str, object] = OrderedDict((name, module) for name, module in input.named_children())
+        params = next(input.parameters(), None)
+        dtype = params.dtype if params is not None else torch.float32
+        device = params.device if params is not None else torch.device("cpu")
+        if input_shape is None:
+            first_linear = next((m for m in source_layers.values() if isinstance(m, nn.Linear)), None)
+            if first_linear is None:
+                raise ValueError("Model must define input_shape for conversion.")
+            input_shape = (int(first_linear.in_features),)
+    elif isinstance(input, Mapping):
+        source_layers = OrderedDict((str(k), v) for k, v in input.items())
+        dtype = torch.float32
+        device = torch.device("cpu")
+        if input_shape is None:
+            first_linear = next((m for m in source_layers.values() if isinstance(m, nn.Linear)), None)
+            if first_linear is None:
+                raise ValueError("Model must define input_shape for conversion.")
+            input_shape = (int(first_linear.in_features),)
+    elif isinstance(input, Iterable):
+        source_layers = OrderedDict((f"layer{i}", module) for i, module in enumerate(input))
+        dtype = torch.float32
+        device = torch.device("cpu")
+        if input_shape is None:
+            first_linear = next((m for m in source_layers.values() if isinstance(m, nn.Linear)), None)
+            if first_linear is None:
+                raise ValueError("Model must define input_shape for conversion.")
+            input_shape = (int(first_linear.in_features),)
     else:
         raise ValueError(
             f"Unsupported input type: {type(input)}."
-            + "Must be an NN object, an Iterable of nn.Module objects, or a Mapping of str -> nn.Module."
+            + "Must be a canonical relu network, an Iterable/Mapping of nn.Module objects, or an iterable of (W, b)."
         )
 
-    params = next(model.parameters())
-    input_shape = getattr(model, "input_shape", None)
     if input_shape is None:
         raise ValueError("Model must define input_shape for conversion.")
-    x = torch.zeros((1,) + input_shape, dtype=params.dtype, device=params.device)
+    x = torch.zeros((1,) + input_shape, dtype=dtype, device=device)
     layers = OrderedDict()
-    assert "Flatten Input" not in model.layers
+    assert "Flatten Input" not in source_layers
     layers["Flatten Input"] = nn.Flatten()
     print("\nConverting model to canonical format")
-    for name, module in list(model.layers.items()):
+    for name, module in list(source_layers.items()):
         print("    Layer:", name)
         if isinstance(module, (nn.Linear, nn.ReLU)):
             layers[name] = module
@@ -250,32 +333,32 @@ def convert(
         elif isinstance(module, nn.Conv2d):
             shape = tuple(int(dim) for dim in x.shape[1:])
             assert isinstance(shape, tuple) and len(shape) == 3
-            new_layer = torch_conv_layer_to_affine(module, shape).to(model.device, model.dtype)
+            new_layer = torch_conv_layer_to_affine(module, shape).to(device=device, dtype=dtype)
             layers[name] = new_layer
         elif isinstance(module, nn.AvgPool2d) and module.kernel_size == module.stride:
             shape = tuple(int(dim) for dim in x.shape[1:])
             assert isinstance(shape, tuple) and len(shape) == 3
-            new_layer = avgpool2d_to_affine(module, shape).to(model.device, model.dtype)
+            new_layer = avgpool2d_to_affine(module, shape).to(device=device, dtype=dtype)
             layers[name] = new_layer
         else:
             raise ValueError(f"Module {name} is not supported: {module}")
         x = module(x)
-        module.to(model.device)
+        module.to(device=device)
     layers = combine_linear_layers(layers)
-    new_model = NN(layers=layers, input_shape=(np.prod(model.input_shape, dtype=int),)).to(model.device, model.dtype)
+    canonical_layers = _canonicalize_named_layers(layers)
+    new_model = ReLUNetwork(layers=canonical_layers, input_shape=(np.prod(input_shape, dtype=int),))
 
-    has_logsoftmax = any(isinstance(m, nn.LogSoftmax) for m in model.layers.values())
-    if not has_logsoftmax:
-        was_training = model.training
+    has_logsoftmax = any(isinstance(m, nn.LogSoftmax) for m in source_layers.values())
+    if not has_logsoftmax and isinstance(input, nn.Module) and not isinstance(input, nn.ModuleList):
+        was_training = input.training
         try:
-            model.eval()
-            new_model.eval()
-            x = torch.randn(input_shape, dtype=params.dtype, device=params.device)
-            old_y = model(x)
-            new_y = new_model(x)
+            input.eval()
+            x = torch.randn(input_shape, dtype=dtype, device=device)
+            old_y = input(x)
+            new_y = torch.as_tensor(new_model(x))
             assert torch.allclose(old_y, new_y, atol=1e-5, rtol=1e-5)
         except Exception as e:
             raise ValueError(f"Conversion failed: {e}") from e
         finally:
-            model.train(was_training)
+            input.train(was_training)
     return new_model
