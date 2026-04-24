@@ -70,8 +70,11 @@ class TorchMLP(nn.Sequential):
             return torch.float64
 
 
-def mlp(widths: Iterable[int], add_last_relu: bool = False) -> Any:
-    """Create a standard fully connected ReLU MLP wrapped as :class:`NN`.
+def mlp(widths: Iterable[int], add_last_relu: bool = False) -> "TorchMLP | ReLUNetwork":
+    """Create a standard fully connected ReLU MLP.
+
+    Returns a :class:`TorchMLP` when PyTorch is available, otherwise falls back
+    to a :class:`~relucent.model.ReLUNetwork` with NumPy weights.
 
     Args:
         widths: Layer widths including input and output widths.
@@ -79,7 +82,7 @@ def mlp(widths: Iterable[int], add_last_relu: bool = False) -> Any:
         add_last_relu: If ``True``, append a ReLU after the final Linear layer.
 
     Returns:
-        An :class:`NN` instance with named Linear/ReLU layers.
+        A model with named Linear/ReLU layers in the canonical relucent format.
     """
     widths = list(widths)
     try:

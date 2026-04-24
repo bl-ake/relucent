@@ -1,3 +1,5 @@
+"""Polyhedron: a single linear region of a ReLU network in input space."""
+
 import hashlib
 import warnings
 from collections.abc import Iterable
@@ -343,6 +345,8 @@ class Polyhedron:
 
         Args:
             bound: Radius of the bounding hypercube.
+            qhull_mode: Qhull numerical-warning handling strategy. Defaults to
+                :data:`relucent.config.QHULL_MODE`.
 
         Returns:
             np.ndarray or None: Array of vertex coordinates, or None if the
@@ -660,10 +664,8 @@ class Polyhedron:
 
     @cached_property
     def tag(self) -> bytes:
-        """Unique tag for this polyhedron, computed as a hashable representation of the sign sequence."""
-        if self._tag is None:
-            self._tag = encode_ss(self.ss_np)
-        return self._tag
+        """Hashable bytes representation of the sign sequence; stable (possibly non-unique) identity key."""
+        return encode_ss(self.ss_np)
 
     @property
     def halfspaces(self) -> torch.Tensor | np.ndarray:
@@ -683,10 +685,8 @@ class Polyhedron:
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-            assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
-            return self._halfspaces
-        else:
-            return self._halfspaces
+        assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
+        return self._halfspaces
 
     @property
     def halfspaces_np(self) -> np.ndarray:
@@ -699,9 +699,7 @@ class Polyhedron:
                 self._halfspaces_np = hs.detach().cpu().numpy()
             else:
                 raise TypeError(f"Unsupported halfspaces type: {type(hs)}")
-            return self._halfspaces_np
-        else:
-            return self._halfspaces_np
+        return self._halfspaces_np
 
     @property
     def W(self) -> torch.Tensor | np.ndarray:
@@ -719,10 +717,8 @@ class Polyhedron:
             self._b = b
             self._halfspaces_np = None
             self._num_dead_relus = num_dead_relus
-            assert isinstance(self._w, (torch.Tensor, np.ndarray))
-            return self._w
-        else:
-            return self._w
+        assert isinstance(self._w, (torch.Tensor, np.ndarray))
+        return self._w
 
     @property
     def b(self) -> torch.Tensor | np.ndarray:
@@ -773,9 +769,7 @@ class Polyhedron:
                 self._Wl2 = float(np.linalg.norm(self.W))
             else:
                 raise NotImplementedError
-            return self._Wl2
-        else:
-            return self._Wl2
+        return self._Wl2
 
     @property
     def center(self) -> np.ndarray | None:
@@ -849,7 +843,7 @@ class Polyhedron:
 
     @property
     def num_faces(self) -> int:
-        """Alias for Polyhedron.num_shis"""
+        """Number of faces; alias for :attr:`num_shis`."""
         return self.num_shis
 
     @cached_property

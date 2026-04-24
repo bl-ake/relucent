@@ -330,19 +330,19 @@ def astar_calculations(
 
 def searcher(
     cx: "Complex",
-    start=None,
-    max_depth=float("inf"),
-    max_polys=float("inf"),
-    queue=None,
-    bound=None,
-    nworkers=None,
-    verbose=None,
+    start: "torch.Tensor | np.ndarray | Polyhedron | None" = None,
+    max_depth: float = float("inf"),
+    max_polys: float = float("inf"),
+    queue: Any = None,
+    bound: float | None = None,
+    nworkers: int | None = None,
+    verbose: int | None = None,
     cube_radius: float | None = None,
     cube_mode: str = "unrestricted",
     geometry_properties: Iterable[str] | None = None,
     keep_caches: bool = False,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> dict[str, Any]:
     """Search for polyhedra in the complex by discovering neighbors.
 
     This is a generic search method that can be configured for different
@@ -481,6 +481,10 @@ def searcher(
         disable=not verbose,
     )
     pbar.update(n=1)
+    # Clear any stale multiprocessing locks left over from a previous pool in
+    # this process. tqdm acquires a process-wide lock during pool imap_unordered;
+    # if a prior pool was terminated without joining, the lock list can be non-empty
+    # and cause deadlocks on the next pool.
     pbar.get_lock().locks = []
 
     unprocessed = len(queue)
@@ -488,7 +492,7 @@ def searcher(
 
     with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
         try:
-            for p, shi, depth, node_index in pool.imap_unordered(
+            for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
                 partial(
                     search_calculations,
                     bound=bound,
@@ -789,7 +793,7 @@ def hamming_astar(
                 bad_shi_computations.append(item)
                 continue
 
-            assert len(item) > 0  ## TODO: Simplify
+            assert len(item) > 0
             p = cast(Polyhedron, item[0])
             expanded += 1
             depth = int(gScore[p])
@@ -848,6 +852,7 @@ def hamming_astar(
             pool.terminate()
             pool.join()
         openSet.close()
+        # Same stale-lock guard as in searcher().
         tqdm.get_lock().locks = []
         pbar.close()
     succeeded = neighbor == end_poly

@@ -1,4 +1,10 @@
-"""Feedforward ReLU model representation used by relucent."""
+"""Canonical feedforward ReLU network representation.
+
+:class:`ReLUNetwork` wraps an ordered sequence of :class:`LinearLayer`,
+:class:`ReLULayer`, and :class:`FlattenLayer` objects and provides NumPy/PyTorch
+agnostic forward passes.  All PyTorch models are converted to this format by
+:func:`relucent.convert_model.convert` before use.
+"""
 
 from collections import OrderedDict
 from collections.abc import Container, Iterable, Mapping
