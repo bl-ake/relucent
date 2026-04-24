@@ -66,7 +66,7 @@ def _canonical_from_affine_tuples(
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
 @torch.no_grad()
-def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int, int]) -> torch.nn.Linear:
+def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]) -> nn.Linear:
     """Convert a Conv2d layer to an equivalent Linear layer.
 
     Args:
@@ -147,7 +147,7 @@ def torch_conv_layer_to_affine(conv: torch.nn.Conv2d, input_size: tuple[int, int
 
 
 @torch.no_grad()
-def avgpool2d_to_affine(avgpool: torch.nn.AvgPool2d, input_size: tuple[int, int, int]) -> torch.nn.Linear:
+def avgpool2d_to_affine(avgpool: nn.AvgPool2d, input_size: tuple[int, int, int]) -> nn.Linear:
     """Convert an AvgPool2d layer to an equivalent Linear layer.
 
     Converts average pooling into a fully connected layer by representing it
