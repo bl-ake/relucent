@@ -134,26 +134,32 @@ class Complex:
             raise KeyError("Complex can only be indexed by Polyhedra, arrays, or tensors")
 
     def str_to_poly(self, name: str, ensure_unique: bool = True) -> Polyhedron:
-        """Convert a string to the first Polyhedron with that __repr__. These values may not be unique.
+        """Return the polyhedron whose ``__repr__`` equals ``name``.
 
         Args:
-            name: The string name.
+            name: The string returned by ``str(poly)`` / ``repr(poly)``.
+            ensure_unique: If ``True`` (default), raise :exc:`ValueError` when more
+                than one polyhedron matches. If ``False``, return the first match
+                immediately without scanning for duplicates.
 
         Returns:
-            Polyhedron: The polyhedron associated with the given name.
+            The matching :class:`Polyhedron`.
+
+        Raises:
+            KeyError: If no polyhedron with the given name is in the complex.
+            ValueError: If ``ensure_unique`` is ``True`` and multiple polyhedra match.
         """
         match = None
         for p in self:
             if p.__repr__() == name:
-                if match is not None:
-                    raise ValueError(f"Multiple Polyhedra with name {name} in Complex")
-                if ensure_unique:
-                    match = p
-                else:
+                if not ensure_unique:
                     return p
+                if match is not None:
+                    raise ValueError(f"Multiple polyhedra with name {name!r} in complex")
+                match = p
         if match is not None:
             return match
-        raise KeyError(f"Polyhedron with name {name} not in Complex")
+        raise KeyError(f"Polyhedron with name {name!r} not in complex")
 
     def __contains__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> bool:
         try:
@@ -747,7 +753,7 @@ class Complex:
             self.get_boundary_edges(i, verbose=verbose), desc="Getting Boundary Cells", delay=1, disable=not verbose
         ):
             ss = edge[0].ss_np.copy()
-            ss[0, self.G.edges[edge]["shi"]] *= 0
+            ss[0, self.G.edges[edge]["shi"]] = 0
             faces.add(self.ss2poly(ss, check_exists=False))
         return faces
 
@@ -916,7 +922,7 @@ class Complex:
         match_locations: bool = False,
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
-        verbose: bool = False,
+        verbose: bool = True,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
         """Construct the dual graph of the complex.
 

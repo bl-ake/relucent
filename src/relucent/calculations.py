@@ -216,7 +216,7 @@ def solve_radius(
             # Relative inradius in that hull is infinite unless the hull is 0-dimensional.
             rnk = int(np.linalg.matrix_rank(A_eq))
             aff_dim = dim - rnk
-            if aff_dim <= 0:  ## TODO: Either this or avoid calling solve_radius by checking the poly's codimension
+            if aff_dim <= 0:
                 # Unique feasible point (affine hull is a single point).
                 return x_feas, 0.0
             if max_radius == GRB.INFINITY:
@@ -235,7 +235,7 @@ def solve_radius(
             model.addConstr(equalities[:, :-1] @ x == -equalities[:, -1:])
         model.setObjective(y, sense)
     except Exception as e:
-        raise ValueError(f"GB Error Building Model: {e}") from e
+        raise ValueError(f"Failed to build Gurobi model: {e}") from e
     model.optimize()
     status = model.status
 
@@ -269,21 +269,20 @@ def solve_radius(
     else:
         model.close()
         if max_radius == GRB.INFINITY:
-            # Chebyshev LP can be INFEASIBLE while the linear system is still feasible
-            # (e.g. intrinsic inradius 0).
+            # The Chebyshev LP can be INFEASIBLE even when the system is feasible
+            # (e.g. intrinsic inradius 0); treat both as "no interior point found".
             if status == GRB.INFEASIBLE:
                 # if _halfspaces_feasible(env, halfspaces, zero_indices_eff):
                 #     warnings.warn(
                 #         "Chebyshev LP is INFEASIBLE but halfspace system is feasible.",
                 #         stacklevel=2,
                 #     )
-                # return None, float("inf")
                 return None, None
-            elif status == GRB.INF_OR_UNBD:
+            if status == GRB.INF_OR_UNBD:
                 raise ValueError("Unable to disambiguate INF_OR_UNBD status.")
-            elif status == GRB.UNBOUNDED:
+            if status == GRB.UNBOUNDED:
                 return None, float("inf")
-            raise ValueError(f"Interior Point Model Status: {status}")
+            raise ValueError(f"Chebyshev LP ended with unexpected status: {status}")
         else:
             # Finite max_radius: same Chebyshev outcomes as above (intrinsic inradius 0, etc.).
             if status == GRB.INFEASIBLE:
@@ -294,7 +293,7 @@ def solve_radius(
                 raise ValueError("Unable to disambiguate INF_OR_UNBD status.")
             if status == GRB.UNBOUNDED:
                 return None, None
-            raise ValueError(f"Interior Point Model Status: {status}")
+            raise ValueError(f"Chebyshev LP ended with unexpected status: {status}")
 
 
 @torch.no_grad()
@@ -422,7 +421,7 @@ def _get_hs_torch(
 
             mask = poly._ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
 
-            ## Replace mask 0s with 1s
+            # Treat mask 0s as 1 so their halfspaces are included as equalities.
             nonzero_mask = torch.where(mask == 0, torch.ones_like(mask), mask)
 
             new_constr_A = current_A * nonzero_mask
@@ -672,10 +671,9 @@ def get_shis(
             continue
         if (A[i, :-1] == 0).all():
             continue
-        # model.update()
         pbar.set_postfix_str(f"#shis: {len(shis)}")
 
-        ## Relax halspace i
+        # Relax halfspace i
         constrs[i].setAttr("RHS", -b[i, 0] + push_size)
 
         model.setObjective((A[i] @ x).item() + b[i, 0], GRB.MAXIMIZE)
@@ -772,7 +770,7 @@ def get_shis(
                 if hasattr(x, "X"):
                     poly_info[-1]["Proof"] = x.X
 
-        ## Restore halfspace i
+        # Restore halfspace i
         constrs[i].setAttr("RHS", -b[i, 0])
 
         pbar.update(A.shape[0] - len(subset) - pbar.n)

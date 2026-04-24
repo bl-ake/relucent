@@ -1,3 +1,5 @@
 - different CPWL activations
 - maxout layers (max layers)
 - ensure vis works on windows
+- stress test
+- clean up Poly init
