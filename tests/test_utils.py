@@ -10,6 +10,7 @@ from relucent import mlp
 from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
+    TorchMLP,
     UpdatablePriorityQueue,
     encode_ss,
     get_env,
@@ -157,16 +158,18 @@ class TestSplitSequential:
     def test_split(self, seeded):
         assert seeded is not None
         net = mlp(widths=[4, 8, 6, 2])
+        assert isinstance(net, TorchMLP)
         nn1, nn2 = split_sequential(net, "relu0")
         x = torch.zeros((1, 4), device=net.device, dtype=net.dtype)
         y1 = nn1(x)
         y_full = net(x)
         y2 = nn2(y1)
-        assert torch.allclose(y_full, y2, atol=1e-5)
+        assert torch.allclose(torch.as_tensor(y_full), torch.as_tensor(y2), atol=1e-5)
 
     def test_split_layer_in_first(self, seeded):
         assert seeded is not None
         net = mlp(widths=[2, 4, 2])
+        assert isinstance(net, TorchMLP)
         nn1, nn2 = split_sequential(net, "fc0")
         assert "fc0" in nn1.layers
         assert "fc1" in nn2.layers or "relu0" in nn2.layers
@@ -177,6 +180,7 @@ class TestNormalizeWeights:
     def test_function_invariant(self, seeded, widths):
         assert seeded is not None
         net = mlp(widths=widths)
+        assert isinstance(net, TorchMLP)
         original = copy.deepcopy(net)
 
         x = torch.randn(32, widths[0], device=net.device, dtype=net.dtype)
@@ -185,4 +189,4 @@ class TestNormalizeWeights:
         normalize_weights(net)
         y_after = net(x)
 
-        assert torch.allclose(y_before, y_after, atol=1e-5, rtol=1e-5)
+        assert torch.allclose(torch.as_tensor(y_before), torch.as_tensor(y_after), atol=1e-5, rtol=1e-5)

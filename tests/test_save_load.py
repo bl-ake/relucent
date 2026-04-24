@@ -4,12 +4,14 @@ import numpy as np
 import torch
 
 from relucent import Complex, mlp, set_seeds
+from relucent.utils import TorchMLP
 from tests.helpers import ss_to_numpy
 
 
 def test_complex_save_load_roundtrip_with_ssm(tmp_path, seed: int):
     set_seeds(seed)
     net = mlp(widths=[4, 7, 3], add_last_relu=True)
+    assert isinstance(net, TorchMLP)
     cplx = Complex(net)
     points = [torch.rand((1, 4), device=net.device, dtype=net.dtype) for _ in range(3)]
     for pt in points:
@@ -33,6 +35,7 @@ def test_complex_save_load_roundtrip_with_ssm(tmp_path, seed: int):
 def test_complex_save_load_roundtrip_no_ssm(tmp_path, seed: int):
     set_seeds(seed)
     net = mlp(widths=[4, 7, 3], add_last_relu=True)
+    assert isinstance(net, TorchMLP)
     cplx = Complex(net)
     points = [torch.rand((1, 4), device=net.device, dtype=net.dtype) for _ in range(3)]
     for pt in points:

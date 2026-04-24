@@ -231,7 +231,7 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
 
 @torch.no_grad()
 def convert(
-    model: nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerTuple],
+    model: "ReLUNetwork | nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerTuple]",
     input_shape: tuple[int, ...] | None = None,
 ) -> ReLUNetwork:
     """Convert a PyTorch model to canonical NN format.
