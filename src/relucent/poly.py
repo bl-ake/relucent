@@ -162,34 +162,6 @@ class Polyhedron:
         """Rows of ``halfspaces_np`` corresponding to equality constraints (zeros in the sign sequence)."""
         return self.hyperplanes
 
-    # def reparametrize_inequalities(self) -> np.ndarray:
-    #     if not self.zero_indices:
-    #         # No equalities: work in the original coordinates.
-    #         dim = self.ambient_dim
-    #         F = np.eye(dim)
-    #         x0 = np.zeros((dim, 1))
-
-    #         def remapper(x):
-    #             return F @ x + x0
-
-    #         return self.inequalities, remapper, F, x0
-
-    #     eq_A = self.equalities[:, :-1]
-    #     eq_b = self.equalities[:, -1:]
-    #     # Solve eq_A @ x = -eq_b in the least-squares sense to obtain a point on
-    #     # the affine subspace defined by the equalities. This works even when
-    #     # eq_A is not square.
-    #     x0, *_ = np.linalg.lstsq(eq_A, -eq_b, rcond=None)
-    #     F = null_space(eq_A)
-    #     A = self.inequalities[:, :-1] @ F
-    #     b = self.inequalities[:, -1:] - self.inequalities[:, :-1] @ x0
-    #     new_inequalities = np.concatenate([A, b], axis=1)
-
-    #     def remapper(x):
-    #         return F @ x + x0
-
-    #     return new_inequalities, remapper, F, x0
-
     def get_interior_point(
         self,
         env: Any = None,
@@ -236,19 +208,6 @@ class Polyhedron:
             interior_point = interior_point.squeeze()
         if interior_point is None:
             raise ValueError("Interior point not found. Check that the polyhedron is feasible and MAX_RADIUS is large enough.")
-        # Match solve_radius: validate only non-degenerate halfspaces, with slack for
-        # LP feasibility (__contains__ uses all rows + tighter TOL_HALFSPACE_CONTAINMENT).
-        # if interior_point is not None:
-        #     hs_check = _drop_degenerate_halfspaces(self.halfspaces_np[:])
-        #     if hs_check.size > 0:
-        #         pt = interior_point.reshape(1, -1)
-        #         dists = pt @ hs_check[:, :-1].T + hs_check[:, -1]
-        #         max_v = float(dists.max())
-        #         if max_v > cfg.TOL_INTERIOR_VERIFY:
-        #             raise ValueError(
-        #                 f"Interior point invalid - {interior_point} not in {self}: "
-        #                 f"max violation {max_v} (tol {cfg.TOL_INTERIOR_VERIFY})"
-        #             )
         return interior_point
 
     def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
@@ -326,16 +285,10 @@ class Polyhedron:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Polyhedron):
-            return self.tag == other.tag  # and (self.ss == other.ss).all()
-        elif isinstance(other, str):
-            # warnings.warn(
-            #     "Comparing Polyhedron with string is deprecated and will be removed in a future version", stacklevel=2
-            # )
-            return str(self) == other
-        elif other is None:
+            return self.tag == other.tag
+        if other is None:
             return False
-        else:
-            raise ValueError(f"Cannot compare Polyhedron with {type(other)}")
+        return NotImplemented
 
     def __hash__(self) -> int:
         if self._hash is None:
@@ -406,7 +359,6 @@ class Polyhedron:
             self.warnings.append(w)
             return None
 
-        ## TODO: Move this logic into a separate method and reuse it here and in get_interior_point()
         n_rows_raw = bounded_halfspaces.shape[0]
         zero_idx = self.zero_indices[(self.zero_indices >= 0) & (self.zero_indices < n_rows_raw)]
 
@@ -437,7 +389,9 @@ class Polyhedron:
 
         projected_halfspaces = bounded_halfspaces
         projected_int_point = np.asarray(int_point).reshape(-1)
-        remap_vertices = lambda verts: verts  # noqa: E731
+
+        def remap_vertices(verts: np.ndarray) -> np.ndarray:
+            return verts
 
         # HalfspaceIntersection expects a full-dimensional interior. For k<d cells
         # (equalities induced by zero sign entries), project to nullspace coords.
@@ -492,26 +446,6 @@ class Polyhedron:
             vertices = remap_vertices(reduced_vertices)
             return np.unique(vertices, axis=0)
         try:
-            # Debug aid for rare Qhull failures (e.g. QH6023: feasible point not clearly inside halfspace).
-            # If any halfspace normal is ~0, Qhull can behave pathologically.
-            try:
-                normals = bounded_halfspaces[:, :-1]
-                normal_norms = np.linalg.norm(normals, axis=1)
-                tiny = np.flatnonzero(normal_norms < 1e-12)
-                if tiny.size > 0:
-                    print(
-                        "[relucent] DEBUG: near-zero halfspace normals detected before HalfspaceIntersection\n"
-                        + f"  poly={self}\n"
-                        + f"  bound={bound}\n"
-                        + f"  int_point={np.asarray(int_point).ravel()}\n"
-                        + f"  tiny_indices={tiny.tolist()}\n"
-                        + f"  tiny_rows={bounded_halfspaces[tiny].tolist()}\n"
-                        + f"  normal_norms: min={float(normal_norms.min()):.3e}, "
-                        + f"median={float(np.median(normal_norms)):.3e}, max={float(normal_norms.max()):.3e}"
-                    )
-            except Exception:
-                # Never fail geometry due to debug printing.
-                pass
             with warnings.catch_warnings(record=True) as w:
                 hs = HalfspaceIntersection(
                     projected_halfspaces,
@@ -690,10 +624,6 @@ class Polyhedron:
 
         compute_properties(self, qhull_mode=qhull_mode)
 
-    """
-    All of the following properties are computed on the fly and cached
-    """
-
     @property
     def vertices(self) -> np.ndarray | None:
         """Vertices of the polyhedron (not always reliable)."""
@@ -728,7 +658,7 @@ class Polyhedron:
             self._compute_qhull_geometry()
         return self._volume if self._volume is not None else -1.0
 
-    @cached_property  ## !! See if this works
+    @cached_property
     def tag(self) -> bytes:
         """Unique tag for this polyhedron, computed as a hashable representation of the sign sequence."""
         if self._tag is None:
@@ -972,8 +902,6 @@ class Polyhedron:
         """Returns a new Polyhedron object based on sign sequence multiplication"""
         return Polyhedron(self._net, self.ss + other.ss * (self.ss == 0))
 
-    """The following methods are used for pickling"""
-
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         self._preserve_cache_on_pickle = False
@@ -989,14 +917,14 @@ class Polyhedron:
             "_hash": self._hash,
             "_finite_computed": self._finite_computed,
             "_finite": self._finite,
-            "_center": self._center,  ## TODO: Does this slow down things? Careful when removing this!
+            "_center": self._center,
             "_interior_point_norm": self._interior_point_norm,
             "_inradius": self._inradius,
             "_shis": self._shis,
             "_Wl2": self._Wl2,
             "_volume": self._volume,
             "_num_dead_relus": self._num_dead_relus,
-            "_interior_point": self._interior_point,  ## TODO: Does this slow down things?
+            "_interior_point": self._interior_point,
             "_attempted_compute_properties": self._attempted_compute_properties,
             "warnings": self.warnings,
         }

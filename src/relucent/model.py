@@ -7,6 +7,8 @@ from typing import Any, cast
 
 import numpy as np
 
+from relucent._logging import logger
+
 __all__ = ["ReLUNetwork", "LinearLayer", "ReLULayer", "FlattenLayer"]
 
 
@@ -14,17 +16,16 @@ __all__ = ["ReLUNetwork", "LinearLayer", "ReLULayer", "FlattenLayer"]
 class LinearLayer:
     weight: np.ndarray
     bias: np.ndarray
-    kind: str = "linear"
 
 
 @dataclass
 class ReLULayer:
-    kind: str = "relu"
+    pass
 
 
 @dataclass
 class FlattenLayer:
-    kind: str = "flatten"
+    pass
 
 
 Layer = LinearLayer | ReLULayer | FlattenLayer
@@ -37,7 +38,6 @@ class ReLUNetwork:
         self,
         layers: Iterable[Layer] | Mapping[str, Layer],
         input_shape: tuple[int, ...] | None = None,
-        **_: Any,
     ) -> None:
         if isinstance(layers, Mapping):
             self.layers: OrderedDict[str, Layer] = OrderedDict((str(name), layer) for name, layer in layers.items())
@@ -50,28 +50,10 @@ class ReLUNetwork:
             input_shape = (int(first_linear.weight.shape[1]),)
         self.input_shape = input_shape
         self.trained_on = None
-        self._device = "cpu"
-        self._dtype = np.float64
 
     @property
     def num_relus(self) -> int:
         return sum(isinstance(layer, ReLULayer) for layer in self.layers.values())
-
-    @property
-    def device(self) -> str:
-        return self._device
-
-    @property
-    def dtype(self) -> Any:
-        try:
-            import torch  # type: ignore
-
-            return torch.float64
-        except Exception:
-            return self._dtype
-
-    def save_numpy_weights(self) -> None:
-        return
 
     def __call__(self, data: np.ndarray | Any) -> np.ndarray | Any:
         return self.forward(data)
@@ -84,6 +66,7 @@ class ReLUNetwork:
 
     @staticmethod
     def _apply_layer(layer: Layer, x: np.ndarray | Any) -> np.ndarray | Any:
+        """Apply a single layer. Supports both NumPy arrays and PyTorch tensors."""
         if isinstance(layer, LinearLayer):
             w = layer.weight
             b = layer.bias
@@ -105,7 +88,7 @@ class ReLUNetwork:
         x = data
         for name, layer in self.layers.items():
             if verbose:
-                print(f"Layer {name}: {layer}")
+                logger.info("Layer %s: %s", name, layer)
             x = self._apply_layer(layer, x)
             if layers is None or name in layers:
                 outputs.append((name, x))
@@ -121,4 +104,3 @@ class ReLUNetwork:
                     return layer.weight[remaining_rows]
                 remaining_rows -= layer.weight.shape[0]
         raise ValueError(f"Invalid Neuron Index: {shi}")
-

@@ -55,10 +55,9 @@ class TestMlp:
 class TestReLUNetwork:
     """Tests for ReLUNetwork class."""
 
-    def test_save_numpy_weights(self, seeded):
+    def test_network_type(self, seeded):
         assert seeded is not None
         net = cast(Any, mlp(widths=[2, 4, 1]))
-        net.save_numpy_weights()
         assert isinstance(net, (ReLUNetwork, nn.Sequential))
 
     def test_device_dtype(self, seeded):
@@ -93,7 +92,6 @@ class TestReLUNetwork:
         net = cast(Any, mlp(widths=[4, 8, 2]))
         if isinstance(net, nn.Sequential):
             pytest.skip("shi2weights is specific to canonical wrapper")
-        net.save_numpy_weights()
         w = net.shi2weights(0, return_idx=False)
         assert not isinstance(w, tuple)
         assert w.shape == (4,)
@@ -103,7 +101,7 @@ class TestReLUNetwork:
         net = cast(Any, mlp(widths=[4, 8, 2]))
         if isinstance(net, nn.Sequential):
             pytest.skip("shi2weights is specific to canonical wrapper")
-        name, idx = net.shi2weights(3, return_idx=True)
+        name, idx = net.shi2weights(3, return_idx=True)  # type: ignore[misc]
         assert isinstance(name, str)
         assert isinstance(idx, int)
         assert 0 <= idx < 8

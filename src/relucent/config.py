@@ -50,6 +50,16 @@ def _env_float(setting: str, default: float) -> float:
         raise ValueError(f"Invalid float value for {_env_name(setting)!r}: {raw!r}") from exc
 
 
+def _env_int(setting: str, default: int) -> int:
+    raw = os.getenv(_env_name(setting))
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(f"Invalid int value for {_env_name(setting)!r}: {raw!r}") from exc
+
+
 def _env_float_list(setting: str, default: list[float]) -> list[float]:
     raw = os.getenv(_env_name(setting))
     if raw is None:
@@ -159,6 +169,19 @@ ASTAR_BIAS_WEIGHT: float = _env_float("ASTAR_BIAS_WEIGHT", 0.9)
 # by this factor to add margin (e.g. maxcoord * PLOT_MARGIN_FACTOR).
 PLOT_MARGIN_FACTOR: float = _env_float("PLOT_MARGIN_FACTOR", 1.1)
 
+# -----------------------------------------------------------------------------
+# Logging / verbosity
+# -----------------------------------------------------------------------------
+
+# Controls how much relucent prints during search and parallel operations.
+# The integer maps to Python logging levels:
+#   0  → WARNING  (silent — only errors/warnings are shown)
+#   1  → INFO     (default — normal progress: worker counts, cube-filter info, …)
+# Values >= 2 are reserved for future DEBUG-level output.
+# Can be overridden at runtime via update_settings(VERBOSE=0) or by setting
+# the environment variable RELUCENT_VERBOSE before importing relucent.
+VERBOSE: int = _env_int("VERBOSE", 1)
+
 # Fallback max coordinate for 2D plot when there are no interior points.
 PLOT_DEFAULT_MAXCOORD: float = _env_float("PLOT_DEFAULT_MAXCOORD", 10)
 
@@ -193,6 +216,7 @@ __all__ = [
     "TOL_NEARLY_VERTICAL",
     "TOL_SHI_HYPERPLANE",
     "TOL_VERIFY_AB_ATOL",
+    "VERBOSE",
     "VERTEX_TRUST_THRESHOLD",
     "update_settings",
 ]
@@ -204,6 +228,9 @@ def update_settings(**kwargs: Any) -> None:
     Keys must be names listed in :data:`relucent.config.__all__` (excluding
     ``update_settings`` itself). Values replace the current module-level
     constants.
+
+    Changing :data:`VERBOSE` also immediately updates the level of the
+    ``"relucent"`` package logger (see :mod:`relucent._logging`).
 
     Args:
         **kwargs: ``NAME=value`` pairs matching public config attributes.
@@ -218,3 +245,7 @@ def update_settings(**kwargs: Any) -> None:
     mod = globals()
     for k, v in kwargs.items():
         mod[k] = v
+    if "VERBOSE" in kwargs:
+        from relucent._logging import _apply_verbose
+
+        _apply_verbose(int(kwargs["VERBOSE"]))

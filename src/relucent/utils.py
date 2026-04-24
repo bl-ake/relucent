@@ -22,7 +22,7 @@ from gurobipy import Env, disposeDefaultEnv
 
 import relucent.config as cfg
 from relucent._torch_compat import TORCH_AVAILABLE, nn, torch
-from relucent.model import ReLUNetwork, FlattenLayer, LinearLayer, ReLULayer
+from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
 __all__ = [
     "BlockingQueue",
@@ -68,9 +68,6 @@ class TorchMLP(nn.Sequential):
             return next(self.parameters()).dtype
         except StopIteration:
             return torch.float64
-
-    def save_numpy_weights(self) -> None:
-        return
 
 
 def mlp(widths: Iterable[int], add_last_relu: bool = False) -> Any:
@@ -448,6 +445,7 @@ def split_sequential(
             nn2 contains the remaining layers.
     """
     if isinstance(model, TorchMLP):
+
         def _infer_torch_widths(
             layers: OrderedDict[str, nn.Module],
             *,

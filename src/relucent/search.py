@@ -1,5 +1,6 @@
 """Search and pathfinding over a polyhedral complex."""
 
+import contextlib
 import os
 import random
 import warnings
@@ -12,6 +13,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._logging import logger
 from relucent._torch_compat import torch
 from relucent.calculations import get_shis
 from relucent.poly import Polyhedron
@@ -131,7 +133,7 @@ def parallel_compute_geometric_properties(
     nworkers: int | None = None,
     geometry_properties: Iterable[str] | None = None,
     keep_caches: bool = False,
-    verbose: int = 1,
+    verbose: int | None = None,
 ) -> dict[str, Any]:
     """Compute selected properties for all existing polyhedra in parallel.
 
@@ -141,16 +143,21 @@ def parallel_compute_geometric_properties(
         geometry_properties: Iterable of cache/property names to compute.
             If None, defaults to :data:`DEFAULT_GEOMETRY_PROPERTIES`.
         keep_caches: If True, keep heavy caches during worker serialization.
-        verbose: Whether to print progress.
+        verbose: Controls progress output. ``0`` silences all output; ``1``
+            (default) shows worker count and a progress bar.  When ``None``,
+            falls back to :data:`relucent.config.VERBOSE`.
     """
     from relucent.complex import set_globals
+
+    if verbose is None:
+        verbose = cfg.VERBOSE
 
     if len(cx) == 0:
         return {"Computed": 0, "Failed": []}
 
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
-        print(f"Computing geometric properties on {nworkers} workers")
+        logger.info("Computing geometric properties on %d workers", nworkers)
 
     tasks = [(poly.ss_np, poly._shis, i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
@@ -186,6 +193,7 @@ def parallel_add(
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float | None = None,
+    verbose: int | None = None,
 ) -> list[Polyhedron | None]:
     """Add multiple polyhedra from data points using parallel processing.
 
@@ -199,36 +207,46 @@ def parallel_add(
             of CPU cores. Defaults to None.
         bound: Constraint radius for numerical stability when computing halfspaces.
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
+        verbose: Controls progress output. ``0`` silences all output; ``1``
+            (default) shows worker count and progress bars.  When ``None``,
+            falls back to :data:`relucent.config.VERBOSE`.
 
     Returns:
         list: A list of Polyhedron objects (or None for failed computations)
             corresponding to the input points.
     """
+    if verbose is None:
+        verbose = cfg.VERBOSE
     if bound is None:
         bound = cfg.DEFAULT_PARALLEL_ADD_BOUND
     from relucent.complex import set_globals
 
     nworkers = nworkers or process_aware_cpu_count()
-    print(f"Running on {nworkers} workers")
+    if verbose:
+        logger.info("parallel_add using %d workers", nworkers)
     sss = []
-    for p in tqdm(points, desc="Getting SSs", mininterval=5):
+    for p in tqdm(points, desc="Getting SSs", mininterval=5, disable=not verbose):
         s = cx.point2ss(p)
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
+    tasks = [(ss, None, i) for i, ss in enumerate(sss)]
     with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net,)) as pool:
-        ps = pool.map(
+        results = pool.map(
             partial(
                 geometric_calculations,
                 geometry_properties=DEFAULT_GEOMETRY_PROPERTIES,
                 keep_caches=False,
             ),
-            tqdm(sss, desc="Adding Polys", mininterval=5),
+            tqdm(tasks, desc="Adding Polys", mininterval=5, disable=not verbose),
         )
-        ps = [p[0] if isinstance(p[0], Polyhedron) else None for p in ps]
-        for p in ps:
-            if p is not None:
-                cx.add_polyhedron(p)
-        return ps
+    # results are (poly_or_error, poly_index); restore original order
+    ordered: list[Polyhedron | None] = [None] * len(sss)
+    for poly_or_error, poly_index, *_ in results:
+        if isinstance(poly_or_error, Polyhedron):
+            poly_or_error._net = cx._net
+            cx.add_polyhedron(poly_or_error)
+            ordered[poly_index] = poly_or_error
+    return ordered
 
 
 def get_ip(
@@ -258,10 +276,8 @@ def get_ip(
         assert cx._net is not None, "set_globals must be used as pool initializer"
         n = Polyhedron(cx._net, ss)
         for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
-            try:
+            with contextlib.suppress(ValueError):
                 n._interior_point = n.get_interior_point(env=cx.env, max_radius=max_radius)
-            except ValueError:
-                print("Increasing max radius to find interior point")
         return n, shi
     except ValueError as e:
         return e, shi
@@ -320,7 +336,7 @@ def searcher(
     queue=None,
     bound=None,
     nworkers=None,
-    verbose=1,
+    verbose=None,
     cube_radius: float | None = None,
     cube_mode: str = "unrestricted",
     geometry_properties: Iterable[str] | None = None,
@@ -350,7 +366,9 @@ def searcher(
             Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
         nworkers: Number of worker processes for parallel computation. If None,
             uses the number of CPU cores. Defaults to None.
-        verbose: Whether to print progress information. Defaults to 1.
+        verbose: Controls progress output. ``0`` silences all output; ``1``
+            (default) shows worker count and a progress bar.  When ``None``,
+            falls back to :data:`relucent.config.VERBOSE`.
         geometry_properties: Iterable of polyhedron cache/property names to
             compute for each discovered polyhedron. Defaults to
             :data:`DEFAULT_GEOMETRY_PROPERTIES` (all non-SciPy geometry caches).
@@ -373,6 +391,9 @@ def searcher(
     """
     from relucent.complex import set_globals
 
+    if verbose is None:
+        verbose = cfg.VERBOSE
+
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
 
@@ -381,7 +402,7 @@ def searcher(
     elif cube_mode != "unrestricted":
         assert cube_radius is not None, "cube_radius must be provided when cube_mode is not 'unrestricted'"
         if verbose:
-            print(f"Applying cube filter with mode '{cube_mode}' and radius {cube_radius}")
+            logger.info("Applying cube filter with mode '%s' and radius %s", cube_mode, cube_radius)
     elif cube_radius is not None:
         warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.", stacklevel=2)
         cube_radius = None
@@ -416,15 +437,15 @@ def searcher(
     found_sss = SSManager()
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
-        print(f"Running on {nworkers} workers")
+        logger.info("searcher running on %d workers", nworkers)
     if queue is None:
         queue = BlockingQueue(
             queue_class=deque,
-            pop=cast(Callable[[deque[object]], object], deque.pop),
+            pop=cast(Callable[[deque[object]], object], deque.popleft),
             push=cast(Callable[[deque[object], object], None], deque.append),
         )
     if start is None:
-        start = cx.add_point(torch.zeros(cx._net.input_shape, device=cx._net.device, dtype=cx._net.dtype))
+        start = cx.add_point(np.zeros(cx._net.input_shape, dtype=np.float64))
     elif isinstance(start, Polyhedron):
         start = cx.add_polyhedron(start)
     else:
@@ -506,7 +527,7 @@ def searcher(
                         try:
                             warnings.warn(warning, stacklevel=2)
                         except Exception as e:
-                            print(warning, type(warning), e, end="\n\n")
+                            logger.warning("%s %s %s", warning, type(warning), e)
 
                 if depth < max_depth:
                     for new_shi in p.shis:
@@ -536,8 +557,6 @@ def searcher(
         finally:
             queue.close()
             pbar.close()
-
-            pool.close()
             pool.terminate()
             pool.join()
 
@@ -561,15 +580,12 @@ def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs
 
     diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).ravel()).ravel().tolist())
 
-    print("Diffs:", diffs)
-
     if not start._shis:
         get_shis(start)
     shis_set = set(start.shis)
     groupa = shis_set & diffs
     groupb = shis_set - diffs
     for shi in list(groupa):
-        print("Crossing", shi)
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
         next_poly = cx.ss2poly(new_ss)
@@ -577,7 +593,6 @@ def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs
         if rest is not None:
             return [start] + rest
     for shi in list(groupb):
-        print("Crossing", shi)
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
         next_poly = cx.ss2poly(new_ss)
@@ -687,7 +702,6 @@ def hamming_astar(
     end_poly = cx.add_polyhedron(end) if isinstance(end, Polyhedron) else cx.add_point(end)
     hamming_start_goal = int((start_poly.ss_np != end_poly.ss_np).sum())
     if start_poly == end_poly:
-        print("Start and end points are in the same region")
         _ = start_poly.finite
 
         start_poly._interior_point = start_poly.get_interior_point()
@@ -714,7 +728,6 @@ def hamming_astar(
 
     nhs = len(start_poly.halfspaces)
     nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (process_aware_cpu_count() or 1)), nhs)
-    print(f"Using {nworkers} workers")
 
     cameFrom: dict[Polyhedron, Polyhedron] = {}
     gScore = defaultdict(lambda: float("inf"))
@@ -772,7 +785,7 @@ def hamming_astar(
                 # Useful when debugging spawn-related issues on macOS/Windows.
                 if os.environ.get("RELUCENT_DEBUG_ASTAR"):
                     err = item[1]
-                    print(f"A* SHI computation failed: {type(err).__name__}: {err}")
+                    logger.debug("A* SHI computation failed: %s: %s", type(err).__name__, err)
                 bad_shi_computations.append(item)
                 continue
 
@@ -834,8 +847,6 @@ def hamming_astar(
         if pool is not None:
             pool.terminate()
             pool.join()
-            pool.close()
-
         openSet.close()
         tqdm.get_lock().locks = []
         pbar.close()

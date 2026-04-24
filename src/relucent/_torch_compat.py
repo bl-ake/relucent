@@ -8,13 +8,12 @@ from typing import Any
 __all__ = ["TORCH_AVAILABLE", "nn", "torch"]
 
 
-
 def _missing_torch(*_args: Any, **_kwargs: Any) -> Any:
     raise ImportError('This relucent feature requires PyTorch. Install it with `pip install "relucent[torch]"`.')
 
 
 try:
-    import torch as torch  # type: ignore[assignment]
+    import torch  # type: ignore[assignment]
     import torch.nn as nn  # type: ignore[assignment]
 
     _torch_available = True
@@ -42,6 +41,7 @@ except ImportError:
 
     def _no_grad_stub(func: Callable[..., Any] | None = None) -> Any:
         if func is None:
+
             def _decorator(f: Callable[..., Any]) -> Callable[..., Any]:
                 return f
 
@@ -61,4 +61,3 @@ except ImportError:
     nn = _NNStub()  # type: ignore[assignment]
 
 TORCH_AVAILABLE: bool = _torch_available
-
