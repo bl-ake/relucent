@@ -8,7 +8,7 @@ import torch.nn as nn
 
 from relucent.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
 from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
-from relucent.utils import mlp
+from relucent.utils import TorchMLP, mlp
 
 
 class TestCombineLinearLayers:
@@ -196,6 +196,7 @@ class TestConvert:
     def test_mlp_roundtrip(self, seeded):
         assert seeded is not None
         net = mlp(widths=[4, 8, 3])
+        assert isinstance(net, TorchMLP)
         canonical = convert(net)
         assert isinstance(canonical, ReLUNetwork)
         assert canonical.input_shape == (4,)

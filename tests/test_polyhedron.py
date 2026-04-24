@@ -1,23 +1,31 @@
 """Tests for relucent.poly (Polyhedron, solve_radius)."""
 
 import pickle
+from collections.abc import Iterable
 
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 
-from relucent import Complex, Polyhedron, mlp
+from relucent import Complex, Polyhedron
+from relucent import mlp as _mlp
+from relucent.utils import TorchMLP
 from tests.helpers import ss_to_numpy
 
 
-def _set_linear_params(net, layer_name: str, weight: torch.Tensor, bias: torch.Tensor) -> None:
+def mlp(widths: Iterable[int], add_last_relu: bool = False) -> TorchMLP:
+    result = _mlp(widths, add_last_relu=add_last_relu)
+    assert isinstance(result, TorchMLP)
+    return result
+
+
+def _set_linear_params(net: TorchMLP, layer_name: str, weight: torch.Tensor, bias: torch.Tensor) -> None:
     layer = net.layers[layer_name]
-    if isinstance(layer.weight, torch.Tensor):
-        layer.weight.data.copy_(weight.to(net.device, net.dtype))
-        layer.bias.data.copy_(bias.to(net.device, net.dtype).reshape(-1))
-    else:
-        layer.weight = weight.to(net.device, net.dtype).cpu().numpy()
-        layer.bias = bias.to(net.device, net.dtype).cpu().numpy().reshape(1, -1)
+    assert isinstance(layer, nn.Linear)
+    layer.weight.data.copy_(weight.to(net.device, net.dtype))
+    assert layer.bias is not None
+    layer.bias.data.copy_(bias.to(net.device, net.dtype).reshape(-1))
 
 
 class TestPolyhedronBasics:

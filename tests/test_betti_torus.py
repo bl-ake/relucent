@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch import optim
 
 from relucent import Complex, mlp, set_seeds
+from relucent.utils import TorchMLP
 
 BUNDLED_TORUS_CHECKPOINT = Path(__file__).parent / "data" / "torus_boundary_model_seed2.pt"
 
@@ -61,9 +62,10 @@ def _make_torus(
     return points, labels
 
 
-def _train_torus_model(steps: int = 40_000) -> torch.nn.Module:
+def _train_torus_model(steps: int = 40_000) -> TorchMLP:
     """Train the torus classifier from canonicalpoly2.0's notebook recipe."""
     model = mlp(widths=[3, 15, 15, 1], add_last_relu=False)
+    assert isinstance(model, TorchMLP)
     model.to("cpu")
     criterion = nn.BCELoss()
     lr = 0.01
@@ -94,9 +96,10 @@ def _train_torus_model(steps: int = 40_000) -> torch.nn.Module:
     return model
 
 
-def _model_with_db_relu(model: torch.nn.Module) -> torch.nn.Module:
+def _model_with_db_relu(model: TorchMLP) -> TorchMLP:
     """Create a topology model with final ReLU so DB is represented as a BH."""
     topo_model = mlp(widths=[3, 15, 15, 1], add_last_relu=True)
+    assert isinstance(topo_model, TorchMLP)
     src_state = model.state_dict()
     dst_state = topo_model.state_dict()
     for key, value in src_state.items():
@@ -116,10 +119,12 @@ def test_torus_decision_boundary_betti_numbers(seeded):
 
     checkpoint = os.environ.get("RELUCENT_TORUS_CHECKPOINT")
     checkpoint_path = Path(checkpoint) if checkpoint is not None else BUNDLED_TORUS_CHECKPOINT
-    model: torch.nn.Module
+    model: TorchMLP
 
     if checkpoint_path.exists():
-        model = mlp(widths=[3, 15, 15, 1], add_last_relu=False)
+        _net = mlp(widths=[3, 15, 15, 1], add_last_relu=False)
+        assert isinstance(_net, TorchMLP)
+        model = _net
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
         model.load_state_dict(state_dict)
     elif os.environ.get("RELUCENT_TORUS_TRAIN", "0") == "1":

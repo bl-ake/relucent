@@ -14,6 +14,7 @@ import torch.nn as nn
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent.calculations import adjacent_polyhedra
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
+from relucent.utils import TorchMLP
 
 
 def _rand_batch(dim: int, batch: int = 1) -> torch.Tensor:
@@ -67,7 +68,7 @@ def test_bfs_polyhedron_affine_and_membership(seed: int):
     assert p.ss_np.size == cplx.n
     assert isinstance(p.W, torch.Tensor)
     assert isinstance(p.b, torch.Tensor)
-    assert torch.allclose(start @ p.W + p.b, model(start))
+    assert torch.allclose(start @ p.W + p.b, torch.as_tensor(model(start), dtype=(start @ p.W).dtype))
 
     cplx.bfs(max_polys=100, start=start)
     assert p in cplx
@@ -304,13 +305,18 @@ class TestComplexAutoConversion:
         """Auto-converting a Sequential gives the same complex as the explicit NN."""
         assert seeded is not None
         net = mlp(widths=[4, 8, 2])
+        assert isinstance(net, TorchMLP)
         # Build an equivalent torch Sequential from canonical weights.
+        fc0_layer = cast(nn.Linear, net.layers["fc0"])
         fc0 = nn.Linear(4, 8)
-        fc0.weight.data.copy_(torch.as_tensor(net.layers["fc0"].weight, dtype=torch.float64))
-        fc0.bias.data.copy_(torch.as_tensor(net.layers["fc0"].bias.reshape(-1), dtype=torch.float64))
+        fc0.weight.data.copy_(fc0_layer.weight.data.to(torch.float64))
+        assert fc0.bias is not None and fc0_layer.bias is not None
+        fc0.bias.data.copy_(fc0_layer.bias.data.to(torch.float64))
+        fc1_layer = cast(nn.Linear, net.layers["fc1"])
         fc1 = nn.Linear(8, 2)
-        fc1.weight.data.copy_(torch.as_tensor(net.layers["fc1"].weight, dtype=torch.float64))
-        fc1.bias.data.copy_(torch.as_tensor(net.layers["fc1"].bias.reshape(-1), dtype=torch.float64))
+        fc1.weight.data.copy_(fc1_layer.weight.data.to(torch.float64))
+        assert fc1.bias is not None and fc1_layer.bias is not None
+        fc1.bias.data.copy_(fc1_layer.bias.data.to(torch.float64))
         sequential = nn.Sequential(fc0, nn.ReLU(), fc1).to(dtype=torch.float64)
         cplx_nn = Complex(net)
         cplx_seq = Complex(sequential)
@@ -344,7 +350,7 @@ def _exercise_complex_for_model(model: nn.Module | ReLUNetwork) -> None:
     assert p in cplx
 
 
-def _build_canonical_nn() -> ReLUNetwork:
+def _build_canonical_nn() -> TorchMLP | ReLUNetwork:
     return mlp(widths=[4, 8, 2], add_last_relu=False)
 
 
