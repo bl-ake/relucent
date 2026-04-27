@@ -521,3 +521,15 @@ class TestComplexNumpyCanonicalNetworks:
         assert cplx.dim == 4
         assert cplx.n == 6
         assert p in cplx
+
+    def test_build_complex_from_affine_array_like_pair_sequence(self, seeded):
+        assert seeded is not None
+        w0 = np.random.randn(6, 4).tolist()
+        b0 = np.random.randn(6).tolist()
+        w1 = np.random.randn(3, 6).tolist()
+        b1 = np.random.randn(3).tolist()
+        cplx = Complex([[w0, b0], [w1, b1]])
+        p = cplx.add_point(np.random.randn(1, 4))
+        assert cplx.dim == 4
+        assert cplx.n == 6
+        assert p in cplx

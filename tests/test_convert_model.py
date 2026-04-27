@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
@@ -193,6 +194,20 @@ class TestAvgPool2dToAffine:
 
 
 class TestConvert:
+    def test_affine_array_like_pairs_are_accepted(self, seeded):
+        assert seeded is not None
+        w0 = np.random.randn(6, 4).tolist()
+        b0 = np.random.randn(6).tolist()
+        w1 = np.random.randn(3, 6).tolist()
+        b1 = np.random.randn(3).tolist()
+        canonical = convert([[w0, b0], [w1, b1]])
+        assert isinstance(canonical, ReLUNetwork)
+        assert canonical.input_shape == (4,)
+        linear_layers = [layer for layer in canonical.layers.values() if isinstance(layer, LinearLayer)]
+        assert len(linear_layers) == 2
+        assert linear_layers[0].weight.shape == (6, 4)
+        assert linear_layers[1].weight.shape == (3, 6)
+
     def test_mlp_roundtrip(self, seeded):
         assert seeded is not None
         net = mlp(widths=[4, 8, 3])
