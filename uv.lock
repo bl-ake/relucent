@@ -1497,14 +1497,14 @@ vis = [
 [package.metadata]
 requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.39.0" },
-    { name = "gurobipy", specifier = ">=12.0.1" },
+    { name = "gurobipy", specifier = ">=10.0.0" },
     { name = "kaleido", marker = "extra == 'vis'" },
     { name = "matplotlib", specifier = ">=3.10" },
-    { name = "networkx", specifier = ">=3.6" },
+    { name = "networkx", specifier = ">=2.0" },
     { name = "numpy", specifier = ">=2.4.1" },
     { name = "pandas", specifier = ">=2.3" },
-    { name = "pillow", specifier = ">=12.1.0" },
-    { name = "plotly", specifier = ">=6.3" },
+    { name = "pillow", specifier = ">=2.0.0" },
+    { name = "plotly", specifier = ">=5.20" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "pyvis", marker = "extra == 'vis'", specifier = ">=0.3" },
     { name = "ruff", marker = "extra == 'dev'" },
