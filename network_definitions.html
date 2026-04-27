@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation</title>
+  <title>Relucent Documentation: Network Definition Options</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -20,7 +20,8 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="next" title="Search Geometry and Cache Strategy" href="search_geometry.html" />
+    <link rel="prev" title="Quick Start" href="quickstart.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -33,7 +34,7 @@
 
           
           
-          <a href="#" class="icon icon-home">
+          <a href="index.html" class="icon icon-home">
             relucent
           </a>
 <div role="search">
@@ -45,7 +46,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
@@ -54,11 +55,11 @@
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-pytorch-model">1) Pass A PyTorch Model</a></li>
-<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
-<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
-<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Network Definition Options</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#pass-a-pytorch-model">1) Pass A PyTorch Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
@@ -196,17 +197,17 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">relucent</a>
+          <a href="index.html">relucent</a>
       </nav>
 
       <div class="wy-nav-content">
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Relucent Documentation</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Network Definition Options</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/network_definitions.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -214,49 +215,90 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <a class="reference internal image-reference" href="_images/title.svg"><img alt="Relucent" class="align-center" src="_images/title.svg" style="width: 420px;" />
-</a>
-<div style="margin-bottom: 1.25rem;"></div><p>Relucent computes and visualizes the polyhedral structure induced by ReLU neural
-networks. It helps you explore activation regions, compute
-their geometric properties, and analyze how they are connected to each other.</p>
-<p>Core capabilities include:</p>
-<ul class="simple">
-<li><p>Distributed local-search routines for discovering activation regions.</p></li>
-<li><p>Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).</p></li>
-<li><p>Complex-level analyses and graph-based views of region adjacency.</p></li>
-<li><p>2D and 3D visualizations using Plotly and matplotlib-backed utilities.</p></li>
-<li><p>Native compatibility with PyTorch models</p></li>
-</ul>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
-</ul>
+  <section id="network-definition-options">
+<h1>Network Definition Options<a class="headerlink" href="#network-definition-options" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">Complex</span></code> accepts multiple formats for defining the ReLU network whose
+activation regions you want to explore.</p>
+<p>At a high level, all inputs are converted to relucent’s internal
+<code class="docutils literal notranslate"><span class="pre">ReLUNetwork</span></code> representation.</p>
+<section id="pass-a-pytorch-model">
+<h2>1) Pass A PyTorch Model<a class="headerlink" href="#pass-a-pytorch-model" title="Link to this heading"></a></h2>
+<p>You can pass common PyTorch model structures directly.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+    <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</pre></div>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a></li>
-<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
-</ul>
+<p>This path is convenient when your model is already in PyTorch.</p>
+</section>
+<section id="pass-a-relunetwork">
+<h2>2) Pass A ReLUNetwork<a class="headerlink" href="#pass-a-relunetwork" title="Link to this heading"></a></h2>
+<p>You can construct the canonical network explicitly with NumPy arrays.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">relucent.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">ReLUNetwork</span><span class="p">,</span> <span class="n">LinearLayer</span><span class="p">,</span> <span class="n">ReLULayer</span>
+
+<span class="n">layers</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;fc0&quot;</span><span class="p">,</span> <span class="n">LinearLayer</span><span class="p">(</span><span class="n">weight</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">8</span><span class="p">))),</span>
+        <span class="p">(</span><span class="s2">&quot;relu0&quot;</span><span class="p">,</span> <span class="n">ReLULayer</span><span class="p">()),</span>
+        <span class="p">(</span><span class="s2">&quot;fc1&quot;</span><span class="p">,</span> <span class="n">LinearLayer</span><span class="p">(</span><span class="n">weight</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">bias</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">ReLUNetwork</span><span class="p">(</span><span class="n">layers</span><span class="o">=</span><span class="n">layers</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,))</span>
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">net</span><span class="p">)</span>
+</pre></div>
 </div>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
+<p>This is the most explicit, torch-free way to define your network.</p>
+</section>
+<section id="pass-an-iterable-of-w-i-b-i-tuples">
+<h2>3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples<a class="headerlink" href="#pass-an-iterable-of-w-i-b-i-tuples" title="Link to this heading"></a></h2>
+<p>You can pass only affine layers; relucent inserts ReLU layers between them.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+
+<span class="n">W0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">b0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>      <span class="c1"># also accepts shape (1, 8)</span>
+<span class="n">W1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="n">b1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">([(</span><span class="n">W0</span><span class="p">,</span> <span class="n">b0</span><span class="p">),</span> <span class="p">(</span><span class="n">W1</span><span class="p">,</span> <span class="n">b1</span><span class="p">)])</span>
+</pre></div>
+</div>
+<p>Rules:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+<li><p>Each <code class="docutils literal notranslate"><span class="pre">W_i</span></code> must be 2D with shape <code class="docutils literal notranslate"><span class="pre">(out_i,</span> <span class="pre">in_i)</span></code>.</p></li>
+<li><p>Each <code class="docutils literal notranslate"><span class="pre">b_i</span></code> must have shape <code class="docutils literal notranslate"><span class="pre">(out_i,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">out_i)</span></code>.</p></li>
+<li><p>ReLU is inserted after every affine layer except the last one.</p></li>
 </ul>
+</section>
+<section id="use-relucent-convert-explicitly">
+<h2>4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly<a class="headerlink" href="#use-relucent-convert-explicitly" title="Link to this heading"></a></h2>
+<p>If you want to inspect or reuse the canonical network before building a
+<code class="docutils literal notranslate"><span class="pre">Complex</span></code>, call <code class="docutils literal notranslate"><span class="pre">convert</span></code> directly.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">relucent</span><span class="w"> </span><span class="kn">import</span> <span class="n">convert</span><span class="p">,</span> <span class="n">Complex</span>
+
+<span class="n">canonical</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">model_or_layer_spec</span><span class="p">)</span>
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">Complex</span><span class="p">(</span><span class="n">canonical</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quick Start" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="search_geometry.html" class="btn btn-neutral float-right" title="Search Geometry and Cache Strategy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
