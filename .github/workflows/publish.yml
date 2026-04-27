@@ -90,3 +90,13 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+      - name: Trigger PyRelucent.jl version sync
+        env:
+          PYRELUCENT_DISPATCH_TOKEN: ${{ secrets.RELUCENT_DISPATCH_TOKEN }}
+        run: |
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer $PYRELUCENT_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/bl-ake/PyRelucent.jl/dispatches \
+            -d '{"event_type":"relucent-released"}'
