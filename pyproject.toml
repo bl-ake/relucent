@@ -10,12 +10,12 @@ requires-python = ">= 3.11"
 
 dependencies = [
     "pandas>=2.3",
-    "gurobipy>=12.0.1",
-    "networkx>=3.6",
+    "gurobipy>=10.0.0",
+    "networkx>=2.0",
     "matplotlib>=3.10",
     "numpy>=2.4.1",
-    "Pillow>=12.1.0",
-    "plotly>=6.3",
+    "Pillow>=2.0.0",
+    "plotly>=5.20",
     "scikit_learn>=1.8.0",
     "scipy>=1.17.0",
     "tqdm>=4.67.0",
