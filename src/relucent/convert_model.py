@@ -7,8 +7,10 @@ which consists of Linear and ReLU layers only.
 
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
+from typing import TypeGuard
 
 import numpy as np
+import numpy.typing as npt
 from tqdm.auto import tqdm
 
 from relucent._torch_compat import nn, torch
@@ -16,7 +18,8 @@ from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
 __all__ = ["convert"]
 
-AffineLayerTuple = tuple[np.ndarray | torch.Tensor, np.ndarray | torch.Tensor]
+AffineArrayLike = npt.ArrayLike | torch.Tensor
+AffineLayerPair = Sequence[AffineArrayLike]
 
 
 def _canonicalize_layer(layer: object) -> LinearLayer | ReLULayer | FlattenLayer:
@@ -41,12 +44,16 @@ def _canonicalize_named_layers(layers: Mapping[str, object]) -> OrderedDict[str,
     return OrderedDict((name, _canonicalize_layer(layer)) for name, layer in layers.items())
 
 
-def _is_affine_tuple_layer(item: object) -> bool:
-    return isinstance(item, tuple) and len(item) == 2
+def _is_affine_pair_layer(item: object) -> bool:
+    return isinstance(item, Sequence) and not isinstance(item, str | bytes) and len(item) == 2
+
+
+def _is_affine_pair_sequence(model: object) -> TypeGuard[Sequence[AffineLayerPair]]:
+    return isinstance(model, Sequence) and len(model) > 0 and all(_is_affine_pair_layer(layer) for layer in model)
 
 
 def _canonical_from_affine_tuples(
-    layers: Sequence[AffineLayerTuple],
+    layers: Sequence[AffineLayerPair],
 ) -> OrderedDict[str, LinearLayer | ReLULayer]:
     canonical: OrderedDict[str, LinearLayer | ReLULayer] = OrderedDict()
     for i, (w_raw, b_raw) in enumerate(layers):
@@ -231,7 +238,7 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
 
 @torch.no_grad()
 def convert(
-    model: "ReLUNetwork | nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerTuple]",
+    model: "ReLUNetwork | nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerPair]",
     input_shape: tuple[int, ...] | None = None,
 ) -> ReLUNetwork:
     """Convert a PyTorch model to canonical NN format.
@@ -248,7 +255,8 @@ def convert(
 
     Args:
         model: A ``torch.nn.Module``, a ``ModuleList``, a ``ModuleDict``, or an
-            iterable of affine layer tuples ``(W_i, b_i)``.
+            iterable of affine layer pairs ``(W_i, b_i)``. Each pair element may be
+            any NumPy array-like object or a torch tensor.
         input_shape: Shape of the input data (excluding batch dimension).
             Inferred from the first ``Linear`` layer when ``None``.
 
@@ -264,8 +272,8 @@ def convert(
             model.input_shape = input_shape
         return model
 
-    if isinstance(model, Sequence) and len(model) > 0 and all(_is_affine_tuple_layer(layer) for layer in model):
-        affine_layers = [layer for layer in model if isinstance(layer, tuple)]
+    if _is_affine_pair_sequence(model):
+        affine_layers = [(layer[0], layer[1]) for layer in model]
         canonical_layers = _canonical_from_affine_tuples(affine_layers)
         if input_shape is None:
             first_linear = next((m for m in canonical_layers.values() if isinstance(m, LinearLayer)), None)
