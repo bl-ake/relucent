@@ -35,3 +35,22 @@ def test_readme():
     _ = p.center
     _ = p.inradius
     _ = cplx.get_dual_graph()
+
+
+def test_readme_numpy():
+    # Create Model
+
+    network = [(np.random.randn(10, 2), np.random.randn(10)), (np.random.randn(5, 10), np.random.randn(5))]
+
+    cplx = relucent.Complex(network)
+
+    cplx.bfs()
+
+    _ = cplx.plot()
+
+    assert len(cplx) > 0
+    assert sum(len(p.shis) for p in cplx) / len(cplx) > 0
+
+    input_point = np.random.random((1, 2))
+    p = cplx.point2poly(input_point)
+    _ = p.halfspaces[p.shis]
