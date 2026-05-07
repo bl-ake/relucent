@@ -59,13 +59,7 @@ def _license_env_start_failure(exc: GurobiError) -> bool:
     if exc.errno in _LICENSE_ENV_START_FALLBACK_ERRNOS:
         return True
     msg = exc.message.lower()
-    return (
-        "license" in msg
-        or "token server" in msg
-        or "web license service" in msg
-        or "wls" in msg
-        or "compute server" in msg
-    )
+    return "license" in msg or "token server" in msg or "web license service" in msg or "wls" in msg or "compute server" in msg
 
 
 def _configure_cached_gurobi_env(env: Env, num_threads: int | None) -> None:

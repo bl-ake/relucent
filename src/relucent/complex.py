@@ -794,44 +794,314 @@ class Complex:
         return chain
 
     @staticmethod
-    def _gf2_rank(matrix: np.ndarray) -> int:
-        """Compute matrix rank over GF(2) via Gaussian elimination."""
-        if matrix.size == 0:
+    def _gf2_rank_packed(packed: np.ndarray, ncols: int) -> int:
+        """Gaussian elimination rank over GF(2) on row-major bit-packed rows (uint64 words)."""
+        if packed.size == 0 or ncols == 0:
             return 0
-        A = matrix.astype(np.uint8, copy=True) & 1
-        nrows, ncols = A.shape
+        nrows = int(packed.shape[0])
         rank = 0
         for col in range(ncols):
             if rank >= nrows:
                 break
-            # Find the first usable pivot in this column (at/under current rank row).
-            pivot_rows = np.flatnonzero(A[rank:, col]) + rank
-            if pivot_rows.size == 0:
+            word = col >> 6
+            sh = col & 63
+            bitm = np.uint64(1) << sh
+            colbits = packed[rank:, word] & bitm
+            pivot_offs = np.flatnonzero(colbits)
+            if pivot_offs.size == 0:
                 continue
-            pivot = int(pivot_rows[0])
+            pivot = rank + int(pivot_offs[0])
             if pivot != rank:
-                # Put the pivot where we want it before XOR elimination.
-                A[[rank, pivot], :] = A[[pivot, rank], :]
-            eliminate_rows = np.flatnonzero(A[:, col])
-            eliminate_rows = eliminate_rows[eliminate_rows != rank]
-            if eliminate_rows.size > 0:
-                # Over GF(2), subtraction is XOR, so this zeroes the column quickly.
-                A[eliminate_rows, :] ^= A[rank, :]
+                packed[[rank, pivot], :] = packed[[pivot, rank], :]
+            mask = (packed[:, word] & bitm) != 0
+            mask[rank] = False
+            inds = np.flatnonzero(mask)
+            if inds.size > 0:
+                packed[inds, :] ^= packed[rank, :]
             rank += 1
         return rank
 
-    def get_betti_numbers(self) -> dict[int, int]:
-        """Compute Betti numbers of the complex over GF(2).
+    @staticmethod
+    def _gf2_rank(matrix: np.ndarray) -> int:
+        """Compute matrix rank over GF(2) via Gaussian elimination.
 
-        Uses ``get_chain_complex()`` to obtain k-cells by contracting from top-dimensional
-        cells. The boundary operators are built from dual-graph incidences at each chain level,
-        then Betti numbers are computed as ``beta_k = dim(C_k) - rank(∂_k) - rank(∂_{k+1})``.
+        Uses a bit-packed row representation (~8× less RAM than ``uint8``) and fills it
+        in 64-column stripes so callers are not forced to materialize a huge dense matrix.
+        """
+        if matrix.size == 0:
+            return 0
+        nrows, ncols = matrix.shape
+        nwords = (int(ncols) + 63) // 64
+        packed = np.zeros((nrows, nwords), dtype=np.uint64)
+        m = np.asarray(matrix)
+        for w in range(nwords):
+            c0 = w * 64
+            c1 = min(c0 + 64, int(ncols))
+            acc = np.zeros(nrows, dtype=np.uint64)
+            for j, bc in enumerate(range(c0, c1)):
+                acc |= (m[:, bc].astype(np.uint8, copy=False) & 1).astype(np.uint64) << j
+            packed[:, w] = acc
+        return int(Complex._gf2_rank_packed(packed, int(ncols)))
+
+    @staticmethod
+    def _simplicial_betti_gf2(
+        *,
+        simplices_by_dim: dict[int, list[tuple[int, ...]]],
+    ) -> dict[int, int]:
+        """Compute simplicial Betti numbers over GF(2).
+
+        ``simplices_by_dim[k]`` is a list of k-simplices as tuples of vertex ids.
+        Vertex ids are assumed to be 0..N-1 (not necessarily contiguous, but consistent).
+        """
+        if not simplices_by_dim:
+            return {}
+
+        dims = sorted(simplices_by_dim.keys())
+        kmin = dims[0]
+        kmax = dims[-1]
+
+        # Ensure all lower-dimensional faces are present (closure).
+        for k in range(kmax, 0, -1):
+            if k not in simplices_by_dim:
+                continue
+            faces: set[tuple[int, ...]] = set(simplices_by_dim.get(k - 1, []))
+            for s in simplices_by_dim[k]:
+                for j in range(len(s)):
+                    faces.add(tuple(s[:j] + s[j + 1 :]))
+            simplices_by_dim[k - 1] = sorted(faces)
+
+        ncells = {k: len(simplices_by_dim.get(k, [])) for k in range(kmin, kmax + 1)}
+
+        boundary_rank: dict[int, int] = {}
+        for k in range(kmin, kmax + 1):
+            if k == kmin:
+                # d_0 = 0
+                boundary_rank[k] = 0
+                continue
+            sk = simplices_by_dim.get(k, [])
+            skm1 = simplices_by_dim.get(k - 1, [])
+            if not sk or not skm1:
+                boundary_rank[k] = 0
+                continue
+            row_index = {s: i for i, s in enumerate(skm1)}
+            nrows = len(skm1)
+            ncols = len(sk)
+            nwords = (ncols + 63) // 64
+            packed = np.zeros((nrows, nwords), dtype=np.uint64)
+            for col, s in enumerate(sk):
+                w = col >> 6
+                bit = np.uint64(1) << (col & 63)
+                # Boundary is the sum of codimension-1 faces (mod 2).
+                for j in range(len(s)):
+                    face = tuple(s[:j] + s[j + 1 :])
+                    row = row_index.get(face)
+                    if row is None:
+                        continue
+                    packed[row, w] ^= bit
+            boundary_rank[k] = int(Complex._gf2_rank_packed(packed, ncols))
+
+        # beta_k = dim C_k - rank(d_k) - rank(d_{k+1})
+        out: dict[int, int] = {}
+        for k in range(kmin, kmax + 1):
+            out[k] = int(ncells.get(k, 0) - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0))
+        return out
+
+    def _get_traditional_truncation_bound(self) -> float:
+        """Choose an L-infinity bounding box radius from polyhedron interior points.
+
+        Per manuscript convention, we set the truncation box using the interior point
+        (one per cell) with the largest max-norm across the complex.
+        """
+        if len(self) == 0:
+            return 1.0
+        max_norm = 0.0
+        for p in self:
+            ip = p.interior_point
+            if ip is None:
+                continue
+            max_norm = max(max_norm, float(np.max(np.abs(np.asarray(ip).reshape(-1)))))
+        # Avoid degenerate bound when everything is near the origin.
+        return max(max_norm, 1.0)
+
+    def get_betti_numbers(
+        self,
+        homology: Literal[
+            "standard",
+            "borel_moore",
+            "traditional",
+            # Clearer aliases (kept for readability + backward compatibility).
+            "contracted_standard",
+            "contracted_borel_moore",
+            "traditional_truncated",
+        ] = "standard",
+        *,
+        truncate_bound: float | None = None,
+        truncate_tol: float = 1e-7,
+    ) -> dict[int, int]:
+        """Compute Betti numbers over GF(2).
+
+        Args:
+            homology: Which Betti numbers to compute. There are **three** distinct modes:
+
+                - **Contracted standard** (aliases: ``"standard"``, ``"contracted_standard"``):
+                  uses relucent's contraction-chain cell-complex representation (finite, compactified
+                  handling of unbounded cells), with the standard boundary operator on that contracted
+                  chain complex.
+
+                - **Contracted Borel--Moore** (aliases: ``"borel_moore"``, ``"contracted_borel_moore"``):
+                  same contracted chain complex, but uses the dual-graph incidence boundary operator,
+                  which (in this contracted representation) corresponds to ignoring boundary faces with
+                  only one top-dimensional adjacent cell.
+
+                - **Traditional (truncated)** (aliases: ``"traditional"``, ``"traditional_truncated"``):
+                  computes *ordinary* homology of the geometric boundary after **truncating** each
+                  (possibly unbounded) cell by an axis-aligned bounding box (L-infinity ball)
+                  ``max_i |x_i| <= R``, **without** contracting directions to infinity. This yields the
+                  familiar interpretation (e.g. ``beta_0`` counts connected components of the truncated
+                  set). Implementation uses a simplicial approximation from bounded vertices + Delaunay
+                  triangulation in each cell's affine hull (GF(2) coefficients).
+            truncate_bound: Only for ``homology="traditional"``. If None, choose from the maximum
+                L-infinity norm over interior points in the complex (see
+                :meth:`_get_traditional_truncation_bound`).
+            truncate_tol: Vertex deduplication tolerance for the simplicial approximation.
+
+        Returns:
+            A mapping ``k -> beta_k`` with Betti numbers over GF(2).
         """
         self._warn_research_use("get_betti_numbers")
         if len(self) == 0:
             return {}
 
+        # Normalize aliases.
+        if homology == "contracted_standard":
+            homology = "standard"
+        elif homology == "contracted_borel_moore":
+            homology = "borel_moore"
+        elif homology == "traditional_truncated":
+            homology = "traditional"
+
+        if homology not in {"standard", "borel_moore", "traditional"}:
+            raise ValueError(f"Unknown homology mode: {homology!r}")
+
+        if homology == "traditional":
+            # Build a simplicial complex from bounded vertices of each top-dimensional cell,
+            # triangulating each cell in its affine hull and unioning the simplices.
+            from scipy.spatial import Delaunay
+
+            bound = float(truncate_bound) if truncate_bound is not None else self._get_traditional_truncation_bound()
+            top_dim = max(int(p.dim) for p in self)
+            if top_dim >= 4:
+                raise NotImplementedError(
+                    "Traditional (truncated) Betti numbers currently only support boundary-cell "
+                    f"dimension <= 3, but this complex has top_dim={top_dim}. "
+                )
+
+            # Global vertex table (deduplicated by rounding to tolerance).
+            key2vid: dict[tuple[int, ...], int] = {}
+            vertices: list[np.ndarray] = []
+
+            def _vid(v: np.ndarray) -> int:
+                vv = np.asarray(v, dtype=np.float64).reshape(-1)
+                q = tuple(np.round(vv / truncate_tol).astype(np.int64).tolist())
+                hit = key2vid.get(q)
+                if hit is not None:
+                    return int(hit)
+                new_id = len(vertices)
+                key2vid[q] = new_id
+                vertices.append(vv)
+                return new_id
+
+            simplices_by_dim: dict[int, set[tuple[int, ...]]] = {k: set() for k in range(top_dim + 1)}
+
+            for p in self:
+                if int(p.dim) != top_dim:
+                    continue
+                verts = p.get_bounded_vertices(bound)
+                if verts is None:
+                    continue
+                verts = np.asarray(verts, dtype=np.float64)
+                if verts.ndim != 2 or verts.shape[0] < top_dim + 1:
+                    continue
+
+                # Map local vertex list to global ids.
+                local_vids = [_vid(verts[i]) for i in range(verts.shape[0])]
+
+                # If the cell is 0D: it's just a vertex.
+                if top_dim == 0:
+                    simplices_by_dim[0].update([(vid,) for vid in local_vids])
+                    continue
+
+                # Build coordinates in the affine hull for Delaunay triangulation.
+                v0 = verts[0]
+                X = verts - v0[None, :]
+                # Orthonormal basis for span(X); rank should be top_dim for generic cells.
+                u, s, vh = np.linalg.svd(X, full_matrices=False)
+                # Use a relative tolerance for numerical rank (robust to overall scale).
+                tol = float(s[0]) * 1e-9 if s.size > 0 else 1e-10
+                rank = int(np.sum(s > tol))
+                if rank <= 0:
+                    # Degenerate: treat as a point.
+                    simplices_by_dim[0].add((local_vids[0],))
+                    continue
+                # Clamp rank to expected dimension (can be smaller due to numerical issues).
+                rank = min(rank, top_dim)
+                basis = vh[:rank, :].T  # (ambient_dim, rank)
+                coords = X @ basis  # (nverts, rank)
+
+                if rank == 1:
+                    # 1D cell: connect sorted endpoints in coordinate order.
+                    order = np.argsort(coords[:, 0])
+                    for a, b in zip(order[:-1], order[1:], strict=False):
+                        ia, ib = local_vids[int(a)], local_vids[int(b)]
+                        simplices_by_dim[1].add(tuple(sorted((ia, ib))))
+                    continue
+
+                try:
+                    tri = Delaunay(coords)
+                except Exception as e:
+                    # Delaunay/Qhull can fail on nearly-coplanar/cospherical points or precision issues.
+                    # Silently skipping would corrupt the simplicial approximation and Betti numbers.
+                    raise RuntimeError(
+                        "Traditional (truncated) Betti numbers: Delaunay triangulation failed for a "
+                        f"top_dim={top_dim} cell (computed affine rank={rank}). "
+                        "This usually indicates a precision/degeneracy issue (e.g. coplanar points) in "
+                        "the bounded-vertex set. Consider adjusting truncate_tol / truncation bound, or "
+                        "using a different homology mode."
+                    ) from e
+
+                # Delaunay simplices are (rank+1)-simplices filling the convex hull in the affine hull.
+                # We only support up to 3D boundary cells (rank 2 or 3) here. Higher rank would mean
+                # skipping top-dimensional cells, which would silently corrupt Betti numbers.
+                if rank >= 4:
+                    raise NotImplementedError(
+                        "Traditional (truncated) Betti numbers currently only support cell affine "
+                        f"dimension <= 3, but encountered rank={rank} for a cell with top_dim={top_dim}. "
+                        "Refusing to silently skip this cell."
+                    )
+                if rank not in {2, 3}:
+                    # rank==1 handled above; rank==0 handled above.
+                    raise NotImplementedError(f"Unexpected rank={rank} in traditional Betti computation (top_dim={top_dim}).")
+                for simplex in np.asarray(tri.simplices, dtype=np.int64):
+                    simp_vids = tuple(sorted(local_vids[int(i)] for i in simplex))
+                    simplices_by_dim[rank].add(simp_vids)
+
+            if not any(len(v) > 0 for v in simplices_by_dim.values()):
+                return {}
+
+            # Important: include empty lower-dimensional slots so closure can
+            # populate them and beta_0 is reported.
+            simp_lists: dict[int, list[tuple[int, ...]]] = {k: sorted(v) for k, v in simplices_by_dim.items()}
+            return self._simplicial_betti_gf2(simplices_by_dim=simp_lists)
+
+        # Build a chain complex.
+        # We use the existing contraction-based chain construction for both modes, and
+        # differ only in how the k->(k-1) boundary operator is assembled:
+        # - ``borel_moore`` uses dual-graph incidences (only internal faces with two
+        #   top-dimensional adjacent cells contribute).
+        # - ``standard`` includes all codimension-1 faces that are present as explicit cells
+        #   at the next chain level.
         chain = self.get_chain_complex()
+
         dim2complex = {int(c.index2poly[0].dim): c for c in chain if len(c) > 0}
         dims = sorted(dim2complex.keys())
         ncells = {k: len(dim2complex[k]) for k in dims}
@@ -846,27 +1116,47 @@ class Complex:
                 continue
 
             c_km1 = chain[i + 1]
-            boundary = np.zeros((len(c_km1), len(c_k)), dtype=np.uint8)
+            nrows_bm = len(c_km1)
+            ncols_bm = len(c_k)
+            nwords_bm = (ncols_bm + 63) // 64
+            boundary_packed = np.zeros((nrows_bm, nwords_bm), dtype=np.uint64)
 
-            # In this contraction-based chain construction, (k-1)-cells correspond to
-            # edges of the dual graph of k-cells. Over GF(2), each such edge is incident
-            # to its two endpoint k-cells.
-            G = c_k.get_dual_graph()
-            for p1, p2, shi in G.edges(data="shi"):
-                # Recover the contracted face SS by turning the crossing SHI into 0.
-                face_ss = p1.ss_np.copy()
-                face_ss[0, shi] = 0
-                if face_ss not in c_km1:
-                    # If the face is missing in this chain level, just skip it.
-                    continue
-                row = c_km1.ssm[face_ss]
-                col1 = c_k.ssm[p1.ss_np]
-                col2 = c_k.ssm[p2.ss_np]
-                # Each dual edge contributes the two endpoint incidences mod 2.
-                boundary[row, col1] ^= 1
-                boundary[row, col2] ^= 1
+            if homology == "borel_moore":
+                # In this contraction-based chain construction, (k-1)-cells correspond to
+                # edges of the dual graph of k-cells. Over GF(2), each such edge is incident
+                # to its two endpoint k-cells.
+                G = c_k.get_dual_graph()
+                for p1, p2, shi in G.edges(data="shi"):
+                    # Recover the contracted face SS by turning the crossing SHI into 0.
+                    face_ss = p1.ss_np.copy()
+                    face_ss[0, shi] = 0
+                    if face_ss not in c_km1:
+                        # If the face is missing in this chain level, just skip it.
+                        continue
+                    row = c_km1.ssm[face_ss]
+                    col1 = c_k.ssm[p1.ss_np]
+                    col2 = c_k.ssm[p2.ss_np]
+                    # Each dual edge contributes the two endpoint incidences mod 2.
+                    w1 = col1 >> 6
+                    boundary_packed[row, w1] ^= np.uint64(1) << (col1 & 63)
+                    w2 = col2 >> 6
+                    boundary_packed[row, w2] ^= np.uint64(1) << (col2 & 63)
+            else:
+                # Standard boundary over GF(2): each k-cell contributes to every codimension-1
+                # face in its supporting halfspace list.
+                for p1 in c_k:
+                    col = c_k.ssm[p1.ss_np]
+                    w = col >> 6
+                    bit = np.uint64(1) << (col & 63)
+                    for shi in p1.shis:
+                        face_ss = p1.ss_np.copy()
+                        face_ss[0, shi] = 0
+                        if face_ss not in c_km1:
+                            continue
+                        row = c_km1.ssm[face_ss]
+                        boundary_packed[row, w] ^= bit
 
-            boundary_rank[k] = self._gf2_rank(boundary)
+            boundary_rank[k] = self._gf2_rank_packed(boundary_packed, ncols_bm)
 
         # Standard beta_k = dim C_k - rank(d_k) - rank(d_{k+1}).
         return {k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0)) for k in dims}

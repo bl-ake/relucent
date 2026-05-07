@@ -154,8 +154,11 @@ def test_torus_decision_boundary_betti_numbers(seeded):
     cplx.bfs(start=start, nworkers=1, verbose=0)
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
-    betti = db_cplx.get_betti_numbers()
-    assert len(betti) == 3
+    betti_standard = db_cplx.get_betti_numbers(homology="standard")
+    betti_borel_moore = db_cplx.get_betti_numbers(homology="borel_moore")
 
-    betti_list = [betti.get(i, 0) for i in range(3)]
+    assert betti_standard == betti_borel_moore
+    assert len(betti_standard) == 3
+
+    betti_list = [betti_standard.get(i, 0) for i in range(3)]
     assert betti_list == [1, 2, 1]
