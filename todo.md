@@ -3,3 +3,4 @@
 - ensure vis works on windows
 - stress test
 - clean up Poly init
+- fix torch support for model.py

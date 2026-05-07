@@ -1,0 +1,184 @@
+"""Decision-boundary Betti number tests for known shapes.
+
+These tests construct small, fixed-weight ReLU networks whose decision boundary
+(the last neuron's bent hyperplane) is a piecewise-linear set with known topology.
+"""
+
+from __future__ import annotations
+
+import os
+
+import numpy as np
+import pytest
+import torch
+import torch.nn as nn
+
+from relucent import Complex, set_seeds
+
+INTEGRATION_ENV = "RELUCENT_RUN_DB_INTEGRATION"
+
+
+def _add_points(cplx: Complex, pts: np.ndarray) -> None:
+    """Add a batch of points to a complex, skipping any boundary points."""
+    for x in np.asarray(pts, dtype=np.float64):
+        ss = cplx.point2ss(x.reshape(1, -1))
+        if (np.asarray(ss) == 0).any():
+            continue
+        cplx.add_point(x.reshape(1, -1), check_exists=True)
+
+
+def _betti_list(betti: dict[int, int], *, up_to: int) -> list[int]:
+    return [int(betti.get(i, 0)) for i in range(up_to + 1)]
+
+
+def _diamond_boundary_model_l1_ball(radius: float = 1.0) -> nn.Sequential:
+    """ReLU network whose decision boundary is |x|_1 = radius (a diamond, homeomorphic to S^1)."""
+    # Build g(x) = |x1| + |x2| - radius using ReLU primitives:
+    # abs(t) = relu(t) + relu(-t)
+    #
+    # fc0: [x1, -x1, x2, -x2, extra...]
+    # relu
+    # fc1: [|x1|, |x2|]
+    # fc2: [|x1| + |x2| - radius]
+    # relu  (final ReLU so the last neuron's BH encodes the decision boundary)
+    #
+    # The extra ReLU units are "topology-only": their outgoing weights are 0, so they
+    # do not affect g(x), but they *do* subdivide the decision boundary into multiple
+    # cells so `get_boundary_complex()` has a meaningful cell decomposition.
+    fc0 = nn.Linear(2, 6, bias=False, dtype=torch.float64)
+    fc0.weight.data[:] = torch.tensor(
+        [
+            [1.0, 0.0],
+            [-1.0, 0.0],
+            [0.0, 1.0],
+            [0.0, -1.0],
+            [1.0, 1.0],
+            [1.0, -1.0],
+        ],
+        dtype=torch.float64,
+    )
+
+    fc1 = nn.Linear(6, 2, bias=False, dtype=torch.float64)
+    fc1.weight.data[:] = torch.tensor(
+        [
+            [1.0, 1.0, 0.0, 0.0, 0.0, 0.0],  # relu(x1) + relu(-x1)
+            [0.0, 0.0, 1.0, 1.0, 0.0, 0.0],  # relu(x2) + relu(-x2)
+        ],
+        dtype=torch.float64,
+    )
+
+    fc2 = nn.Linear(2, 1, bias=True, dtype=torch.float64)
+    fc2.weight.data[:] = torch.tensor([[1.0, 1.0]], dtype=torch.float64)
+    fc2.bias.data[:] = torch.tensor([-float(radius)], dtype=torch.float64)
+
+    return nn.Sequential(fc0, nn.ReLU(), fc1, fc2, nn.ReLU())
+
+
+def _line_boundary_model() -> nn.Sequential:
+    """ReLU network whose decision boundary is x1 = 0 (a non-compact line, homeomorphic to R)."""
+    # Add extra "unused" ReLUs to subdivide the line into multiple 1-cells
+    # without changing the output function.
+    fc0 = nn.Linear(2, 4, bias=False, dtype=torch.float64)
+    fc0.weight.data[:] = torch.tensor(
+        [
+            [1.0, 0.0],  # the actual decision hyperplane x1=0
+            [0.0, 1.0],
+            [0.0, -1.0],
+            [1.0, 1.0],
+        ],
+        dtype=torch.float64,
+    )
+    fc1 = nn.Linear(4, 1, bias=False, dtype=torch.float64)
+    fc1.weight.data[:] = torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float64)
+    return nn.Sequential(fc0, nn.ReLU(), fc1, nn.ReLU())
+
+
+def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
+    """Compact boundary: both modes should agree (sanity check)."""
+    set_seeds(seeded)
+    model = _diamond_boundary_model_l1_ball(radius=1.0)
+    cplx = Complex(model)
+    # Populate many regions near the decision boundary without running BFS.
+    thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
+    dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
+    inside = 0.9 * dirs
+    outside = 1.1 * dirs
+    _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
+    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
+    db_cplx = cplx.get_boundary_complex(cplx.n - 1)
+
+    betti_std = db_cplx.get_betti_numbers(homology="standard")
+    betti_bm = db_cplx.get_betti_numbers(homology="borel_moore")
+
+    assert betti_std == betti_bm
+    # At minimum, the boundary should have a nontrivial 1-cycle over GF(2).
+    assert int(betti_std.get(1, 0)) >= 1
+
+
+def test_decision_boundary_line_differs_between_homologies(seeded: int):
+    """Non-compact boundary: both modes should run (sanity check)."""
+    set_seeds(seeded)
+    # Use a truly affine last-neuron BH so the boundary is x1=0 (a line).
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    model = nn.Sequential(fc, nn.ReLU())
+    cplx = Complex(model)
+    # Sample points on both sides of the boundary x1=0, across a range of x2 values.
+    xs = np.linspace(-2.0, 2.0, 25)
+    ys = np.linspace(-2.0, 2.0, 25)
+    grid = np.array([[x, y] for x in xs for y in ys], dtype=np.float64)
+    eps = 1e-2
+    left = grid.copy()
+    left[:, 0] = -eps
+    right = grid.copy()
+    right[:, 0] = eps
+    _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
+    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
+    db_cplx = cplx.get_boundary_complex(cplx.n - 1)
+
+    betti_std = db_cplx.get_betti_numbers(homology="standard")
+    betti_bm = db_cplx.get_betti_numbers(homology="borel_moore")
+    betti_trad = db_cplx.get_betti_numbers(homology="traditional")
+
+    assert isinstance(betti_std, dict)
+    assert isinstance(betti_bm, dict)
+    assert isinstance(betti_trad, dict)
+
+    # Traditional truncation should treat the (truncated) line as a connected 1D set
+    # with no 1-cycles: beta_0 = 1, beta_1 = 0.
+    assert int(betti_trad.get(0, 0)) == 1
+    assert int(betti_trad.get(1, 0)) == 0
+
+
+@torch.no_grad()
+def _far_away_hyperplane_model() -> nn.Sequential:
+    """Model whose last neuron's BH is an affine line far from sampled points."""
+    # y = ReLU(x1 + 100) has decision boundary x1 = -100 (homeomorphic to R).
+    fc = nn.Linear(2, 1, bias=True, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    fc.bias.data[:] = torch.tensor([100.0], dtype=torch.float64)
+    return nn.Sequential(fc, nn.ReLU())
+
+
+@pytest.mark.skipif(
+    os.environ.get("GITHUB_ACTIONS", "0") == "1" or os.environ.get("CI", "0") == "1",
+    reason="Skip decision-boundary integration tests on CI (optional).",
+)
+@pytest.mark.skipif(
+    os.environ.get(INTEGRATION_ENV, "0") != "1",
+    reason=f"Opt-in integration test. Set {INTEGRATION_ENV}=1.",
+)
+def test_decision_boundary_empty_boundary_has_no_cells(seeded: int):
+    """Affine hyperplane boundary yields a simple 1-cell complex in both modes."""
+    set_seeds(seeded)
+    model = _far_away_hyperplane_model()
+    cplx = Complex(model)
+    _add_points(cplx, np.random.randn(300, 2))
+    # Graph construction warns about missing boundary neighbors before auto-add;
+    # that's expected here since only one side is discovered by sampling.
+    with pytest.warns(UserWarning, match=r"Dual graph is incomplete"):
+        cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
+    db = cplx.get_boundary_complex(cplx.n - 1)
+    assert len(db) == 1
+    assert db.get_betti_numbers(homology="standard") == {1: 1}
+    assert db.get_betti_numbers(homology="borel_moore") == {1: 1}
