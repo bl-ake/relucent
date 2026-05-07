@@ -993,7 +993,7 @@ class Complex:
             if top_dim >= 4:
                 raise NotImplementedError(
                     "Traditional (truncated) Betti numbers currently only support boundary-cell "
-                    f"dimension <= 3, but this complex has top_dim={top_dim}. "
+                    + f"dimension <= 3, but this complex has top_dim={top_dim}. "
                 )
 
             # Global vertex table (deduplicated by rounding to tolerance).
@@ -1035,7 +1035,7 @@ class Complex:
                 v0 = verts[0]
                 X = verts - v0[None, :]
                 # Orthonormal basis for span(X); rank should be top_dim for generic cells.
-                u, s, vh = np.linalg.svd(X, full_matrices=False)
+                _, s, vh = np.linalg.svd(X, full_matrices=False)
                 # Use a relative tolerance for numerical rank (robust to overall scale).
                 tol = float(s[0]) * 1e-9 if s.size > 0 else 1e-10
                 rank = int(np.sum(s > tol))
@@ -1063,10 +1063,10 @@ class Complex:
                     # Silently skipping would corrupt the simplicial approximation and Betti numbers.
                     raise RuntimeError(
                         "Traditional (truncated) Betti numbers: Delaunay triangulation failed for a "
-                        f"top_dim={top_dim} cell (computed affine rank={rank}). "
-                        "This usually indicates a precision/degeneracy issue (e.g. coplanar points) in "
-                        "the bounded-vertex set. Consider adjusting truncate_tol / truncation bound, or "
-                        "using a different homology mode."
+                        + f"top_dim={top_dim} cell (computed affine rank={rank}). "
+                        + "This usually indicates a precision/degeneracy issue (e.g. coplanar points) in "
+                        + "the bounded-vertex set. Consider adjusting truncate_tol / truncation bound, or "
+                        + "using a different homology mode."
                     ) from e
 
                 # Delaunay simplices are (rank+1)-simplices filling the convex hull in the affine hull.
@@ -1075,8 +1075,8 @@ class Complex:
                 if rank >= 4:
                     raise NotImplementedError(
                         "Traditional (truncated) Betti numbers currently only support cell affine "
-                        f"dimension <= 3, but encountered rank={rank} for a cell with top_dim={top_dim}. "
-                        "Refusing to silently skip this cell."
+                        + f"dimension <= 3, but encountered rank={rank} for a cell with top_dim={top_dim}. "
+                        + "Refusing to silently skip this cell."
                     )
                 if rank not in {2, 3}:
                     # rank==1 handled above; rank==0 handled above.
