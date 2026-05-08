@@ -32,6 +32,7 @@ class Polyhedron:
         halfspaces: np.ndarray | torch.Tensor | None = None,
         W: np.ndarray | torch.Tensor | None = None,
         b: np.ndarray | torch.Tensor | None = None,
+        finite: bool | None = None,
         shis: list[int] | None = None,
         bound: float | None = None,
         **kwargs: Any,
@@ -67,8 +68,8 @@ class Polyhedron:
         self._shis: list[int] | None = shis
         self._hs: HalfspaceIntersection | None = None
         self._ch: ConvexHull | None = None
-        self._finite_computed: bool = False
-        self._finite: bool | None = None
+        self._finite: bool | None = finite
+        self._finite_computed: bool = finite is not None
         self._vertices: np.ndarray | None = None
         self._volume: float | None = None
 
@@ -310,6 +311,11 @@ class Polyhedron:
         if ss[0, shi] == 0:
             raise ValueError(f"SHI {shi} contains the polyhedron, cannot get neighbor")
         ss[0, shi] = -ss[0, shi]
+        # If this Polyhedron was constructed directly from explicit halfspaces (no net),
+        # preserve them when flipping an inequality sign. The feasible region in input
+        # space is the same; only the sign sequence label changes.
+        if self._net is None and self._halfspaces is not None:
+            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
         return Polyhedron(self._net, ss)
 
     def get_face(self, shi: int) -> "Polyhedron":
@@ -327,6 +333,27 @@ class Polyhedron:
         # polyhedron. Setting a sign to 0 changes which constraints are active and can
         # change the derived halfspace representation; reusing caches can yield an
         # inconsistent cell complex (and invalid Betti numbers).
+        #
+        # Exception: when there is no associated network and the polyhedron was created
+        # from explicit halfspaces, the halfspace system itself *defines* the geometry.
+        # In that case, the face is represented by the same halfspaces but with one
+        # more constraint treated as an equality (via the zero sign entry).
+        if self._net is None and self._halfspaces is not None:
+            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
+        return Polyhedron(self._net, ss, bound=self.bound)
+
+    def get_face_by_shis(self, shis: Iterable[int]) -> "Polyhedron":
+        """Get a (possibly higher-codimension) face by zeroing multiple SHIs.
+
+        This is a purely combinatorial operation on the sign sequence: for each
+        ``shi`` in ``shis``, we set ``ss[0, shi] = 0`` and construct the resulting
+        Polyhedron. No cached geometry is reused (same rationale as :meth:`get_face`).
+        """
+        ss = self.ss_np.copy()
+        for shi in shis:
+            ss[0, int(shi)] = 0
+        if self._net is None and self._halfspaces is not None:
+            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
         return Polyhedron(self._net, ss, bound=self.bound)
 
     @property
@@ -354,6 +381,8 @@ class Polyhedron:
         Returns:
             bool: True if this polyhedron is a face of the other.
         """
+        if not self.feasible or not other.feasible:
+            return False
         eq = (self * other).ss == other.ss
         if isinstance(eq, np.ndarray):
             return bool(eq.all())
