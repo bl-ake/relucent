@@ -312,6 +312,28 @@ class Polyhedron:
         ss[0, shi] = -ss[0, shi]
         return Polyhedron(self._net, ss)
 
+    def get_face(self, shi: int) -> "Polyhedron":
+        """Get the face of the polyhedron across the supporting hyperplane at index shi.
+
+        Args:
+            shi: Index of the supporting hyperplane to cross.
+
+        Returns:
+            Polyhedron: The face polyhedron.
+        """
+        ss = self.ss_np.copy()
+        ss[0, shi] = 0
+        # IMPORTANT: do not reuse cached geometry (halfspaces/W/b/shis) from the parent
+        # polyhedron. Setting a sign to 0 changes which constraints are active and can
+        # change the derived halfspace representation; reusing caches can yield an
+        # inconsistent cell complex (and invalid Betti numbers).
+        return Polyhedron(self._net, ss, bound=self.bound)
+
+    @property
+    def faces(self) -> list["Polyhedron"]:
+        """All codimension-1 faces of the polyhedron."""
+        return [self.get_face(shi) for shi in self.shis]
+
     def nflips(self, other: "Polyhedron") -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
 

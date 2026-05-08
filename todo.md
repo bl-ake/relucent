@@ -4,3 +4,4 @@
 - stress test
 - clean up Poly init
 - fix torch support for model.py
+- ensure computations work in 1d/points, should be able to simplify topology.py
