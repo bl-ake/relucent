@@ -4,7 +4,8 @@ import os
 import pickle
 import random
 import warnings
-from collections.abc import Generator, Iterable, Iterator
+from collections.abc import Callable, Generator, Iterable, Iterator
+from itertools import combinations
 from typing import Any, Literal, overload
 
 import networkx as nx
@@ -773,7 +774,9 @@ class Complex:
         for p1, p2, shi in G.edges(data="shi"):
             new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
-            new_complex.add_ss(new_ss, halfspaces=p1.halfspaces, shis=list(set(p1.shis) & set(p2.shis) - {shi}))
+            new_complex.add_ss(
+                new_ss, halfspaces=p1.halfspaces, shis=list(set(p1.shis) & set(p2.shis) - {shi}), finite=p1.finite or p2.finite
+            )
 
         return new_complex
 
@@ -792,6 +795,140 @@ class Complex:
         if verbose:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
+
+    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph:
+        """Return a meta-graph encoding cells across all dimensions and face relations.
+
+        This method mirrors the face-encoding convention used by relucent's contracted
+        chain complex and topology routines: a codimension-1 face of a k-cell is
+        obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
+
+        Nodes correspond to cells across dimensions k=0..d and are keyed by the
+        polyhedron's stable ``tag``. Each node stores:
+          - ``poly``: a representative :class:`~relucent.poly.Polyhedron`
+          - ``dim``: the cell dimension k
+          - ``ss``: the cell's sign-sequence array (numpy)
+
+        Directed edges go from a k-cell to a (k-1)-cell whenever the latter is a
+        codimension-1 face of the former under the SHI-zeroing rule. Edges store:
+          - ``shi``: the supporting hyperplane index that was zeroed
+
+        If ``enrich=True`` (default), the returned graph is post-processed with a
+        second pass that propagates boundedness/SHI information downward, in the
+        same spirit as :meth:`contract`. Concretely, for each face node ``f`` with
+        cofaces ``c`` (incoming edges) and edge attributes ``shi(c→f)``, we set:
+
+        - ``finite``: ``any(c.finite for c in cofaces)``
+        - ``shis``: ``intersection((c.shis - {shi(c→f)}) for c in cofaces)``
+
+        These are stored as node attributes on the meta-graph (they do not mutate
+        the underlying :class:`~relucent.poly.Polyhedron` objects).
+
+        Note:
+            The resulting structure encodes the face relations present in the
+            contracted chain returned by :meth:`get_chain_complex`. In particular,
+            boundary faces that are not represented in the contracted chain will
+            not appear unless they were already present in the chain complexes.
+        """
+        if len(self) == 0:
+            return nx.MultiDiGraph()
+
+        chain = self.get_chain_complex(verbose=verbose)
+        # Dimension -> complex in the chain (there is at most one per dimension).
+        by_dim: dict[int, Complex] = {}
+        for c in chain:
+            if len(c) == 0:
+                continue
+            by_dim[int(c.index2poly[0].dim)] = c
+
+        meta = nx.MultiDiGraph()
+
+        # Add all cells as nodes, keyed by stable poly.tag (bytes).
+        for k, c_k in sorted(by_dim.items(), reverse=True):
+            for p in c_k:
+                meta.add_node(
+                    p.tag,
+                    poly=p,
+                    dim=int(k),
+                    ss=np.asarray(p.ss_np),
+                    finite=getattr(p, "finite", None),
+                    shis=sorted(int(s) for s in getattr(p, "shis", [])),
+                )
+
+        # Add face edges k -> k-1 using the same SS-zeroing rule used elsewhere.
+        for k, c_k in sorted(by_dim.items(), reverse=True):
+            if int(k) <= 0:
+                continue
+            c_km1 = by_dim.get(int(k - 1))
+            for p in tqdm(c_k, desc=f"Building meta-graph faces (k={k})", leave=False, disable=not verbose):
+                ss = np.asarray(p.ss_np)
+                for shi in p.shis:
+                    face_ss = ss.copy()
+                    face_ss[0, int(shi)] = 0
+
+                    face_poly: Polyhedron | None = None
+                    if c_km1 is not None and face_ss in c_km1:
+                        face_poly = c_km1[face_ss]
+                    elif face_ss in self:
+                        face_poly = self[face_ss]
+
+                    if face_poly is None:
+                        # If the contracted chain doesn't contain this face, skip it.
+                        continue
+
+                    if face_poly.tag not in meta:
+                        meta.add_node(
+                            face_poly.tag,
+                            poly=face_poly,
+                            dim=int(face_poly.dim),
+                            ss=np.asarray(face_poly.ss_np),
+                            finite=getattr(face_poly, "finite", None),
+                            shis=sorted(int(s) for s in getattr(face_poly, "shis", [])),
+                        )
+                    meta.add_edge(p.tag, face_poly.tag, shi=int(shi))
+
+        if enrich:
+            # Second pass: propagate boundedness/SHI information down the face poset.
+            # Traverse high->low so coface attrs are already available.
+            for k in sorted(by_dim.keys(), reverse=True):
+                if int(k) <= 0:
+                    continue
+                face_tags = [n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == int(k - 1)]
+                for face_tag in face_tags:
+                    # Consider only immediate cofaces (dim+1).
+                    in_edges = [
+                        (u, data)
+                        for u, _, data in meta.in_edges(face_tag, data=True)
+                        if int(meta.nodes[u].get("dim", -999)) == int(k)
+                    ]
+                    if not in_edges:
+                        continue
+
+                    cofaces = [meta.nodes[u].get("poly") for u, _ in in_edges]
+                    cofaces = [p for p in cofaces if p is not None]
+                    if not cofaces:
+                        continue
+
+                    finite_vals = [getattr(p, "finite", None) for p in cofaces]
+                    if any(v is not None for v in finite_vals):
+                        finite = any(bool(v) for v in finite_vals if v is not None)
+                    else:
+                        finite = None
+
+                    # contract()-style SHI inference: intersect coface SHIs after removing crossed facet.
+                    shis_sets: list[set[int]] = []
+                    for (_u, data), coface in zip(in_edges, cofaces, strict=False):
+                        shi = data.get("shi")
+                        s = set(int(x) for x in getattr(coface, "shis", []))
+                        if shi is not None:
+                            s.discard(int(shi))
+                        shis_sets.append(s)
+                    inferred_shis = sorted(set.intersection(*shis_sets)) if shis_sets else []
+
+                    meta.nodes[face_tag]["finite"] = finite
+                    meta.nodes[face_tag]["shis"] = inferred_shis
+
+        return meta
 
     @staticmethod
     def _gf2_rank_packed(packed: np.ndarray, ncols: int) -> int:
@@ -925,276 +1062,226 @@ class Complex:
 
     def get_betti_numbers(
         self,
-        homology: Literal[
-            "standard",
-            "borel_moore",
-            "traditional",
-            # Clearer aliases (kept for readability + backward compatibility).
-            "contracted_standard",
-            "contracted_borel_moore",
-            "traditional_truncated",
-        ] = "standard",
         *,
-        truncate_bound: float | None = None,
-        truncate_tol: float | None = None,
+        reduced: bool = False,
+        compactify: bool = False,
+        respect_finite: bool = False,
+        infinity: Literal["link", "one_point"] = "link",
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
-        Args:
-            homology: Which Betti numbers to compute. There are **three** distinct modes:
-
-                - **Contracted standard** (aliases: ``"standard"``, ``"contracted_standard"``):
-                  uses relucent's contraction-chain cell-complex representation (finite, compactified
-                  handling of unbounded cells), with the standard boundary operator on that contracted
-                  chain complex.
-
-                - **Contracted Borel--Moore** (aliases: ``"borel_moore"``, ``"contracted_borel_moore"``):
-                  same contracted chain complex, but uses the dual-graph incidence boundary operator,
-                  which (in this contracted representation) corresponds to ignoring boundary faces with
-                  only one top-dimensional adjacent cell.
-
-                - **Traditional (truncated)** (aliases: ``"traditional"``, ``"traditional_truncated"``):
-                  computes *ordinary* homology of the geometric boundary after **truncating** each
-                  (possibly unbounded) cell by an axis-aligned bounding box (L-infinity ball)
-                  ``max_i |x_i| <= R``, **without** contracting directions to infinity. This yields the
-                  familiar interpretation (e.g. ``beta_0`` counts connected components of the truncated
-                  set). Implementation uses a simplicial approximation from bounded vertices + Delaunay
-                  triangulation in each cell's affine hull (GF(2) coefficients).
-            truncate_bound: Only for ``homology="traditional"``. If None, choose from the maximum
-                L-infinity norm over interior points in the complex (see
-                :meth:`_get_traditional_truncation_bound`).
-            truncate_tol: Vertex deduplication tolerance for the simplicial approximation.
-
-        Returns:
-            A mapping ``k -> beta_k`` with Betti numbers over GF(2).
+        This is a thin public wrapper around :func:`relucent.topology.get_betti_numbers`.
         """
         self._warn_research_use("get_betti_numbers")
+        from relucent.topology import get_betti_numbers as _get_betti_numbers
+
+        return _get_betti_numbers(
+            self,
+            reduced=reduced,
+            compactify=compactify,
+            respect_finite=respect_finite,
+            infinity=infinity,
+        )
+
+    def verify_dual_graph_consistency(self) -> None:
+        """Verify that dual-graph edges correspond to valid shared faces (by sign sequences).
+
+        - For top_dim==1: each dual-graph edge must correspond to exactly one shared 0-face tag.
+        - For top_dim>=2: each dual-graph edge's `shi` must induce a common codim-1 face.
+        """
+        if len(self) == 0:
+            return
+        try:
+            top_dim = max(int(p.dim) for p in self)
+        except ValueError:
+            return
+        if top_dim <= 0:
+            return
+
+        G = self.get_dual_graph(verbose=False)
+        if top_dim == 1:
+            endtags: dict[bytes, set[bytes]] = {}
+            for p in self:
+                if int(p.dim) != 1:
+                    continue
+                tags: set[bytes] = set()
+                ss = np.asarray(p.ss_np)
+                for shi in np.flatnonzero(ss[0] != 0):
+                    face_ss = ss.copy()
+                    face_ss[0, int(shi)] = 0
+                    face = p.__class__(p._net, face_ss, bound=p.bound)
+                    if face.is_face_of(p):
+                        tags.add(face.tag)
+                endtags[p.tag] = tags
+
+            for u, v in G.edges():
+                inter = endtags.get(u.tag, set()) & endtags.get(v.tag, set())
+                if len(inter) != 1:
+                    raise RuntimeError(
+                        "Dual-graph adjacency is inconsistent with 0-face sign-sequence endpoints: "
+                        + f"|intersection|={len(inter)} for edge ({u.tag!r}, {v.tag!r})."
+                    )
+            return
+
+        for u, v, shi in G.edges(data="shi"):
+            if shi is None:
+                raise RuntimeError("Dual-graph edge is missing 'shi' attribute.")
+            face = u.get_face(int(shi))
+            if not (face.is_face_of(u) and face.is_face_of(v)):
+                raise RuntimeError(
+                    "Dual-graph adjacency is inconsistent with SS-implied shared face: "
+                    + f"edge shi={int(shi)} did not yield a common face."
+                )
+
+    # -------------------------------------------------------------------------
+    # Intrinsic vertex identification / verification (dual-graph cube structure)
+    # -------------------------------------------------------------------------
+
+    def intrinsic_vertex_coords(
+        self,
+        *,
+        top_dim: int | None = None,
+        bound: float,
+        tol: float,
+        verify_cube: bool = True,
+    ) -> dict[bytes, np.ndarray]:
+        """Identify intrinsic (non-truncation-box) vertices and optionally verify cube structure.
+
+        Intrinsic vertices are 0-faces obtained by intersecting ReLU facets (SHIs), not
+        vertices introduced by clipping with the truncation box.
+        """
         if len(self) == 0:
             return {}
-
-        # Normalize aliases.
-        if homology == "contracted_standard":
-            homology = "standard"
-        elif homology == "contracted_borel_moore":
-            homology = "borel_moore"
-        elif homology == "traditional_truncated":
-            homology = "traditional"
-
-        if homology not in {"standard", "borel_moore", "traditional"}:
-            raise ValueError(f"Unknown homology mode: {homology!r}")
-
-        if homology == "traditional":
-            # Build a simplicial complex from bounded vertices of each top-dimensional cell,
-            # triangulating each cell in its affine hull and unioning the simplices.
-            from scipy.spatial import Delaunay
-
-            bound = float(truncate_bound) if truncate_bound is not None else self._get_traditional_truncation_bound()
-            tol = float(truncate_tol) if truncate_tol is not None else (1e-4 * max(1.0, bound))
+        if top_dim is None:
             top_dim = max(int(p.dim) for p in self)
-            if top_dim >= 4:
-                raise NotImplementedError(
-                    "Traditional (truncated) Betti numbers currently only support boundary-cell "
-                    + f"dimension <= 3, but this complex has top_dim={top_dim}. "
-                )
+        if int(top_dim) < 2:
+            return {}
 
-            # Global vertex table (deduplicated by rounding to tolerance).
-            key2vid: dict[tuple[int, ...], int] = {}
-            vertices: list[np.ndarray] = []
+        G = self.get_dual_graph(verbose=False)
 
-            def _vid(v: np.ndarray) -> int:
-                vv = np.asarray(v, dtype=np.float64).reshape(-1)
-                q = tuple(np.round(vv / tol).astype(np.int64).tolist())
-                hit = key2vid.get(q)
-                if hit is not None:
-                    return int(hit)
-                new_id = len(vertices)
-                key2vid[q] = new_id
-                vertices.append(vv)
-                return new_id
-
-            simplices_by_dim: dict[int, set[tuple[int, ...]]] = {k: set() for k in range(top_dim + 1)}
-
-            if top_dim == 1:
-                # Robust 1D special case: each cell is a (possibly unbounded) line segment after truncation.
-                for p in self:
-                    if int(p.dim) != 1:
-                        continue
-                    verts = p.get_bounded_vertices(bound)
-                    if verts is None:
-                        continue
-                    verts = np.asarray(verts, dtype=np.float64)
-                    if verts.ndim != 2 or verts.shape[0] < 2:
-                        continue
-                    uniq = np.unique(np.round(verts, decimals=8), axis=0)
-                    if uniq.shape[0] < 2:
-                        continue
-                    # Pick farthest pair as endpoints.
-                    best = (0, 1)
-                    best_d = -1.0
-                    for i in range(uniq.shape[0]):
-                        for j in range(i + 1, uniq.shape[0]):
-                            d = float(np.sum((uniq[i] - uniq[j]) ** 2))
-                            if d > best_d:
-                                best_d = d
-                                best = (i, j)
-                    u = _vid(uniq[best[0]])
-                    v = _vid(uniq[best[1]])
-                    simplices_by_dim[0].add((u,))
-                    simplices_by_dim[0].add((v,))
-                    a, b = (u, v) if u < v else (v, u)
-                    simplices_by_dim[1].add((a, b))
-
-                return Complex._simplicial_betti_gf2(
-                    simplices_by_dim={k: sorted(list(v)) for k, v in simplices_by_dim.items()}
-                )
-
-            for p in self:
-                if int(p.dim) != top_dim:
-                    continue
-                verts = p.get_bounded_vertices(bound)
-                if verts is None:
-                    continue
-                verts = np.asarray(verts, dtype=np.float64)
-                if verts.ndim != 2 or verts.shape[0] < top_dim + 1:
-                    continue
-
-                # Map local vertex list to global ids.
-                local_vids = [_vid(verts[i]) for i in range(verts.shape[0])]
-
-                # If the cell is 0D: it's just a vertex.
-                if top_dim == 0:
-                    simplices_by_dim[0].update([(vid,) for vid in local_vids])
-                    continue
-
-                # Build coordinates in the affine hull for Delaunay triangulation.
-                v0 = verts[0]
-                X = verts - v0[None, :]
-                # Orthonormal basis for span(X); rank should be top_dim for generic cells.
-                _, s, vh = np.linalg.svd(X, full_matrices=False)
-                # Use a relative tolerance for numerical rank (robust to overall scale).
-                tol = float(s[0]) * 1e-9 if s.size > 0 else 1e-10
-                rank = int(np.sum(s > tol))
-                if rank <= 0:
-                    # Degenerate: treat as a point.
-                    simplices_by_dim[0].add((local_vids[0],))
-                    continue
-                # Clamp rank to expected dimension (can be smaller due to numerical issues).
-                rank = min(rank, top_dim)
-                basis = vh[:rank, :].T  # (ambient_dim, rank)
-                coords = X @ basis  # (nverts, rank)
-
-                if rank == 1:
-                    # 1D cell: connect sorted endpoints in coordinate order.
-                    order = np.argsort(coords[:, 0])
-                    for a, b in zip(order[:-1], order[1:], strict=False):
-                        ia, ib = local_vids[int(a)], local_vids[int(b)]
-                        simplices_by_dim[1].add(tuple(sorted((ia, ib))))
-                    continue
-
-                try:
-                    tri = Delaunay(coords)
-                except Exception as e:
-                    # Delaunay/Qhull can fail on nearly-coplanar/cospherical points or precision issues.
-                    # Silently skipping would corrupt the simplicial approximation and Betti numbers.
-                    raise RuntimeError(
-                        "Traditional (truncated) Betti numbers: Delaunay triangulation failed for a "
-                        + f"top_dim={top_dim} cell (computed affine rank={rank}). "
-                        + "This usually indicates a precision/degeneracy issue (e.g. coplanar points) in "
-                        + "the bounded-vertex set. Consider adjusting truncate_tol / truncation bound, or "
-                        + "using a different homology mode."
-                    ) from e
-
-                # Delaunay simplices are (rank+1)-simplices filling the convex hull in the affine hull.
-                # We only support up to 3D boundary cells (rank 2 or 3) here. Higher rank would mean
-                # skipping top-dimensional cells, which would silently corrupt Betti numbers.
-                if rank >= 4:
-                    raise NotImplementedError(
-                        "Traditional (truncated) Betti numbers currently only support cell affine "
-                        + f"dimension <= 3, but encountered rank={rank} for a cell with top_dim={top_dim}. "
-                        + "Refusing to silently skip this cell."
-                    )
-                if rank not in {2, 3}:
-                    # rank==1 handled above; rank==0 handled above.
-                    raise NotImplementedError(f"Unexpected rank={rank} in traditional Betti computation (top_dim={top_dim}).")
-                for simplex in np.asarray(tri.simplices, dtype=np.int64):
-                    simp_vids = tuple(sorted(local_vids[int(i)] for i in simplex))
-                    simplices_by_dim[rank].add(simp_vids)
-
-            if not any(len(v) > 0 for v in simplices_by_dim.values()):
-                return {}
-
-            # Important: include empty lower-dimensional slots so closure can
-            # populate them and beta_0 is reported.
-            simp_lists: dict[int, list[tuple[int, ...]]] = {k: sorted(v) for k, v in simplices_by_dim.items()}
-            return self._simplicial_betti_gf2(simplices_by_dim=simp_lists)
-
-        # Build a chain complex.
-        # We use the existing contraction-based chain construction for both modes, and
-        # differ only in how the k->(k-1) boundary operator is assembled:
-        # - ``borel_moore`` uses dual-graph incidences (only internal faces with two
-        #   top-dimensional adjacent cells contribute).
-        # - ``standard`` includes all codimension-1 faces that are present as explicit cells
-        #   at the next chain level.
-        chain = self.get_chain_complex()
-
-        dim2complex = {int(c.index2poly[0].dim): c for c in chain if len(c) > 0}
-        dims = sorted(dim2complex.keys())
-        ncells = {k: len(dim2complex[k]) for k in dims}
-
-        boundary_rank: dict[int, int] = {}
-
-        for i, c_k in enumerate(chain):
-            k = int(c_k.index2poly[0].dim)
-            if i == len(chain) - 1:
-                # Lowest-dimensional chain group has zero outgoing boundary map.
-                boundary_rank[k] = 0
+        # vertex_tag -> (S, incident top cells)
+        vtx: dict[bytes, tuple[tuple[int, ...], list[Polyhedron]]] = {}
+        for p in self:
+            if int(p.dim) != int(top_dim):
                 continue
+            shis = tuple(int(s) for s in p.shis)
+            if len(shis) < int(top_dim):
+                continue
+            for S in combinations(shis, int(top_dim)):
+                face = p.get_face_by_shis(S)
+                if int(face.dim) != 0:
+                    continue
+                if not face.is_face_of(p):
+                    continue
+                tag = face.tag
+                S_sorted = tuple(sorted(int(x) for x in S))
+                hit = vtx.get(tag)
+                if hit is None:
+                    vtx[tag] = (S_sorted, [p])
+                else:
+                    S0, cells = hit
+                    if S_sorted != S0:
+                        raise RuntimeError(
+                            "Intrinsic vertex tag produced with inconsistent SHI sets: "
+                            + f"tag={tag!r} had {S0} vs {S_sorted}."
+                        )
+                    cells.append(p)
 
-            c_km1 = chain[i + 1]
-            nrows_bm = len(c_km1)
-            ncols_bm = len(c_k)
-            nwords_bm = (ncols_bm + 63) // 64
-            boundary_packed = np.zeros((nrows_bm, nwords_bm), dtype=np.uint64)
+        out: dict[bytes, np.ndarray] = {}
+        match_box = float(cfg.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
 
-            if homology == "borel_moore":
-                # In this contraction-based chain construction, (k-1)-cells correspond to
-                # edges of the dual graph of k-cells. Over GF(2), each such edge is incident
-                # to its two endpoint k-cells.
-                G = c_k.get_dual_graph()
-                for p1, p2, shi in G.edges(data="shi"):
-                    # Recover the contracted face SS by turning the crossing SHI into 0.
-                    face_ss = p1.ss_np.copy()
-                    face_ss[0, shi] = 0
-                    if face_ss not in c_km1:
-                        # If the face is missing in this chain level, just skip it.
+        for tag, (S, cells) in vtx.items():
+            if verify_cube:
+                patt2cell: dict[int, Polyhedron] = {}
+                for p in cells:
+                    ss = np.asarray(p.ss_np)
+                    patt = 0
+                    for i, shi in enumerate(S):
+                        sgn = int(ss[0, int(shi)])
+                        if sgn == 0:
+                            patt = -1
+                            break
+                        if sgn > 0:
+                            patt |= 1 << i
+                    if patt < 0:
                         continue
-                    row = c_km1.ssm[face_ss]
-                    col1 = c_k.ssm[p1.ss_np]
-                    col2 = c_k.ssm[p2.ss_np]
-                    # Each dual edge contributes the two endpoint incidences mod 2.
-                    w1 = col1 >> 6
-                    boundary_packed[row, w1] ^= np.uint64(1) << (col1 & 63)
-                    w2 = col2 >> 6
-                    boundary_packed[row, w2] ^= np.uint64(1) << (col2 & 63)
-            else:
-                # Standard boundary over GF(2): each k-cell contributes to every codimension-1
-                # face in its supporting halfspace list.
-                for p1 in c_k:
-                    col = c_k.ssm[p1.ss_np]
-                    w = col >> 6
-                    bit = np.uint64(1) << (col & 63)
-                    for shi in p1.shis:
-                        face_ss = p1.ss_np.copy()
-                        face_ss[0, shi] = 0
-                        if face_ss not in c_km1:
-                            continue
-                        row = c_km1.ssm[face_ss]
-                        boundary_packed[row, w] ^= bit
+                    if patt in patt2cell and patt2cell[patt].tag != p.tag:
+                        raise RuntimeError(
+                            "Intrinsic vertex incident set contains duplicate sign patterns: "
+                            + f"vertex={tag!r} pattern={patt}."
+                        )
+                    patt2cell[patt] = p
 
-            boundary_rank[k] = self._gf2_rank_packed(boundary_packed, ncols_bm)
+                patt_by_tag = {p.tag: patt for patt, p in patt2cell.items()}
+                cell_tags = set(patt_by_tag.keys())
+                for u, v, shi in G.edges(data="shi"):
+                    if u.tag not in cell_tags or v.tag not in cell_tags:
+                        continue
+                    if shi is None:
+                        raise RuntimeError("Dual-graph edge is missing 'shi' attribute.")
+                    if int(shi) not in S:
+                        raise RuntimeError(
+                            "Dual-graph edge crosses a facet not in the intrinsic-vertex cube directions: "
+                            + f"vertex={tag!r} edge_shi={int(shi)} S={S}."
+                        )
+                    pu = patt_by_tag[u.tag]
+                    pv = patt_by_tag[v.tag]
+                    if bin(pu ^ pv).count("1") != 1:
+                        raise RuntimeError(
+                            "Dual-graph edge within intrinsic-vertex incident set is not a single-bit flip: "
+                            + f"vertex={tag!r} patterns=({pu},{pv}) S={S}."
+                        )
 
-        # Standard beta_k = dim C_k - rank(d_k) - rank(d_{k+1}).
-        return {k: int(ncells[k] - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0)) for k in dims}
+            witness = cells[0]
+            face = witness.get_face_by_shis(S)
+            x = getattr(face, "interior_point", None)
+            if x is None:
+                x = getattr(face, "center", None)
+            if x is None:
+                continue
+            x = np.asarray(x, dtype=np.float64).reshape(-1)
+            if float(np.max(np.abs(x))) <= float(bound) + match_box:
+                out[tag] = x
+
+        return out
+
+    def truncation_vertex_id_mapper(
+        self,
+        *,
+        top_dim: int,
+        bound: float,
+        tol: float,
+        verify_cube: bool,
+    ) -> Callable[[np.ndarray], int]:
+        """Return a vertex-id mapper that canonicalizes intrinsic vertices by SS tag."""
+        intrinsic_coords = self.intrinsic_vertex_coords(top_dim=top_dim, bound=bound, tol=tol, verify_cube=verify_cube)
+        intrinsic_tag2vid: dict[bytes, int] = {}
+        key2vid: dict[tuple[int, ...], int] = {}
+        vertices: list[np.ndarray] = []
+
+        def vid(v: np.ndarray) -> int:
+            vv = np.asarray(v, dtype=np.float64).reshape(-1)
+            if intrinsic_coords:
+                thr = float(cfg.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
+                for t, x in intrinsic_coords.items():
+                    if float(np.max(np.abs(vv - x))) <= thr:
+                        hit = intrinsic_tag2vid.get(t)
+                        if hit is not None:
+                            return int(hit)
+                        new_id = len(vertices)
+                        intrinsic_tag2vid[t] = new_id
+                        vertices.append(np.asarray(x, dtype=np.float64).reshape(-1))
+                        return new_id
+            q = tuple(np.round(vv / tol).astype(np.int64).tolist())
+            hit = key2vid.get(q)
+            if hit is not None:
+                return int(hit)
+            new_id = len(vertices)
+            key2vid[q] = new_id
+            vertices.append(vv)
+            return new_id
+
+        return vid
 
     @property
     def G(self) -> nx.Graph[Polyhedron]:

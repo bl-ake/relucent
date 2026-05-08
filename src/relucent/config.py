@@ -170,6 +170,16 @@ ASTAR_BIAS_WEIGHT: float = _env_float("ASTAR_BIAS_WEIGHT", 0.9)
 PLOT_MARGIN_FACTOR: float = _env_float("PLOT_MARGIN_FACTOR", 1.1)
 
 # -----------------------------------------------------------------------------
+# Topology / Betti computation
+# -----------------------------------------------------------------------------
+
+# When merging geometrically-computed vertices with combinatorially-identified intrinsic vertices,
+# accept a match if ||x - x_intrinsic||_inf <= TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR * tol.
+TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = _env_float(
+    "TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0
+)
+
+# -----------------------------------------------------------------------------
 # Logging / verbosity
 # -----------------------------------------------------------------------------
 
@@ -209,6 +219,7 @@ __all__ = [
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",
     "QHULL_MODE",
+    "TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR",
     "TOL_DEAD_RELU",
     "TOL_HALFSPACE_CONTAINMENT",
     "TOL_INTERIOR_VERIFY",
