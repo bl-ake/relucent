@@ -921,7 +921,7 @@ class Complex:
                 continue
             max_norm = max(max_norm, float(np.max(np.abs(np.asarray(ip).reshape(-1)))))
         # Avoid degenerate bound when everything is near the origin.
-        return max(max_norm, 1.0)
+        return float(cfg.PLOT_MARGIN_FACTOR) * max(max_norm, 1.0)
 
     def get_betti_numbers(
         self,
@@ -936,7 +936,7 @@ class Complex:
         ] = "standard",
         *,
         truncate_bound: float | None = None,
-        truncate_tol: float = 1e-7,
+        truncate_tol: float | None = None,
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
@@ -989,6 +989,7 @@ class Complex:
             from scipy.spatial import Delaunay
 
             bound = float(truncate_bound) if truncate_bound is not None else self._get_traditional_truncation_bound()
+            tol = float(truncate_tol) if truncate_tol is not None else (1e-4 * max(1.0, bound))
             top_dim = max(int(p.dim) for p in self)
             if top_dim >= 4:
                 raise NotImplementedError(
@@ -1002,7 +1003,7 @@ class Complex:
 
             def _vid(v: np.ndarray) -> int:
                 vv = np.asarray(v, dtype=np.float64).reshape(-1)
-                q = tuple(np.round(vv / truncate_tol).astype(np.int64).tolist())
+                q = tuple(np.round(vv / tol).astype(np.int64).tolist())
                 hit = key2vid.get(q)
                 if hit is not None:
                     return int(hit)
@@ -1012,6 +1013,40 @@ class Complex:
                 return new_id
 
             simplices_by_dim: dict[int, set[tuple[int, ...]]] = {k: set() for k in range(top_dim + 1)}
+
+            if top_dim == 1:
+                # Robust 1D special case: each cell is a (possibly unbounded) line segment after truncation.
+                for p in self:
+                    if int(p.dim) != 1:
+                        continue
+                    verts = p.get_bounded_vertices(bound)
+                    if verts is None:
+                        continue
+                    verts = np.asarray(verts, dtype=np.float64)
+                    if verts.ndim != 2 or verts.shape[0] < 2:
+                        continue
+                    uniq = np.unique(np.round(verts, decimals=8), axis=0)
+                    if uniq.shape[0] < 2:
+                        continue
+                    # Pick farthest pair as endpoints.
+                    best = (0, 1)
+                    best_d = -1.0
+                    for i in range(uniq.shape[0]):
+                        for j in range(i + 1, uniq.shape[0]):
+                            d = float(np.sum((uniq[i] - uniq[j]) ** 2))
+                            if d > best_d:
+                                best_d = d
+                                best = (i, j)
+                    u = _vid(uniq[best[0]])
+                    v = _vid(uniq[best[1]])
+                    simplices_by_dim[0].add((u,))
+                    simplices_by_dim[0].add((v,))
+                    a, b = (u, v) if u < v else (v, u)
+                    simplices_by_dim[1].add((a, b))
+
+                return Complex._simplicial_betti_gf2(
+                    simplices_by_dim={k: sorted(list(v)) for k, v in simplices_by_dim.items()}
+                )
 
             for p in self:
                 if int(p.dim) != top_dim:

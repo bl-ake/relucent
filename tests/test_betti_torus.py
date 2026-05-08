@@ -151,7 +151,7 @@ def test_torus_decision_boundary_betti_numbers(seeded):
     if start is None:
         pytest.skip("Could not sample a non-boundary start point for BFS.")
 
-    cplx.bfs(start=start, nworkers=1, verbose=0)
+    cplx.bfs(start=start)  # nworkers=1,
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_standard = db_cplx.get_betti_numbers(homology="standard")
