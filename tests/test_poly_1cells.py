@@ -80,9 +80,12 @@ class TestOneCellsInAmbient1D:
             fv = f.get_bounded_vertices(bound=2.0)
             assert fv is not None
             assert fv.shape == (1, 1)
-        endpoints = _sorted_rows(
-            np.vstack([f.get_bounded_vertices(bound=2.0) for f in faces if f.get_bounded_vertices(bound=2.0) is not None])
-        )
+        endpoints_list: list[np.ndarray] = []
+        for f in faces:
+            fv = f.get_bounded_vertices(bound=2.0)
+            if fv is not None:
+                endpoints_list.append(fv)
+        endpoints = _sorted_rows(np.vstack(endpoints_list))
         assert np.allclose(endpoints[:, 0], np.array([0.0, 1.0]), atol=1e-7)
 
 

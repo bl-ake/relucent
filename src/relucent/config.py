@@ -175,9 +175,7 @@ PLOT_MARGIN_FACTOR: float = _env_float("PLOT_MARGIN_FACTOR", 1.1)
 
 # When merging geometrically-computed vertices with combinatorially-identified intrinsic vertices,
 # accept a match if ||x - x_intrinsic||_inf <= TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR * tol.
-TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = _env_float(
-    "TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0
-)
+TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = _env_float("TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0)
 
 # -----------------------------------------------------------------------------
 # Logging / verbosity

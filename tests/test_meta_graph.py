@@ -61,4 +61,3 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
         assert "finite" in attrs
         assert "shis" in attrs
         assert isinstance(attrs["shis"], list)
-
