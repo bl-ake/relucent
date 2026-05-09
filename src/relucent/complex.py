@@ -796,7 +796,7 @@ class Complex:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
-    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph:
+    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph[bytes]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
         This method mirrors the face-encoding convention used by relucent's contracted
@@ -831,7 +831,7 @@ class Complex:
             not appear unless they were already present in the chain complexes.
         """
         if len(self) == 0:
-            return nx.MultiDiGraph()
+            return nx.MultiDiGraph[bytes]()
 
         chain = self.get_chain_complex(verbose=verbose)
         # Dimension -> complex in the chain (there is at most one per dimension).
@@ -841,7 +841,7 @@ class Complex:
                 continue
             by_dim[int(c.index2poly[0].dim)] = c
 
-        meta = nx.MultiDiGraph()
+        meta: nx.MultiDiGraph[bytes] = nx.MultiDiGraph()
 
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
         for k, c_k in sorted(by_dim.items(), reverse=True):
@@ -1167,36 +1167,36 @@ class Complex:
             shis = tuple(int(s) for s in p.shis)
             if len(shis) < int(top_dim):
                 continue
-            for S in combinations(shis, int(top_dim)):
-                face = p.get_face_by_shis(S)
+            for shis_subset in combinations(shis, int(top_dim)):
+                face = p.get_face_by_shis(shis_subset)
                 if int(face.dim) != 0:
                     continue
                 if not face.is_face_of(p):
                     continue
                 tag = face.tag
-                S_sorted = tuple(sorted(int(x) for x in S))
+                shis_sorted = tuple(sorted(int(x) for x in shis_subset))
                 hit = vtx.get(tag)
                 if hit is None:
-                    vtx[tag] = (S_sorted, [p])
+                    vtx[tag] = (shis_sorted, [p])
                 else:
                     S0, cells = hit
-                    if S_sorted != S0:
+                    if shis_sorted != S0:
                         raise RuntimeError(
                             "Intrinsic vertex tag produced with inconsistent SHI sets: "
-                            + f"tag={tag!r} had {S0} vs {S_sorted}."
+                            + f"tag={tag!r} had {S0} vs {shis_sorted}."
                         )
                     cells.append(p)
 
         out: dict[bytes, np.ndarray] = {}
         match_box = float(cfg.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
 
-        for tag, (S, cells) in vtx.items():
+        for tag, (shis_cube, cells) in vtx.items():
             if verify_cube:
                 patt2cell: dict[int, Polyhedron] = {}
                 for p in cells:
                     ss = np.asarray(p.ss_np)
                     patt = 0
-                    for i, shi in enumerate(S):
+                    for i, shi in enumerate(shis_cube):
                         sgn = int(ss[0, int(shi)])
                         if sgn == 0:
                             patt = -1
@@ -1219,21 +1219,21 @@ class Complex:
                         continue
                     if shi is None:
                         raise RuntimeError("Dual-graph edge is missing 'shi' attribute.")
-                    if int(shi) not in S:
+                    if int(shi) not in shis_cube:
                         raise RuntimeError(
                             "Dual-graph edge crosses a facet not in the intrinsic-vertex cube directions: "
-                            + f"vertex={tag!r} edge_shi={int(shi)} S={S}."
+                            + f"vertex={tag!r} edge_shi={int(shi)} S={shis_cube}."
                         )
                     pu = patt_by_tag[u.tag]
                     pv = patt_by_tag[v.tag]
                     if bin(pu ^ pv).count("1") != 1:
                         raise RuntimeError(
                             "Dual-graph edge within intrinsic-vertex incident set is not a single-bit flip: "
-                            + f"vertex={tag!r} patterns=({pu},{pv}) S={S}."
+                            + f"vertex={tag!r} patterns=({pu},{pv}) S={shis_cube}."
                         )
 
             witness = cells[0]
-            face = witness.get_face_by_shis(S)
+            face = witness.get_face_by_shis(shis_cube)
             x = getattr(face, "interior_point", None)
             if x is None:
                 x = getattr(face, "center", None)
