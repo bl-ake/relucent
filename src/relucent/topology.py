@@ -85,6 +85,29 @@ def get_betti_numbers(
         # far-truncation is captured by adding "boundary at infinity" 0-cells.
         synthetic_edges: list[tuple[object, object]] = []
         if not compactify and k == 1:
+            # Edge case: the contracted chain/meta-graph can contain explicit 0-cells with
+            # ``finite is False`` (a "vertex at infinity") that are shared by multiple 1-cells.
+            #
+            # For ordinary homology with ``infinity="link"``, we do NOT want such vertices to
+            # glue different missing ends together. Instead, treat incidences to finite=False
+            # 0-cells as "missing endpoints" and attach distinct synthetic endpoints.
+            #
+            # For ``infinity="one_point"``, gluing is intended, so we keep them.
+            if infinity == "link":
+                # Treat explicit finite=False 0-cells as "at infinity": they should not
+                # serve as shared vertices for ordinary homology under link semantics.
+                #
+                # Remove them from the 0-chain group and let the synthetic endpoint
+                # logic below add distinct ends per missing incidence.
+                rows = [
+                    r
+                    for r in rows
+                    if (not isinstance(r, (bytes, bytearray)))
+                    or (meta.nodes.get(bytes(r), {}) or {}).get("finite", None) != False  # noqa: E712
+                ]
+                # Keep counts consistent with the modified chain group used for ∂₁.
+                nodes_by_dim[0] = list(rows)
+
             end_count: dict[object, int] = {c: 0 for c in cols}
             for u, v, _data in meta.edges(data=True):
                 if u in end_count and v in rows:
@@ -102,7 +125,7 @@ def get_betti_numbers(
 
             next_idx = 0
             for u, cnt in end_count.items():
-                if meta.nodes[u].get("finite", None) is True:
+                if isinstance(u, (bytes, bytearray)) and meta.nodes[bytes(u)].get("finite", None) is True:
                     continue
                 if cnt == 2:
                     continue
@@ -139,6 +162,11 @@ def get_betti_numbers(
                     synthetic_edges.append((u, s2))
                 else:
                     raise RuntimeError(f"1-cell has >2 incident 0-faces in meta-graph: {cnt}")
+
+            # ``rows`` is the actual (k-1)-chain basis used to build ∂₁, including any
+            # synthetic boundary-at-infinity vertices we appended above. Ensure the
+            # β₀ formula uses the same basis size.
+            nodes_by_dim[0] = list(rows)
 
         row_index = {r: i for i, r in enumerate(rows)}
         col_index = {c: j for j, c in enumerate(cols)}
@@ -205,7 +233,6 @@ def get_betti_numbers(
 
     # Trim zeros for cleanliness.
     return {k: v for k, v in beta.items() if v != 0}
-
 
     return {k: v for k, v in beta.items() if v != 0}
 
