@@ -687,6 +687,9 @@ def get_shis(
     Indices of non-redundant halfspaces on the boundary (neurons whose BHs are
     actually faces of the polyhedron).
 
+    Near-zero-norm halfspace rows are dropped (same as :func:`solve_radius`) before
+    building the LP; returned SHI indices refer to the original ``halfspaces_np`` rows.
+
     Args:
         poly: "Polyhedron" to analyze.
         collect_info: If true, also return debug info; ``"All"`` adds more detail.
@@ -707,26 +710,67 @@ def get_shis(
     if tol is None:
         tol = cfg.TOL_SHI_HYPERPLANE
     shis = []
-    A = poly.halfspaces_np[:, :-1]
-    b = poly.halfspaces_np[:, -1:]
+    hs_np = poly.halfspaces_np
+    n_orig = int(hs_np.shape[0])
+    A_orig = hs_np[:, :-1]
+    b_orig = hs_np[:, -1:]
+    amb_d = int(A_orig.shape[1])
     env = env or get_env()
+
+    try:
+        hs_work, old_to_new = _drop_degenerate_halfspaces_tracked(hs_np)
+    except DegenerateHalfspaceInfeasibility:
+        if collect_info:
+            return [], []
+        return []
+
+    n_work = int(hs_work.shape[0])
+    if n_work == 0:
+        if collect_info:
+            return [], []
+        return []
+    work_to_orig = np.full(n_work, -1, dtype=np.intp)
+    for old_i in range(n_orig):
+        ni = int(old_to_new[old_i])
+        if ni >= 0:
+            work_to_orig[ni] = old_i
+
+    A_work = hs_work[:, :-1]
+    b_work = hs_work[:, -1:]
+    zero_eff = _remap_zero_indices(poly.zero_indices, old_to_new)
+
+    # Work in intrinsic coordinates z with x = N z + x0 so every active constraint is a
+    # genuine inequality in z-space (no separate Gurobi ``EQUAL`` senses for zero-sign
+    # rows).  Maximal cells: N = I, x0 = 0.
+    if zero_eff is not None and zero_eff.size > 0:
+        x0, null_basis, ineq_mask = _affine_null_basis(hs_work, zero_eff)
+        k = int(null_basis.shape[1])
+        if k == 0:
+            if collect_info:
+                return [], []
+            return []
+        ineq_rows = np.flatnonzero(ineq_mask)
+        ineq_half = hs_work[ineq_mask]
+        a_red = ineq_half[:, :-1] @ null_basis
+        b_red = ineq_half[:, :-1] @ x0 + ineq_half[:, -1:]
+        row_lp = {int(r): j for j, r in enumerate(ineq_rows.tolist())}
+    else:
+        x0 = np.zeros((amb_d, 1), dtype=np.float64)
+        null_basis = np.eye(amb_d, dtype=np.float64)
+        ineq_rows = np.arange(n_work, dtype=np.intp)
+        a_red = A_work
+        b_red = b_work
+        row_lp = {int(r): r for r in range(n_work)}
+        k = amb_d
+
     model = Model("SHIS", env)
-    x = model.addMVar((poly.halfspaces_np.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
-    constrs = model.addConstr(A @ x == -b, name="hyperplanes")
-    constrs.setAttr("Sense", GRB.LESS_EQUAL)
-    # For zero-sign entries (zeros in the sign sequence), the polyhedron lives on
-    # the hyperplane itself (codimension >= 1). ``halfspaces_np`` only stores one
-    # side of that hyperplane as a row, so leaving it as ``<=`` would inflate the
-    # LP feasible region from the cell to an ambient extension and over-count SHIs
-    # for lower-dimensional cells. Enforce these rows as equalities instead.
-    if poly.zero_indices.size > 0:
-        for zi in poly.zero_indices.ravel():
-            constrs[int(zi)].setAttr("Sense", GRB.EQUAL)
+    z = model.addMVar((k, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="z")
+    constrs = model.addConstr(a_red @ z <= -b_red, name="hyperplanes")
     model.optimize()
     if model.status != GRB.OPTIMAL:
         raise ValueError(f"Initial Solve Failed: Model status: {model.status}")
 
-    subset = subset or set(range(A.shape[0])) - set(poly.zero_indices)
+    subset = subset or set(range(n_orig)) - set(poly.zero_indices)
     subset = set(subset)
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
@@ -735,17 +779,25 @@ def get_shis(
         i = subset.pop()
         if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
             continue
-        if (A[i] == 0).all():
+        wi = int(old_to_new[i])
+        if wi < 0:
+            continue
+        if (A_orig[i] == 0).all():
+            continue
+        j = row_lp.get(wi)
+        if j is None:
             continue
         pbar.set_postfix_str(f"#shis: {len(shis)}")
 
-        # Relax halfspace i
-        constrs[i].setAttr("RHS", -b[i, 0] + push_size)
+        # Relax halfspace i (row j in the LP over z); i is the original halfspace index.
+        constrs[j].setAttr("RHS", -b_red[j, 0] + push_size)
 
-        model.setObjective((A[i] @ x).item() + b[i, 0], GRB.MAXIMIZE)
+        ai = A_orig[i : i + 1, :].T  # (amb_d, 1)
+        c_obj = null_basis.T @ ai  # (k, 1); left-multiply z as (1,k) @ (k,1) for Gurobi
+        const_obj = float((ai.T @ x0).item() + b_orig[i, 0])
+        model.setObjective(c_obj.T @ z + const_obj, GRB.MAXIMIZE)
         model.params.BestObjStop = cfg.GUROBI_SHI_BEST_OBJ_STOP
         model.params.BestBdStop = cfg.GUROBI_SHI_BEST_BD_STOP
-        # model.update()
         model.optimize()
 
         if model.status == GRB.INTERRUPTED:
@@ -753,7 +805,8 @@ def get_shis(
             raise KeyboardInterrupt
         if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
             if model.objVal > 0:
-                dists = A @ x.X + b
+                x_amb = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
+                dists = A_orig @ x_amb + b_orig
                 if dists[(dists > 0)].sum() >= 1 + tol:
                     msg = (
                         f"Invalid Proof for SHI {i}! Violation Sizes: "
@@ -766,56 +819,38 @@ def get_shis(
                     shis.append(i)
 
             basis_indices = constrs.CBasis.ravel() != 0
-            if new_method and basis_indices.sum() != A.shape[1]:
+            if new_method and basis_indices.sum() != k:
                 warnings.warn(
                     "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
                     stacklevel=2,
                 )
             skip_size = 0
-            if new_method and basis_indices.sum() == A.shape[1]:
-                point_shis = poly.halfspaces[basis_indices, :-1]  # (d(# point shis) x d)
-                others = poly.halfspaces[~basis_indices, :-1]  # (num_other_hyperplanes x d)
-                if TORCH_AVAILABLE and isinstance(point_shis, torch.Tensor):
-                    try:
-                        sols = torch.linalg.solve(point_shis, others.T)
-                    except RuntimeError:
-                        warnings.warn(
-                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
-                            stacklevel=2,
-                        )
-                        sols = torch.zeros(others.T.shape, device=poly.halfspaces.device)
-                    all_correct = (sols > 0).all(dim=0)
-                    assert all_correct.shape[0] == others.shape[0]
-                    correct_indices = torch.argwhere(all_correct).reshape(-1)
-                    if correct_indices.shape[0] > 0:
-                        A_indices = torch.arange(A.shape[0], device=poly.halfspaces.device)[~basis_indices][all_correct]
-                        old_len = len(subset)
-                        subset -= set(A_indices.detach().cpu().numpy().ravel().tolist())
-                        new_len = len(subset)
-                        skip_size = old_len - new_len
-                else:
-                    point_shis_np = np.asarray(point_shis)
-                    others_np = np.asarray(others)
-                    try:
-                        sols_np = np.linalg.solve(point_shis_np, others_np.T)
-                    except np.linalg.LinAlgError:
-                        warnings.warn(
-                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
-                            stacklevel=2,
-                        )
-                        sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
-                    all_correct_np = (sols_np > 0).all(axis=0)
-                    if all_correct_np.any():
-                        A_indices_np = np.arange(A.shape[0])[~basis_indices][all_correct_np]
-                        old_len = len(subset)
-                        subset -= set(A_indices_np.ravel().tolist())
-                        new_len = len(subset)
-                        skip_size = old_len - new_len
+            if new_method and basis_indices.sum() == k:
+                point_shis_np = a_red[basis_indices, :]
+                others_np = a_red[~basis_indices, :]
+                try:
+                    sols_np = np.linalg.solve(point_shis_np, others_np.T)
+                except np.linalg.LinAlgError:
+                    warnings.warn(
+                        "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                        stacklevel=2,
+                    )
+                    sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
+                all_correct_np = (sols_np > 0).all(axis=0)
+                if all_correct_np.any():
+                    reduced_idx = np.arange(a_red.shape[0], dtype=np.intp)[~basis_indices][all_correct_np]
+                    work_rows = ineq_rows[reduced_idx]
+                    orig_to_remove = work_to_orig[work_rows]
+                    old_len = len(subset)
+                    subset -= set(int(x) for x in orig_to_remove.tolist() if x >= 0)
+                    new_len = len(subset)
+                    skip_size = old_len - new_len
         else:
             raise ValueError(f"Model status: {model.status}")
 
         if collect_info:
             assert poly_info is not None
+            x_proof = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
             poly_info.append(
                 {
                     "Objective Value": model.objVal,
@@ -828,18 +863,16 @@ def get_shis(
                 poly_info[-1]["Objective Value"] = model.objVal
             if hasattr(model, "objBound"):
                 poly_info[-1]["Objective Bound"] = model.objBound
-            if hasattr(x, "X"):
-                poly_info[-1]["x Norm"] = np.linalg.norm(x.X)
+            poly_info[-1]["x Norm"] = float(np.linalg.norm(x_proof))
             if collect_info == "All":
-                poly_info[-1] |= {"Slacks": constrs.Slack, "-b[i]": -b[i], "Status": model.status}
+                poly_info[-1] |= {"Slacks": constrs.Slack, "-b[i]": -b_orig[i], "Status": model.status}
 
-                if hasattr(x, "X"):
-                    poly_info[-1]["Proof"] = x.X
+                poly_info[-1]["Proof"] = x_proof
 
         # Restore halfspace i
-        constrs[i].setAttr("RHS", -b[i, 0])
+        constrs[j].setAttr("RHS", -b_red[j, 0])
 
-        pbar.update(A.shape[0] - len(subset) - pbar.n)
+        pbar.update(n_orig - len(subset) - pbar.n)
     model.close()
     if collect_info:
         assert poly_info is not None
