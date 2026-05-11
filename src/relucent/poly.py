@@ -451,20 +451,14 @@ class Polyhedron:
         # HalfspaceIntersection expects a full-dimensional interior. For k<d cells
         # (equalities induced by zero sign entries), project to nullspace coords.
         if zero_idx.size > 0:
-            equalities = bounded_halfspaces[zero_idx]
-            inequalities = bounded_halfspaces[~np.isin(np.arange(bounded_halfspaces.shape[0]), zero_idx)]
-            eq_A = equalities[:, :-1]
-            eq_b = equalities[:, -1:]
-            x0, *_ = np.linalg.lstsq(eq_A, -eq_b, rcond=None)
-            x0 = np.asarray(x0).reshape(-1, 1)
+            from relucent.calculations import _affine_null_basis
 
-            _, s, vh = np.linalg.svd(eq_A, full_matrices=True)
-            rank = int(np.sum(s > cfg.TOL_HALFSPACE_NORMAL))
-            null_basis = vh[rank:, :].T
+            x0, null_basis, ineq_mask = _affine_null_basis(bounded_halfspaces, zero_idx)
 
             if null_basis.shape[1] == 0:
                 return x0.reshape(1, -1)
 
+            inequalities = bounded_halfspaces[ineq_mask]
             A_red = inequalities[:, :-1] @ null_basis
             b_red = inequalities[:, :-1] @ x0 + inequalities[:, -1:]
             projected_halfspaces = np.hstack((A_red, b_red))
