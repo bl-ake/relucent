@@ -115,7 +115,6 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
         ssd = np.asarray(meta_tr.nodes[dup]["ss"])
         assert int(ssd.flat[-1]) == 0
 
-
 def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     """Half-plane activation regions: duplicates mirror the unbounded induced subgraph."""
     set_seeds(seeded)
