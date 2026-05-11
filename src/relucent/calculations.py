@@ -656,11 +656,18 @@ def get_shis(
     x = model.addMVar((poly.halfspaces_np.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
     constrs = model.addConstr(A @ x == -b, name="hyperplanes")
     constrs.setAttr("Sense", GRB.LESS_EQUAL)
+    # For zero-sign entries (zeros in the sign sequence), the polyhedron lives on
+    # the hyperplane itself (codimension >= 1). ``halfspaces_np`` only stores one
+    # side of that hyperplane as a row, so leaving it as ``<=`` would inflate the
+    # LP feasible region from the cell to an ambient extension and over-count SHIs
+    # for lower-dimensional cells. Enforce these rows as equalities instead.
+    if poly.zero_indices.size > 0:
+        raise NotImplementedError("Zero-sign entries not supported yet")
     model.optimize()
     if model.status != GRB.OPTIMAL:
         raise ValueError(f"Initial Solve Failed: Model status: {model.status}")
 
-    subset = subset or range(A.shape[0])
+    subset = subset or set(range(A.shape[0])) - set(poly.zero_indices)
     subset = set(subset)
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)

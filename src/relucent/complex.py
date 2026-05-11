@@ -35,6 +35,10 @@ from relucent.vis import get_colors, plot_complex
 __all__ = ["Complex"]
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
+# ``shi`` edge attribute for truncation incidences in :meth:`Complex.get_meta_graph`
+# when ``truncate=True`` (not a supporting-hyperplane index of the underlying network).
+TRUNCATION_META_SHI: int = -1
+
 # Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
 _net: ReLUNetwork | None = None
@@ -755,7 +759,13 @@ class Complex:
         ):
             ss = edge[0].ss_np.copy()
             ss[0, self.G.edges[edge]["shi"]] = 0
-            faces.add(self.ss2poly(ss, check_exists=False))
+            p = self.ss2poly(
+                ss,
+                check_exists=False,
+                shis=list(set(edge[0].shis) & set(edge[1].shis) - {self.G.edges[edge]["shi"]}),
+                finite=edge[0].finite or edge[1].finite,
+            )
+            faces.add(p)
         return faces
 
     def get_boundary_complex(self, i: int, verbose: bool = False) -> Complex:
@@ -796,7 +806,7 @@ class Complex:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
-    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph[bytes]:
+    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False, truncate: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
         This method mirrors the face-encoding convention used by relucent's contracted
@@ -824,6 +834,19 @@ class Complex:
         These are stored as node attributes on the meta-graph (they do not mutate
         the underlying :class:`~relucent.poly.Polyhedron` objects).
 
+        If ``truncate=True``, the meta-graph is augmented to encode a combinatorial
+        truncation by a large bounding halfspace that meets only unbounded cells.
+        Every existing node's ``ss`` gains a trailing ``1`` (strictly inside the
+        truncation halfspace). The induced subgraph on nodes with ``finite is False``
+        (unbounded cells) is duplicated: each copy has trailing ``0`` on ``ss``,
+        dimension decremented by one, and node keys ``("trunc", tag)`` where ``tag``
+        is the original polyhedron tag. Face edges among duplicates mirror the
+        induced subgraph; each original unbounded node ``n`` gains an edge
+        ``n → ("trunc", n)`` with ``shi`` equal to :data:`TRUNCATION_META_SHI` (not a
+        network SHI). Duplicates are not created for 0-cells (no ``-1``-dimensional
+        placeholder). When ``truncate`` is set, node keys may be ``bytes`` or
+        ``("trunc", bytes)`` tuples.
+
         Note:
             The resulting structure encodes the face relations present in the
             contracted chain returned by :meth:`get_chain_complex`. In particular,
@@ -831,7 +854,7 @@ class Complex:
             not appear unless they were already present in the chain complexes.
         """
         if len(self) == 0:
-            return nx.MultiDiGraph[bytes]()
+            return nx.MultiDiGraph()
 
         chain = self.get_chain_complex(verbose=verbose)
         # Dimension -> complex in the chain (there is at most one per dimension).
@@ -841,7 +864,7 @@ class Complex:
                 continue
             by_dim[int(c.index2poly[0].dim)] = c
 
-        meta: nx.MultiDiGraph[bytes] = nx.MultiDiGraph()
+        meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
 
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
         for k, c_k in sorted(by_dim.items(), reverse=True):
@@ -904,10 +927,13 @@ class Complex:
                     if not in_edges:
                         continue
 
-                    cofaces = [meta.nodes[u].get("poly") for u, _ in in_edges]
-                    cofaces = [p for p in cofaces if p is not None]
-                    if not cofaces:
+                    # Keep cofaces aligned with `in_edges`: dropping Nones from cofaces alone would
+                    # pair the wrong SHI data with the wrong poly under zip().
+                    in_edges = [(u, data) for u, data in in_edges if meta.nodes[u].get("poly") is not None]
+                    if not in_edges:
                         continue
+
+                    cofaces = [meta.nodes[u].get("poly") for u, _ in in_edges]
 
                     finite_vals = [getattr(p, "finite", None) for p in cofaces]
                     if any(v is not None for v in finite_vals):
@@ -917,7 +943,7 @@ class Complex:
 
                     # contract()-style SHI inference: intersect coface SHIs after removing crossed facet.
                     shis_sets: list[set[int]] = []
-                    for (_u, data), coface in zip(in_edges, cofaces, strict=False):
+                    for (_u, data), coface in zip(in_edges, cofaces, strict=True):
                         shi = data.get("shi")
                         s = set(int(x) for x in getattr(coface, "shis", []))
                         if shi is not None:
@@ -927,6 +953,54 @@ class Complex:
 
                     meta.nodes[face_tag]["finite"] = finite
                     meta.nodes[face_tag]["shis"] = inferred_shis
+
+        if truncate:
+            # --- combinatorial "big ball" truncation (see docstring) ---
+            # Unbounded cells are the ones that would meet the truncating boundary; grab their
+            # face poset *before* we tack the extra sign bit onto everyone's `ss`.
+            unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
+            ub_faces = meta.subgraph(unbounded).copy()
+
+            def _ss_with_extra_bit(ss: np.ndarray, bit: int) -> np.ndarray:
+                a = np.asarray(ss)
+                dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
+                return np.hstack([a, np.full((a.shape[0], 1), bit, dtype=dt)])
+
+            # Mark everything as strictly inside the truncation halfspace (trailing 1).
+            for attrs in meta.nodes.values():
+                if (ss0 := attrs.get("ss")) is not None:
+                    attrs["ss"] = _ss_with_extra_bit(np.asarray(ss0), 1)
+
+            # For each positive-dim unbounded cell: shadow copy on the cut (trailing 0, dim−1),
+            # and wire it to the original with a fake SHI so it's not confused with a ReLU facet.
+            dup_keys: set[Any] = set()
+            for orig in unbounded:
+                oa = meta.nodes[orig]
+                k = int(oa.get("dim", -1))
+                ss_in = oa.get("ss")
+                if k <= 0 or ss_in is None:
+                    continue
+                dup = ("trunc", orig)
+                ss_on_cut = np.asarray(ss_in).copy()
+                ss_on_cut[..., -1] = 0
+                dup_keys.add(dup)
+                meta.add_node(
+                    dup,
+                    poly=oa.get("poly"),
+                    dim=k - 1,
+                    ss=ss_on_cut,
+                    finite=True,
+                    shis=list(oa.get("shis", [])),
+                    truncation_duplicate=True,
+                )
+                meta.add_edge(orig, dup, shi=TRUNCATION_META_SHI)
+
+            # Copy face incidences among unbounded cells onto their boundary doubles (both ends
+            # need a duplicate; 0-cells deliberately have none).
+            for u, v, ed in ub_faces.edges(data=True):
+                tu, tv = ("trunc", u), ("trunc", v)
+                if tu in dup_keys and tv in dup_keys:
+                    meta.add_edge(tu, tv, **dict(ed))
 
         return meta
 
@@ -1066,11 +1140,11 @@ class Complex:
         reduced: bool = False,
         compactify: bool = False,
         respect_finite: bool = False,
-        infinity: Literal["link", "one_point"] = "link",
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
         This is a thin public wrapper around :func:`relucent.topology.get_betti_numbers`.
+        The ``infinity`` argument is deprecated and ignored (see that function's docstring).
         """
         self._warn_research_use("get_betti_numbers")
         from relucent.topology import get_betti_numbers as _get_betti_numbers
@@ -1080,7 +1154,6 @@ class Complex:
             reduced=reduced,
             compactify=compactify,
             respect_finite=respect_finite,
-            infinity=infinity,
         )
 
     def verify_dual_graph_consistency(self) -> None:
@@ -1133,10 +1206,6 @@ class Complex:
                     + f"edge shi={int(shi)} did not yield a common face."
                 )
 
-    # -------------------------------------------------------------------------
-    # Intrinsic vertex identification / verification (dual-graph cube structure)
-    # -------------------------------------------------------------------------
-
     def intrinsic_vertex_coords(
         self,
         *,
@@ -1145,11 +1214,7 @@ class Complex:
         tol: float,
         verify_cube: bool = True,
     ) -> dict[bytes, np.ndarray]:
-        """Identify intrinsic (non-truncation-box) vertices and optionally verify cube structure.
-
-        Intrinsic vertices are 0-faces obtained by intersecting ReLU facets (SHIs), not
-        vertices introduced by clipping with the truncation box.
-        """
+        """Identify intrinsic (non-truncation-box) vertices and optionally verify them with the dual-graph."""
         if len(self) == 0:
             return {}
         if top_dim is None:
