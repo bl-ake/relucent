@@ -3,6 +3,10 @@
 import pytest
 
 from relucent import mlp, set_seeds
+from relucent.config import update_settings
+
+# All tests run with extra consistency checks (see :data:`relucent.config.CAREFUL_MODE`).
+update_settings(CAREFUL_MODE=True)
 
 
 @pytest.fixture

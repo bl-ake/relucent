@@ -759,11 +759,13 @@ class Complex:
         ):
             ss = edge[0].ss_np.copy()
             ss[0, self.G.edges[edge]["shi"]] = 0
+            # Do not pass ``finite`` from cofaces: ambient boundedness of neighbors does not
+            # determine intrinsic boundedness of the shared (d-1)-face (e.g. a segment can be
+            # bounded while both incident d-cells are unbounded in R^d). Let Chebyshev run.
             p = self.ss2poly(
                 ss,
                 check_exists=False,
                 shis=list(set(edge[0].shis) & set(edge[1].shis) - {self.G.edges[edge]["shi"]}),
-                finite=edge[0].finite or edge[1].finite,
             )
             faces.add(p)
         return faces
@@ -785,7 +787,9 @@ class Complex:
             new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
             new_complex.add_ss(
-                new_ss, halfspaces=p1.halfspaces, shis=list(set(p1.shis) & set(p2.shis) - {shi}), finite=p1.finite or p2.finite
+                new_ss,
+                halfspaces=p1.halfspaces,
+                shis=list(set(p1.shis) & set(p2.shis) - {shi}),
             )
 
         return new_complex
@@ -1444,7 +1448,8 @@ class Complex:
         for poly in tqdm(graph.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
             ss = poly.ss_np.copy()
             for shi in poly.shis:
-                assert ss[0, shi] != 0
+                if cfg.CAREFUL_MODE:
+                    assert ss[0, shi] != 0
                 ss[0, shi] *= -1
                 try:
                     graph.add_edge(poly, self[ss], shi=shi)
@@ -1548,10 +1553,12 @@ class Complex:
         ):
             poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
             poly2_ss = poly1.ss_np.copy()
-            assert poly2_ss[0, shi] != 0
+            if cfg.CAREFUL_MODE:
+                assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
             poly2 = self.add_ss(poly2_ss, check_exists=False)
-            assert isinstance(poly1._shis, list)
+            if cfg.CAREFUL_MODE:
+                assert isinstance(poly1._shis, list)
             if shi not in poly1._shis:
                 poly1._shis.append(shi)
             poly2._shis = [shi]

@@ -13,6 +13,7 @@ import numpy as np
 import numpy.typing as npt
 from tqdm.auto import tqdm
 
+import relucent.config as cfg
 from relucent._torch_compat import nn, torch
 from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
@@ -355,7 +356,8 @@ def convert(
             x = torch.randn(input_shape, dtype=dtype, device=device)
             old_y = model(x)
             new_y = torch.as_tensor(new_model(x))
-            assert torch.allclose(old_y, new_y, atol=1e-5, rtol=1e-5)
+            if cfg.CAREFUL_MODE:
+                assert torch.allclose(old_y, new_y, atol=1e-5, rtol=1e-5)
         except Exception as e:
             raise ValueError(f"Conversion failed: {e}") from e
         finally:

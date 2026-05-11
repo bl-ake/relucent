@@ -78,6 +78,10 @@ Polyhedron and halfspace geometry
      - ``str``
      - ``"IGNORE"``
      - How Qhull warnings from ``HalfspaceIntersection`` are handled: ``"IGNORE"``, ``"WARN_ALL"``, ``"HIGH_PRECISION"``, or ``"JITTERED"`` (retry with QJ).
+   * - ``CAREFUL_MODE``
+     - ``bool``
+     - ``False``
+     - When True, run extra consistency checks (Chebyshev vs. propagated boundedness, forward-pass vs. affine reconstruction, conversion spot-checks, graph invariants). The test suite and CI enable this (see ``tests/conftest.py`` and ``RELUCENT_CAREFUL_MODE``).
    * - ``MAX_RADIUS``
      - ``float``
      - ``100``

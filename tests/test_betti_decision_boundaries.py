@@ -177,7 +177,12 @@ def _far_away_hyperplane_model() -> nn.Sequential:
     reason=f"Opt-in integration test. Set {INTEGRATION_ENV}=1.",
 )
 def test_decision_boundary_empty_boundary_has_no_cells(seeded: int):
-    """Affine hyperplane boundary yields a simple 1-cell complex in both modes."""
+    """Far-away affine BH: sampling misses one side; one boundary 1-cell is recovered.
+
+    With intrinsic ``finite`` from Chebyshev (not coface propagation), the lone
+    bounded line segment yields the same ``{1: 1}`` pattern in standard and
+    Borel–Moore conventions here.
+    """
     set_seeds(seeded)
     model = _far_away_hyperplane_model()
     cplx = Complex(model)

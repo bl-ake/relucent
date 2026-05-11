@@ -19,8 +19,8 @@ before or between calls.
     update_settings(TOL_HALFSPACE_CONTAINMENT=1e-7, MAX_RADIUS=200)
 
 * Or set environment variables before import (for example
-  ``RELUCENT_TOL_HALFSPACE_CONTAINMENT=1e-7``). Every public setting can be
-  overridden with ``RELUCENT_<SETTING_NAME>``.
+  ``RELUCENT_TOL_HALFSPACE_CONTAINMENT=1e-7`` or ``RELUCENT_CAREFUL_MODE=1``).
+  Every public setting can be overridden with ``RELUCENT_<SETTING_NAME>``.
 
 See the :doc:`configuration` chapter in the HTML documentation for a full
 settings reference.
@@ -60,6 +60,18 @@ def _env_int(setting: str, default: int) -> int:
         raise ValueError(f"Invalid int value for {_env_name(setting)!r}: {raw!r}") from exc
 
 
+def _env_bool(setting: str, default: bool) -> bool:
+    raw = os.getenv(_env_name(setting))
+    if raw is None:
+        return default
+    v = raw.strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"Invalid bool value for {_env_name(setting)!r}: {raw!r}")
+
+
 def _env_float_list(setting: str, default: list[float]) -> list[float]:
     raw = os.getenv(_env_name(setting))
     if raw is None:
@@ -82,6 +94,12 @@ def _env_float_list(setting: str, default: list[float]) -> list[float]:
 # -----------------------------------------------------------------------------
 # Polyhedron & halfspace geometry
 # -----------------------------------------------------------------------------
+
+# When True, run extra consistency checks (assertions, forward-pass vs. affine
+# recomputation, conversion spot-checks, etc.). Intended for tests and
+# debugging; default is False for lower overhead in production runs.
+# Set ``RELUCENT_CAREFUL_MODE=1`` before import, or assign after import.
+CAREFUL_MODE: bool = _env_bool("CAREFUL_MODE", False)
 
 # QHULL_MODE controls how Qhull numerical warnings from HalfspaceIntersection
 # are handled:
@@ -206,6 +224,7 @@ BLOCKING_QUEUE_WAIT_TIMEOUT: float = _env_float("BLOCKING_QUEUE_WAIT_TIMEOUT", 0
 __all__ = [
     "ASTAR_BIAS_WEIGHT",
     "BLOCKING_QUEUE_WAIT_TIMEOUT",
+    "CAREFUL_MODE",
     "DEFAULT_COMPLEX_PLOT_BOUND",
     "DEFAULT_PARALLEL_ADD_BOUND",
     "DEFAULT_PLOT_BOUND",
