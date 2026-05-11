@@ -99,6 +99,64 @@ def _remap_zero_indices(zero_indices: np.ndarray | None, old_to_new: np.ndarray)
     return zm
 
 
+def _affine_null_basis(
+    halfspaces: np.ndarray,
+    zero_indices: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Null-space basis for the equality sub-system of a halfspace array.
+
+    Separates the equality rows (``zero_indices``) from inequality rows and
+    returns the data needed to project any point or halfspace system into the
+    affine subspace they define.
+
+    The decomposition uses SVD of the equality normals, which is more
+    numerically stable than forming ``A A^T`` explicitly (as a pseudo-inverse
+    based projector would do).
+
+    Args:
+        halfspaces: Shape ``(n, d+1)`` halfspace array; last column is bias.
+        zero_indices: Row indices to treat as equalities (the ``zero_indices``
+            attribute of a non-maximal :class:`~relucent.poly.Polyhedron`).
+            Must be non-empty.
+
+    Returns:
+        ``(x0, null_basis, ineq_mask)`` where
+
+        * ``x0`` – shape ``(d, 1)`` particular solution satisfying
+          ``eq_A @ x0 ≈ −eq_b``.
+        * ``null_basis`` – shape ``(d, k)`` orthonormal columns spanning the
+          null space of ``eq_A``; ``k == 0`` means the equalities pin a single
+          point and no inequalities can further restrict it.
+        * ``ineq_mask`` – boolean array of length ``n`` that is ``True`` for
+          inequality rows (everything not in ``zero_indices``).
+
+    Usage patterns::
+
+        # Project a halfspace system to reduced coordinates z  (x = N z + x0)
+        ineqs = halfspaces[ineq_mask]
+        A_red = ineqs[:, :-1] @ null_basis
+        b_red = ineqs[:, :-1] @ x0 + ineqs[:, -1:]
+        reduced_halfspaces = np.hstack((A_red, b_red))
+
+        # Project a point to reduced coordinates
+        z = np.linalg.lstsq(null_basis, point.reshape(-1, 1) - x0, rcond=None)[0].reshape(-1)
+
+        # Unproject vertices back to ambient coordinates
+        ambient_verts = (null_basis @ reduced_verts.T + x0).T
+
+        # Effective norm of inequality normals in the affine subspace (for Chebyshev LP)
+        norm_vec = np.linalg.norm(ineqs[:, :-1] @ null_basis, axis=1, keepdims=True)
+    """
+    equalities = halfspaces[zero_indices]
+    ineq_mask = ~np.isin(np.arange(halfspaces.shape[0]), zero_indices)
+    eq_A, eq_b = equalities[:, :-1], equalities[:, -1:]
+    x0 = np.asarray(np.linalg.lstsq(eq_A, -eq_b, rcond=None)[0]).reshape(-1, 1)
+    _, s, vh = np.linalg.svd(eq_A, full_matrices=True)
+    rank = int(np.sum(s > cfg.TOL_HALFSPACE_NORMAL))
+    null_basis = vh[rank:, :].T  # shape (d, k) – orthonormal columns
+    return x0, null_basis, ineq_mask
+
+
 def _halfspaces_feasible(
     env: Env,
     halfspaces: np.ndarray,
@@ -183,17 +241,17 @@ def solve_radius(
 
     if zero_indices_eff is not None and len(zero_indices_eff) > 0:
         # warnings.warn("Working with k<d polyhedron.", stacklevel=2)
-        equalities = halfspaces[zero_indices_eff]
-        inequalities = halfspaces[~np.isin(np.arange(halfspaces.shape[0]), zero_indices_eff)]
-        P = (
-            np.eye(equalities[:, :-1].shape[1])
-            - equalities[:, :-1].T @ np.linalg.pinv(equalities[:, :-1] @ equalities[:, :-1].T) @ equalities[:, :-1]
-        )
-        norm_vector = np.reshape(np.linalg.norm(inequalities[:, :-1] @ P.T, axis=1), (inequalities[:, :-1].shape[0], 1))
+        _x0, null_basis, ineq_mask = _affine_null_basis(halfspaces, zero_indices_eff)
+        equalities = halfspaces[~ineq_mask]
+        inequalities = halfspaces[ineq_mask]
+        # Effective norm of each inequality normal *within* the affine subspace.
+        # Equivalent to ||a_i P|| where P = N N^T is the orthogonal projector onto
+        # the null space of eq_A, but avoids squaring the condition number via A A^T.
+        norm_vector = np.linalg.norm(inequalities[:, :-1] @ null_basis, axis=1, keepdims=True)
     else:
         inequalities = halfspaces
         equalities = None
-        norm_vector = np.reshape(np.linalg.norm(inequalities[:, :-1], axis=1), (inequalities[:, :-1].shape[0], 1))
+        norm_vector = np.linalg.norm(inequalities[:, :-1], axis=1, keepdims=True)
 
     if not np.isfinite(norm_vector).all():
         raise ValueError("Norm vector contains NaN or Inf coefficients")
@@ -656,11 +714,19 @@ def get_shis(
     x = model.addMVar((poly.halfspaces_np.shape[1] - 1, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")
     constrs = model.addConstr(A @ x == -b, name="hyperplanes")
     constrs.setAttr("Sense", GRB.LESS_EQUAL)
+    # For zero-sign entries (zeros in the sign sequence), the polyhedron lives on
+    # the hyperplane itself (codimension >= 1). ``halfspaces_np`` only stores one
+    # side of that hyperplane as a row, so leaving it as ``<=`` would inflate the
+    # LP feasible region from the cell to an ambient extension and over-count SHIs
+    # for lower-dimensional cells. Enforce these rows as equalities instead.
+    if poly.zero_indices.size > 0:
+        for zi in poly.zero_indices.ravel():
+            constrs[int(zi)].setAttr("Sense", GRB.EQUAL)
     model.optimize()
     if model.status != GRB.OPTIMAL:
         raise ValueError(f"Initial Solve Failed: Model status: {model.status}")
 
-    subset = subset or range(A.shape[0])
+    subset = subset or set(range(A.shape[0])) - set(poly.zero_indices)
     subset = set(subset)
 
     pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
@@ -787,6 +853,13 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
     Mutates ``poly`` cache fields (``_hs``, ``_vertices``, ``_ch``, ``_volume``,
     ``_attempted_compute_properties``). No-op if already attempted.
 
+    For non-maximal cells (``zero_indices`` non-empty) the halfspace system lives on a
+    lower-dimensional affine subspace.  The function projects into that subspace via an
+    SVD-derived null basis, runs :class:`~scipy.spatial.HalfspaceIntersection` in the
+    reduced coordinates, then maps vertices back to ambient space.  Volume / convex hull
+    are computed in the intrinsic (reduced) coordinates so they remain meaningful instead
+    of collapsing to zero due to the ambient degeneracy.
+
     Raises:
         ValueError: If input dimension > 6, interior point is missing, or qhull fails
             (depending on ``qhull_mode``).
@@ -800,15 +873,73 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
     assert poly._net is not None
     if poly._net.input_shape[0] > 6:
         raise ValueError("Input shape too large to compute extra properties")
-    # Filter degenerate constraints before calling Qhull (also used by retry paths below).
-    halfspaces = _drop_degenerate_halfspaces(poly.halfspaces_np)
+
+    # Filter degenerate constraints and remap zero_indices accordingly.
+    halfspaces, old_to_new = _drop_degenerate_halfspaces_tracked(poly.halfspaces_np)
+    zero_indices_eff = _remap_zero_indices(poly.zero_indices, old_to_new)
+
+    # For non-maximal cells, project into the affine subspace defined by the equality
+    # constraints.  HalfspaceIntersection requires a full-dimensional interior point,
+    # which cannot exist when equality hyperplanes reduce the dimension.
+    x0: np.ndarray | None = None
+    null_basis: np.ndarray | None = None
+    projected_halfspaces = halfspaces
+
+    if zero_indices_eff is not None and zero_indices_eff.size > 0:
+        x0, null_basis, ineq_mask = _affine_null_basis(halfspaces, zero_indices_eff)
+
+        if null_basis.shape[1] == 0:
+            # The equality system pins a unique point; no inequalities can reduce it further.
+            poly._vertices = x0.T  # shape (1, ambient_dim)
+            poly._volume = 0.0
+            return
+
+        # Express inequality halfspaces in reduced coordinates z: x = null_basis @ z + x0.
+        inequalities = halfspaces[ineq_mask]
+        A_red = inequalities[:, :-1] @ null_basis
+        b_red = inequalities[:, :-1] @ x0 + inequalities[:, -1:]
+        projected_halfspaces = np.hstack((A_red, b_red))
+
+    # Project interior point to reduced coordinates.
+    if poly.interior_point is None:
+        raise ValueError("Interior point not found")
+    if null_basis is not None and x0 is not None:
+        z0, *_ = np.linalg.lstsq(null_basis, poly.interior_point.reshape(-1, 1) - x0, rcond=None)
+        projected_interior_point = np.asarray(z0).reshape(-1)
+    else:
+        projected_interior_point = poly.interior_point
+
+    # Qhull does not support 1-D halfspace intersection; handle analytically.
+    reduced_dim = projected_halfspaces.shape[1] - 1
+    if reduced_dim == 1:
+        a_col = projected_halfspaces[:, 0]
+        b_col = projected_halfspaces[:, 1]
+        lower, upper = -float("inf"), float("inf")
+        for ai, bi in zip(a_col, b_col, strict=True):
+            if abs(ai) <= cfg.TOL_HALFSPACE_NORMAL:
+                if bi > cfg.TOL_HALFSPACE_CONTAINMENT:
+                    raise ValueError("Infeasible 1-D projected halfspace system")
+                continue
+            cutoff = -bi / ai
+            if ai > 0:
+                upper = min(upper, cutoff)
+            else:
+                lower = max(lower, cutoff)
+        if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper + cfg.TOL_HALFSPACE_CONTAINMENT:
+            raise ValueError("Projected 1-D intersection is empty or unbounded")
+        reduced_verts = np.array([[lower], [upper]], dtype=np.float64)
+        if null_basis is not None and x0 is not None:
+            poly._vertices = np.unique((null_basis @ reduced_verts.T + x0).T, axis=0)
+        else:
+            poly._vertices = np.unique(reduced_verts, axis=0)
+        poly._volume = float(upper - lower)
+        return
+
     try:
-        if poly.interior_point is None:
-            raise ValueError("Interior point not found")
         with warnings.catch_warnings(record=True) as w:
             hs = HalfspaceIntersection(
-                halfspaces,
-                poly.interior_point,
+                projected_halfspaces,
+                projected_interior_point,
                 qhull_options=None,
             )  # http://www.qhull.org/html/qh-optq.htm
         if w:
@@ -822,8 +953,8 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
             elif qhull_mode == "JITTERED":
                 with warnings.catch_warnings(record=True) as w2:
                     new_hs = HalfspaceIntersection(
-                        halfspaces,
-                        poly.interior_point,
+                        projected_halfspaces,
+                        projected_interior_point,
                         # Triangulated output is approximately 1000 times more accurate than joggled input.
                         qhull_options="QJ",
                     )  # http://www.qhull.org/html/qh-optq.htm
@@ -843,11 +974,9 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
     except Exception as e:
         if qhull_mode == "JITTERED":
             try:
-                if poly.interior_point is None:
-                    raise ValueError("Interior point not found")
                 hs = HalfspaceIntersection(
-                    halfspaces,
-                    poly.interior_point,
+                    projected_halfspaces,
+                    projected_interior_point,
                     # Triangulated output is approximately 1000 times more accurate than joggled input.
                     qhull_options="QJ",
                 )  # http://www.qhull.org/html/qh-optq.htm
@@ -858,34 +987,29 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
             raise ValueError(f"Error while computing halfspace intersection: {e}") from e
 
     poly._hs = hs
-    # It seems like the SHIs are not always computed correctly by HalfSpaceIntersection, so we will not check them
-    # try:
-    #     hs_shis = np.unique([shi for shis in hs.dual_facets for shi in shis]).tolist()
-    #     # hs_shis = hs.dual_vertices.ravel().tolist()
-    #     if set(hs_shis) != set(poly.shis):
-    #         w = RuntimeWarning(
-    #             f"HalfspaceIntersection SHIs on {poly} != computed SHIs: {sorted(hs_shis)} vs {sorted(poly.shis)}"
-    #         )
-    #         poly.warnings.append(w)
-    # except Exception as e:
-    #     w = RuntimeWarning(f"Error while getting dual vertices: {e}")
-    #     poly.warnings.append(w)
-    #     raise ValueError(f"Error while getting dual vertices: {e}")
-    vertices = hs.intersections
+    raw_vertices = hs.intersections  # in reduced coordinates when projected
+
+    # Remap to ambient coordinates for the trust filter and poly._vertices.
+    vertices = (null_basis @ raw_vertices.T + x0).T if null_basis is not None and x0 is not None else raw_vertices
+
     trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
     trust_vertices_2 = (halfspaces[:, :-1] @ vertices[trust_vertices].T + halfspaces[:, -1, None]).sum(
         axis=0
     ) < cfg.VERTEX_TRUST_THRESHOLD
     poly._vertices = vertices[trust_vertices][trust_vertices_2]
-    if poly.finite and len(poly._vertices) > poly.ambient_dim:
+
+    # ConvexHull and volume are computed in the intrinsic (reduced) coordinates.
+    # Using ambient-space vertices for non-maximal cells would produce a degenerate hull.
+    ch_vertices = raw_vertices[trust_vertices][trust_vertices_2] if null_basis is not None else poly._vertices
+
+    if poly.finite and len(ch_vertices) > reduced_dim:
         try:
-            poly._ch = ConvexHull(vertices)
+            poly._ch = ConvexHull(ch_vertices)
             try:
                 poly._volume = poly._ch.volume
             except Exception as e:
                 raise ValueError(f"Error while computing convex hull volume: {e}") from e
         except Exception as e:
-            # warnings.warn("Error while computing convex hull:", e)
             if qhull_mode == "WARN_ALL":
                 warnings.warn(f"Error while computing convex hull: {e}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
