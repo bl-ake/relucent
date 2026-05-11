@@ -337,6 +337,9 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
     )
     p_bounded._finite = True
     p_bounded._finite_computed = True
+    # Complete Chebyshev cache so ``finite`` does not re-run LP on dummy halfspaces.
+    p_bounded._center = np.array([0.1, 0.1], dtype=np.float64)
+    p_bounded._inradius = 0.05
 
     p_unbounded = _poly_with_vertices(
         ambient_dim=2,

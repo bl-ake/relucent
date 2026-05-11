@@ -1,6 +1,7 @@
 """Polyhedron: a single linear region of a ReLU network in input space."""
 
 import hashlib
+import math
 import warnings
 from collections.abc import Iterable
 from functools import cached_property
@@ -194,8 +195,9 @@ class Polyhedron:
         max_radius = max_radius or cfg.MAX_RADIUS
         if self.finite is None:
             raise ValueError("Polyhedron is infeasible (empty).")
-        if self._finite is True:
-            assert self._center is not None
+        # ``finite=True`` may be supplied at construction (e.g. propagated from cofaces)
+        # without ever running the Chebyshev solve; in that case ``_center`` is unset.
+        if self._finite is True and self._center is not None:
             interior_point = np.asarray(self._center).squeeze()
         else:
             env = env or get_env()
@@ -819,17 +821,18 @@ class Polyhedron:
     @property
     def center(self) -> np.ndarray | None:
         """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded or infeasible."""
-        if not self._finite_computed:
+        if not self._finite_computed or (self._finite is True and self._center is None):
             _ = self.finite
         return self._center
 
     @property
     def inradius(self) -> float | None:
         """Inradius of the polyhedron, ``inf`` if unbounded feasible, ``None`` if infeasible."""
-        if not self._finite_computed:
+        if not self._finite_computed or (self._finite is True and self._inradius is None):
             _ = self.finite
         if self._finite is True:
-            assert self._inradius is not None  # when bounded, get_center_inradius() has set it
+            if cfg.CAREFUL_MODE:
+                assert self._inradius is not None  # when bounded, get_center_inradius() has set it
             return self._inradius
         if self._finite is False:
             return float("inf")
@@ -838,7 +841,15 @@ class Polyhedron:
     @property
     def finite(self) -> bool | None:
         """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``."""
-        if not self._finite_computed:
+        # Constructor or callers may set ``finite=True`` without populating Chebyshev caches;
+        # treat that as "bounded hint" until a solve confirms and fills ``_center`` / ``_inradius``.
+        _chebyshev_incomplete = (
+            self._finite_computed and self._finite is True and (self._center is None or self._inradius is None)
+        )
+        if not self._finite_computed or _chebyshev_incomplete:
+            hinted_finite = self._finite if _chebyshev_incomplete else None
+            prior_center = self._center
+            prior_inradius = self._inradius
             center, inradius = self.get_center_inradius()
             self._center = center
             self._inradius = inradius
@@ -853,6 +864,50 @@ class Polyhedron:
             self._finite_computed = True
             if self._finite is None:
                 self._interior_point = None
+            if _chebyshev_incomplete and cfg.CAREFUL_MODE:
+                assert hinted_finite is not None
+                if prior_center is None and prior_inradius is None:
+                    if self._finite != hinted_finite:
+                        warnings.warn(
+                            "Cached boundedness hint disagreed with Chebyshev solve "
+                            + f"(hinted finite={hinted_finite!r}, computed finite={self._finite!r}); "
+                            + "using the LP result.",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                else:
+                    assert self._finite == hinted_finite, (
+                        "Propagated boundedness disagreed with Chebyshev solve: "
+                        f"hinted finite={hinted_finite!r}, computed finite={self._finite!r}"
+                    )
+                if prior_center is not None:
+                    assert center is not None, (
+                        f"Chebyshev refresh dropped center: prior_center={prior_center!r}, computed center={center!r}"
+                    )
+                    assert np.allclose(
+                        np.asarray(prior_center, dtype=np.float64).reshape(-1),
+                        np.asarray(center, dtype=np.float64).reshape(-1),
+                        rtol=1e-5,
+                        atol=float(cfg.TOL_INTERIOR_VERIFY),
+                    ), f"Chebyshev center changed after refresh: prior={prior_center!r}, computed={center!r}"
+                if prior_inradius is not None:
+                    assert inradius is not None, (
+                        "Chebyshev refresh dropped inradius: "
+                        f"prior_inradius={prior_inradius!r}, computed inradius={inradius!r}"
+                    )
+                    pc = float(prior_inradius)
+                    ic = float(inradius)
+                    both_inf = math.isinf(pc) and math.isinf(ic)
+                    same_inf_sign = math.copysign(1.0, pc) == math.copysign(1.0, ic)
+                    close = math.isclose(
+                        pc,
+                        ic,
+                        rel_tol=1e-9,
+                        abs_tol=float(cfg.TOL_INTERIOR_VERIFY),
+                    )
+                    assert (both_inf and same_inf_sign) or close, (
+                        f"Chebyshev inradius changed after refresh: prior={prior_inradius!r}, computed={inradius!r}"
+                    )
         return self._finite
 
     @property

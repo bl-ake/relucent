@@ -50,6 +50,8 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install ".[dev,torch]"
     - name: Test with pytest
+      env:
+        RELUCENT_CAREFUL_MODE: "1"
       run: pytest
 
   test-no-torch:
@@ -74,4 +76,6 @@ jobs:
         print("torch not installed: OK")
         PY
     - name: Run no-torch compatibility checks
+      env:
+        RELUCENT_CAREFUL_MODE: "1"
       run: pytest tests/test_no_torch.py

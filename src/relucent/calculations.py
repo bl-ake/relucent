@@ -508,7 +508,12 @@ def _get_hs_torch(
             assert isinstance(current_A, torch.Tensor)
             assert isinstance(current_b, torch.Tensor)
             assert outs is not None
-            assert torch.allclose(torch.as_tensor(outs[name]), (data @ current_A) + current_b, atol=cfg.TOL_VERIFY_AB_ATOL)
+            if cfg.CAREFUL_MODE:
+                assert torch.allclose(
+                    torch.as_tensor(outs[name]),
+                    (data @ current_A) + current_b,
+                    atol=cfg.TOL_VERIFY_AB_ATOL,
+                )
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None
@@ -617,11 +622,12 @@ def _get_hs_numpy(
             if isinstance(expected, torch.Tensor):
                 expected = expected.detach().cpu().numpy()
             expected = np.asarray(expected)
-            assert np.allclose(
-                expected,
-                (data @ current_A) + current_b,
-                atol=cfg.TOL_VERIFY_AB_ATOL,
-            )
+            if cfg.CAREFUL_MODE:
+                assert np.allclose(
+                    expected,
+                    (data @ current_A) + current_b,
+                    atol=cfg.TOL_VERIFY_AB_ATOL,
+                )
         if get_all_Ab:
             assert current_A is not None
             assert current_b is not None

@@ -169,3 +169,26 @@ class TestOneCellsEmbeddedInHigherDimensions:
         assert np.allclose(verts, np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]), atol=1e-7)
 
         assert set(p.shis) == {0, 1}
+
+
+def test_finite_true_without_chebyshev_cache_interior_and_center():
+    """``finite=True`` from construction (e.g. boundary propagation) must not require ``_center``.
+
+    ``vertices`` / Qhull paths require a network; this checks the LP interior path used by them.
+    """
+    halfspaces = np.array(
+        [
+            [-1.0, 0.0],
+            [1.0, -1.0],
+        ],
+        dtype=np.float64,
+    )
+    ss = np.ones((1, 2), dtype=np.int8)
+    p = Polyhedron(None, ss, halfspaces=halfspaces, finite=True)
+    assert p._center is None
+    ip = np.asarray(p.interior_point).reshape(-1)
+    assert np.allclose(ip, np.array([0.5]), atol=1e-6)
+    assert np.allclose(p.get_interior_point().reshape(-1), np.array([0.5]), atol=1e-6)
+    assert p.center is not None
+    assert p.inradius is not None
+    assert np.isclose(float(p.inradius), 0.5, atol=1e-6)

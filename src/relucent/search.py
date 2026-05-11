@@ -470,7 +470,8 @@ def searcher(
         new_ss[0, shi] *= -1
         found_sss.add(new_ss)
         queue.push((new_ss, shi, 1, cx.ssm[start.ss_np]))
-        assert new_ss in found_sss
+        if cfg.CAREFUL_MODE:
+            assert new_ss in found_sss
 
     rolling_average = len(start.shis)
     bad_shi_computations = []
@@ -862,7 +863,8 @@ def hamming_astar(
         termination = "found"
         path = [end_poly]
         while path[-1] != start_poly:
-            assert cameFrom[path[-1]] not in path, path
+            if cfg.CAREFUL_MODE:
+                assert cameFrom[path[-1]] not in path, path
             path.append(cameFrom[path[-1]])
         path.reverse()
     else:
