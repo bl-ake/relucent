@@ -99,11 +99,11 @@ If you run into any problems or have any feature requests, please create an issu
 
 ## Related Software:
 Please check out the amazing software created by others working in this area. Depending on your goal, some of these could be even better!
-- [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar ([Paper](https://doi.org/10.3389/fdata.2023.1274831))
 - [CanonicalPoly 2.0](https://github.com/mmasden/canonicalpoly2.0) by Marissa Maden ([Paper](https://doi.org/10.1137/24M1646996))
+- [GoL Toolbox](https://github.com/cglrtrgy/GoL_Toolbox) by Turgay Caglar ([Paper](https://doi.org/10.3389/fdata.2023.1274831))
+- [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek ([Paper](https://doi.org/10.48550/arXiv.2510.12700))
 - [ReLU Edge Subdivision](https://github.com/arturs-berzins/relu_edge_subdivision) by Arturs Berzins ([Paper](https://proceedings.mlr.press/v202/berzins23a.html))
 - [SplineCam](https://github.com/AhmedImtiazPrio/SplineCAM) by Ahmed Imtiaz Humayun ([Paper](https://doi.org/10.48550/arXiv.2302.12828))
-- [Neural Network Elements](https://github.com/gtri/neural-network-elements) by Andrew Tawfeek ([Paper](https://doi.org/10.48550/arXiv.2510.12700))
 
 ## Bibliography
 This package was made possible by the following work:
