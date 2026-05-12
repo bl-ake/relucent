@@ -62,7 +62,7 @@ input_point = np.random.random((1, 2))
 p = cplx.point2poly(input_point)
 print(p.halfspaces[p.shis])
 ```
-Attributes like `p.halfspaces` (halfspaces of the form Ax + b <= 0, in format [A; b], induced by each neuron), `p.shis` (the indices of the non-redundant halfspaces), and `p.center` (the Chebyshev Center) are computed lazily.
+Attributes like `p.halfspaces` (halfspaces of the form Ax + b <= 0, in format [A; b], induced by each neuron), `p.shis` (the indices of the non-redundant halfspaces), and `p.center` (the Chebyshev center) are computed lazily.
 
 You could also check the average number of faces of all polyhedrons with:
 ```
