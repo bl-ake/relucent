@@ -118,6 +118,43 @@ def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
     assert int(betti_std.get(1, 0)) >= 1
 
 
+def test_decision_boundary_verify_chain_complex_passes(seeded: int):
+    """∂²=0 on meta-graph boundary maps for small analytic decision boundaries."""
+    set_seeds(seeded)
+    model = _diamond_boundary_model_l1_ball(radius=1.0)
+    cplx = Complex(model)
+    thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
+    dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
+    inside = 0.9 * dirs
+    outside = 1.1 * dirs
+    _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
+    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
+    db = cplx.get_boundary_complex(cplx.n - 1)
+    betti_std = db.get_betti_numbers()
+    assert db.get_betti_numbers(verify_chain_complex=True) == betti_std
+    betti_bm = db.get_betti_numbers(compactify=True, reduced=True)
+    assert db.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True) == betti_bm
+
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    line_model = nn.Sequential(fc, nn.ReLU())
+    cplx2 = Complex(line_model)
+    xs = np.linspace(-2.0, 2.0, 25)
+    ys = np.linspace(-2.0, 2.0, 25)
+    grid = np.array([[x, y] for x in xs for y in ys], dtype=np.float64)
+    eps = 1e-2
+    left = grid.copy()
+    left[:, 0] = -eps
+    right = grid.copy()
+    right[:, 0] = eps
+    _add_points(cplx2, np.vstack([left, right, np.random.randn(200, 2)]))
+    cplx2._dual_graph = cplx2.get_dual_graph(auto_add=True, verbose=False)
+    db2 = cplx2.get_boundary_complex(cplx2.n - 1)
+    _ = db2.get_betti_numbers(verify_chain_complex=True)
+    _ = db2.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True)
+    _ = db2.get_betti_numbers(respect_finite=True, verify_chain_complex=True)
+
+
 def test_decision_boundary_line_differs_between_homologies(seeded: int):
     """Non-compact boundary: both modes should run (sanity check)."""
     set_seeds(seeded)
