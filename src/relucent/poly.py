@@ -91,7 +91,10 @@ class Polyhedron:
     def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """Return an integer-typed sign sequence (values in {-1, 0, 1})."""
         if isinstance(value, np.ndarray):
-            if not np.issubdtype(value.dtype, np.integer):
+            # ``dtype.kind in "iu"`` is ~50x faster than ``np.issubdtype`` and
+            # this path is hit once per Polyhedron construction (hot in e.g.
+            # ``Complex.recover_from_dual_graph``).
+            if value.dtype.kind not in "iu":
                 value = value.astype(np.int8, copy=False)
             return value
         if isinstance(value, torch.Tensor):

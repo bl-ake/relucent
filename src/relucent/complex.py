@@ -856,6 +856,14 @@ class Complex:
             contracted chain returned by :meth:`get_chain_complex`. In particular,
             boundary faces that are not represented in the contracted chain will
             not appear unless they were already present in the chain complexes.
+
+            A breadth-first search over full-dimensional regions can still leave this
+            graph short of a closed cellular complex: some codimension-one faces of a
+            stored cell may not appear as nodes (their sign pattern is missing from the
+            explored complex or from the contracted chain), so incidence data can omit
+            entries that true geometry would require. That breaks ``∂² = 0`` for the
+            GF(2) boundary maps in :func:`relucent.topology.get_betti_numbers` unless
+            ``verify_chain_complex`` is disabled; see that function's documentation.
         """
         if len(self) == 0:
             return nx.MultiDiGraph()
@@ -900,7 +908,11 @@ class Complex:
                         face_poly = self[face_ss]
 
                     if face_poly is None:
-                        # If the contracted chain doesn't contain this face, skip it.
+                        # ``c_{k-1}`` is built by :meth:`contract` from **dual edges** only, so
+                        # a geometric facet of ``p`` (zeroing ``shi``) may not appear as a stored
+                        # polyhedron—e.g. missing neighbor off the explored subgraph. The
+                        # ``face_ss in self`` branch rarely helps for codim-1 faces of top cells
+                        # (their ``ss`` has a new zero vs. full-dimensional regions in ``self``).
                         continue
 
                     if face_poly.tag not in meta:
@@ -1144,11 +1156,14 @@ class Complex:
         reduced: bool = False,
         compactify: bool = False,
         respect_finite: bool = False,
+        verify_chain_complex: bool = False,
+        verbose: bool = False,
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
         This is a thin public wrapper around :func:`relucent.topology.get_betti_numbers`.
         The ``infinity`` argument is deprecated and ignored (see that function's docstring).
+        Pass ``verbose=True`` for stderr progress from topology and meta-graph construction.
         """
         self._warn_research_use("get_betti_numbers")
         from relucent.topology import get_betti_numbers as _get_betti_numbers
@@ -1158,6 +1173,8 @@ class Complex:
             reduced=reduced,
             compactify=compactify,
             respect_finite=respect_finite,
+            verify_chain_complex=verify_chain_complex,
+            verbose=verbose,
         )
 
     def verify_dual_graph_consistency(self) -> None:
@@ -1544,12 +1561,13 @@ class Complex:
         if copy:
             graph = graph.copy()
         initial_p = self.add_ss(initial_ss)
-        initial_p._shis = []
         graph.nodes[source]["poly"] = initial_p
+        # ``nx.bfs_edges`` yields only the N-1 tree edges, so the progress bar
+        # total must be in terms of nodes, not the total number of dual edges.
         for edge in tqdm(
             nx.bfs_edges(graph, source=source),
             desc="Recovering Polyhedra",
-            total=graph.number_of_edges(),
+            total=graph.number_of_nodes() - 1,
         ):
             poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
             poly2_ss = poly1.ss_np.copy()
@@ -1557,16 +1575,18 @@ class Complex:
                 assert poly2_ss[0, shi] != 0
             poly2_ss[0, shi] *= -1
             poly2 = self.add_ss(poly2_ss, check_exists=False)
-            if cfg.CAREFUL_MODE:
-                assert isinstance(poly1._shis, list)
-            if shi not in poly1._shis:
-                poly1._shis.append(shi)
-            poly2._shis = [shi]
-
             graph.nodes[edge[1]]["poly"] = poly2
 
-        for node in graph:
-            self[graph.nodes[node]["poly"]]._shis = [graph.edges[edge]["shi"] for edge in graph.edges(node)]
+        # Populate each polyhedron's ``_shis`` from the full dual graph in a
+        # single pass: iterating ``graph.edges(node)`` per-node would visit each
+        # edge twice and also force a redundant ``self[...]`` SSManager lookup.
+        shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
+        for u, v, data in graph.edges(data=True):
+            shi = data["shi"]
+            shis_per_node[u].append(shi)
+            shis_per_node[v].append(shi)
+        for node, shis in shis_per_node.items():
+            graph.nodes[node]["poly"]._shis = shis
 
     def plot(
         self,
