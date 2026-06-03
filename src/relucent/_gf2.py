@@ -24,7 +24,7 @@ import threading
 
 # import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
@@ -35,6 +35,7 @@ _C_SRC = _HERE / "_gf2_rank.c"
 # Lazily initialised: None = not yet attempted, False = failed, CDLL = success.
 _lib: ctypes.CDLL | None | bool = None
 _lib_lock = threading.Lock()
+_ProgressFn: Any = None
 
 
 def _so_path() -> Path:
@@ -72,7 +73,7 @@ def _compile(so: Path) -> bool:
 
 def _load_lib() -> ctypes.CDLL | None:
     """Compile (if needed) and load the shared library; return None on failure."""
-    global _lib
+    global _lib, _ProgressFn
     with _lib_lock:
         if _lib is not None:
             return _lib if isinstance(_lib, ctypes.CDLL) else None
@@ -85,7 +86,7 @@ def _load_lib() -> ctypes.CDLL | None:
 
             # int gf2_rank_packed(uint64_t*, int nrows, int ncols,
             #                     progress_fn, void*, int cb_interval)
-            _ProgressFn = ctypes.CFUNCTYPE(
+            progress_fn_type = ctypes.CFUNCTYPE(
                 ctypes.c_int,
                 ctypes.c_int,  # col
                 ctypes.c_int,  # ncols
@@ -96,10 +97,11 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.POINTER(ctypes.c_uint64),
                 ctypes.c_int,
                 ctypes.c_int,
-                _ProgressFn,
+                progress_fn_type,
                 ctypes.c_void_p,
                 ctypes.c_int,
             ]
+            _ProgressFn = progress_fn_type
 
             # void gf2_transpose_packed(const uint64_t*, int, int, uint64_t*)
             lib.gf2_transpose_packed.restype = None
@@ -110,7 +112,6 @@ def _load_lib() -> ctypes.CDLL | None:
                 ctypes.POINTER(ctypes.c_uint64),
             ]
 
-            lib._ProgressFn = _ProgressFn  # keep the type alive
             _lib = lib
         except Exception:
             _lib = False
@@ -141,9 +142,10 @@ def gf2_rank_packed_c(
     nrows = int(arr.shape[0])
     ptr = arr.ctypes.data_as(ctypes.POINTER(ctypes.c_uint64))
 
+    if _ProgressFn is None:
+        raise RuntimeError("C GF(2) backend not available")
     if not progress:
-        null_cb = ctypes.cast(None, lib._ProgressFn)
-        return int(lib.gf2_rank_packed(ptr, nrows, ncols, null_cb, None, 0))
+        return int(lib.gf2_rank_packed(ptr, nrows, ncols, _ProgressFn(), None, 0))
 
     # Progress bar via callback.  ctypes releases the GIL so the callback
     # thread runs concurrently with C.
@@ -155,8 +157,8 @@ def gf2_rank_packed_c(
 
     pbar = tqdm(total=ncols, desc=desc, leave=False, unit="col")
 
-    @lib._ProgressFn
-    def _cb(col: int, total: int, _ud: ctypes.c_void_p) -> int:
+    @_ProgressFn
+    def _cb(col: int, _total: int, _ud: ctypes.c_void_p) -> int:
         pbar.n = col
         pbar.refresh()
         return 0

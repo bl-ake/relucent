@@ -1117,8 +1117,7 @@ def plot_persistence_diagram(
                     legendgroup=name,
                     marker=dict(size=marker_size, color=color, symbol="circle"),
                     hovertemplate=(
-                        f"H{dim}<br>birth=%{{x:.4g}}<br>death=%{{y:.4g}}<br>"
-                        + "persistence=%{customdata:.4g}<extra></extra>"
+                        f"H{dim}<br>birth=%{{x:.4g}}<br>death=%{{y:.4g}}<br>" + "persistence=%{customdata:.4g}<extra></extra>"
                     ),
                     customdata=[p.death - p.birth for p in finite],
                 )

@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
+from relucent._torch_compat import TORCH_AVAILABLE, torch
+
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
 
@@ -109,9 +111,11 @@ def _affine_output_at_representative(
     if isinstance(w, np.ndarray):
         w_np = w
         b_np = np.asarray(b).reshape(-1)
-    else:
+    elif TORCH_AVAILABLE and isinstance(w, torch.Tensor):
         w_np = w.detach().cpu().numpy()
-        b_np = b.detach().cpu().numpy().reshape(-1)
+        b_np = b.detach().cpu().numpy().reshape(-1) if isinstance(b, torch.Tensor) else np.asarray(b).reshape(-1)
+    else:
+        raise TypeError(f"Unsupported affine map type: {type(w)}")
 
     x = poly.interior_point
     if x is None:
@@ -133,6 +137,7 @@ class AffineOutputFiltration(Filtration):
     """
 
     lower_star: bool
+    combine: Literal["last", "diff"]
 
     def __init__(
         self,

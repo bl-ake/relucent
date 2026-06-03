@@ -19,7 +19,7 @@ import relucent.config as cfg
 from relucent._logging import logger
 from relucent._torch_compat import TORCH_AVAILABLE, torch
 from relucent.convert_model import convert
-from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
+from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.poly import Polyhedron
 from relucent.search import greedy_path as _greedy_path_fn
 from relucent.search import hamming_astar as _hamming_astar_fn
@@ -128,6 +128,8 @@ def _contract_dual_graph_for_shi(
         a, b = node_map[u], node_map[v]
         if a == b:
             continue
+        if shi is None:
+            continue
         new_shi = shi - 1 if shi > deleted_shi else shi
         if contracted.has_edge(a, b):
             assert contracted.edges[a, b]["shi"] == new_shi
@@ -147,7 +149,7 @@ def _net_remove_ss_layer_and_following_relu(net: ReLUNetwork, ss_layer_idx: int)
         raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
     n_removed_outputs = int(removed_linear.weight.shape[0])
 
-    new_items: list[tuple[str, LinearLayer | ReLULayer]] = []
+    new_items: list[tuple[str, Layer]] = []
     skip_next_relu = False
     for i, (name, layer) in enumerate(items):
         if i == ss_layer_idx:
@@ -179,7 +181,7 @@ def _net_without_last_ss_layer_neuron(
         return _net_remove_ss_layer_and_following_relu(net, ss_layer_idx)
 
     items = list(net.layers.items())
-    new_items: list[tuple[str, LinearLayer | ReLULayer]] = []
+    new_items: list[tuple[str, Layer]] = []
     delete_column_from_next_linear = False
     for i, (name, layer) in enumerate(items):
         if i == ss_layer_idx and isinstance(layer, LinearLayer):
