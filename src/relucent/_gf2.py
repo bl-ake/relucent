@@ -13,6 +13,7 @@ available() -> bool
 gf2_rank_packed_c(packed, ncols, *, progress, progress_desc) -> int
 gf2_rank_boundary_c(packed, ncols, *, progress, progress_desc) -> int
 """
+
 from __future__ import annotations
 
 import ctypes
@@ -20,7 +21,8 @@ import hashlib
 import subprocess
 import sys
 import threading
-import time
+
+# import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -50,11 +52,14 @@ def _compile(so: Path) -> bool:
     for extra in (["-fopenmp"], []):
         cmd = [
             "gcc",
-            "-O3", "-march=native",
+            "-O3",
+            "-march=native",
             *extra,
-            "-shared", "-fPIC",
+            "-shared",
+            "-fPIC",
             str(_C_SRC),
-            "-o", str(so),
+            "-o",
+            str(so),
         ]
         try:
             result = subprocess.run(cmd, capture_output=True, timeout=60)

@@ -37,9 +37,9 @@ try:
     from relucent._gf2 import (
         gf2_rank_boundary_c as _gf2_rank_boundary_c,
     )
-    from relucent._gf2 import (
-        gf2_transpose_packed_c as _gf2_transpose_packed_c,
-    )
+    # from relucent._gf2 import (
+    #     gf2_transpose_packed_c as _gf2_transpose_packed_c,
+    # )
 
     _C_BACKEND: bool = _c_available()
 except Exception:
