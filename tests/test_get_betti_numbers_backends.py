@@ -1,7 +1,7 @@
 """``get_betti_numbers`` must agree when GF(2) rank uses the C vs Python backends.
 
 The C path is selected inside :func:`~relucent.topology.gf2_rank_boundary` when
-``topology._C_BACKEND`` is true (see :data:`~relucent.topology.C_BACKEND_AVAILABLE`).
+``topology._c_backend`` is true (see :data:`~relucent.topology.C_BACKEND_AVAILABLE`).
 These tests force each backend and compare full Betti dictionaries on small complexes.
 """
 
@@ -23,7 +23,7 @@ from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
 def _set_gf2_backend(monkeypatch: pytest.MonkeyPatch, *, use_c: bool) -> None:
     if use_c and not C_BACKEND_AVAILABLE:
         pytest.skip("C GF(2) backend not available (gcc compile/load failed)")
-    monkeypatch.setattr(topology, "_C_BACKEND", use_c)
+    monkeypatch.setattr(topology, "_c_backend", use_c)
 
 
 def _betti_for_backend(
@@ -121,9 +121,7 @@ def test_get_betti_numbers_python_backend_smoke(seeded: int, monkeypatch: pytest
 @pytest.mark.requires_c_gf2
 def test_c_gf2_backend_available() -> None:
     """CI on Linux must compile and load ``_gf2_rank.c`` (see workflow job ``gf2-backend``)."""
-    assert C_BACKEND_AVAILABLE, (
-        "C GF(2) backend failed to compile or load; get_betti_numbers would use slow Python rank only"
-    )
+    assert C_BACKEND_AVAILABLE, "C GF(2) backend failed to compile or load; get_betti_numbers would use slow Python rank only"
 
 
 @pytest.mark.requires_c_gf2

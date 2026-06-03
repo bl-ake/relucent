@@ -88,7 +88,11 @@ def test_sparse_rank_matches_packed_on_meta_like_grid() -> None:
         for v in rng.choice(nodes_0, size=2, replace=False):
             meta.add_edge(u, v)
 
-    nodes_by_dim = {2: nodes_2, 1: nodes_1, 0: nodes_0}
+    nodes_by_dim: dict[int, list[object]] = {
+        2: list(nodes_2),
+        1: list(nodes_1),
+        0: list(nodes_0),
+    }
     for k in (1, 2):
         row_sets, ncols = _boundary_row_sets(meta, nodes_by_dim, k=k, compactify=False)
         packed, nc = _packed_boundary_matrix(meta, nodes_by_dim, k=k, compactify=False)
@@ -109,8 +113,8 @@ def test_c_backend_matches_dense_reference_random() -> None:
         (15, 15, 3, 200),
         (20, 30, 4, 100),
         (30, 20, 4, 100),
-        (25, 25, 8, 100),   # denser
-        (25, 25, 2, 100),   # very sparse
+        (25, 25, 8, 100),  # denser
+        (25, 25, 2, 100),  # very sparse
     ]
     for nrows, ncols, nnz_per_row, trials in configs:
         for _ in range(trials):
@@ -122,9 +126,7 @@ def test_c_backend_matches_dense_reference_random() -> None:
                     dense[i, j] = 1
             expected = _dense_rank_gf2(dense)
             rc = gf2_rank_packed_c(packed.copy(), ncols)
-            assert rc == expected, (
-                f"Mismatch ({nrows}×{ncols} nnz/row={nnz_per_row}): dense={expected} c={rc}"
-            )
+            assert rc == expected, f"Mismatch ({nrows}×{ncols} nnz/row={nnz_per_row}): dense={expected} c={rc}"
 
 
 def test_c_backend_flip_parity_edge_case() -> None:
@@ -142,12 +144,15 @@ def test_c_backend_flip_parity_edge_case() -> None:
     #   row 2: cols {2}     → binary 100
     # rank should be 3.
     ncols = 3
-    p = np.array([
-        [np.uint64(0b011)],
-        [np.uint64(0b001)],
-        [np.uint64(0b100)],
-    ], dtype=np.uint64)
-    expected = _dense_rank_gf2(np.array([[1,1,0],[1,0,0],[0,0,1]], dtype=np.uint8))
+    p = np.array(
+        [
+            [np.uint64(0b011)],
+            [np.uint64(0b001)],
+            [np.uint64(0b100)],
+        ],
+        dtype=np.uint64,
+    )
+    expected = _dense_rank_gf2(np.array([[1, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.uint8))
     assert expected == 3
     rc = gf2_rank_packed_c(p.copy(), ncols)
     assert rc == 3, f"Expected rank 3, got {rc}"
@@ -161,10 +166,10 @@ def test_c_backend_flip_parity_edge_case() -> None:
 
 
 def test_transpose_rank_matches_direct() -> None:
-  nrows, ncols = 500, 8000
-  rng = np.random.default_rng(1)
-  row_sets = _random_sparse_rowsets(rng, nrows, ncols, nnz_per_row=4)
-  packed = _row_sets_to_packed(row_sets, ncols)
-  assert gf2_rank_boundary(packed.copy(), ncols) == gf2_rank_packed(packed.copy(), ncols)
-  transposed, ncols_t = _transpose_packed(packed, ncols)
-  assert gf2_rank_packed(transposed.copy(), ncols_t) == gf2_rank_packed(packed.copy(), ncols)
+    nrows, ncols = 500, 8000
+    rng = np.random.default_rng(1)
+    row_sets = _random_sparse_rowsets(rng, nrows, ncols, nnz_per_row=4)
+    packed = _row_sets_to_packed(row_sets, ncols)
+    assert gf2_rank_boundary(packed.copy(), ncols) == gf2_rank_packed(packed.copy(), ncols)
+    transposed, ncols_t = _transpose_packed(packed, ncols)
+    assert gf2_rank_packed(transposed.copy(), ncols_t) == gf2_rank_packed(packed.copy(), ncols)

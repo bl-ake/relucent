@@ -6,6 +6,7 @@ import math
 
 import networkx as nx
 import numpy as np
+import plotly.graph_objects as go
 import torch
 import torch.nn as nn
 
@@ -147,7 +148,8 @@ def test_plot_persistence_diagram():
         cell_filtration={"a": 0.0, "b": 2.0},
     )
     fig = vis.plot_persistence_diagram(diagram)
-    assert len(fig.data) >= 2
+    assert isinstance(fig, go.Figure)
+    assert len(list(fig.data)) >= 2
     fig2 = diagram.plot(title=None)
     assert fig2.layout.title.text is None
 

@@ -30,20 +30,24 @@ if TYPE_CHECKING:
     from relucent.complex import Complex
 
 # Try to load the C backend once at import time.
+_c_backend = False
+_gf2_rank_boundary_c = None
+
 try:
     from relucent._gf2 import (
         available as _c_available,
     )
     from relucent._gf2 import (
-        gf2_rank_boundary_c as _gf2_rank_boundary_c,
+        gf2_rank_boundary_c as _gf2_rank_boundary_c_impl,
     )
     # from relucent._gf2 import (
     #     gf2_transpose_packed_c as _gf2_transpose_packed_c,
     # )
 
-    _C_BACKEND: bool = _c_available()
+    _gf2_rank_boundary_c = _gf2_rank_boundary_c_impl
+    _c_backend = _c_available()
 except Exception:
-    _C_BACKEND = False
+    pass
 
 __all__ = [
     "ChainComplexInconsistent",
@@ -59,7 +63,7 @@ __all__ = [
 _SLOW_RANK_MIN_DIM = 50_000
 
 # Public flag: True when _gf2_rank.c compiled and loaded successfully.
-C_BACKEND_AVAILABLE: bool = _C_BACKEND
+C_BACKEND_AVAILABLE: bool = _c_backend
 
 
 def _verbose_line(verbose: bool, msg: str) -> None:
@@ -502,7 +506,7 @@ def get_betti_numbers(
         nrows = int(packed.shape[0])
         if verify_chain_complex:
             packed_by_k[k] = packed.copy()
-        if verbose and not _C_BACKEND and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
+        if verbose and not _c_backend and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
             ratio = ncols / max(nrows, 1)
             if 0.5 <= ratio <= 2.0:
                 _verbose_line(
@@ -615,7 +619,7 @@ def gf2_rank_boundary(
     Falls back gracefully to pure Python if the C library could not be
     compiled or loaded.
     """
-    if _C_BACKEND:
+    if _c_backend and _gf2_rank_boundary_c is not None:
         return _gf2_rank_boundary_c(packed, ncols, progress=progress, progress_desc=progress_desc)
     # Pure-Python fallback: transpose when it reduces column count.
     nrows = int(packed.shape[0])
