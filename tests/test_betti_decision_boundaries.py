@@ -104,7 +104,6 @@ def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
     inside = 0.9 * dirs
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
@@ -128,7 +127,6 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     inside = 0.9 * dirs
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db = cplx.get_boundary_complex(cplx.n - 1)
     betti_std = db.get_betti_numbers()
     assert db.get_betti_numbers(verify_chain_complex=True) == betti_std
@@ -148,7 +146,6 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx2, np.vstack([left, right, np.random.randn(200, 2)]))
-    cplx2._dual_graph = cplx2.get_dual_graph(auto_add=True, verbose=False)
     db2 = cplx2.get_boundary_complex(cplx2.n - 1)
     _ = db2.get_betti_numbers(verify_chain_complex=True)
     _ = db2.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True)
@@ -173,7 +170,6 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
@@ -224,10 +220,6 @@ def test_decision_boundary_empty_boundary_has_no_cells(seeded: int):
     model = _far_away_hyperplane_model()
     cplx = Complex(model)
     _add_points(cplx, np.random.randn(300, 2))
-    # Graph construction warns about missing boundary neighbors before auto-add;
-    # that's expected here since only one side is discovered by sampling.
-    with pytest.warns(UserWarning, match=r"Dual graph is incomplete"):
-        cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db = cplx.get_boundary_complex(cplx.n - 1)
     assert len(db) == 1
     assert db.get_betti_numbers() == {1: 1}

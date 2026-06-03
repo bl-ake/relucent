@@ -2,17 +2,30 @@
 
 import os
 
+import numpy as np
 import pytest
 
-from relucent import mlp, set_seeds
+from relucent import Complex, mlp, set_seeds
 from relucent.config import update_settings
 from relucent.topology import C_BACKEND_AVAILABLE
+
+
+def explore_for_topology(
+    cplx: Complex,
+    start: np.ndarray,
+    *,
+    max_polys: int = 5000,
+) -> None:
+    """BFS from ``start`` and require a complete top-dimensional dual graph."""
+    cplx.bfs(start=np.asarray(start, dtype=np.float64).reshape(1, -1), max_polys=max_polys)
+    cplx.get_dual_graph(verbose=False, require_complete=True)
+
 
 # All tests run with extra consistency checks (see :data:`relucent.config.CAREFUL_MODE`).
 update_settings(CAREFUL_MODE=True)
 
 
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Skip C GF(2) tests when the JIT backend is unavailable (typical on Windows CI).
 
     The dedicated ``gf2-backend`` workflow job sets ``RELUCENT_REQUIRE_C_GF2=1`` so those
