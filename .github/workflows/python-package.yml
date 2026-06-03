@@ -52,11 +52,7 @@ jobs:
     - name: Test with pytest
       env:
         RELUCENT_CAREFUL_MODE: "1"
-      run: pytest
-    - name: get_betti_numbers (Python GF2 rank)
-      env:
-        RELUCENT_CAREFUL_MODE: "1"
-      run: pytest tests/test_get_betti_numbers_backends.py -m python_gf2
+      run: pytest -m "not requires_c_gf2"
 
   gf2-backend:
     name: GF(2) C backend + get_betti_numbers parity
@@ -76,9 +72,10 @@ jobs:
     - name: Require C backend and run parity tests
       env:
         RELUCENT_CAREFUL_MODE: "1"
+        RELUCENT_REQUIRE_C_GF2: "1"
       run: |
         python -c "from relucent.topology import C_BACKEND_AVAILABLE; assert C_BACKEND_AVAILABLE"
-        pytest tests/test_get_betti_numbers_backends.py -m requires_c_gf2
+        pytest -m requires_c_gf2
 
   test-no-torch:
     name: Test (no torch) - ubuntu py3.13

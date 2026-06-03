@@ -1,12 +1,31 @@
 """Shared pytest fixtures for relucent tests."""
 
+import os
+
 import pytest
 
 from relucent import mlp, set_seeds
 from relucent.config import update_settings
+from relucent.topology import C_BACKEND_AVAILABLE
 
 # All tests run with extra consistency checks (see :data:`relucent.config.CAREFUL_MODE`).
 update_settings(CAREFUL_MODE=True)
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip C GF(2) tests when the JIT backend is unavailable (typical on Windows CI).
+
+    The dedicated ``gf2-backend`` workflow job sets ``RELUCENT_REQUIRE_C_GF2=1`` so those
+    tests run and fail loudly if gcc cannot compile ``_gf2_rank.c``.
+    """
+    if os.environ.get("RELUCENT_REQUIRE_C_GF2") == "1":
+        return
+    if C_BACKEND_AVAILABLE:
+        return
+    skip = pytest.mark.skip(reason="C GF(2) backend not available (gcc compile/load failed)")
+    for item in items:
+        if "requires_c_gf2" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture
