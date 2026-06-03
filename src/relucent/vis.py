@@ -20,6 +20,7 @@ from relucent._torch_compat import TORCH_AVAILABLE, torch
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
+    from relucent.persistence import PersistenceDiagram
     from relucent.poly import Polyhedron
 
 try:
@@ -30,6 +31,7 @@ except ImportError:
 __all__ = [
     "get_colors",
     "plot_complex",
+    "plot_persistence_diagram",
     "plot_polyhedron",
 ]
 
@@ -1023,3 +1025,142 @@ def plot_complex(
     if plot_mode == "1-skeleton":
         return _complex_figure_1_skeleton(cpx, hide_unbounded=hide_unbounded, **kwargs)
     raise ValueError(f"Unknown plot_mode {plot_mode!r}; expected 'cells', 'graph', or '1-skeleton'.")
+
+
+# --- Persistence diagrams -----------------------------------------------------------
+
+
+def _persistence_plot_extent(
+    diagram: PersistenceDiagram,
+    *,
+    max_death: float | None,
+) -> tuple[float, float, float, float]:
+    """Return (xmin, xmax, ymin, ymax) for diagram axes with padding."""
+    xs: list[float] = list(diagram.cell_filtration.values())
+    ys: list[float] = list(diagram.cell_filtration.values())
+    for p in diagram.pairs:
+        xs.append(float(p.birth))
+        if np.isfinite(p.death):
+            ys.append(float(p.death))
+    if not xs:
+        return 0.0, 1.0, 0.0, 1.0
+    xmin = float(np.min(xs))
+    xmax = float(np.max(xs))
+    ymax_finite = float(np.max(ys)) if ys else xmax
+    if max_death is not None:
+        ymax = float(max_death)
+    else:
+        ymax = ymax_finite
+        if any(not np.isfinite(p.death) for p in diagram.pairs):
+            span = ymax - xmin
+            ymax = ymax + (0.05 * span if span > 0 else 0.1)
+    ymin = float(min(ys)) if ys else xmin
+    if ymax <= ymin:
+        ymax = ymin + 1.0
+    pad_x = 0.03 * (xmax - xmin) if xmax > xmin else 0.1
+    pad_y = 0.03 * (ymax - ymin) if ymax > ymin else 0.1
+    return xmin - pad_x, xmax + pad_x, ymin - pad_y, ymax + pad_y
+
+
+def plot_persistence_diagram(
+    diagram: PersistenceDiagram,
+    *,
+    max_death: float | None = None,
+    show_diagonal: bool = True,
+    title: str | None = "Persistence diagram",
+    dim_cmap: str = "Plotly",
+    marker_size: int = 10,
+    **layout_kwargs: Any,
+) -> go.Figure:
+    """Plot a persistence diagram (birth vs death) as a Plotly figure.
+
+    Finite pairs are drawn at ``(birth, death)``. Essential classes (``death=inf``)
+    are shown along the top of the plot at ``y=max_death`` (computed from finite deaths
+    plus padding unless ``max_death`` is given).
+
+    Args:
+        diagram: :class:`~relucent.persistence.PersistenceDiagram` from
+            :func:`~relucent.persistence.compute_persistent_homology`.
+        max_death: Upper ``death`` axis limit and y-position for essential points.
+        show_diagonal: If True, draw the diagonal ``birth=death`` reference line.
+        title: Figure title; ``None`` omits the title.
+        dim_cmap: Plotly qualitative colorscale name for homological degree.
+        marker_size: Scatter marker size.
+        **layout_kwargs: Forwarded to :meth:`plotly.graph_objects.Figure.update_layout`.
+
+    Returns:
+        A :class:`plotly.graph_objects.Figure`.
+    """
+    xmin, xmax, ymin, ymax = _persistence_plot_extent(diagram, max_death=max_death)
+    essential_y = ymax if max_death is None else float(max_death)
+
+    dims = sorted({p.dimension for p in diagram.pairs})
+    if not dims:
+        dims = [0]
+    palette = getattr(px.colors.qualitative, dim_cmap, px.colors.qualitative.Plotly)
+    dim_to_color = {d: palette[i % len(palette)] for i, d in enumerate(dims)}
+
+    fig = go.Figure()
+    for dim in dims:
+        finite = [p for p in diagram.pairs if p.dimension == dim and np.isfinite(p.death)]
+        essential = [p for p in diagram.pairs if p.dimension == dim and not np.isfinite(p.death)]
+        color = dim_to_color[dim]
+        name = f"H{dim}"
+
+        if finite:
+            fig.add_trace(
+                go.Scatter(
+                    x=[p.birth for p in finite],
+                    y=[p.death for p in finite],
+                    mode="markers",
+                    name=name,
+                    legendgroup=name,
+                    marker=dict(size=marker_size, color=color, symbol="circle"),
+                    hovertemplate=(
+                        f"H{dim}<br>birth=%{{x:.4g}}<br>death=%{{y:.4g}}<br>"
+                        + "persistence=%{customdata:.4g}<extra></extra>"
+                    ),
+                    customdata=[p.death - p.birth for p in finite],
+                )
+            )
+        if essential:
+            fig.add_trace(
+                go.Scatter(
+                    x=[p.birth for p in essential],
+                    y=[essential_y] * len(essential),
+                    mode="markers",
+                    name=f"{name} (essential)",
+                    legendgroup=name,
+                    marker=dict(size=marker_size, color=color, symbol="triangle-up"),
+                    hovertemplate=f"H{dim}<br>birth=%{{x:.4g}}<br>death=∞<extra></extra>",
+                )
+            )
+
+    if show_diagonal:
+        lo = min(xmin, ymin)
+        hi = max(xmax, ymax)
+        fig.add_trace(
+            go.Scatter(
+                x=[lo, hi],
+                y=[lo, hi],
+                mode="lines",
+                name="diagonal",
+                line=dict(color="gray", dash="dash", width=1),
+                hoverinfo="skip",
+                showlegend=True,
+            )
+        )
+
+    layout: dict[str, Any] = dict(
+        xaxis_title="Birth",
+        yaxis_title="Death",
+        xaxis=dict(range=[xmin, xmax], constrain="domain"),
+        yaxis=dict(range=[ymin, ymax], scaleanchor="x", scaleratio=1),
+        plot_bgcolor="white",
+        legend=dict(title="Homology"),
+    )
+    if title is not None:
+        layout["title"] = title
+    layout.update(layout_kwargs)
+    fig.update_layout(**layout)
+    return fig
