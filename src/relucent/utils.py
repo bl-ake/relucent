@@ -128,7 +128,51 @@ class TorchMLP(nn.Sequential):
             return torch.float64
 
 
-def mlp(widths: Iterable[int], add_last_relu: bool = False) -> "TorchMLP | ReLUNetwork":
+MLP_INIT_METHODS = frozenset(
+    {
+        "uniform",
+        "xavier_uniform",
+        "xavier_normal",
+        "kaiming_uniform",
+        "kaiming_normal",
+        "orthogonal",
+    }
+)
+
+
+def initialize_linear(linear: nn.Linear, method: str = "uniform") -> None:
+    """Initialize a :class:`torch.nn.Linear` layer in place."""
+    if method not in MLP_INIT_METHODS:
+        raise ValueError(f"Unknown init method {method!r}; expected one of {sorted(MLP_INIT_METHODS)}")
+
+    fan_in = linear.in_features
+    with torch.no_grad():
+        if method == "uniform":
+            bound = 1.0 / sqrt(fan_in) if fan_in > 0 else 0.0
+            linear.weight.uniform_(-bound, bound)
+            linear.bias.uniform_(-bound, bound)
+        elif method == "xavier_uniform":
+            nn.init.xavier_uniform_(linear.weight)
+            nn.init.zeros_(linear.bias)
+        elif method == "xavier_normal":
+            nn.init.xavier_normal_(linear.weight)
+            nn.init.zeros_(linear.bias)
+        elif method == "kaiming_uniform":
+            nn.init.kaiming_uniform_(linear.weight, nonlinearity="relu")
+            nn.init.zeros_(linear.bias)
+        elif method == "kaiming_normal":
+            nn.init.kaiming_normal_(linear.weight, nonlinearity="relu")
+            nn.init.zeros_(linear.bias)
+        elif method == "orthogonal":
+            nn.init.orthogonal_(linear.weight)
+            nn.init.zeros_(linear.bias)
+
+
+def mlp(
+    widths: Iterable[int],
+    add_last_relu: bool = False,
+    init: str = "uniform",
+) -> "TorchMLP | ReLUNetwork":
     """Create a standard fully connected ReLU MLP.
 
     Returns a :class:`TorchMLP` when PyTorch is available, otherwise falls back
@@ -138,21 +182,21 @@ def mlp(widths: Iterable[int], add_last_relu: bool = False) -> "TorchMLP | ReLUN
         widths: Layer widths including input and output widths.
             For example, ``[2, 10, 5, 1]``.
         add_last_relu: If ``True``, append a ReLU after the final Linear layer.
+        init: Weight initialization for Linear layers. One of
+            :data:`MLP_INIT_METHODS` (default ``"uniform"``).
 
     Returns:
         A model with named Linear/ReLU layers in the canonical relucent format.
     """
+    if init not in MLP_INIT_METHODS:
+        raise ValueError(f"Unknown init {init!r}; expected one of {sorted(MLP_INIT_METHODS)}")
+
     widths = list(widths)
     try:
         layers: list[tuple[str, nn.Module]] = []
         for i in range(len(widths) - 1):
             fc = nn.Linear(widths[i], widths[i + 1], dtype=torch.float64)
-            # Match torch's default Linear initialization explicitly so behavior is
-            # stable regardless of the module-construction path.
-            bound = 1.0 / sqrt(widths[i]) if widths[i] > 0 else 0.0
-            with torch.no_grad():
-                fc.weight.uniform_(-bound, bound)
-                fc.bias.uniform_(-bound, bound)
+            initialize_linear(fc, init)
             layers.append((f"fc{i}", fc))
             if i < len(widths) - 2 or add_last_relu:
                 layers.append((f"relu{i}", nn.ReLU()))
