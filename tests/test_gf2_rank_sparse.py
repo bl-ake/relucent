@@ -100,12 +100,10 @@ def test_sparse_rank_matches_packed_on_meta_like_grid() -> None:
         assert gf2_rank_sparse_rowsets([s.copy() for s in row_sets], ncols) == gf2_rank_packed(packed.copy(), ncols)
 
 
+@pytest.mark.requires_c_gf2
 def test_c_backend_matches_dense_reference_random() -> None:
     """C backend returns same rank as brute-force GF(2) dense elimination."""
-    try:
-        from relucent._gf2 import gf2_rank_packed_c
-    except Exception:
-        pytest.skip("C backend not available")
+    from relucent._gf2 import gf2_rank_packed_c
 
     rng = np.random.default_rng(999)
     # Tiny matrices so _dense_rank_gf2 (pure Python) is fast.
@@ -129,13 +127,11 @@ def test_c_backend_matches_dense_reference_random() -> None:
             assert rc == expected, f"Mismatch ({nrows}×{ncols} nnz/row={nnz_per_row}): dense={expected} c={rc}"
 
 
+@pytest.mark.requires_c_gf2
 def test_c_backend_flip_parity_edge_case() -> None:
     """C Phase 1 must handle the flip-parity case: a row with bit_c=0 can still
     be a valid pivot when an existing pivot has bit_c set (any_pv_bit_c != 0)."""
-    try:
-        from relucent._gf2 import gf2_rank_packed_c
-    except Exception:
-        pytest.skip("C backend not available")
+    from relucent._gf2 import gf2_rank_packed_c
 
     # Build a 3×3 GF(2) matrix (packed into 1 uint64 per row):
     #   row 0: cols {0, 1}  → binary 011
