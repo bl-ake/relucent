@@ -13,6 +13,7 @@ import torch.nn as nn
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent.calculations import adjacent_polyhedra
+from relucent.complex import IncompleteDualGraphError
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.utils import TorchMLP
 
@@ -52,7 +53,8 @@ def test_recover_from_dual_graph(seed: int):
     G1 = cplx1.get_dual_graph(relabel=True)
     cplx2 = Complex(model)
     cplx2.recover_from_dual_graph(G1, initial_ss=cplx1.point2ss(start1), source=0)
-    G2 = cplx2.get_dual_graph(relabel=True, auto_add=True)
+    cplx2.bfs(start=start1, max_polys=5000)
+    G2 = cplx2.get_dual_graph(relabel=True, require_complete=True)
     assert all(p.feasible for p in cplx2)
     assert nx.is_isomorphic(G1, G2, edge_match=lambda u, v: u["shi"] == v["shi"])
 
@@ -221,11 +223,17 @@ class TestComplexPointAndSS:
 
 
 class TestComplexDualGraph:
+    def test_contract_raises_on_incomplete_dual(self, small_mlp):
+        cplx = Complex(small_mlp)
+        cplx.bfs(start=_rand_batch(4), max_polys=30)
+        with pytest.raises(IncompleteDualGraphError, match=r"boundary neighbor"):
+            cplx.contract(verbose=False)
+
     def test_dual_graph_basic(self, small_mlp):
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=30)
-        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
+        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary neighbor"):
             G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
         for _, _, d in G.edges(data=True):
@@ -235,7 +243,7 @@ class TestComplexDualGraph:
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=15)
-        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary cells were not added"):
+        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary neighbor"):
             G = cplx.get_dual_graph(relabel=True)
         assert set(G.nodes()) == set(range(len(cplx)))
 

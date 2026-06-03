@@ -48,6 +48,9 @@ class Filtration(ABC):
         for tag, attrs in meta.nodes(data=True):
             if int(attrs.get("dim", -1)) < 0:
                 continue
+            poly = attrs.get("poly")
+            if poly is not None and getattr(poly, "finite", True) is None:
+                continue
             out[tag] = float(self.raw_cell_value(tag, attrs))
         return out
 

@@ -18,6 +18,7 @@ import torch.nn as nn
 import relucent.topology as topology
 from relucent import Complex, set_seeds
 from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
+from tests.conftest import explore_for_topology
 
 
 def _set_gf2_backend(monkeypatch: pytest.MonkeyPatch, *, use_c: bool) -> None:
@@ -78,7 +79,6 @@ def _populate_diamond_boundary(seed: int) -> Complex:
     thetas = np.linspace(0.0, 2.0 * np.pi, 40, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, rng.standard_normal((80, 2))]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -96,7 +96,6 @@ def _populate_line_boundary(seed: int) -> Complex:
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, rng.standard_normal((80, 2))]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -104,8 +103,7 @@ def _populate_small_1d_complex(seed: int) -> Complex:
     set_seeds(seed)
     model = nn.Sequential(nn.Linear(1, 3), nn.ReLU(), nn.Linear(3, 1), nn.ReLU())
     cplx = Complex(model)
-    for x in np.linspace(-2.0, 2.0, 11):
-        cplx.add_point(np.array([[x]], dtype=np.float64), check_exists=True)
+    explore_for_topology(cplx, np.array([0.0]))
     return cplx
 
 

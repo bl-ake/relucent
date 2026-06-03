@@ -24,6 +24,7 @@ from relucent.persistence import (
     betti_curve,
     compute_persistent_homology,
 )
+from tests.conftest import explore_for_topology
 
 
 def _triangle_persistence() -> tuple[list[set[int]], list[float], list[int], list[str]]:
@@ -110,7 +111,6 @@ def test_neuron_activation_filtration_on_diamond(seeded: int):
     thetas = np.linspace(0.0, 2.0 * np.pi, 32, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db = cplx.get_boundary_complex(cplx.n - 1)
     assert len(db) > 0
 
@@ -127,8 +127,7 @@ def test_logit_filtration_and_betti_curve(seeded: int):
     set_seeds(seeded)
     model = nn.Sequential(nn.Linear(1, 2), nn.ReLU(), nn.Linear(2, 1), nn.ReLU())
     cplx = Complex(model)
-    for x in np.linspace(-1.5, 1.5, 7):
-        cplx.add_point(np.array([[x]], dtype=np.float64), check_exists=True)
+    explore_for_topology(cplx, np.array([0.0]))
     fil = LogitSublevelFiltration(binary=False)
     diagram = compute_persistent_homology(cplx, fil)
     thresholds = np.unique(sorted(diagram.cell_filtration.values()))
@@ -159,8 +158,7 @@ def test_training_distance_filtration(seeded: int):
     model = nn.Sequential(nn.Linear(2, 4), nn.ReLU(), nn.Linear(4, 1))
     cplx = Complex(model)
     train = np.array([[0.0, 0.0], [1.0, 0.0]], dtype=np.float64)
-    cplx.add_point(train[0].reshape(1, -1), check_exists=True)
-    cplx.add_point(train[1].reshape(1, -1), check_exists=True)
+    explore_for_topology(cplx, train[0])
     fil = TrainingDistanceFiltration(train)
     diagram = compute_persistent_homology(cplx, fil)
     assert len(diagram.pairs) >= 0

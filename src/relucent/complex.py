@@ -33,7 +33,19 @@ from relucent.utils import (
 )
 from relucent.vis import get_colors, plot_complex
 
-__all__ = ["Complex"]
+__all__ = ["Complex", "IncompleteDualGraphError"]
+
+
+class IncompleteDualGraphError(ValueError):
+    """The dual graph has missing boundary neighbors (partially explored complex).
+
+    :meth:`Complex.contract`, :meth:`Complex.get_chain_complex`, and
+    :meth:`Complex.get_meta_graph` require a complete adjacency structure among
+    top-dimensional cells. Explore the complex further (e.g. BFS/DFS) before building
+    the chain complex or running topology routines.
+    """
+
+
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
 # ``shi`` edge attribute for truncation incidences in :meth:`Complex.get_meta_graph`
@@ -958,7 +970,12 @@ class Complex:
         return faces
 
     def get_boundary_complex(self, i: int, verbose: bool = False) -> Complex:
-        """Get the boundary complex of neuron i."""
+        """Get the boundary complex of neuron i.
+
+        Raises:
+            IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
+        """
+        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True)
         cplx = Complex(self.net)
         for poly in tqdm(
             self.get_boundary_cells(i, verbose=verbose), desc="Getting Boundary Complex", delay=1, disable=not verbose
@@ -967,8 +984,12 @@ class Complex:
         return cplx
 
     def contract(self, verbose: bool = False) -> Complex:
-        """Contract the maximal cells in the complex."""
-        G = self.get_dual_graph(verbose=verbose)
+        """Contract the maximal cells in the complex.
+
+        Raises:
+            IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
+        """
+        G = self.get_dual_graph(verbose=verbose, require_complete=True)
         new_complex = Complex(self.net)
         for p1, p2, shi in G.edges(data="shi"):
             new_ss = p1.ss_np.copy()
@@ -982,10 +1003,18 @@ class Complex:
         return new_complex
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
-        """Get the chain complex of the complex."""
+        """Get the chain complex of the complex.
+
+        Raises:
+            IncompleteDualGraphError: If dual adjacency is incomplete at some dimension;
+                see :meth:`contract`.
+        """
         chain: list[Complex] = [self]
         while True:
-            new_complex = chain[-1].contract(verbose=verbose)
+            cur = chain[-1]
+            if len(cur) == 0:
+                break
+            new_complex = cur.contract(verbose=verbose)
             if len(new_complex) == 0:
                 break
             chain.append(new_complex)
@@ -1051,6 +1080,10 @@ class Complex:
             entries that true geometry would require. That breaks ``∂² = 0`` for the
             GF(2) boundary maps in :func:`relucent.topology.get_betti_numbers` unless
             ``verify_chain_complex`` is disabled; see that function's documentation.
+
+        Raises:
+            IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
+                :meth:`get_chain_complex`.
         """
         if len(self) == 0:
             return nx.MultiDiGraph()
@@ -1594,7 +1627,6 @@ class Complex:
     @overload
     def get_dual_graph(
         self,
-        auto_add: bool = False,
         *,
         relabel: Literal[False] = False,
         plot: bool = False,
@@ -1605,12 +1637,12 @@ class Complex:
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
         verbose: bool = False,
+        require_complete: bool = False,
     ) -> nx.Graph[Polyhedron]: ...
 
     @overload
     def get_dual_graph(
         self,
-        auto_add: bool = False,
         *,
         relabel: Literal[True],
         plot: bool = False,
@@ -1621,11 +1653,11 @@ class Complex:
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
         verbose: bool = False,
+        require_complete: bool = False,
     ) -> nx.Graph[int]: ...
 
     def get_dual_graph(
         self,
-        auto_add: bool = False,
         *,
         relabel: bool = False,
         plot: bool = False,
@@ -1636,6 +1668,7 @@ class Complex:
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
         verbose: bool = True,
+        require_complete: bool = False,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
         """Construct the dual graph of the complex.
 
@@ -1644,8 +1677,6 @@ class Complex:
         sharing a supporting hyperplane).
 
         Args:
-            auto_add: If True, add polyhedra to the complex if they are not already present.
-                Defaults to False.
             relabel: If True, nodes are indexed by integers matching self.index2poly
                 indices. If False, nodes are Polyhedron objects. Defaults to False.
             plot: If True, prepare the graph for visualization with pyvis by
@@ -1661,6 +1692,9 @@ class Complex:
             show_node_labels: If True, show node labels in the graph. Defaults to False.
             show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
             verbose: If True, print progress messages. Defaults to True.
+            require_complete: If True, raise :class:`IncompleteDualGraphError` when
+                boundary neighbors are missing. Defaults to False (emit a warning).
+                Used by :meth:`contract`.
 
         Returns:
             networkx.Graph: The dual graph of the complex. Nodes are polyhedra
@@ -1670,6 +1704,8 @@ class Complex:
 
         Raises:
             ValueError: If match_locations is True and the complex is not 2D.
+            IncompleteDualGraphError: If ``require_complete`` is True and boundary
+                neighbors are missing.
         """
         max_dim = max(poly.dim for poly in self)
         graph = nx.Graph()
@@ -1689,18 +1725,18 @@ class Complex:
                     missing.append((ss.copy(), shi, poly))
                 ss[0, shi] *= -1
 
-        if len(missing) > 0 and max_dim == self.dim:
+        if len(missing) > 0 and max_dim == self.dim and not require_complete:
             warnings.warn(
-                f"Dual graph is incomplete. {len(missing)} boundary cells were not added to the complex."
-                + "Set auto_add=True to add them.",
+                f"Dual graph is incomplete. {len(missing)} boundary neighbor(s) are missing from the complex."
+                + " Explore further (e.g. BFS/DFS) before topology routines.",
                 stacklevel=2,
             )
-        if auto_add:
-            for ss, shi, source_poly in missing:
-                neighbor = self.ss2poly(ss, check_exists=False)
-                if neighbor.feasible:
-                    self.add_polyhedron(neighbor, check_exists=False)
-                    graph.add_edge(source_poly, neighbor, shi=shi)
+        if require_complete and len(missing) > 0 and max_dim == self.dim:
+            raise IncompleteDualGraphError(
+                f"Dual graph is incomplete: {len(missing)} boundary neighbor(s) are missing from the "
+                + "complex. Explore further (e.g. BFS/DFS) before contract(), get_chain_complex(), "
+                + "get_meta_graph(), or get_boundary_complex()."
+            )
         if plot:
             if match_locations:
                 if self.dim != 2:

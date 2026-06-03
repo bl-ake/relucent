@@ -40,7 +40,6 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
 
     # Ensure we have both sides so the boundary complex has a nontrivial 1D decomposition.
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db = cplx.get_boundary_complex(cplx.n - 1)
 
     chain = db.get_chain_complex(verbose=False)
@@ -93,7 +92,6 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
 
-    cplx._dual_graph = cplx.get_dual_graph(auto_add=True, verbose=False)
     db = cplx.get_boundary_complex(cplx.n - 1)
 
     meta_plain = db.get_meta_graph(enrich=True, verbose=False, truncate=False)
