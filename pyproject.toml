@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "0.9.0"
+version = "0.9.1"
 requires-python = ">= 3.11"
 
 dependencies = [
@@ -37,6 +37,10 @@ Documentation = "https://bl-ake.github.io/relucent/"
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:This process .* is multi-threaded, use of fork\\(\\).*:DeprecationWarning",
+]
+markers = [
+    "requires_c_gf2: needs compiled relucent._gf2 C extension (gf2 rank for get_betti_numbers)",
+    "python_gf2: forces pure-Python GF(2) rank path (no C required)",
 ]
 
 [tool.ruff]

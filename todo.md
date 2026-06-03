@@ -7,3 +7,4 @@
 - ensure computations work in 1d/points, should be able to simplify topology.py
 - reusing halfspaces when flipping deep neurons during shi calculations
 - project lower-dim polyhedra for SHI calculations
+- searcher tqdm formatting
