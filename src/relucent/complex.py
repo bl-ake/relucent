@@ -4,6 +4,7 @@ import os
 import pickle
 import random
 import warnings
+from collections import OrderedDict
 from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
 from typing import Any, Literal, overload
@@ -72,6 +73,127 @@ def set_globals(get_net: ReLUNetwork, get_volumes: bool = True, num_threads: int
     dim = int(np.prod(_net.input_shape))
     global get_vol_calc
     get_vol_calc = get_volumes
+
+
+def _delete_ss_columns(ss: np.ndarray | torch.Tensor, deleted_shis: Iterable[int]) -> np.ndarray | torch.Tensor:
+    axis = int(ss.ndim - 1)
+    for shi in sorted(set(int(s) for s in deleted_shis), reverse=True):
+        if isinstance(ss, np.ndarray):
+            ss = np.delete(ss, shi, axis=axis)
+        elif TORCH_AVAILABLE and isinstance(ss, torch.Tensor):
+            keep = [i for i in range(ss.shape[axis]) if i != shi]
+            ss = ss.index_select(axis, torch.tensor(keep, device=ss.device))
+        else:
+            raise TypeError(f"Unsupported ss type: {type(ss)}")
+    return ss
+
+
+def _contract_dual_graph_for_shi(
+    graph: nx.Graph[int],
+    deleted_shi: int,
+) -> tuple[nx.Graph[int], dict[int, int]]:
+    """Quotient a relabeled dual graph by edges with ``shi == deleted_shi``.
+
+    Returns the contracted graph (nodes ``0 .. n-1``) and a map from each new
+    node to a representative old node id.
+    """
+    parent = {node: node for node in graph.nodes}
+
+    def find(node: int) -> int:
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+
+    for u, v, data in graph.edges(data=True):
+        if data.get("shi") == deleted_shi:
+            union(u, v)
+
+    roots = sorted({find(node) for node in graph.nodes})
+    root_to_new = {root: i for i, root in enumerate(roots)}
+    old_representative = {root_to_new[root]: root for root in roots}
+    node_map = {node: root_to_new[find(node)] for node in graph.nodes}
+
+    contracted = nx.Graph()
+    contracted.add_nodes_from(range(len(roots)))
+    for u, v, data in graph.edges(data=True):
+        shi = data.get("shi")
+        if shi == deleted_shi:
+            continue
+        a, b = node_map[u], node_map[v]
+        if a == b:
+            continue
+        new_shi = shi - 1 if shi > deleted_shi else shi
+        if contracted.has_edge(a, b):
+            assert contracted.edges[a, b]["shi"] == new_shi
+        else:
+            contracted.add_edge(a, b, shi=new_shi)
+    return contracted, old_representative
+
+
+def _net_remove_ss_layer_and_following_relu(net: ReLUNetwork, ss_layer_idx: int) -> ReLUNetwork:
+    """Remove a width-1 linear layer and the ReLU immediately after it."""
+    items = list(net.layers.items())
+    relu_idx = ss_layer_idx + 1
+    if relu_idx >= len(items) or not isinstance(items[relu_idx][1], ReLULayer):
+        raise ValueError(f"Layer index {ss_layer_idx} is not immediately followed by a ReLU.")
+    removed_linear = items[ss_layer_idx][1]
+    if not isinstance(removed_linear, LinearLayer):
+        raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
+    n_removed_outputs = int(removed_linear.weight.shape[0])
+
+    new_items: list[tuple[str, LinearLayer | ReLULayer]] = []
+    skip_next_relu = False
+    for i, (name, layer) in enumerate(items):
+        if i == ss_layer_idx:
+            skip_next_relu = True
+            continue
+        if skip_next_relu and i == relu_idx:
+            skip_next_relu = False
+            continue
+        if skip_next_relu:
+            raise RuntimeError("Expected ReLU immediately after removed linear layer.")
+        if i == relu_idx + 1 and isinstance(layer, LinearLayer):
+            weight = np.delete(layer.weight, np.arange(n_removed_outputs), axis=1)
+            new_items.append((name, LinearLayer(weight=weight, bias=layer.bias)))
+        else:
+            new_items.append((name, layer))
+    return ReLUNetwork(OrderedDict(new_items), input_shape=net.input_shape)
+
+
+def _net_without_last_ss_layer_neuron(
+    net: ReLUNetwork,
+    ss_layer_idx: int,
+    neuron_idx: int,
+) -> ReLUNetwork:
+    """Return a copy of ``net`` with one neuron removed from the given ReLU hidden layer."""
+    layer = list(net.layers.values())[ss_layer_idx]
+    if not isinstance(layer, LinearLayer):
+        raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
+    if int(layer.weight.shape[0]) == 1:
+        return _net_remove_ss_layer_and_following_relu(net, ss_layer_idx)
+
+    items = list(net.layers.items())
+    new_items: list[tuple[str, LinearLayer | ReLULayer]] = []
+    delete_column_from_next_linear = False
+    for i, (name, layer) in enumerate(items):
+        if i == ss_layer_idx and isinstance(layer, LinearLayer):
+            weight = np.delete(layer.weight, neuron_idx, axis=0)
+            bias = np.delete(layer.bias, neuron_idx, axis=1)
+            new_items.append((name, LinearLayer(weight=weight, bias=bias)))
+            delete_column_from_next_linear = True
+        elif delete_column_from_next_linear and isinstance(layer, LinearLayer):
+            weight = np.delete(layer.weight, neuron_idx, axis=1)
+            new_items.append((name, LinearLayer(weight=weight, bias=layer.bias)))
+            delete_column_from_next_linear = False
+        else:
+            new_items.append((name, layer))
+    return ReLUNetwork(OrderedDict(new_items), input_shape=net.input_shape)
 
 
 class Complex:
@@ -246,6 +368,69 @@ class Complex:
     def n(self) -> int:
         """The number of bent hyperplanes/neurons in the network."""
         return len(self.ssi2maski)
+
+    def _deleted_shi_for_last_layer_neuron(self, neuron_idx: int) -> int:
+        last_ss_layer = max(self.ss_layers)
+        for shi, (layer_idx, (_, idx)) in enumerate(self.ssi2maski):
+            if layer_idx == last_ss_layer and idx == neuron_idx:
+                return shi
+        raise RuntimeError(f"neuron_idx {neuron_idx} is not in the last ReLU hidden layer.")
+
+    def without_last_layer_neuron(self, neuron_idx: int) -> Complex:
+        """Return the complex obtained by deleting a neuron from the last ReLU layer.
+
+        The last ReLU layer is the final :class:`~relucent.model.LinearLayer` that is
+        immediately followed by a ReLU in the canonical network (the same layer used
+        by output-neuron boundary analysis).  Top-dimensional cells that shared a
+        facet on the removed neuron are merged; recovered SHIs are the union of the
+        two sides' facet indices, minus the removed neuron (see :meth:`contract`).
+
+        If that layer has only one neuron, the linear layer and its following ReLU are
+        removed from the network entirely.
+
+        Implementation: contract dual-graph edges for the removed SHI, then rebuild
+        cells with :meth:`recover_from_dual_graph` on the smaller network.
+
+        Args:
+            neuron_idx: Index of the neuron within that last hidden linear layer
+                (not the global supporting-hyperplane index).  Must be ``0`` when the
+                layer has width ``1``.
+
+        Returns:
+            A new :class:`Complex` over the smaller network.  The dual graph is not
+            copied.
+
+        Raises:
+            ValueError: If there is no ReLU hidden layer or ``neuron_idx`` is out of
+                range for the last one.
+        """
+        if not self.ss_layers:
+            raise ValueError("Network has no ReLU layers; cannot delete a neuron.")
+        last_ss_layer = max(self.ss_layers)
+        layer = list(self._net.layers.values())[last_ss_layer]
+        if not isinstance(layer, LinearLayer):
+            raise ValueError("Last sign-sequence layer is not a LinearLayer.")
+        n_neurons = int(layer.weight.shape[0])
+        if not (0 <= neuron_idx < n_neurons):
+            raise ValueError(f"neuron_idx must be in [0, {n_neurons}), got {neuron_idx} for the last ReLU layer.")
+
+        deleted_shi = self._deleted_shi_for_last_layer_neuron(neuron_idx)
+        new_net = _net_without_last_ss_layer_neuron(self._net, last_ss_layer, neuron_idx)
+        out = Complex(new_net)
+        out.net = new_net if isinstance(self.net, ReLUNetwork) else self.net
+
+        dual = self.get_dual_graph(relabel=True, verbose=False)
+        if dual.number_of_nodes() == 0:
+            return out
+
+        contracted, old_rep = _contract_dual_graph_for_shi(dual, deleted_shi)
+        for component in nx.connected_components(contracted):
+            sub = contracted.subgraph(component).copy()
+            source = min(component)
+            initial_ss = _delete_ss_columns(self.index2poly[old_rep[source]].ss_np, [deleted_shi])
+            out.recover_from_dual_graph(sub, initial_ss, source=source, copy=True)
+
+        return out
 
     @torch.no_grad()
     def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor | np.ndarray, None, None]:
@@ -737,7 +922,7 @@ class Complex:
 
     def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
         """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
-        assert 0 <= i < self.n, "Neuron index out of range"
+        assert 0 <= i < self.n, f"Neuron index out of range: {i} not in [0, {self.n})"
         return {
             (a, b)
             for a, b, shi in tqdm(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1, disable=not verbose)
@@ -1174,6 +1359,34 @@ class Complex:
             compactify=compactify,
             respect_finite=respect_finite,
             verify_chain_complex=verify_chain_complex,
+            verbose=verbose,
+        )
+
+    def get_persistent_homology(
+        self,
+        filtration: object,
+        *,
+        compactify: bool = False,
+        respect_finite: bool = False,
+        lower_star: bool | None = None,
+        verbose: bool = False,
+    ) -> object:
+        """Compute persistent homology over GF(2) for a :class:`~relucent.filtration.Filtration`.
+
+        See :func:`relucent.persistence.compute_persistent_homology`.
+        """
+        self._warn_research_use("get_persistent_homology")
+        from relucent.filtration import Filtration
+        from relucent.persistence import compute_persistent_homology
+
+        if not isinstance(filtration, Filtration):
+            raise TypeError(f"filtration must be a Filtration instance, got {type(filtration)!r}")
+        return compute_persistent_homology(
+            self,
+            filtration,
+            compactify=compactify,
+            respect_finite=respect_finite,
+            lower_star=lower_star,
             verbose=verbose,
         )
 
