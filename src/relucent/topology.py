@@ -20,19 +20,46 @@ Notes:
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from tqdm.auto import tqdm
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
 
+# Try to load the C backend once at import time.
+try:
+    from relucent._gf2 import (
+        available as _c_available,
+    )
+    from relucent._gf2 import (
+        gf2_rank_boundary_c as _gf2_rank_boundary_c,
+    )
+    from relucent._gf2 import (
+        gf2_transpose_packed_c as _gf2_transpose_packed_c,
+    )
+
+    _C_BACKEND: bool = _c_available()
+except Exception:
+    _C_BACKEND = False
+
 __all__ = [
     "ChainComplexInconsistent",
+    "C_BACKEND_AVAILABLE",
     "get_betti_numbers",
     "gf2_matmul_packed_stacked_rows",
+    "gf2_rank_boundary",
     "gf2_rank_packed",
+    "gf2_rank_sparse_rowsets",
 ]
+
+# Warn when a single ∂_k rank may take a long time (nearly square, large, pure-Python only).
+_SLOW_RANK_MIN_DIM = 50_000
+
+# Public flag: True when _gf2_rank.c compiled and loaded successfully.
+C_BACKEND_AVAILABLE: bool = _C_BACKEND
 
 
 def _verbose_line(verbose: bool, msg: str) -> None:
@@ -96,6 +123,168 @@ def _packed_boundary_matrix(
         packed[i, w] ^= bit
 
     return packed, ncols
+
+
+def _boundary_row_sets(
+    meta: Any,
+    nodes_by_dim: dict[int, list[object]],
+    *,
+    k: int,
+    compactify: bool,
+) -> tuple[list[set[int]], int]:
+    """Sparse ∂_k as a list of row sets (row index → column indices with a 1)."""
+    rows = nodes_by_dim.get(k - 1, [])
+    cols = nodes_by_dim.get(k, [])
+    if not rows or not cols:
+        return [], 0
+
+    row_index = {r: i for i, r in enumerate(rows)}
+    col_index = {c: j for j, c in enumerate(cols)}
+
+    nrows = len(rows)
+    ncols = len(cols)
+    row_sets: list[set[int]] = [set() for _ in range(nrows)]
+
+    inc_count: dict[object, int] | None = None
+    if compactify:
+        inc_count = {r: 0 for r in rows}
+        for u, v, _ in meta.edges(data=True):
+            if u in col_index and v in row_index:
+                inc_count[v] += 1
+
+    for u, v, _ in meta.edges(data=True):
+        if u not in col_index or v not in row_index:
+            continue
+        if inc_count is not None and inc_count[v] < 2:
+            continue
+        j = int(col_index[u])
+        i = int(row_index[v])
+        row_sets[i].add(j)
+
+    return row_sets, ncols
+
+
+def _swap_rows_in_col_index(
+    col_to_rows: dict[int, set[int]],
+    row_sets: list[set[int]],
+    i: int,
+    j: int,
+) -> None:
+    row_sets[i], row_sets[j] = row_sets[j], row_sets[i]
+    for c in row_sets[i] | row_sets[j]:
+        rows = col_to_rows.setdefault(c, set())
+        rows.discard(i)
+        rows.discard(j)
+        if c in row_sets[i]:
+            rows.add(i)
+        if c in row_sets[j]:
+            rows.add(j)
+        if not rows:
+            col_to_rows.pop(c, None)
+
+
+def gf2_rank_sparse_rowsets(
+    row_sets: list[set[int]],
+    ncols: int,
+    *,
+    progress: bool = False,
+    progress_desc: str | None = None,
+) -> int:
+    """Gaussian elimination rank over GF(2) on sparse row sets.
+
+    Each row is a set of column indices where the matrix entry is 1.  An inverted
+    index (column → rows) avoids scanning all rows on every elimination step, which
+    matters when boundaries have hundreds of thousands of cells but only a few
+    incidences per column.
+    """
+    nrows = len(row_sets)
+    if nrows == 0 or ncols == 0:
+        return 0
+
+    col_to_rows: dict[int, set[int]] = {}
+    for r, cols in enumerate(row_sets):
+        for c in cols:
+            col_to_rows.setdefault(c, set()).add(r)
+
+    rank = 0
+    col_iter: Iterable[int] = range(ncols)
+    if progress:
+        col_iter = tqdm(
+            col_iter,
+            desc=progress_desc or "GF(2) rank",
+            leave=False,
+            total=ncols,
+        )
+
+    for col in col_iter:
+        if rank >= nrows:
+            break
+        candidates = [r for r in col_to_rows.get(col, ()) if r >= rank]
+        if not candidates:
+            continue
+        pivot = min(candidates)
+        if pivot != rank:
+            _swap_rows_in_col_index(col_to_rows, row_sets, rank, pivot)
+
+        pivot_row = row_sets[rank]
+        for r in list(col_to_rows.get(col, ())):
+            if r == rank or r < rank:
+                continue
+            if col not in row_sets[r]:
+                continue
+            old = row_sets[r]
+            new = old ^ pivot_row
+            if new is old:
+                continue
+            row_sets[r] = new
+            for c in old.symmetric_difference(new):
+                rows = col_to_rows.setdefault(c, set())
+                if c in new:
+                    rows.add(r)
+                else:
+                    rows.discard(r)
+                    if not rows:
+                        col_to_rows.pop(c, None)
+        rank += 1
+
+    return rank
+
+
+def _row_sets_to_packed(row_sets: list[set[int]], ncols: int) -> np.ndarray:
+    nrows = len(row_sets)
+    nwords = (ncols + 63) // 64
+    packed = np.zeros((nrows, nwords), dtype=np.uint64)
+    for i, cols in enumerate(row_sets):
+        for j in cols:
+            w = j >> 6
+            packed[i, w] ^= np.uint64(1) << (j & 63)
+    return packed
+
+
+def _transpose_packed(packed: np.ndarray, ncols: int) -> tuple[np.ndarray, int]:
+    """Return ``A^T`` for a bit-packed GF(2) matrix ``A`` with ``ncols`` logical columns."""
+    nrows_in = int(packed.shape[0])
+    nwords_in = int(packed.shape[1])
+    nrows_out = int(ncols)
+    ncols_out = nrows_in
+    nwords_out = (ncols_out + 63) // 64
+    out = np.zeros((nrows_out, nwords_out), dtype=np.uint64)
+    for r in range(nrows_in):
+        for w in range(nwords_in):
+            word = int(packed[r, w])
+            if word == 0:
+                continue
+            base = w << 6
+            while word:
+                b = (word & -word).bit_length() - 1
+                word &= word - 1
+                c = base + b
+                if c >= ncols:
+                    continue
+                tw = r >> 6
+                tb = r & 63
+                out[c, tw] ^= np.uint64(1) << tb
+    return out, ncols_out
 
 
 def _packed_to_dense_mod2(packed: np.ndarray, ncols: int) -> np.ndarray:
@@ -298,7 +487,12 @@ def get_betti_numbers(
     packed_by_k: dict[int, np.ndarray] = {}
     ncols_by_k: dict[int, int] = {}
 
-    for k in range(max(1, kmin), kmax + 1):
+    k_values = list(range(max(1, kmin), kmax + 1))
+    k_iter: Iterable[int] = k_values
+    if verbose:
+        k_iter = tqdm(k_values, desc="Betti: boundary maps", unit="∂", leave=False)
+
+    for k in k_iter:
         packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, compactify=compactify)
         ncols_by_k[k] = ncols
         if ncols == 0:
@@ -307,13 +501,26 @@ def get_betti_numbers(
             continue
         nrows = int(packed.shape[0])
         if verify_chain_complex:
-            packed_by_k[k] = packed
-            boundary_rank[k] = int(gf2_rank_packed(packed.copy(), ncols))
-        else:
-            boundary_rank[k] = int(gf2_rank_packed(packed, ncols))
+            packed_by_k[k] = packed.copy()
+        if verbose and not _C_BACKEND and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
+            ratio = ncols / max(nrows, 1)
+            if 0.5 <= ratio <= 2.0:
+                _verbose_line(
+                    verbose,
+                    f"get_betti_numbers: ∂_{k} is large and nearly square ({nrows}×{ncols}); "
+                    + "C backend unavailable—pure-Python GF(2) rank may take hours.",
+                )
+        boundary_rank[k] = int(
+            gf2_rank_boundary(
+                packed,
+                ncols,
+                progress=verbose,
+                progress_desc=f"GF(2) rank ∂_{k}",
+            )
+        )
         _verbose_line(
             verbose,
-            f"get_betti_numbers: ∂_{k} packed shape ({nrows},{ncols}), rank={boundary_rank[k]}",
+            f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={boundary_rank[k]}",
         )
 
     if verify_chain_complex:
@@ -351,13 +558,27 @@ def get_betti_numbers(
     return trimmed
 
 
-def gf2_rank_packed(packed: np.ndarray, ncols: int) -> int:
+def gf2_rank_packed(
+    packed: np.ndarray,
+    ncols: int,
+    *,
+    progress: bool = False,
+    progress_desc: str | None = None,
+) -> int:
     """Gaussian elimination rank over GF(2) on row-major bit-packed rows (uint64 words)."""
     if packed.size == 0 or ncols == 0:
         return 0
     nrows = int(packed.shape[0])
     rank = 0
-    for col in range(ncols):
+    col_iter: Iterable[int] = range(ncols)
+    if progress:
+        col_iter = tqdm(
+            col_iter,
+            desc=progress_desc or "GF(2) rank",
+            leave=False,
+            total=ncols,
+        )
+    for col in col_iter:
         if rank >= nrows:
             break
         word = col >> 6
@@ -377,6 +598,32 @@ def gf2_rank_packed(packed: np.ndarray, ncols: int) -> int:
             packed[inds, :] ^= packed[rank, :]
         rank += 1
     return rank
+
+
+def gf2_rank_boundary(
+    packed: np.ndarray,
+    ncols: int,
+    *,
+    progress: bool = False,
+    progress_desc: str | None = None,
+) -> int:
+    """Rank of a boundary matrix.
+
+    Uses the C backend (``_gf2_rank.c``) when available—typically 100–500×
+    faster than the pure-Python path.  The C backend automatically transposes
+    tall matrices to reduce column count, which speeds up ∂₁ and ∂₃.
+    Falls back gracefully to pure Python if the C library could not be
+    compiled or loaded.
+    """
+    if _C_BACKEND:
+        return _gf2_rank_boundary_c(packed, ncols, progress=progress, progress_desc=progress_desc)
+    # Pure-Python fallback: transpose when it reduces column count.
+    nrows = int(packed.shape[0])
+    if nrows > ncols and ncols > 0:
+        transposed, ncols_t = _transpose_packed(packed, ncols)
+        desc = f"{progress_desc} (A^T)" if progress_desc else "GF(2) rank (A^T)"
+        return gf2_rank_packed(transposed, ncols_t, progress=progress, progress_desc=desc)
+    return gf2_rank_packed(packed, ncols, progress=progress, progress_desc=progress_desc)
 
 
 #
