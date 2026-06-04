@@ -216,9 +216,12 @@ def compute_persistent_homology(
     if len(cplx) == 0:
         return PersistenceDiagram(pairs=(), cell_filtration={})
 
-    truncate = not compactify and not respect_finite
     _verbose_line(verbose, "building meta-graph …")
-    meta = cplx.get_meta_graph(enrich=True, verbose=verbose, truncate=truncate)
+    meta = cplx.get_meta_graph(enrich=True, verbose=verbose)
+    if not compactify and not respect_finite:
+        from relucent.complex import Complex
+
+        Complex.truncate_meta_graph(meta)
 
     raw_values = filtration.values_for_meta(meta)
     use_lower_star = filtration.lower_star if lower_star is None else lower_star
