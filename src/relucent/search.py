@@ -17,11 +17,11 @@ from relucent._logging import logger
 from relucent._torch_compat import torch
 from relucent.calculations import get_shis
 from relucent.poly import Polyhedron
-from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
     UpdatablePriorityQueue,
+    encode_ss,
     get_mp_context,
     process_aware_cpu_count,
 )
@@ -434,7 +434,7 @@ def searcher(
         p._halfspaces_np = bounded_halfspaces
         return p.feasible
 
-    found_sss = SSManager()
+    found_tags: set[bytes] = set()
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
         logger.info("searcher running on %d workers", nworkers)
@@ -459,7 +459,7 @@ def searcher(
             "Bad SHI Computations": [],
             "Complete": True,
         }
-    found_sss.add(start.ss_np)
+    found_tags.add(encode_ss(start.ss_np))
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
     result = get_shis(start, bound=bound, **kwargs)
@@ -468,10 +468,8 @@ def searcher(
     for shi in start.shis:
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
-        found_sss.add(new_ss)
+        found_tags.add(encode_ss(new_ss))
         queue.push((new_ss, shi, 1, cx.ssm[start.ss_np]))
-        if cfg.CAREFUL_MODE:
-            assert new_ss in found_sss
 
     rolling_average = len(start.shis)
     bad_shi_computations = []
@@ -539,9 +537,10 @@ def searcher(
                         if new_shi != shi and len(cx) < max_polys:
                             ss = p.ss_np.copy()
                             ss[0, new_shi] *= -1
-                            if ss not in found_sss:
+                            tag = encode_ss(ss)
+                            if tag not in found_tags:
+                                found_tags.add(tag)
                                 queue.push((ss, new_shi, depth + 1, cx.ssm[p.ss_np]))
-                                found_sss.add(ss)
                                 unprocessed += 1
 
                 pbar.update(n=len(cx) - pbar.n)
