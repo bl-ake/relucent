@@ -94,8 +94,9 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
 
     db = cplx.get_boundary_complex(cplx.n - 1)
 
-    meta_plain = db.get_meta_graph(enrich=True, verbose=False, truncate=False)
-    meta_tr = db.get_meta_graph(enrich=True, verbose=False, truncate=True)
+    meta_plain = db.get_meta_graph(enrich=True, verbose=False)
+    meta_tr = meta_plain.copy()
+    Complex.truncate_meta_graph(meta_tr)
 
     # Every original (non-truncation) node has its sign sequence extended with a trailing 1.
     for n in meta_plain.nodes():
@@ -134,8 +135,9 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
 
-    meta_plain = cplx.get_meta_graph(enrich=True, verbose=False, truncate=False)
-    meta_tr = cplx.get_meta_graph(enrich=True, verbose=False, truncate=True)
+    meta_plain = cplx.get_meta_graph(enrich=True, verbose=False)
+    meta_tr = meta_plain.copy()
+    Complex.truncate_meta_graph(meta_tr)
 
     ub = {n for n, a in meta_plain.nodes(data=True) if a.get("finite", None) is False}
     assert ub, "expected unbounded meta nodes in this construction"

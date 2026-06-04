@@ -35,7 +35,7 @@ def _betti_for_backend(
     **kwargs: Any,
 ) -> dict[int, int]:
     _set_gf2_backend(monkeypatch, use_c=use_c)
-    return get_betti_numbers(cplx, **kwargs)
+    return cplx.get_betti_numbers(**kwargs)
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -154,6 +154,34 @@ def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatc
     """Public :meth:`~relucent.complex.Complex.get_betti_numbers`` matches topology module."""
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
-    via_topology = get_betti_numbers(db, compactify=False)
+    meta = db.get_meta_graph(enrich=True, verbose=False)
+    Complex.truncate_meta_graph(meta)
+    via_topology = get_betti_numbers(meta)
     via_complex = db.get_betti_numbers(compactify=False)
     assert via_topology == via_complex
+
+
+@pytest.mark.requires_c_gf2
+@pytest.mark.parametrize(
+    "build_cplx,kwargs",
+    [
+        (_populate_diamond_boundary, {}),
+        (_populate_diamond_boundary, {"compactify": True, "reduced": True}),
+        (_populate_diamond_boundary, {"verify_chain_complex": True}),
+        (_populate_line_boundary, {}),
+        (_populate_small_1d_complex, {}),
+    ],
+)
+def test_get_betti_numbers_parallel_matches_sequential(
+    seeded: int,
+    monkeypatch: pytest.MonkeyPatch,
+    build_cplx: Callable[[int], Complex],
+    kwargs: dict[str, Any],
+) -> None:
+    """Parallel ranking (nworkers>1) yields the same Betti numbers as sequential (nworkers=1)."""
+    _set_gf2_backend(monkeypatch, use_c=True)
+    cplx = build_cplx(seeded)
+    assert len(cplx) > 0
+    betti_seq = cplx.get_betti_numbers(nworkers=1, **kwargs)
+    betti_par = cplx.get_betti_numbers(nworkers=4, **kwargs)
+    assert betti_seq == betti_par, f"sequential {betti_seq} != parallel {betti_par} (kwargs={kwargs})"
