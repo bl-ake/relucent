@@ -16,7 +16,7 @@ from collections.abc import Callable, Hashable, Iterable, Iterator, Sized
 from heapq import heappop, heappush
 from math import sqrt
 from multiprocessing.context import BaseContext
-from threading import Condition
+from threading import Condition, local
 from typing import Any, Generic, TypeVar, cast
 
 import numpy as np
@@ -35,6 +35,7 @@ __all__ = [
     "encode_ss",
     "get_env",
     "get_mp_context",
+    "get_thread_env",
     "mlp",
     "normalize_weights",
     "process_aware_cpu_count",
@@ -44,6 +45,7 @@ __all__ = [
 
 _env: Env | None = None
 _default_env_disposed: bool = False
+_thread_local_gurobi: local = local()
 
 _LICENSE_ENV_START_FALLBACK_ERRNOS: frozenset[int] = frozenset(
     {
@@ -344,6 +346,39 @@ def get_env(num_threads: int | None = None) -> Env:
         )
     _env = candidate
     return _env
+
+
+def get_thread_env() -> Env:
+    """Get a thread-local Gurobi environment.
+
+    Creates and caches one environment per thread, each configured like
+    :func:`get_env`. Intended for use with
+    :class:`concurrent.futures.ThreadPoolExecutor` when running multiple
+    Gurobi solves in parallel — a single shared environment cannot safely
+    be used from multiple threads simultaneously.
+
+    Returns:
+        gurobipy.Env: A thread-local Gurobi environment with logging disabled.
+    """
+    if not hasattr(_thread_local_gurobi, "env"):
+        candidate = Env(logfilename="", empty=True)
+        _configure_cached_gurobi_env(candidate, None)
+        try:
+            candidate.start()
+        except GurobiError as exc:
+            if not _license_env_start_failure(exc):
+                candidate.close()
+                raise
+            candidate.close()
+            candidate = Env(logfilename="", empty=True)
+            _configure_cached_gurobi_env(candidate, None)
+            try:
+                _start_env_with_hidden_license_files(candidate)
+            except GurobiError:
+                candidate.close()
+                raise
+        _thread_local_gurobi.env = candidate
+    return _thread_local_gurobi.env
 
 
 def close_env() -> None:

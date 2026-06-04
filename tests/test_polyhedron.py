@@ -222,3 +222,21 @@ class TestPolyhedronPickle:
         y2 = x @ W2 + b2
         assert torch.allclose(y2, net(x))
         assert p2.halfspaces.shape == p.halfspaces.shape
+
+    def test_pickle_roundtrip_preserves_dimension_caches(self, seeded):
+        assert seeded is not None
+        net = mlp(widths=[2, 4, 1])
+        cplx = Complex(net)
+        p = cplx.add_point(torch.randn(1, 2, device=net.device, dtype=net.dtype))
+        _ = p.halfspaces
+        p._ambient_dim = p.ambient_dim
+        _ = p.codim, p.dim
+
+        blob = pickle.dumps(p)
+        p2 = pickle.loads(blob)
+
+        assert p2._ambient_dim == p._ambient_dim
+        assert p2.codim == p.codim
+        assert p2.dim == p.dim
+        assert "codim" in p2.__dict__
+        assert "dim" in p2.__dict__
