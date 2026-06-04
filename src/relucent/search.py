@@ -548,9 +548,8 @@ def searcher(
 
                 assert isinstance(p._shis, list)
                 pbar.set_postfix_str(
-                    f"Depth: {depth}  Unprocessed: {unprocessed}  Faces: {len(p._shis)}  Avg: {rolling_average:.2f} "
-                    + f"IP Norm: {p._interior_point_norm or -1:.2f}  Finite: {p._finite} "
-                    + f"Mistakes: {len(bad_shi_computations)}",
+                    f"Depth: {depth}  Unprocessed: {unprocessed} Mistakes: {len(bad_shi_computations)}"
+                    + f" Mean Facets: {rolling_average:.2f}",
                     refresh=False,
                 )
 
