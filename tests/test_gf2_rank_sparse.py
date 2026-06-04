@@ -94,8 +94,8 @@ def test_sparse_rank_matches_packed_on_meta_like_grid() -> None:
         0: list(nodes_0),
     }
     for k in (1, 2):
-        row_sets, ncols = _boundary_row_sets(meta, nodes_by_dim, k=k, compactify=False)
-        packed, nc = _packed_boundary_matrix(meta, nodes_by_dim, k=k, compactify=False)
+        row_sets, ncols = _boundary_row_sets(meta, nodes_by_dim, k=k)
+        packed, nc = _packed_boundary_matrix(meta, nodes_by_dim, k=k)
         assert nc == ncols
         assert gf2_rank_sparse_rowsets([s.copy() for s in row_sets], ncols) == gf2_rank_packed(packed.copy(), ncols)
 
