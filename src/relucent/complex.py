@@ -4,10 +4,10 @@ import os
 import pickle
 import random
 import warnings
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
-from typing import Any, Literal, overload
+from typing import Any, Literal, Self, overload
 
 import networkx as nx
 import numpy as np
@@ -29,7 +29,10 @@ from relucent.search import searcher as _searcher_fn
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
+    encode_ss,
     get_env,
+    get_mp_context,
+    process_aware_cpu_count,
 )
 from relucent.vis import get_colors, plot_complex
 
@@ -48,8 +51,8 @@ class IncompleteDualGraphError(ValueError):
 
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
-# ``shi`` edge attribute for truncation incidences in :meth:`Complex.get_meta_graph`
-# when ``truncate=True`` (not a supporting-hyperplane index of the underlying network).
+# ``shi`` edge attribute for truncation incidences in :meth:`Complex.truncate_meta_graph`
+# (not a supporting-hyperplane index of the underlying network).
 TRUNCATION_META_SHI: int = -1
 
 # Worker process state — set by set_globals() when used as a pool initializer.
@@ -210,6 +213,64 @@ def _net_without_last_ss_layer_neuron(
     return ReLUNetwork(OrderedDict(new_items), input_shape=net.input_shape)
 
 
+# Parallelize meta-graph face discovery above this many k-cells (per dimension).
+_META_FACE_PARALLEL_MIN_CELLS = 64
+
+
+def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
+    return {
+        "poly": poly,
+        "dim": int(poly.dim),
+        "ss": np.asarray(poly.ss_np),
+        "finite": getattr(poly, "finite", None),
+        "shis": sorted(int(s) for s in getattr(poly, "shis", [])),
+    }
+
+
+def _collect_meta_face_edges(
+    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
+    valid_face_tags: set[bytes],
+) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
+    """Return face edges (src, dst, shi) and dst tags discovered for one chunk of k-cells."""
+    edges: list[tuple[bytes, bytes, int]] = []
+    extra_tags: list[bytes] = []
+    for src_tag, ss, shis in cells:
+        ss_arr = np.asarray(ss)
+        row = ss_arr[0]
+        for shi in shis:
+            shi_i = int(shi)
+            old = row[shi_i]
+            row[shi_i] = 0
+            face_tag = ss_arr.astype(np.int8, copy=False).ravel().tobytes()
+            row[shi_i] = old
+            if face_tag not in valid_face_tags:
+                continue
+            edges.append((src_tag, face_tag, shi_i))
+            extra_tags.append(face_tag)
+    return edges, extra_tags
+
+
+def _parallel_collect_meta_face_edges(
+    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
+    valid_face_tags: set[bytes],
+    *,
+    nworkers: int,
+) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
+    n = len(cells)
+    chunk_size = max(n // (nworkers * 4), 1)
+    chunks = [cells[i : i + chunk_size] for i in range(0, n, chunk_size)]
+    edges: list[tuple[bytes, bytes, int]] = []
+    extra_tags: list[bytes] = []
+    with get_mp_context().Pool(nworkers) as pool:
+        for chunk_edges, chunk_extras in pool.starmap(
+            _collect_meta_face_edges,
+            [(chunk, valid_face_tags) for chunk in chunks],
+        ):
+            edges.extend(chunk_edges)
+            extra_tags.extend(chunk_extras)
+    return edges, extra_tags
+
+
 class Complex:
     """Manages the polyhedral complex of a neural network.
 
@@ -232,6 +293,7 @@ class Complex:
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
+        self.tag2poly: dict[bytes, Polyhedron] = {}
 
         net_layers = list(self._net.layers.values())
         self.ss_layers = [i for i, next_layer in enumerate(net_layers[1:]) if isinstance(next_layer, ReLULayer)]
@@ -268,11 +330,15 @@ class Complex:
             KeyError: If the polyhedron with the given key is not in the complex.
         """
         if isinstance(key, Polyhedron):
-            return self.index2poly[self.ssm[key.ss_np]]
+            tag = key.tag
         elif isinstance(key, (np.ndarray, torch.Tensor)):
-            return self.index2poly[self.ssm[key]]
+            tag = encode_ss(key)
         else:
             raise KeyError("Complex can only be indexed by Polyhedra, arrays, or tensors")
+        try:
+            return self.tag2poly[tag]
+        except KeyError:
+            raise KeyError(key) from None
 
     def str_to_poly(self, name: str, ensure_unique: bool = True) -> Polyhedron:
         """Return the polyhedron whose ``__repr__`` equals ``name``.
@@ -303,11 +369,11 @@ class Complex:
         raise KeyError(f"Polyhedron with name {name!r} not in complex")
 
     def __contains__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> bool:
-        try:
-            self[key]
-            return True
-        except KeyError:
-            return False
+        if isinstance(key, Polyhedron):
+            return key.tag in self.tag2poly
+        elif isinstance(key, (np.ndarray, torch.Tensor)):
+            return encode_ss(key) in self.tag2poly
+        return False
 
     def __iter__(self) -> Iterator[Polyhedron]:
         """Iterate over all Polyhedra in the complex.
@@ -334,8 +400,8 @@ class Complex:
         with open(filename, "wb") as f:
             pickle.dump(state, f)
 
-    @staticmethod
-    def load(filename: str | os.PathLike[str]) -> Complex:
+    @classmethod
+    def load(cls, filename: str | os.PathLike[str]) -> Self:
         """Load a Complex from a pickle file.
 
         Intended to be called as Complex.load(filename). The file must have been
@@ -345,11 +411,11 @@ class Complex:
             filename: Path to the pickle file.
 
         Returns:
-            Complex: The restored complex.
+            The restored complex.
         """
         with open(filename, "rb") as f:
             state = pickle.load(f)
-        cplx = Complex(state["net"])
+        cplx = cls(state["net"])
         cplx.__setstate__(state)
         return cplx
 
@@ -372,6 +438,7 @@ class Complex:
                 self.ssm.add(p.ss_np)
         for p in self.index2poly:
             p._net = self._net
+            self.tag2poly[p.tag] = p
 
     @property
     def dim(self) -> int:
@@ -585,20 +652,24 @@ class Complex:
         if not check_exists:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
+            self.tag2poly[p.tag] = p
             self._dual_graph = None
             return p
 
-        p_exists = p in self
+        tag = p.tag
+        p_exists = tag in self.tag2poly
 
         if p_exists and overwrite:
-            self.index2poly[self.ssm[p.ss_np]] = p
+            self.index2poly[self.ssm.tag2index[tag]] = p
+            self.tag2poly[tag] = p
             self._dual_graph = None
             return p
         elif p_exists:
-            return self[p]
+            return self.tag2poly[tag]
         else:
             self.index2poly.append(p)
             self.ssm.add(p.ss_np)
+            self.tag2poly[tag] = p
             self._dual_graph = None
             return p
 
@@ -1026,7 +1097,66 @@ class Complex:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
-    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False, truncate: bool = False) -> nx.MultiDiGraph[Any]:
+    @staticmethod
+    def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
+        """Return the subcomplex induced by nodes with ``finite is True``."""
+        finite = [n for n, a in meta.nodes(data=True) if a.get("finite", None) is True]
+        return meta.subgraph(finite).copy()
+
+    @staticmethod
+    def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
+        """Augment ``meta`` in place with combinatorial truncation at infinity.
+
+        Every node's ``ss`` gains a trailing ``1`` (strictly inside the truncation halfspace).
+        The induced subgraph on nodes with ``finite is False`` (unbounded cells) is duplicated:
+        each copy has trailing ``0`` on ``ss``, dimension decremented by one, and node keys
+        ``("trunc", tag)``. Face edges among duplicates mirror the induced subgraph; each
+        original unbounded node ``n`` gains an edge ``n → ("trunc", n)`` with ``shi`` equal to
+        :data:`TRUNCATION_META_SHI`. Duplicates are not created for 0-cells.
+        """
+        if meta.number_of_nodes() == 0:
+            return
+
+        unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
+        ub_faces = meta.subgraph(unbounded).copy()
+
+        def _ss_with_extra_bit(ss: np.ndarray, bit: int) -> np.ndarray:
+            a = np.asarray(ss)
+            dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
+            return np.hstack([a, np.full((a.shape[0], 1), bit, dtype=dt)])
+
+        for attrs in meta.nodes.values():
+            if (ss0 := attrs.get("ss")) is not None:
+                attrs["ss"] = _ss_with_extra_bit(np.asarray(ss0), 1)
+
+        dup_keys: set[Any] = set()
+        for orig in unbounded:
+            oa = meta.nodes[orig]
+            k = int(oa.get("dim", -1))
+            ss_in = oa.get("ss")
+            if k <= 0 or ss_in is None:
+                continue
+            dup = ("trunc", orig)
+            ss_on_cut = np.asarray(ss_in).copy()
+            ss_on_cut[..., -1] = 0
+            dup_keys.add(dup)
+            meta.add_node(
+                dup,
+                poly=oa.get("poly"),
+                dim=k - 1,
+                ss=ss_on_cut,
+                finite=True,
+                shis=list(oa.get("shis", [])),
+                truncation_duplicate=True,
+            )
+            meta.add_edge(orig, dup, shi=TRUNCATION_META_SHI)
+
+        for u, v, ed in ub_faces.edges(data=True):
+            tu, tv = ("trunc", u), ("trunc", v)
+            if tu in dup_keys and tv in dup_keys:
+                meta.add_edge(tu, tv, **dict(ed))
+
+    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
         This method mirrors the face-encoding convention used by relucent's contracted
@@ -1054,18 +1184,10 @@ class Complex:
         These are stored as node attributes on the meta-graph (they do not mutate
         the underlying :class:`~relucent.poly.Polyhedron` objects).
 
-        If ``truncate=True``, the meta-graph is augmented to encode a combinatorial
-        truncation by a large bounding halfspace that meets only unbounded cells.
-        Every existing node's ``ss`` gains a trailing ``1`` (strictly inside the
-        truncation halfspace). The induced subgraph on nodes with ``finite is False``
-        (unbounded cells) is duplicated: each copy has trailing ``0`` on ``ss``,
-        dimension decremented by one, and node keys ``("trunc", tag)`` where ``tag``
-        is the original polyhedron tag. Face edges among duplicates mirror the
-        induced subgraph; each original unbounded node ``n`` gains an edge
-        ``n → ("trunc", n)`` with ``shi`` equal to :data:`TRUNCATION_META_SHI` (not a
-        network SHI). Duplicates are not created for 0-cells (no ``-1``-dimensional
-        placeholder). When ``truncate`` is set, node keys may be ``bytes`` or
-        ``("trunc", bytes)`` tuples.
+        For combinatorial truncation (link-at-infinity homology), build the graph with
+        this method and call :meth:`truncate_meta_graph` on a copy before
+        :func:`relucent.topology.get_betti_numbers` or
+        :meth:`get_betti_numbers_from_meta` with ``compactify=False``.
 
         Note:
             The resulting structure encodes the face relations present in the
@@ -1099,52 +1221,52 @@ class Complex:
         meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
 
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
-        for k, c_k in sorted(by_dim.items(), reverse=True):
+        for _k, c_k in sorted(by_dim.items(), reverse=True):
             for p in c_k:
-                meta.add_node(
-                    p.tag,
-                    poly=p,
-                    dim=int(k),
-                    ss=np.asarray(p.ss_np),
-                    finite=getattr(p, "finite", None),
-                    shis=sorted(int(s) for s in getattr(p, "shis", [])),
-                )
+                meta.add_node(p.tag, **_meta_node_attrs(p))
 
         # Add face edges k -> k-1 using the same SS-zeroing rule used elsewhere.
         for k, c_k in sorted(by_dim.items(), reverse=True):
             if int(k) <= 0:
                 continue
             c_km1 = by_dim.get(int(k - 1))
-            for p in tqdm(c_k, desc=f"Building meta-graph faces (k={k})", leave=False, disable=not verbose):
-                ss = np.asarray(p.ss_np)
-                for shi in p.shis:
-                    face_ss = ss.copy()
-                    face_ss[0, int(shi)] = 0
+            lookup: dict[bytes, Polyhedron] = dict(self.tag2poly)
+            if c_km1 is not None:
+                lookup.update(c_km1.tag2poly)
+            valid_face_tags = set(lookup.keys())
+            cells = [(p.tag, np.asarray(p.ss_np), tuple(int(s) for s in p.shis)) for p in c_k]
+            nworkers = process_aware_cpu_count() or 1
+            use_parallel = len(cells) >= _META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
+            if use_parallel:
+                edges, extra_tags = _parallel_collect_meta_face_edges(
+                    cells,
+                    valid_face_tags,
+                    nworkers=nworkers,
+                )
+            else:
+                if verbose:
+                    edges, extra_tags = _collect_meta_face_edges(
+                        list(
+                            tqdm(
+                                cells,
+                                desc=f"Building meta-graph faces (k={k})",
+                                leave=False,
+                            )
+                        ),
+                        valid_face_tags,
+                    )
+                else:
+                    edges, extra_tags = _collect_meta_face_edges(cells, valid_face_tags)
 
-                    face_poly: Polyhedron | None = None
-                    if c_km1 is not None and face_ss in c_km1:
-                        face_poly = c_km1[face_ss]
-                    elif face_ss in self:
-                        face_poly = self[face_ss]
+            known_nodes = set(meta.nodes)
+            for face_tag in set(extra_tags):
+                if face_tag in known_nodes:
+                    continue
+                face_poly = lookup[face_tag]
+                meta.add_node(face_tag, **_meta_node_attrs(face_poly))
+                known_nodes.add(face_tag)
 
-                    if face_poly is None:
-                        # ``c_{k-1}`` is built by :meth:`contract` from **dual edges** only, so
-                        # a geometric facet of ``p`` (zeroing ``shi``) may not appear as a stored
-                        # polyhedron—e.g. missing neighbor off the explored subgraph. The
-                        # ``face_ss in self`` branch rarely helps for codim-1 faces of top cells
-                        # (their ``ss`` has a new zero vs. full-dimensional regions in ``self``).
-                        continue
-
-                    if face_poly.tag not in meta:
-                        meta.add_node(
-                            face_poly.tag,
-                            poly=face_poly,
-                            dim=int(face_poly.dim),
-                            ss=np.asarray(face_poly.ss_np),
-                            finite=getattr(face_poly, "finite", None),
-                            shis=sorted(int(s) for s in getattr(face_poly, "shis", [])),
-                        )
-                    meta.add_edge(p.tag, face_poly.tag, shi=int(shi))
+            meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges)
 
         if enrich:
             # Second pass: propagate boundedness/SHI information down the face poset.
@@ -1152,17 +1274,12 @@ class Complex:
             for k in sorted(by_dim.keys(), reverse=True):
                 if int(k) <= 0:
                     continue
-                face_tags = [n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == int(k - 1)]
-                for face_tag in face_tags:
-                    # Consider only immediate cofaces (dim+1).
-                    in_edges = [
-                        (u, data)
-                        for u, _, data in meta.in_edges(face_tag, data=True)
-                        if int(meta.nodes[u].get("dim", -999)) == int(k)
-                    ]
-                    if not in_edges:
-                        continue
+                cofaces_by_face: dict[Any, list[tuple[Any, dict[str, Any]]]] = defaultdict(list)
+                for u, v, data in meta.in_edges(data=True):
+                    if int(meta.nodes[u]["dim"]) == int(k):
+                        cofaces_by_face[v].append((u, data))
 
+                for face_tag, in_edges in cofaces_by_face.items():
                     # Keep cofaces aligned with `in_edges`: dropping Nones from cofaces alone would
                     # pair the wrong SHI data with the wrong poly under zip().
                     in_edges = [(u, data) for u, data in in_edges if meta.nodes[u].get("poly") is not None]
@@ -1189,54 +1306,6 @@ class Complex:
 
                     meta.nodes[face_tag]["finite"] = finite
                     meta.nodes[face_tag]["shis"] = inferred_shis
-
-        if truncate:
-            # --- combinatorial "big ball" truncation (see docstring) ---
-            # Unbounded cells are the ones that would meet the truncating boundary; grab their
-            # face poset *before* we tack the extra sign bit onto everyone's `ss`.
-            unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
-            ub_faces = meta.subgraph(unbounded).copy()
-
-            def _ss_with_extra_bit(ss: np.ndarray, bit: int) -> np.ndarray:
-                a = np.asarray(ss)
-                dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
-                return np.hstack([a, np.full((a.shape[0], 1), bit, dtype=dt)])
-
-            # Mark everything as strictly inside the truncation halfspace (trailing 1).
-            for attrs in meta.nodes.values():
-                if (ss0 := attrs.get("ss")) is not None:
-                    attrs["ss"] = _ss_with_extra_bit(np.asarray(ss0), 1)
-
-            # For each positive-dim unbounded cell: shadow copy on the cut (trailing 0, dim−1),
-            # and wire it to the original with a fake SHI so it's not confused with a ReLU facet.
-            dup_keys: set[Any] = set()
-            for orig in unbounded:
-                oa = meta.nodes[orig]
-                k = int(oa.get("dim", -1))
-                ss_in = oa.get("ss")
-                if k <= 0 or ss_in is None:
-                    continue
-                dup = ("trunc", orig)
-                ss_on_cut = np.asarray(ss_in).copy()
-                ss_on_cut[..., -1] = 0
-                dup_keys.add(dup)
-                meta.add_node(
-                    dup,
-                    poly=oa.get("poly"),
-                    dim=k - 1,
-                    ss=ss_on_cut,
-                    finite=True,
-                    shis=list(oa.get("shis", [])),
-                    truncation_duplicate=True,
-                )
-                meta.add_edge(orig, dup, shi=TRUNCATION_META_SHI)
-
-            # Copy face incidences among unbounded cells onto their boundary doubles (both ends
-            # need a duplicate; 0-cells deliberately have none).
-            for u, v, ed in ub_faces.edges(data=True):
-                tu, tv = ("trunc", u), ("trunc", v)
-                if tu in dup_keys and tv in dup_keys:
-                    meta.add_edge(tu, tv, **dict(ed))
 
         return meta
 
@@ -1370,6 +1439,48 @@ class Complex:
         # Avoid degenerate bound when everything is near the origin.
         return float(cfg.PLOT_MARGIN_FACTOR) * max(max_norm, 1.0)
 
+    @classmethod
+    def get_betti_numbers_from_meta(
+        cls,
+        meta: nx.MultiDiGraph[Any],
+        *,
+        reduced: bool = False,
+        compactify: bool = False,
+        respect_finite: bool = False,
+        verify_chain_complex: bool = False,
+        verbose: bool = False,
+        nworkers: int | None = None,
+    ) -> dict[int, int]:
+        """Compute Betti numbers from an existing meta-graph.
+
+        Args:
+            meta: Output of :meth:`get_meta_graph`, optionally passed through
+                :meth:`truncate_meta_graph` when ``compactify=False`` and not
+                ``respect_finite``.
+            compactify: If True, use a Borel–Moore-style boundary (only faces shared by
+                at least two cofaces). If False, use every face incidence in ``meta``.
+            respect_finite: If True, restrict to the subcomplex of cells with ``finite is True``
+                (no truncation). Other flags are forwarded to :func:`relucent.topology.get_betti_numbers`.
+            nworkers: Forwarded to :func:`relucent.topology.get_betti_numbers`; controls
+                how many threads rank independent boundary maps concurrently.
+        """
+        from relucent.topology import get_betti_numbers
+
+        if meta.number_of_nodes() == 0:
+            return {}
+        if respect_finite:
+            meta = cls.finite_cells_subgraph(meta)
+            if meta.number_of_nodes() == 0:
+                return {}
+        return get_betti_numbers(
+            meta,
+            require_shared_faces=compactify,
+            reduced=reduced,
+            verify_chain_complex=verify_chain_complex,
+            verbose=verbose,
+            nworkers=nworkers,
+        )
+
     def get_betti_numbers(
         self,
         *,
@@ -1378,23 +1489,33 @@ class Complex:
         respect_finite: bool = False,
         verify_chain_complex: bool = False,
         verbose: bool = False,
+        nworkers: int | None = None,
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
-        This is a thin public wrapper around :func:`relucent.topology.get_betti_numbers`.
-        The ``infinity`` argument is deprecated and ignored (see that function's docstring).
-        Pass ``verbose=True`` for stderr progress from topology and meta-graph construction.
+        Builds a meta-graph from this complex, applies truncation when appropriate, then
+        delegates to :meth:`get_betti_numbers_from_meta`. Pass ``verbose=True`` for
+        stderr progress from meta-graph construction and boundary maps.
+
+        Args:
+            nworkers: Number of threads for ranking independent boundary maps concurrently.
+                ``None`` (default): auto (one thread per map when the C backend is available).
+                ``1``: always sequential.  See :func:`relucent.topology.get_betti_numbers`.
         """
         self._warn_research_use("get_betti_numbers")
-        from relucent.topology import get_betti_numbers as _get_betti_numbers
-
-        return _get_betti_numbers(
-            self,
+        if len(self) == 0:
+            return {}
+        meta = self.get_meta_graph(enrich=True, verbose=verbose)
+        if not compactify and not respect_finite:
+            self.truncate_meta_graph(meta)
+        return self.get_betti_numbers_from_meta(
+            meta,
             reduced=reduced,
             compactify=compactify,
             respect_finite=respect_finite,
             verify_chain_complex=verify_chain_complex,
             verbose=verbose,
+            nworkers=nworkers,
         )
 
     def get_persistent_homology(

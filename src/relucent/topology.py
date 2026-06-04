@@ -11,8 +11,8 @@ Notes:
 - Coefficients are in GF(2), so orientations are irrelevant.
 - Cells are represented by :class:`relucent.poly.Polyhedron` objects; a codimension-1
   facet of a cell is obtained by setting one nonzero sign entry to 0.
-- For ``compactify=False``, :func:`get_betti_numbers` uses a truncated meta-graph so
-  non-compact complexes are modeled combinatorially without separate ``infinity`` modes.
+- :func:`get_betti_numbers` uses every codimension-one face incidence encoded in ``meta``.
+  Truncation and Borel–Moore-style boundaries are handled on :class:`~relucent.complex.Complex`.
 - Pass ``verify_chain_complex=True`` to require ``∂²=0`` on the assembled boundary maps;
   the check uses a packed GF(2) multiply (stacked rows), not dense integer matmuls.
 """
@@ -21,13 +21,10 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 from tqdm.auto import tqdm
-
-if TYPE_CHECKING:
-    from relucent.complex import Complex
 
 # Try to load the C backend once at import time.
 _c_backend = False
@@ -92,7 +89,7 @@ def _packed_boundary_matrix(
     nodes_by_dim: dict[int, list[object]],
     *,
     k: int,
-    compactify: bool,
+    require_shared_faces: bool = False,
 ) -> tuple[np.ndarray, int]:
     """Bit-packed ∂_k: C_k → C_{k-1} (rows index (k−1)-cells, columns index k-cells)."""
     rows = nodes_by_dim.get(k - 1, [])
@@ -109,7 +106,7 @@ def _packed_boundary_matrix(
     packed = np.zeros((nrows, nwords), dtype=np.uint64)
 
     inc_count: dict[object, int] | None = None
-    if compactify:
+    if require_shared_faces:
         inc_count = {r: 0 for r in rows}
         for u, v, _ in meta.edges(data=True):
             if u in col_index and v in row_index:
@@ -134,7 +131,7 @@ def _boundary_row_sets(
     nodes_by_dim: dict[int, list[object]],
     *,
     k: int,
-    compactify: bool,
+    require_shared_faces: bool = False,
 ) -> tuple[list[set[int]], int]:
     """Sparse ∂_k as a list of row sets (row index → column indices with a 1)."""
     rows = nodes_by_dim.get(k - 1, [])
@@ -150,7 +147,7 @@ def _boundary_row_sets(
     row_sets: list[set[int]] = [set() for _ in range(nrows)]
 
     inc_count: dict[object, int] | None = None
-    if compactify:
+    if require_shared_faces:
         inc_count = {r: 0 for r in rows}
         for u, v, _ in meta.edges(data=True):
             if u in col_index and v in row_index:
@@ -411,71 +408,53 @@ def _chain_square_violations(
 
 
 def get_betti_numbers(
-    cplx: Complex,
+    meta: Any,
     *,
+    require_shared_faces: bool = False,
     reduced: bool = False,
-    compactify: bool = False,
-    respect_finite: bool = False,
     verify_chain_complex: bool = False,
     verbose: bool = False,
+    nworkers: int | None = None,
 ) -> dict[int, int]:
-    """Single Betti-number entrypoint.
+    """Compute Betti numbers from face incidences in ``meta``.
 
     Args:
+        meta: Face poset as a NetworkX ``MultiDiGraph`` from
+            :meth:`~relucent.complex.Complex.get_meta_graph` (optionally truncated or
+            restricted to finite cells first).
+        require_shared_faces: If True, only incidences where a codimension-one face has at
+            least two cofaces (Borel–Moore-style). Default False counts every meta edge.
+            Set by :meth:`~relucent.complex.Complex.get_betti_numbers_from_meta` when
+            ``compactify=True``.
         reduced: If True, return reduced homology (β̃₀ = β₀ - 1 for nonempty complexes).
-        compactify: If True, use the Borel–Moore-style boundary operator on the usual
-            meta-graph (faces shared by at least two top cells only). If False, use the
-            meta-graph from :meth:`~relucent.complex.Complex.get_meta_graph` with
-            ``truncate=True`` and the full cellular boundary (every meta edge counts),
-            so non-compact spaces are modeled by an explicit far-truncation without
-            ad-hoc ``infinity`` bookkeeping.
-        respect_finite: If True, restrict each chain group to cells with ``finite is True``
-            before constructing boundary maps.
         verify_chain_complex: If True, require ``∂_k ∘ ∂_{k+1} = 0`` (mod 2) for every ``k``
-            where both maps exist; otherwise raise :class:`ChainComplexInconsistent`. This uses
-            :func:`gf2_matmul_packed_stacked_rows` (GF(2) multiply via XOR of packed rows),
-            which avoids dense ``int64`` matmuls. When False, the legacy rank formula is used
-            even if ∂²≠0 (then some ``β_k`` may be meaningless or negative).
-        verbose: If True, print short progress lines to stderr (meta-graph, boundaries, chain
-            checks, result). Also passed through to :meth:`~relucent.complex.Complex.get_meta_graph`.
+            where both maps exist; otherwise raise :class:`ChainComplexInconsistent`.
+        verbose: If True, print short progress lines to stderr.
+        nworkers: Number of threads to use for ranking independent boundary maps concurrently.
+            ``None`` (default): automatically use one thread per non-trivial map when the C
+            backend is available; falls back to sequential for pure-Python rank.
+            ``1`` or ``0``: always sequential.  ``N > 1``: use up to N threads.
+            Parallelism is safe because ctypes releases the GIL during C rank computation,
+            so threads truly run concurrently.
 
     Note:
-        **BFS-complete does not imply ∂²=0.** Breadth-first search can enumerate every
-        full-dimensional activation region in a connected component, but
-        :meth:`~relucent.complex.Complex.get_meta_graph` only adds a codimension-1 face
-        edge when that face appears as a polyhedron in the contracted chain or in the same
-        :class:`~relucent.complex.Complex`. Missing face nodes or incidences yield boundary
-        matrices that are not a chain complex, so homology formulas do not apply until the
-        face data is completed (see the ``Note`` on ``get_meta_graph``).
+        Truncation and finite-cell restriction are prepared on
+        :class:`~relucent.complex.Complex` before calling this function.
     """
-    if len(cplx) == 0:
+    if meta.number_of_nodes() == 0:
         return {}
 
     _verbose_line(
         verbose,
-        f"get_betti_numbers: len(cplx)={len(cplx)} compactify={compactify} reduced={reduced} "
-        + f"respect_finite={respect_finite} verify_chain_complex={verify_chain_complex}",
+        f"get_betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
+        + f"require_shared_faces={require_shared_faces} reduced={reduced} "
+        + f"verify_chain_complex={verify_chain_complex}",
     )
 
-    # ``truncate=True`` adds synthetic ``finite=True`` 0-cell copies of unbounded cells.
-    # When ``respect_finite=True`` those orphan 0-cells (their infinite parent is
-    # filtered out) would spuriously inflate β_0.  Use the plain meta-graph instead:
-    # ``respect_finite`` is already a direct finiteness filter so no truncation is needed.
-    truncate = not compactify and not respect_finite
-    _verbose_line(verbose, "get_betti_numbers: building meta-graph …")
-    meta = cplx.get_meta_graph(enrich=True, verbose=verbose, truncate=truncate)
-    _verbose_line(
-        verbose,
-        f"get_betti_numbers: meta-graph |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} " + f"truncate={truncate}",
-    )
-
-    # Collect nodes by dimension (optionally filtered by finiteness).
     nodes_by_dim: dict[int, list[object]] = {}
     for n, attrs in meta.nodes(data=True):
         k = int(attrs.get("dim", -1))
         if k < 0:
-            continue
-        if respect_finite and attrs.get("finite", None) is not True:
             continue
         nodes_by_dim.setdefault(k, []).append(n)
 
@@ -492,40 +471,88 @@ def get_betti_numbers(
     ncols_by_k: dict[int, int] = {}
 
     k_values = list(range(max(1, kmin), kmax + 1))
-    k_iter: Iterable[int] = k_values
-    if verbose:
-        k_iter = tqdm(k_values, desc="Betti: boundary maps", unit="∂", leave=False)
 
-    for k in k_iter:
-        packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, compactify=compactify)
+    # -------------------------------------------------------------------
+    # Phase A: build all boundary matrices (sequential – fast).
+    # Copies for verify_chain_complex are taken here, before any in-place
+    # rank elimination modifies the arrays.
+    # -------------------------------------------------------------------
+    matrices: dict[int, tuple[np.ndarray, int]] = {}
+    for k in k_values:
+        packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, require_shared_faces=require_shared_faces)
         ncols_by_k[k] = ncols
         if ncols == 0:
             boundary_rank[k] = 0
             _verbose_line(verbose, f"get_betti_numbers: ∂_{k} skipped (no columns)")
-            continue
+        else:
+            if verify_chain_complex:
+                packed_by_k[k] = packed.copy()
+            matrices[k] = (packed, ncols)
+
+    # -------------------------------------------------------------------
+    # Phase B: rank each non-trivial boundary map.
+    # When the C backend is available and there are multiple maps, run them
+    # in parallel threads (ctypes releases the GIL, so threads truly
+    # overlap with each other and with OpenMP inside the C rank call).
+    # -------------------------------------------------------------------
+    non_trivial_ks = [k for k in k_values if k in matrices]
+
+    if nworkers is None:
+        _nw = len(non_trivial_ks) if _c_backend else 1
+    elif nworkers <= 0:
+        _nw = 1
+    else:
+        _nw = nworkers
+
+    _parallel = _nw > 1 and len(non_trivial_ks) > 1
+
+    def _rank_one(k: int) -> tuple[int, int]:
+        packed, ncols = matrices[k]
         nrows = int(packed.shape[0])
-        if verify_chain_complex:
-            packed_by_k[k] = packed.copy()
         if verbose and not _c_backend and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
             ratio = ncols / max(nrows, 1)
             if 0.5 <= ratio <= 2.0:
                 _verbose_line(
-                    verbose,
+                    True,
                     f"get_betti_numbers: ∂_{k} is large and nearly square ({nrows}×{ncols}); "
                     + "C backend unavailable—pure-Python GF(2) rank may take hours.",
                 )
-        boundary_rank[k] = int(
+        rank = int(
             gf2_rank_boundary(
                 packed,
                 ncols,
-                progress=verbose,
+                # Individual per-map progress bars look garbled when multiple
+                # threads write to the terminal simultaneously; suppress them
+                # in parallel mode and show a single outer completion bar instead.
+                progress=verbose and not _parallel,
                 progress_desc=f"GF(2) rank ∂_{k}",
             )
         )
-        _verbose_line(
-            verbose,
-            f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={boundary_rank[k]}",
-        )
+        _verbose_line(verbose, f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={rank}")
+        return k, rank
+
+    if _parallel:
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import as_completed as _as_completed
+
+        pbar = tqdm(total=len(non_trivial_ks), desc="Betti: boundary ranks", unit="∂", leave=False) if verbose else None
+        try:
+            with ThreadPoolExecutor(max_workers=min(_nw, len(non_trivial_ks))) as executor:
+                futures = {executor.submit(_rank_one, k): k for k in non_trivial_ks}
+                for fut in _as_completed(futures):
+                    k_done, r = fut.result()
+                    boundary_rank[k_done] = r
+                    if pbar is not None:
+                        pbar.update(1)
+        finally:
+            if pbar is not None:
+                pbar.close()
+    else:
+        k_iter: Iterable[int] = non_trivial_ks
+        if verbose:
+            k_iter = tqdm(non_trivial_ks, desc="Betti: boundary ranks", unit="∂", leave=False)
+        for k in k_iter:
+            _, boundary_rank[k] = _rank_one(k)
 
     if verify_chain_complex:
         _verbose_line(verbose, "get_betti_numbers: verifying ∂²=0 (chain_square) …")
