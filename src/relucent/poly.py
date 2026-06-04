@@ -1,7 +1,6 @@
 """Polyhedron: a single linear region of a ReLU network in input space."""
 
 import hashlib
-import math
 import warnings
 from collections.abc import Iterable
 from functools import cached_property
@@ -84,9 +83,56 @@ class Polyhedron:
 
         self._attempted_compute_properties: bool = False
         self._preserve_cache_on_pickle: bool = False
+        self._ambient_dim: int | None = None
 
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        self._apply_zero_cell_finite_hint()
+
+    def _apply_zero_cell_finite_hint(self) -> None:
+        """Mark 0-cells (vertices) as bounded without a Chebyshev LP."""
+        hs = self._halfspaces_np
+        if hs is None and self._halfspaces is not None:
+            raw = self._halfspaces
+            if isinstance(raw, np.ndarray):
+                hs = raw
+            elif isinstance(raw, torch.Tensor):
+                hs = raw.detach().cpu().numpy()
+        if hs is None:
+            return
+        ambient = int(hs.shape[1] - 1)
+        if self.codim != ambient:
+            return
+        self._finite = True
+        self._finite_computed = True
+
+    def _is_zero_cell(self) -> bool:
+        return self.dim == 0
+
+    def _interior_point_from_equalities(self) -> np.ndarray:
+        """Recover the unique point of a 0-cell from equality rows (no Gurobi)."""
+        hs = self.halfspaces_np
+        zidx = self.zero_indices
+        if zidx.size == 0:
+            raise ValueError("0-cell has no equality (zero) constraints in its sign sequence")
+        eq = hs[zidx]
+        a_eq = eq[:, :-1]
+        b_eq = -eq[:, -1].ravel()
+        x, *_ = np.linalg.lstsq(a_eq, b_eq, rcond=None)
+        x = np.asarray(x, dtype=np.float64).reshape(-1)
+        if a_eq.size > 0:
+            res = float(np.linalg.norm(a_eq @ x - b_eq))
+            scale = max(1.0, float(np.linalg.norm(b_eq)))
+            if res > float(cfg.TOL_INTERIOR_VERIFY) * scale:
+                raise ValueError("0-cell equality system is infeasible")
+        ineq_idx = self.non_zero_indices
+        if ineq_idx.size > 0:
+            ineq = hs[ineq_idx]
+            slacks = ineq[:, :-1] @ x + ineq[:, -1]
+            if np.any(slacks > float(cfg.TOL_HALFSPACE_CONTAINMENT)):
+                raise ValueError("0-cell candidate point violates active inequalities")
+        return x
 
     def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """Return an integer-typed sign sequence (values in {-1, 0, 1})."""
@@ -130,7 +176,13 @@ class Polyhedron:
     @ss.setter
     def ss(self, value: np.ndarray | torch.Tensor) -> None:
         self._ss = self._coerce_ss_to_int(value)
+        self._clear_ss_derived_caches()
+
+    def _clear_ss_derived_caches(self) -> None:
+        """Drop sign-sequence-derived caches after ``ss`` changes."""
         self._ss_np = None
+        for name in ("codim", "dim", "zero_indices", "non_zero_indices"):
+            self.__dict__.pop(name, None)
 
     @property
     def ss_np(self) -> np.ndarray:
@@ -196,6 +248,8 @@ class Polyhedron:
             ValueError: If no interior point can be found.
         """
         max_radius = max_radius or cfg.MAX_RADIUS
+        if self._is_zero_cell():
+            return self._interior_point_from_equalities()
         if self.finite is None:
             raise ValueError("Polyhedron is infeasible (empty).")
         # ``finite=True`` may be supplied at construction (e.g. propagated from cofaces)
@@ -234,6 +288,9 @@ class Polyhedron:
             system is infeasible (empty); ``center`` is ``None`` and ``inradius``
             is ``inf`` for nonempty unbounded polyhedra (with infinite Chebyshev formulation).
         """
+        if self._is_zero_cell():
+            pt = self._interior_point_from_equalities()
+            return pt.reshape(-1, 1), 0.0
         env = env or get_env()
         from relucent.calculations import solve_radius
 
@@ -821,18 +878,37 @@ class Polyhedron:
                 raise NotImplementedError
         return self._Wl2
 
+    def _ensure_chebyshev_center(self, env: Any = None) -> None:
+        """Populate ``_center`` / ``_inradius`` for bounded cells (optional; not used by meta-graph)."""
+        if self._is_zero_cell():
+            if self._center is None:
+                pt = self._interior_point_from_equalities()
+                self._center = pt.reshape(-1, 1)
+                self._inradius = 0.0
+            return
+        if self._finite is not True or (self._center is not None and self._inradius is not None):
+            return
+        env = env or get_env()
+        center, inradius = self.get_center_inradius(env=env)
+        self._center = center
+        self._inradius = inradius
+
     @property
     def center(self) -> np.ndarray | None:
         """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded or infeasible."""
-        if not self._finite_computed or (self._finite is True and self._center is None):
+        if not self._finite_computed:
             _ = self.finite
+        elif self._finite is True and self._center is None:
+            self._ensure_chebyshev_center()
         return self._center
 
     @property
     def inradius(self) -> float | None:
         """Inradius of the polyhedron, ``inf`` if unbounded feasible, ``None`` if infeasible."""
-        if not self._finite_computed or (self._finite is True and self._inradius is None):
+        if not self._finite_computed:
             _ = self.finite
+        elif self._finite is True and self._inradius is None:
+            self._ensure_chebyshev_center()
         if self._finite is True:
             if cfg.CAREFUL_MODE:
                 assert self._inradius is not None  # when bounded, get_center_inradius() has set it
@@ -844,73 +920,29 @@ class Polyhedron:
     @property
     def finite(self) -> bool | None:
         """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``."""
-        # Constructor or callers may set ``finite=True`` without populating Chebyshev caches;
-        # treat that as "bounded hint" until a solve confirms and fills ``_center`` / ``_inradius``.
-        _chebyshev_incomplete = (
-            self._finite_computed and self._finite is True and (self._center is None or self._inradius is None)
-        )
-        if not self._finite_computed or _chebyshev_incomplete:
-            hinted_finite = self._finite if _chebyshev_incomplete else None
-            prior_center = self._center
-            prior_inradius = self._inradius
-            center, inradius = self.get_center_inradius()
-            self._center = center
-            self._inradius = inradius
-            if center is not None:
-                self._finite = True
-            elif inradius is None:
-                self._finite = None
-            elif inradius == float("inf"):
-                self._finite = False
-            else:
-                raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
+        # 0-cells are vertices; bounded by definition. Never run Chebyshev on them.
+        if self._is_zero_cell():
+            self._finite = True
             self._finite_computed = True
-            if self._finite is None:
-                self._interior_point = None
-            if _chebyshev_incomplete and cfg.CAREFUL_MODE:
-                assert hinted_finite is not None
-                if prior_center is None and prior_inradius is None:
-                    if self._finite != hinted_finite:
-                        warnings.warn(
-                            "Cached boundedness hint disagreed with Chebyshev solve "
-                            + f"(hinted finite={hinted_finite!r}, computed finite={self._finite!r}); "
-                            + "using the LP result.",
-                            RuntimeWarning,
-                            stacklevel=2,
-                        )
-                else:
-                    assert self._finite == hinted_finite, (
-                        "Propagated boundedness disagreed with Chebyshev solve: "
-                        f"hinted finite={hinted_finite!r}, computed finite={self._finite!r}"
-                    )
-                if prior_center is not None:
-                    assert center is not None, (
-                        f"Chebyshev refresh dropped center: prior_center={prior_center!r}, computed center={center!r}"
-                    )
-                    assert np.allclose(
-                        np.asarray(prior_center, dtype=np.float64).reshape(-1),
-                        np.asarray(center, dtype=np.float64).reshape(-1),
-                        rtol=1e-5,
-                        atol=float(cfg.TOL_INTERIOR_VERIFY),
-                    ), f"Chebyshev center changed after refresh: prior={prior_center!r}, computed={center!r}"
-                if prior_inradius is not None:
-                    assert inradius is not None, (
-                        "Chebyshev refresh dropped inradius: "
-                        f"prior_inradius={prior_inradius!r}, computed inradius={inradius!r}"
-                    )
-                    pc = float(prior_inradius)
-                    ic = float(inradius)
-                    both_inf = math.isinf(pc) and math.isinf(ic)
-                    same_inf_sign = math.copysign(1.0, pc) == math.copysign(1.0, ic)
-                    close = math.isclose(
-                        pc,
-                        ic,
-                        rel_tol=1e-9,
-                        abs_tol=float(cfg.TOL_INTERIOR_VERIFY),
-                    )
-                    assert (both_inf and same_inf_sign) or close, (
-                        f"Chebyshev inradius changed after refresh: prior={prior_inradius!r}, computed={inradius!r}"
-                    )
+            if self._center is None:
+                pt = self._interior_point_from_equalities()
+                self._center = pt.reshape(-1, 1)
+                self._inradius = 0.0
+            return True
+        if self._finite_computed:
+            return self._finite
+        center, inradius = self.get_center_inradius()
+        if center is not None:
+            self._finite = True
+        elif inradius is None:
+            self._finite = None
+        elif inradius == float("inf"):
+            self._finite = False
+        else:
+            raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
+        self._finite_computed = True
+        if self._finite is None:
+            self._interior_point = None
         return self._finite
 
     @property
@@ -964,17 +996,19 @@ class Polyhedron:
             self._interior_point_norm = np.linalg.norm(self.interior_point).item()
         return self._interior_point_norm
 
-    @property
+    @cached_property
     def codim(self) -> int:
         """Codimension of the polyhedron, equal to the number of zero sign sequence elements."""
-        return np.sum(self.ss_np == 0)
+        return int(np.count_nonzero(self.ss_np == 0))
 
     @property
     def ambient_dim(self) -> int:
         """Dimension of the ambient space."""
+        if self._ambient_dim is not None:
+            return self._ambient_dim
         return self.halfspaces.shape[1] - 1
 
-    @property
+    @cached_property
     def dim(self) -> int:
         """Dimension of the polyhedron, equal to the dimension of the ambient space minus
         the number of zero sign sequence elements.
@@ -1002,9 +1036,6 @@ class Polyhedron:
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
         self._preserve_cache_on_pickle = False
-        if not hasattr(self, "_finite_computed"):
-            # Legacy pickle: ``_finite`` was only True/False; None meant "not computed".
-            self._finite_computed = self._finite is not None
         if self._finite is True and self._center is None:
             self._finite_computed = False
 
@@ -1024,6 +1055,9 @@ class Polyhedron:
             "_interior_point": self._interior_point,
             "_attempted_compute_properties": self._attempted_compute_properties,
             "warnings": self.warnings,
+            "codim": self.codim,
+            "dim": self.dim,
+            "_ambient_dim": self._ambient_dim,
         }
         if self._preserve_cache_on_pickle:
             state.update(

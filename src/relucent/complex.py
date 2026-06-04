@@ -6,6 +6,7 @@ import random
 import warnings
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 from typing import Any, Literal, Self, overload
 
@@ -32,6 +33,7 @@ from relucent.utils import (
     encode_ss,
     get_env,
     get_mp_context,
+    get_thread_env,
     process_aware_cpu_count,
 )
 from relucent.vis import get_colors, plot_complex
@@ -217,12 +219,25 @@ def _net_without_last_ss_layer_neuron(
 _META_FACE_PARALLEL_MIN_CELLS = 64
 
 
+def _known_bounded(poly: Polyhedron) -> bool:
+    """True when boundedness is already known (no Chebyshev LP needed)."""
+    if poly.dim == 0:
+        return True
+    return bool(poly._finite_computed and poly._finite is True)
+
+
 def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
+    if poly.dim == 0:
+        finite: bool | None = True
+    elif poly._finite_computed:
+        finite = poly._finite
+    else:
+        finite = poly.finite
     return {
         "poly": poly,
         "dim": int(poly.dim),
         "ss": np.asarray(poly.ss_np),
-        "finite": getattr(poly, "finite", None),
+        "finite": finite,
         "shis": sorted(int(s) for s in getattr(poly, "shis", [])),
     }
 
@@ -269,6 +284,53 @@ def _parallel_collect_meta_face_edges(
             edges.extend(chunk_edges)
             extra_tags.extend(chunk_extras)
     return edges, extra_tags
+
+
+def _classify_finite(poly: Polyhedron, env: Any) -> None:
+    """Resolve ``poly.finite`` via Chebyshev, without caching center/inradius.
+
+    No-ops when boundedness is already known (``_finite_computed`` is set or
+    ``dim == 0``). 0-cells are handled by :meth:`~relucent.poly.Polyhedron._apply_zero_cell_finite_hint`
+    at construction, but this is a safe fallback.
+    """
+    if poly._finite_computed or poly.dim == 0:
+        return
+    center, inradius = poly.get_center_inradius(env=env)
+    if center is not None:
+        poly._finite = True
+    elif inradius is None:
+        poly._finite = None
+    elif inradius == float("inf"):
+        poly._finite = False
+    else:
+        raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
+    poly._finite_computed = True
+
+
+def _precompute_finite(polys: list[Polyhedron], nworkers: int) -> None:
+    """Classify ``poly.finite`` for a list of polyhedra.
+
+    Skips polys with ``_finite_computed`` already set (including ``finite=True`` hints
+    from coface propagation or construction). Gurobi releases the GIL during LP solves,
+    so a :class:`~concurrent.futures.ThreadPoolExecutor` gives genuine parallelism
+    without pickling overhead; each thread uses its own
+    :func:`~relucent.utils.get_thread_env`.
+    """
+    pending = [p for p in polys if not p._finite_computed]
+    if not pending:
+        return
+
+    if nworkers <= 1:
+        env = get_env()
+        for poly in pending:
+            _classify_finite(poly, env)
+        return
+
+    def _worker(poly: Polyhedron) -> None:
+        _classify_finite(poly, get_thread_env())
+
+    with ThreadPoolExecutor(max_workers=nworkers) as executor:
+        list(executor.map(_worker, pending))
 
 
 class Complex:
@@ -1021,21 +1083,34 @@ class Complex:
             + [edge[1] for edge in self.get_boundary_edges(i, verbose=verbose)]
         )
 
+    def _codim_one_face_kwargs(self, p1: Polyhedron, p2: Polyhedron, shi: int) -> dict[str, Any]:
+        """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces."""
+        ambient = p1.ambient_dim
+        codim = p1.codim + 1
+        poly_kwargs: dict[str, Any] = {
+            "halfspaces": p1.halfspaces,
+            "shis": list(set(p1.shis) & set(p2.shis) - {shi}),
+            "codim": codim,
+            "dim": ambient - codim,
+            "_ambient_dim": ambient,
+        }
+        if _known_bounded(p1) or _known_bounded(p2):
+            poly_kwargs["finite"] = True
+        return poly_kwargs
+
     def get_boundary_cells(self, i: int, verbose: bool = False) -> set[Polyhedron]:
         """Get all (d-1)-cells in neuron i's BH."""
         faces = set()
-        for edge in tqdm(
-            self.get_boundary_edges(i, verbose=verbose), desc="Getting Boundary Cells", delay=1, disable=not verbose
-        ):
-            ss = edge[0].ss_np.copy()
-            ss[0, self.G.edges[edge]["shi"]] = 0
-            # Do not pass ``finite`` from cofaces: ambient boundedness of neighbors does not
-            # determine intrinsic boundedness of the shared (d-1)-face (e.g. a segment can be
-            # bounded while both incident d-cells are unbounded in R^d). Let Chebyshev run.
+        edges = list(self.get_boundary_edges(i, verbose=verbose))
+        for edge in tqdm(edges, desc="Getting Boundary Cells", delay=1, disable=not verbose):
+            p1, p2 = edge[0], edge[1]
+            shi = int(self.G.edges[edge]["shi"])
+            new_ss = p1.ss_np.copy()
+            new_ss[0, shi] = 0
             p = self.ss2poly(
-                ss,
+                new_ss,
                 check_exists=False,
-                shis=list(set(edge[0].shis) & set(edge[1].shis) - {self.G.edges[edge]["shi"]}),
+                **self._codim_one_face_kwargs(p1, p2, shi),
             )
             faces.add(p)
         return faces
@@ -1067,8 +1142,7 @@ class Complex:
             new_ss[0, shi] = 0
             new_complex.add_ss(
                 new_ss,
-                halfspaces=p1.halfspaces,
-                shis=list(set(p1.shis) & set(p2.shis) - {shi}),
+                **self._codim_one_face_kwargs(p1, p2, int(shi)),
             )
 
         return new_complex
@@ -1208,7 +1282,16 @@ class Complex:
                 :meth:`get_chain_complex`.
         """
         if len(self) == 0:
+            logger.info("get_meta_graph: empty complex, returning empty graph")
             return nx.MultiDiGraph()
+
+        nworkers = process_aware_cpu_count() or 1
+        logger.info(
+            "get_meta_graph: starting (enrich=%s, verbose=%s, nworkers=%d)",
+            enrich,
+            verbose,
+            nworkers,
+        )
 
         chain = self.get_chain_complex(verbose=verbose)
         # Dimension -> complex in the chain (there is at most one per dimension).
@@ -1221,6 +1304,32 @@ class Complex:
         meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
 
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
+        # Pre-compute finite for chain-complex cells in parallel; contracted
+        # lower-dim cells don't have finite cached yet (contract() only copies
+        # halfspaces, not the Chebyshev solve result).
+        all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
+        logger.info(
+            "get_meta_graph: chain complex has %d dimensions, %d cells",
+            len(by_dim),
+            len(all_chain_polys),
+        )
+        pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+        if pending_finite:
+            mode = "ThreadPoolExecutor" if nworkers > 1 else "sequential"
+            logger.info(
+                "get_meta_graph: classifying finite for %d/%d chain cells (%d already classified, %s, %d workers)",
+                pending_finite,
+                len(all_chain_polys),
+                len(all_chain_polys) - pending_finite,
+                mode,
+                nworkers,
+            )
+            _precompute_finite(all_chain_polys, nworkers)
+        else:
+            logger.info(
+                "get_meta_graph: all %d chain cells already have finite; skipping Chebyshev classification",
+                len(all_chain_polys),
+            )
         for _k, c_k in sorted(by_dim.items(), reverse=True):
             for p in c_k:
                 meta.add_node(p.tag, **_meta_node_attrs(p))
@@ -1235,15 +1344,32 @@ class Complex:
                 lookup.update(c_km1.tag2poly)
             valid_face_tags = set(lookup.keys())
             cells = [(p.tag, np.asarray(p.ss_np), tuple(int(s) for s in p.shis)) for p in c_k]
-            nworkers = process_aware_cpu_count() or 1
             use_parallel = len(cells) >= _META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
+                logger.info(
+                    "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
+                    int(k),
+                    nworkers,
+                    len(cells),
+                )
                 edges, extra_tags = _parallel_collect_meta_face_edges(
                     cells,
                     valid_face_tags,
                     nworkers=nworkers,
                 )
             else:
+                if len(cells) < _META_FACE_PARALLEL_MIN_CELLS:
+                    face_mode = f"sequential (cells < {_META_FACE_PARALLEL_MIN_CELLS})"
+                elif nworkers <= 1:
+                    face_mode = "sequential (nworkers <= 1)"
+                else:
+                    face_mode = "sequential"
+                logger.info(
+                    "get_meta_graph: k=%d face edges %s (%d cells)",
+                    int(k),
+                    face_mode,
+                    len(cells),
+                )
                 if verbose:
                     edges, extra_tags = _collect_meta_face_edges(
                         list(
@@ -1259,40 +1385,73 @@ class Complex:
                     edges, extra_tags = _collect_meta_face_edges(cells, valid_face_tags)
 
             known_nodes = set(meta.nodes)
-            for face_tag in set(extra_tags):
-                if face_tag in known_nodes:
-                    continue
-                face_poly = lookup[face_tag]
-                meta.add_node(face_tag, **_meta_node_attrs(face_poly))
-                known_nodes.add(face_tag)
+            new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes]
+            if new_face_tags:
+                # Propagate finite=True from parent edges before Chebyshev so we
+                # skip LPs for faces of bounded cells.
+                target_tags = set(new_face_tags)
+                for u, v, _ in edges:
+                    if v not in target_tags:
+                        continue
+                    face = lookup[v]
+                    if not face._finite_computed and _known_bounded(lookup[u]):
+                        face._finite = True
+                        face._finite_computed = True
+            if new_face_tags:
+                new_face_polys = [lookup[tag] for tag in new_face_tags]
+                pending_finite = sum(1 for p in new_face_polys if not p._finite_computed)
+                if pending_finite:
+                    mode = "ThreadPoolExecutor" if nworkers > 1 else "sequential"
+                    logger.info(
+                        "get_meta_graph: classifying finite for %d/%d new k=%d face nodes "
+                        + "(%d already classified, %s, %d workers)",
+                        pending_finite,
+                        len(new_face_polys),
+                        int(k),
+                        len(new_face_polys) - pending_finite,
+                        mode,
+                        nworkers,
+                    )
+                    _precompute_finite(new_face_polys, nworkers)
+            for face_tag in new_face_tags:
+                meta.add_node(face_tag, **_meta_node_attrs(lookup[face_tag]))
+            known_nodes.update(new_face_tags)
 
             meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges)
 
         if enrich:
+            logger.info("get_meta_graph: enriching (boundedness/SHI propagation)")
             # Second pass: propagate boundedness/SHI information down the face poset.
             # Traverse high->low so coface attrs are already available.
+            cofaces_by_face_by_dim: dict[int, dict[Any, list[tuple[Any, dict[str, Any]]]]] = defaultdict(
+                lambda: defaultdict(list)
+            )
+            for u, v, data in meta.in_edges(data=True):
+                cofaces_by_face_by_dim[int(meta.nodes[u]["dim"])][v].append((u, data))
+
             for k in sorted(by_dim.keys(), reverse=True):
                 if int(k) <= 0:
                     continue
-                cofaces_by_face: dict[Any, list[tuple[Any, dict[str, Any]]]] = defaultdict(list)
-                for u, v, data in meta.in_edges(data=True):
-                    if int(meta.nodes[u]["dim"]) == int(k):
-                        cofaces_by_face[v].append((u, data))
-
-                for face_tag, in_edges in cofaces_by_face.items():
+                for face_tag, in_edges in cofaces_by_face_by_dim.get(int(k), {}).items():
                     # Keep cofaces aligned with `in_edges`: dropping Nones from cofaces alone would
                     # pair the wrong SHI data with the wrong poly under zip().
                     in_edges = [(u, data) for u, data in in_edges if meta.nodes[u].get("poly") is not None]
                     if not in_edges:
                         continue
 
-                    cofaces = [meta.nodes[u].get("poly") for u, _ in in_edges]
+                    cofaces = [meta.nodes[u]["poly"] for u, _ in in_edges]
 
-                    finite_vals = [getattr(p, "finite", None) for p in cofaces]
-                    if any(v is not None for v in finite_vals):
-                        finite = any(bool(v) for v in finite_vals if v is not None)
-                    else:
-                        finite = None
+                    # A face of a bounded cell is always bounded, so we can upgrade
+                    # None/False → True when any coface is known bounded.
+                    # We cannot safely infer False: two unbounded cofaces can share
+                    # a bounded face (the crossed hyperplane may cut off all rays).
+                    # Use meta-node ``finite`` (set by _meta_node_attrs) — not ``poly.finite``.
+                    if any(meta.nodes[u].get("finite") is True for u, _ in in_edges):
+                        meta.nodes[face_tag]["finite"] = True
+                        face_poly = meta.nodes[face_tag].get("poly")
+                        if face_poly is not None:
+                            face_poly._finite = True
+                            face_poly._finite_computed = True
 
                     # contract()-style SHI inference: intersect coface SHIs after removing crossed facet.
                     shis_sets: list[set[int]] = []
@@ -1304,9 +1463,14 @@ class Complex:
                         shis_sets.append(s)
                     inferred_shis = sorted(set.intersection(*shis_sets)) if shis_sets else []
 
-                    meta.nodes[face_tag]["finite"] = finite
                     meta.nodes[face_tag]["shis"] = inferred_shis
 
+        logger.info(
+            "get_meta_graph: done (%d nodes, %d edges, enrich=%s)",
+            meta.number_of_nodes(),
+            meta.number_of_edges(),
+            enrich,
+        )
         return meta
 
     @staticmethod
