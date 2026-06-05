@@ -45,8 +45,11 @@ def _diamond_boundary_model_l1_ball(radius: float = 1.0) -> nn.Sequential:
     # The extra ReLU units are "topology-only": their outgoing weights are 0, so they
     # do not affect g(x), but they *do* subdivide the decision boundary into multiple
     # cells so `get_boundary_complex()` has a meaningful cell decomposition.
+    #
+    # Small noise is added to fc0 weights so that no two neurons share an identical
+    # halfspace direction (genericity condition required by the SHI count heuristic).
     fc0 = nn.Linear(2, 6, bias=False, dtype=torch.float64)
-    fc0.weight.data[:] = torch.tensor(
+    base = torch.tensor(
         [
             [1.0, 0.0],
             [-1.0, 0.0],
@@ -57,6 +60,7 @@ def _diamond_boundary_model_l1_ball(radius: float = 1.0) -> nn.Sequential:
         ],
         dtype=torch.float64,
     )
+    fc0.weight.data[:] = base + 1e-3 * torch.randn_like(base)
 
     fc1 = nn.Linear(6, 2, bias=False, dtype=torch.float64)
     fc1.weight.data[:] = torch.tensor(
@@ -78,8 +82,9 @@ def _line_boundary_model() -> nn.Sequential:
     """ReLU network whose decision boundary is x1 = 0 (a non-compact line, homeomorphic to R)."""
     # Add extra "unused" ReLUs to subdivide the line into multiple 1-cells
     # without changing the output function.
+    # Small noise breaks the anti-parallel pair (rows 1 and 2) to satisfy genericity.
     fc0 = nn.Linear(2, 4, bias=False, dtype=torch.float64)
-    fc0.weight.data[:] = torch.tensor(
+    base = torch.tensor(
         [
             [1.0, 0.0],  # the actual decision hyperplane x1=0
             [0.0, 1.0],
@@ -88,6 +93,7 @@ def _line_boundary_model() -> nn.Sequential:
         ],
         dtype=torch.float64,
     )
+    fc0.weight.data[:] = base + 1e-3 * torch.randn_like(base)
     fc1 = nn.Linear(4, 1, bias=False, dtype=torch.float64)
     fc1.weight.data[:] = torch.tensor([[1.0, 0.0, 0.0, 0.0]], dtype=torch.float64)
     return nn.Sequential(fc0, nn.ReLU(), fc1, nn.ReLU())

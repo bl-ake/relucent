@@ -48,7 +48,7 @@ def _add_points(cplx: Complex, pts: np.ndarray) -> None:
 
 def _diamond_boundary_model(radius: float = 1.0) -> nn.Sequential:
     fc0 = nn.Linear(2, 6, bias=False, dtype=torch.float64)
-    fc0.weight.data[:] = torch.tensor(
+    base = torch.tensor(
         [
             [1.0, 0.0],
             [-1.0, 0.0],
@@ -59,6 +59,7 @@ def _diamond_boundary_model(radius: float = 1.0) -> nn.Sequential:
         ],
         dtype=torch.float64,
     )
+    fc0.weight.data[:] = base + 1e-3 * torch.randn_like(base)
     fc1 = nn.Linear(6, 2, bias=False, dtype=torch.float64)
     fc1.weight.data[:] = torch.tensor(
         [
