@@ -2,7 +2,7 @@ Topology and Persistent Homology
 ================================
 
 Relucent can compute **Betti numbers** and **persistent homology** over
-**GF(2)** on the face poset of a discovered ReLU polyhedral complex. These
+**GF(2)** on the face poset of a discovered ReLU polyhedral (sub)complex. These
 routines build on the same meta-graph convention as contraction and dual-graph
 analysis: a codimension-one face of a cell is obtained by zeroing one supporting
 hyperplane index (SHI) in the cell's sign sequence.
@@ -14,25 +14,22 @@ and :meth:`~relucent.complex.Complex.get_persistent_homology` emit a collaborati
 Prerequisites
 -------------
 
-**Complete exploration.** Local search (BFS, DFS, random walk) usually discovers
-only a *partial* complex. Missing neighbors can leave the meta-graph short of a
+**Complete exploration.** Local search methods like BFS are sufficient for computing topology *only if they run to completion*. 
+Missing neighbors can leave the meta-graph short of a
 closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
-Before topology work, explore until adjacency is complete (for example, run BFS
-with ``require_complete=True`` on :meth:`~relucent.complex.Complex.get_dual_graph`,
-or add explicit seed points until no new regions appear).
 
 **Geometry for filtrations.** Built-in filtrations such as
 :class:`~relucent.filtration.AffineOutputFiltration` and
 :class:`~relucent.filtration.TrainingDistanceFiltration` need interior points on
-cells. Either compute geometry during search or run
+cells. Either compute geometry during search (done by default) or run
 :meth:`~relucent.complex.Complex.compute_geometric_properties` afterward with
 ``properties=["interior_point", "finite"]`` (and ``"W"``, ``"b"`` when affine
 outputs are required).
 
-Graph layers
+Graph representations
 ------------
 
-Relucent uses three related graph views:
+The :class:`~relucent.complex.Complex` class exposes three related graph views:
 
 * **Dual graph** (:meth:`~relucent.complex.Complex.get_dual_graph`): adjacency of
   top-dimensional cells only.
@@ -76,24 +73,27 @@ Example:
    from relucent.filtration import ConstantFiltration
    from relucent.persistence import betti_at_filtration_end, compute_persistent_homology
 
-   cplx = relucent.Complex(relucent.mlp(widths=[2, 8, 4, 1]))
+   model = relucent.mlp(widths=[2, 8, 4, 1])
+   # We append a final ReLU to the model so that the constructed complex includes it's decision boundary.
+   # See the Network Definitions section for more details.
+   cplx = relucent.Complex(relucent.add_output_relu(model))
    cplx.bfs(max_polys=500)
 
-   betti = cplx.get_betti_numbers()
-   print(betti)  # e.g. {0: 1, 1: 0, 2: 0}
+   # Decision boundary of the last ReLU neuron (contracted chain complex)
+   db = cplx.get_boundary_complex(cplx.n - 1)
+
+   betti = db.get_betti_numbers()
+   print(betti)  # e.g. {0: 1}
 
    # Cross-check via persistent homology with a constant filtration
    diagram = compute_persistent_homology(
-       cplx,
+       db,
        ConstantFiltration(0.0),
        lower_star=False,
    )
    ph_betti = betti_at_filtration_end(diagram)
    for k in set(betti) | set(ph_betti):
        assert betti.get(k, 0) == ph_betti.get(k, 0)
-
-For an existing meta-graph (after manual truncation or compactification), use
-:meth:`~relucent.complex.Complex.get_betti_numbers_from_meta`.
 
 Persistent homology workflow
 ----------------------------
@@ -128,7 +128,6 @@ Example:
    import relucent
    from relucent.filtration import LogitSublevelFiltration
 
-   relucent.set_seeds(0)
    model = nn.Sequential(nn.Linear(1, 2), nn.ReLU(), nn.Linear(2, 1), nn.ReLU())
    cplx = relucent.Complex(model)
    cplx.bfs(start=np.array([[0.0]]), max_polys=5000)

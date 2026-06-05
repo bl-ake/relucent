@@ -93,3 +93,21 @@ If you want to inspect or reuse the canonical network before building a
    canonical = convert(model)
    cplx = Complex(canonical)
 
+5) Append A Final ReLU For Decision-Boundary Topology
+-----------------------------------------------------
+
+Classifiers are often trained without a ReLU on the output neuron. To analyze
+the decision boundary as the zero level set of a ReLU pre-activation, append a
+final ReLU while keeping all earlier weights unchanged:
+
+.. code-block:: python
+
+   import relucent
+
+   model = relucent.mlp(widths=[2, 8, 4, 1], add_last_relu=False)
+   topo_model = relucent.add_output_relu(model)
+   cplx = relucent.Complex(topo_model)
+
+This is equivalent to building the network with ``add_last_relu=True`` when
+starting from scratch, but works on any existing trained model.
+
