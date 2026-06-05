@@ -82,8 +82,14 @@ If you want to inspect or reuse the canonical network before building a
 
 .. code-block:: python
 
+   import torch.nn as nn
    from relucent import convert, Complex
 
-   canonical = convert(model_or_layer_spec)
+   model = nn.Sequential(
+       nn.Linear(4, 8),
+       nn.ReLU(),
+       nn.Linear(8, 2),
+   )
+   canonical = convert(model)
    cplx = Complex(canonical)
 

@@ -14,37 +14,60 @@ property for every region can dominate runtime and memory.
 
 The ``geometry_properties`` and ``keep_caches`` options let you choose between:
 
-1. **Faster/lighter topology-first search** (minimal work per discovered region).
-2. **Richer per-region data during search** (more work per region, but ready-to-use).
-3. **Two-phase pipelines** (topology first, then targeted geometry pass).
+1. **Default search** (standard geometry set computed per discovered region).
+2. **Topology-only search** (fastest option, SHIs and feasibility only; pass ``geometry_properties=[]``).
+3. **Custom in-search geometry** (a chosen subset of caches).
+4. **Two-phase pipelines** (topology first, then a targeted geometry pass).
+
+Default behavior
+----------------
+
+When ``geometry_properties`` is ``None``, search uses
+:data:`relucent.search.DEFAULT_GEOMETRY_PROPERTIES`:
+
+``halfspaces``, ``W``, ``b``, ``num_dead_relus``, ``finite``, ``center``,
+``inradius``, ``interior_point``, ``interior_point_norm``, and ``Wl2``.
+
+Workers always compute SHIs (supporting hyperplane indices) and feasibility;
+those are required for adjacency discovery regardless of ``geometry_properties``.
 
 Important tradeoff
 ------------------
 
-A common assumption is that topology-first search is always fastest overall. That
+A common assumption is that topology-only search is always fastest overall. That
 is not always true:
 
 - If you will later need geometry for *most* regions, doing a second pass can be
   slower end-to-end because each region may incur additional recomputation (e.g. getting its h-representation).
-- If you only need topology (or geometry for a small subset), delaying geometry
-  usually saves substantial time and memory.
+- If you only need topology (or geometry for a small subset), pass
+  ``geometry_properties=[]`` to save substantial time and memory.
 
 In practice:
 
-- Use **topology-first** for exploration and large frontier growth.
-- Use **in-search geometry** when downstream steps immediately need those values.
+- Use **topology-only** (``geometry_properties=[]``) for large frontier growth
+  when you only need adjacency or meta-graph structure.
+- Use the **default** or a **custom geometry set** when downstream steps
+  immediately need those values (for example, filtrations that read interior
+  points or affine maps).
 - Keep ``keep_caches=False`` unless repeated heavy cache reuse clearly outweighs
   memory/serialization cost.
 
 Common workflows
 ----------------
 
+The examples below assume a :class:`~relucent.complex.Complex` named ``cplx``:
+
+.. code-block:: python
+
+   import relucent
+   cplx = relucent.Complex(relucent.mlp(widths=[2, 8, 1]))
+
 Topology-only search
 ~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # SHIs + feasibility only (disable default geometry computation)
+   # SHIs + feasibility only (skip DEFAULT_GEOMETRY_PROPERTIES)
    cplx.bfs(max_polys=1000, geometry_properties=[])
 
 Compute selected geometry during search
@@ -73,7 +96,7 @@ Two-phase approach: topology first, geometry later
 
 .. code-block:: python
 
-   cplx.bfs(max_polys=1000)  # fast discovery
+   cplx.bfs(max_polys=1000, geometry_properties=[])  # fast discovery
    cplx.compute_geometric_properties(
        properties=["finite", "center", "inradius", "Wl2"],
        keep_caches=False,

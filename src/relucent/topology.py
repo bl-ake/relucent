@@ -8,12 +8,13 @@ user-provided pseudocode:
 - compute Betti numbers from boundary ranks
 
 Notes:
-- Coefficients are in GF(2), so orientations are irrelevant.
-- Cells are represented by :class:`relucent.poly.Polyhedron` objects; a codimension-1
+
+* Coefficients are in GF(2), so orientations are irrelevant.
+* Cells are represented by :class:`relucent.poly.Polyhedron` objects; a codimension-1
   facet of a cell is obtained by setting one nonzero sign entry to 0.
-- :func:`get_betti_numbers` uses every codimension-one face incidence encoded in ``meta``.
+* :func:`get_betti_numbers` uses every codimension-one face incidence encoded in ``meta``.
   Truncation and Borel–Moore-style boundaries are handled on :class:`~relucent.complex.Complex`.
-- Pass ``verify_chain_complex=True`` to require ``∂²=0`` on the assembled boundary maps;
+* Pass ``verify_chain_complex=True`` to require ``∂²=0`` on the assembled boundary maps;
   the check uses a packed GF(2) multiply (stacked rows), not dense integer matmuls.
 """
 
