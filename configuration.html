@@ -22,7 +22,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Complex" href="complex.html" />
-    <link rel="prev" title="Search Geometry and Cache Strategy" href="search_geometry.html" />
+    <link rel="prev" title="Topology and Persistent Homology" href="topology.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -61,10 +61,12 @@
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#append-a-final-relu-for-decision-boundary-topology">5) Append A Final ReLU For Decision-Boundary Topology</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#default-behavior">Default behavior</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
@@ -76,6 +78,14 @@
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#graph-representations">Graph representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#betti-numbers">Betti numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#persistent-homology-workflow">Persistent homology workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
+</ul>
+</li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#changing-settings">Changing settings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
@@ -84,6 +94,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#topology-and-logging">Topology and logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#utilities-and-visualization">Utilities and visualization</a></li>
 </ul>
 </li>
@@ -99,7 +110,11 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">Complex.finite_cells_subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.one_point_compactify_meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.truncate_meta_graph()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
@@ -116,6 +131,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_chain_complex()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.get_persistent_homology()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
@@ -133,6 +149,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncation_vertex_id_mapper"><code class="docutils literal notranslate"><span class="pre">Complex.truncation_vertex_id_mapper()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.verify_dual_graph_consistency"><code class="docutils literal notranslate"><span class="pre">Complex.verify_dual_graph_consistency()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">Complex.without_last_layer_neuron()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
@@ -192,9 +209,69 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration.combine"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.combine</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration"><code class="docutils literal notranslate"><span class="pre">Filtration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">Filtration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.values_for_meta"><code class="docutils literal notranslate"><span class="pre">Filtration.values_for_meta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.lower_star"><code class="docutils literal notranslate"><span class="pre">Filtration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.LogitSublevelFiltration"><code class="docutils literal notranslate"><span class="pre">LogitSublevelFiltration</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration.raw_cell_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.lower_star_extension"><code class="docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -317,37 +394,42 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p>Feasibility tolerance for halfspace containment (<span class="math notranslate nohighlight">\(a^\top x + b \le 0\)</span>) in checks and related geometry.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_DEAD_RELU</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_INTERIOR_VERIFY</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-5</span></code></p></td>
+<td><p>After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than <code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code> for solver noise).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_DEAD_RELU</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-8</span></code></p></td>
 <td><p>Column norm below which a ReLU is treated as dead.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_HYPERPLANE</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_HYPERPLANE</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p>Hyperplane equality tolerance in SHI computation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_NORMAL</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_NORMAL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-12</span></code></p></td>
 <td><p>Norms below this are treated as degenerate halfspace normals.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_OBJ_STOP</span></code> / <code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_BD_STOP</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_OBJ_STOP</span></code> / <code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_BD_STOP</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code> / <code class="docutils literal notranslate"><span class="pre">-1e-6</span></code></p></td>
 <td><p>Gurobi early-stop tolerances for the SHI MIP models.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-10</span></code></p></td>
 <td><p>2D plotting: halfspace normals with small <code class="docutils literal notranslate"><span class="pre">w[1]</span></code> are treated as vertical.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
 <td><p>Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">allclose</span></code> atol when verifying halfspace <code class="docutils literal notranslate"><span class="pre">(A,</span> <span class="pre">b)</span></code> against network outputs.</p></td>
@@ -410,6 +492,36 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 </tr>
 </tbody>
 </table>
+<section id="topology-and-logging">
+<h3>Topology and logging<a class="headerlink" href="#topology-and-logging" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19.6%" />
+<col style="width: 25.0%" />
+<col style="width: 10.7%" />
+<col style="width: 44.6%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Role</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2.0</span></code></p></td>
+<td><p>When merging geometric vertices with combinatorial intrinsic vertices, accept a match if <span class="math notranslate nohighlight">\(\|x - x_\mathrm{intrinsic}\|_\infty \le\)</span> this factor times the containment tolerance.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
+<td><p>Package logging level during search and parallel work: <code class="docutils literal notranslate"><span class="pre">0</span></code> → WARNING only; <code class="docutils literal notranslate"><span class="pre">1</span></code> → INFO (worker counts, meta-graph progress, …). Also adjustable at runtime via <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a>.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="utilities-and-visualization">
 <h3>Utilities and visualization<a class="headerlink" href="#utilities-and-visualization" title="Link to this heading"></a></h3>
 <table class="docutils align-default">
@@ -477,8 +589,15 @@ attributes requested in <code class="docutils literal notranslate"><span class="
 <code class="docutils literal notranslate"><span class="pre">&quot;interior_point&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;interior_point_norm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;vertices&quot;</span></code>,
 <code class="docutils literal notranslate"><span class="pre">&quot;hs&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ch&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code>.</p>
 <p>Examples:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Topology-only search (default): SHIs + feasibility only</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+<span class="n">cx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">relucent</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">widths</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">]))</span>
+
+<span class="c1"># Default search: SHIs plus the standard geometry set (halfspaces, W, b,</span>
+<span class="c1"># finite, center, inradius, interior_point, interior_point_norm, Wl2)</span>
 <span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+
+<span class="c1"># Topology-only search: SHIs + feasibility only (no extra geometry caches)</span>
+<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[])</span>
 
 <span class="c1"># Compute only finite/interior-point info during search</span>
 <span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span>
@@ -501,7 +620,7 @@ attributes requested in <code class="docutils literal notranslate"><span class="
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="search_geometry.html" class="btn btn-neutral float-left" title="Search Geometry and Cache Strategy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="topology.html" class="btn btn-neutral float-left" title="Topology and Persistent Homology" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="complex.html" class="btn btn-neutral float-right" title="Complex" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

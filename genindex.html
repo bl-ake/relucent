@@ -57,10 +57,12 @@
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#append-a-final-relu-for-decision-boundary-topology">5) Append A Final ReLU For Decision-Boundary Topology</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#default-behavior">Default behavior</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
@@ -72,6 +74,14 @@
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#graph-representations">Graph representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#betti-numbers">Betti numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#persistent-homology-workflow">Persistent homology workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#changing-settings">Changing settings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#environment-variables">Environment variables</a></li>
@@ -80,6 +90,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#topology-and-logging">Topology and logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="configuration.html#utilities-and-visualization">Utilities and visualization</a></li>
 </ul>
 </li>
@@ -95,7 +106,11 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">Complex.finite_cells_subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.one_point_compactify_meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.truncate_meta_graph()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
@@ -112,6 +127,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_chain_complex()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.get_persistent_homology()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
@@ -129,6 +145,7 @@
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncation_vertex_id_mapper"><code class="docutils literal notranslate"><span class="pre">Complex.truncation_vertex_id_mapper()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.verify_dual_graph_consistency"><code class="docutils literal notranslate"><span class="pre">Complex.verify_dual_graph_consistency()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">Complex.without_last_layer_neuron()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
@@ -188,9 +205,69 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration.combine"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.combine</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration"><code class="docutils literal notranslate"><span class="pre">Filtration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">Filtration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.values_for_meta"><code class="docutils literal notranslate"><span class="pre">Filtration.values_for_meta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration.lower_star"><code class="docutils literal notranslate"><span class="pre">Filtration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.LogitSublevelFiltration"><code class="docutils literal notranslate"><span class="pre">LogitSublevelFiltration</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration.raw_cell_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.lower_star_extension"><code class="docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -232,7 +309,9 @@
  | <a href="#H"><strong>H</strong></a>
  | <a href="#I"><strong>I</strong></a>
  | <a href="#L"><strong>L</strong></a>
+ | <a href="#M"><strong>M</strong></a>
  | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
@@ -246,6 +325,8 @@
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="utilities.html#relucent.add_output_relu">add_output_relu() (in module relucent)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.add_point">add_point() (relucent.Complex method)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.add_polyhedron">add_polyhedron() (relucent.Complex method)</a>
@@ -253,6 +334,8 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.add_ss">add_ss() (relucent.Complex method)</a>
+</li>
+      <li><a href="filtration.html#relucent.filtration.AffineOutputFiltration">AffineOutputFiltration (class in relucent.filtration)</a>
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.ambient_dim">ambient_dim (relucent.Polyhedron property)</a>
 </li>
@@ -264,9 +347,17 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.b">b (relucent.Polyhedron property)</a>
 </li>
+      <li><a href="persistence.html#relucent.persistence.betti_at_filtration_end">betti_at_filtration_end() (in module relucent.persistence)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.betti_curve">betti_curve() (in module relucent.persistence)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.bfs">bfs() (relucent.Complex method)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair.birth">birth (relucent.persistence.PersistencePair attribute)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair.birth_cell">birth_cell (relucent.persistence.PersistencePair attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -274,9 +365,13 @@
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="persistence.html#relucent.persistence.PersistenceDiagram.cell_filtration">cell_filtration (relucent.persistence.PersistenceDiagram attribute)</a>
+</li>
       <li><a href="polyhedron.html#relucent.Polyhedron.center">center (relucent.Polyhedron property)</a>
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.ch">ch (relucent.Polyhedron property)</a>
+</li>
+      <li><a href="topology_api.html#relucent.topology.ChainComplexInconsistent">ChainComplexInconsistent</a>
 </li>
       <li><a href="complex.html#relucent.Complex.clean_data">clean_data() (relucent.Complex method)</a>
 
@@ -288,9 +383,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.codim">codim (relucent.Polyhedron property)</a>
 </li>
+      <li><a href="filtration.html#relucent.filtration.AffineOutputFiltration.combine">combine (relucent.filtration.AffineOutputFiltration attribute)</a>
+</li>
       <li><a href="complex.html#relucent.Complex">Complex (class in relucent)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.compute_geometric_properties">compute_geometric_properties() (relucent.Complex method)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.compute_persistent_homology">compute_persistent_homology() (in module relucent.persistence)</a>
+</li>
+      <li><a href="filtration.html#relucent.filtration.ConstantFiltration">ConstantFiltration (class in relucent.filtration)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.contract">contract() (relucent.Complex method)</a>
 </li>
@@ -300,6 +401,10 @@
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair.death">death (relucent.persistence.PersistencePair attribute)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair.death_cell">death_cell (relucent.persistence.PersistencePair attribute)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.dfs">dfs() (relucent.Complex method)</a>
 </li>
   </ul></td>
@@ -310,6 +415,8 @@
         <li><a href="polyhedron.html#relucent.Polyhedron.dim">(relucent.Polyhedron property)</a>
 </li>
       </ul></li>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair.dimension">dimension (relucent.persistence.PersistencePair attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -326,11 +433,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.faces">faces (relucent.Polyhedron property)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.feasible">feasible (relucent.Polyhedron property)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="filtration.html#relucent.filtration.Filtration">Filtration (class in relucent.filtration)</a>
+</li>
       <li><a href="polyhedron.html#relucent.Polyhedron.finite">finite (relucent.Polyhedron property)</a>
+</li>
+      <li><a href="complex.html#relucent.Complex.finite_cells_subgraph">finite_cells_subgraph() (relucent.Complex static method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -340,7 +451,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.G">G (relucent.Complex property)</a>
 </li>
-      <li><a href="complex.html#relucent.Complex.get_betti_numbers">get_betti_numbers() (relucent.Complex method)</a>
+      <li><a href="topology_api.html#relucent.topology.get_betti_numbers">get_betti_numbers() (in module relucent.topology)</a>
+
+      <ul>
+        <li><a href="complex.html#relucent.Complex.get_betti_numbers">(relucent.Complex method)</a>
+</li>
+      </ul></li>
+      <li><a href="complex.html#relucent.Complex.get_betti_numbers_from_meta">get_betti_numbers_from_meta() (relucent.Complex class method)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.get_boundary_cells">get_boundary_cells() (relucent.Complex method)</a>
 </li>
@@ -358,10 +475,10 @@
 </li>
       <li><a href="complex.html#relucent.Complex.get_chain_complex">get_chain_complex() (relucent.Complex method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.get_dual_graph">get_dual_graph() (relucent.Complex method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="utilities.html#relucent.get_env">get_env() (in module relucent)</a>
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.get_face">get_face() (relucent.Polyhedron method)</a>
@@ -376,7 +493,17 @@
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.get_neighbor">get_neighbor() (relucent.Polyhedron method)</a>
 </li>
+      <li><a href="complex.html#relucent.Complex.get_persistent_homology">get_persistent_homology() (relucent.Complex method)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.get_poly_attrs">get_poly_attrs() (relucent.Complex method)</a>
+</li>
+      <li><a href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows">gf2_matmul_packed_stacked_rows() (in module relucent.topology)</a>
+</li>
+      <li><a href="topology_api.html#relucent.topology.gf2_rank_boundary">gf2_rank_boundary() (in module relucent.topology)</a>
+</li>
+      <li><a href="topology_api.html#relucent.topology.gf2_rank_packed">gf2_rank_packed() (in module relucent.topology)</a>
+</li>
+      <li><a href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets">gf2_rank_sparse_rowsets() (in module relucent.topology)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.greedy_path">greedy_path() (relucent.Complex method)</a>
 </li>
@@ -424,8 +551,37 @@
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.load">load() (relucent.Complex static method)</a>
+      <li><a href="complex.html#relucent.Complex.load">load() (relucent.Complex class method)</a>
 </li>
+      <li><a href="filtration.html#relucent.filtration.LogitSublevelFiltration">LogitSublevelFiltration (class in relucent.filtration)</a>
+</li>
+      <li><a href="filtration.html#relucent.filtration.ConstantFiltration.lower_star">lower_star (relucent.filtration.ConstantFiltration attribute)</a>
+
+      <ul>
+        <li><a href="filtration.html#relucent.filtration.Filtration.lower_star">(relucent.filtration.Filtration attribute)</a>
+</li>
+        <li><a href="filtration.html#relucent.filtration.NeuronActivationFiltration.lower_star">(relucent.filtration.NeuronActivationFiltration attribute)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="filtration.html#relucent.filtration.lower_star_extension">lower_star_extension() (in module relucent.filtration)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="M">M</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    module
+
+      <ul>
+        <li><a href="filtration.html#module-relucent.filtration">relucent.filtration</a>
+</li>
+        <li><a href="topology_api.html#module-relucent.topology">relucent.topology</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
@@ -435,6 +591,8 @@
       <li><a href="complex.html#relucent.Complex.n">n (relucent.Complex property)</a>
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.net">net (relucent.Polyhedron property)</a>
+</li>
+      <li><a href="filtration.html#relucent.filtration.NeuronActivationFiltration">NeuronActivationFiltration (class in relucent.filtration)</a>
 </li>
       <li><a href="polyhedron.html#relucent.Polyhedron.nflips">nflips() (relucent.Polyhedron method)</a>
 </li>
@@ -451,17 +609,35 @@
   </ul></td>
 </tr></table>
 
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="complex.html#relucent.Complex.one_point_compactify_meta_graph">one_point_compactify_meta_graph() (relucent.Complex static method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="persistence.html#relucent.persistence.PersistenceDiagram.pairs">pairs (relucent.persistence.PersistenceDiagram attribute)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.parallel_add">parallel_add() (relucent.Complex method)</a>
 </li>
+      <li><a href="persistence.html#relucent.persistence.PersistenceDiagram">PersistenceDiagram (class in relucent.persistence)</a>
+</li>
+      <li><a href="persistence.html#relucent.persistence.PersistencePair">PersistencePair (class in relucent.persistence)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.plot">plot() (relucent.Complex method)</a>
+
+      <ul>
+        <li><a href="persistence.html#relucent.persistence.PersistenceDiagram.plot">(relucent.persistence.PersistenceDiagram method)</a>
 </li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.plot_cells">plot_cells() (relucent.Polyhedron method)</a>
-</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="polyhedron.html#relucent.Polyhedron.plot_cells">plot_cells() (relucent.Polyhedron method)</a>
+</li>
       <li><a href="polyhedron.html#relucent.Polyhedron.plot_graph">plot_graph() (relucent.Polyhedron method)</a>
 </li>
       <li><a href="complex.html#relucent.Complex.point2poly">point2poly() (relucent.Complex method)</a>
@@ -478,10 +654,36 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.random_walk">random_walk() (relucent.Complex method)</a>
 </li>
+      <li><a href="filtration.html#relucent.filtration.AffineOutputFiltration.raw_cell_value">raw_cell_value() (relucent.filtration.AffineOutputFiltration method)</a>
+
+      <ul>
+        <li><a href="filtration.html#relucent.filtration.ConstantFiltration.raw_cell_value">(relucent.filtration.ConstantFiltration method)</a>
+</li>
+        <li><a href="filtration.html#relucent.filtration.Filtration.raw_cell_value">(relucent.filtration.Filtration method)</a>
+</li>
+        <li><a href="filtration.html#relucent.filtration.NeuronActivationFiltration.raw_cell_value">(relucent.filtration.NeuronActivationFiltration method)</a>
+</li>
+        <li><a href="filtration.html#relucent.filtration.TrainingDistanceFiltration.raw_cell_value">(relucent.filtration.TrainingDistanceFiltration method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="complex.html#relucent.Complex.recover_from_dual_graph">recover_from_dual_graph() (relucent.Complex method)</a>
 </li>
+      <li>
+    relucent.filtration
+
+      <ul>
+        <li><a href="filtration.html#module-relucent.filtration">module</a>
+</li>
+      </ul></li>
+      <li>
+    relucent.topology
+
+      <ul>
+        <li><a href="topology_api.html#module-relucent.topology">module</a>
+</li>
+      </ul></li>
       <li><a href="polyhedron.html#relucent.Polyhedron.remove_shi">remove_shi() (relucent.Polyhedron method)</a>
 </li>
   </ul></td>
@@ -518,8 +720,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="polyhedron.html#relucent.Polyhedron.tag">tag (relucent.Polyhedron property)</a>
 </li>
+      <li><a href="filtration.html#relucent.filtration.TrainingDistanceFiltration">TrainingDistanceFiltration (class in relucent.filtration)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="complex.html#relucent.Complex.truncate_meta_graph">truncate_meta_graph() (relucent.Complex static method)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.truncation_vertex_id_mapper">truncation_vertex_id_mapper() (relucent.Complex method)</a>
 </li>
   </ul></td>
@@ -536,6 +742,8 @@
 <h2 id="V">V</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="filtration.html#relucent.filtration.Filtration.values_for_meta">values_for_meta() (relucent.filtration.Filtration method)</a>
+</li>
       <li><a href="complex.html#relucent.Complex.verify_dual_graph_consistency">verify_dual_graph_consistency() (relucent.Complex method)</a>
 </li>
   </ul></td>
@@ -554,6 +762,8 @@
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="complex.html#relucent.Complex.without_last_layer_neuron">without_last_layer_neuron() (relucent.Complex method)</a>
+</li>
       <li><a href="polyhedron.html#relucent.Polyhedron.Wl2">Wl2 (relucent.Polyhedron property)</a>
 </li>
   </ul></td>

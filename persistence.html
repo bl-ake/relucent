@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation</title>
+  <title>Relucent Documentation: Persistence API</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -20,7 +20,8 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="next" title="Topology (GF(2))" href="topology_api.html" />
+    <link rel="prev" title="Filtrations" href="filtration.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -33,7 +34,7 @@
 
           
           
-          <a href="#" class="icon icon-home">
+          <a href="index.html" class="icon icon-home">
             relucent
           </a>
 <div role="search">
@@ -105,7 +106,7 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
@@ -237,24 +238,24 @@
 <li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.filtration.lower_star_extension"><code class="docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Persistence API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
@@ -280,17 +281,17 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">relucent</a>
+          <a href="index.html">relucent</a>
       </nav>
 
       <div class="wy-nav-content">
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Relucent Documentation</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Persistence API</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/persistence.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -298,53 +299,171 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <a class="reference internal image-reference" href="_images/title.svg"><img alt="Relucent" class="align-center" src="_images/title.svg" style="width: 420px;" />
-</a>
-<div style="margin-bottom: 1.25rem;"></div><p>Relucent computes and visualizes the polyhedral structure induced by ReLU neural
-networks. It helps you explore activation regions, compute
-their geometric properties, and analyze how they are connected to each other.</p>
-<p>Core capabilities include:</p>
-<ul class="simple">
-<li><p>Distributed local-search routines for discovering activation regions.</p></li>
-<li><p>Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).</p></li>
-<li><p>Complex-level analyses and graph-based views of region adjacency.</p></li>
-<li><p>2D and 3D visualizations using Plotly and matplotlib-backed utilities.</p></li>
-<li><p>Native compatibility with PyTorch models</p></li>
+  <section id="persistence-api">
+<h1>Persistence API<a class="headerlink" href="#persistence-api" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.persistence.</span></span><span class="sig-name descname"><span class="pre">PersistencePair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dimension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">birth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">death</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">birth_cell</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">death_cell</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.persistence.PersistencePair" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Birth–death pair for a homology class over GF(2).</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair.dimension">
+<span class="sig-name descname"><span class="pre">dimension</span></span><a class="headerlink" href="#relucent.persistence.PersistencePair.dimension" title="Link to this definition"></a></dt>
+<dd><p>Homological degree of the born feature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair.birth">
+<span class="sig-name descname"><span class="pre">birth</span></span><a class="headerlink" href="#relucent.persistence.PersistencePair.birth" title="Link to this definition"></a></dt>
+<dd><p>Filtration value at which the class is born.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair.death">
+<span class="sig-name descname"><span class="pre">death</span></span><a class="headerlink" href="#relucent.persistence.PersistencePair.death" title="Link to this definition"></a></dt>
+<dd><p>Filtration value at which the class dies (<code class="docutils literal notranslate"><span class="pre">math.inf</span></code> if essential).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair.birth_cell">
+<span class="sig-name descname"><span class="pre">birth_cell</span></span><a class="headerlink" href="#relucent.persistence.PersistencePair.birth_cell" title="Link to this definition"></a></dt>
+<dd><p>Meta-graph node key for the birth simplex.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistencePair.death_cell">
+<span class="sig-name descname"><span class="pre">death_cell</span></span><a class="headerlink" href="#relucent.persistence.PersistencePair.death_cell" title="Link to this definition"></a></dt>
+<dd><p>Meta-graph node key for the death simplex (<code class="docutils literal notranslate"><span class="pre">None</span></code> if essential).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.persistence.PersistenceDiagram">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.persistence.</span></span><span class="sig-name descname"><span class="pre">PersistenceDiagram</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pairs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.persistence.PersistencePair" title="relucent.persistence.PersistencePair"><span class="pre">PersistencePair</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cell_filtration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.persistence.PersistenceDiagram" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Persistence diagram bundled with the filtration values used.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.persistence.PersistenceDiagram.plot">
+<span class="sig-name descname"><span class="pre">plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_death</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_diagonal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Persistence</span> <span class="pre">diagram'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="headerlink" href="#relucent.persistence.PersistenceDiagram.plot" title="Link to this definition"></a></dt>
+<dd><p>Plot this diagram via <code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.vis.plot_persistence_diagram()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <code class="xref py py-class docutils literal notranslate"><span class="pre">plotly.graph_objects.Figure</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistenceDiagram.cell_filtration">
+<span class="sig-name descname"><span class="pre">cell_filtration</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.persistence.PersistenceDiagram.cell_filtration" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.persistence.PersistenceDiagram.pairs">
+<span class="sig-name descname"><span class="pre">pairs</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.persistence.PersistencePair" title="relucent.persistence.PersistencePair"><span class="pre">PersistencePair</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.persistence.PersistenceDiagram.pairs" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.persistence.compute_persistent_homology">
+<span class="sig-prename descclassname"><span class="pre">relucent.persistence.</span></span><span class="sig-name descname"><span class="pre">compute_persistent_homology</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cplx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="complex.html#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filtration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="filtration.html#relucent.filtration.Filtration" title="relucent.filtration.Filtration"><span class="pre">Filtration</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">compactify</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">respect_finite</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lower_star</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram" title="relucent.persistence.PersistenceDiagram"><span class="pre">PersistenceDiagram</span></a></span></span><a class="headerlink" href="#relucent.persistence.compute_persistent_homology" title="Link to this definition"></a></dt>
+<dd><p>Compute persistence pairs for a filtration on a <a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a>.</p>
+<p>Cells are ordered by <code class="docutils literal notranslate"><span class="pre">(filtration</span> <span class="pre">value,</span> <span class="pre">dimension,</span> <span class="pre">stable</span> <span class="pre">node</span> <span class="pre">key)</span></code>. Boundary
+columns are built from meta-graph face incidences (same convention as
+<a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers" title="relucent.topology.get_betti_numbers"><code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.topology.get_betti_numbers()</span></code></a>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cplx</strong> – Polyhedral complex from breadth-first search / exploration.</p></li>
+<li><p><strong>filtration</strong> – Filtration assigning a real value to each cell.</p></li>
+<li><p><strong>compactify</strong> – If True, drop face incidences with fewer than two cofaces (Borel–Moore
+style), matching <a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers" title="relucent.topology.get_betti_numbers"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a>.</p></li>
+<li><p><strong>respect_finite</strong> – Restrict to cells with <code class="docutils literal notranslate"><span class="pre">finite</span> <span class="pre">is</span> <span class="pre">True</span></code> on the meta-graph.</p></li>
+<li><p><strong>lower_star</strong> – If True, extend values to higher cells by
+<code class="docutils literal notranslate"><span class="pre">f(σ)</span> <span class="pre">=</span> <span class="pre">max_{τ</span> <span class="pre">≤</span> <span class="pre">σ}</span> <span class="pre">f(τ)</span></code> (sublevel-set convention). If None, use
+<code class="docutils literal notranslate"><span class="pre">filtration.lower_star</span></code> (default True for built-in filtrations).</p></li>
+<li><p><strong>verbose</strong> – Progress lines on stderr.</p></li>
 </ul>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a></li>
-<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#relucent.persistence.PersistenceDiagram" title="relucent.persistence.PersistenceDiagram"><code class="xref py py-class docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a> with finite and essential pairs over GF(2).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.persistence.betti_at_filtration_end">
+<span class="sig-prename descclassname"><span class="pre">relucent.persistence.</span></span><span class="sig-name descname"><span class="pre">betti_at_filtration_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">diagram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram" title="relucent.persistence.PersistenceDiagram"><span class="pre">PersistenceDiagram</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.persistence.betti_at_filtration_end" title="Link to this definition"></a></dt>
+<dd><p>Betti numbers after all cells in <code class="docutils literal notranslate"><span class="pre">diagram</span></code> have entered the filtration.</p>
+<p>Evaluates <a class="reference internal" href="#relucent.persistence.betti_curve" title="relucent.persistence.betti_curve"><code class="xref py py-func docutils literal notranslate"><span class="pre">betti_curve()</span></code></a> at <code class="docutils literal notranslate"><span class="pre">max(cell_filtration)</span> <span class="pre">+</span> <span class="pre">margin</span></code>, which matches
+the homology of the full meta-graph complex when paired with a constant filtration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>diagram</strong> – Persistence diagram from <a class="reference internal" href="#relucent.persistence.compute_persistent_homology" title="relucent.persistence.compute_persistent_homology"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a>.</p></li>
+<li><p><strong>margin</strong> – Added to the maximum cell filtration value to form the evaluation
+threshold (must be positive if all values are equal).</p></li>
 </ul>
-</div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a></li>
-<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">{k:</span> <span class="pre">β_k}</span></code> including dimensions with <code class="docutils literal notranslate"><span class="pre">β_k</span> <span class="pre">=</span> <span class="pre">0</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.persistence.betti_curve">
+<span class="sig-prename descclassname"><span class="pre">relucent.persistence.</span></span><span class="sig-name descname"><span class="pre">betti_curve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">diagram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#relucent.persistence.PersistenceDiagram" title="relucent.persistence.PersistenceDiagram"><span class="pre">PersistenceDiagram</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">thresholds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.persistence.betti_curve" title="Link to this definition"></a></dt>
+<dd><p>Betti numbers β_k at each filtration threshold (right-continuous counting).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>diagram</strong> – Output of <a class="reference internal" href="#relucent.persistence.compute_persistent_homology" title="relucent.persistence.compute_persistent_homology"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a>.</p></li>
+<li><p><strong>thresholds</strong> – Filtration values at which to evaluate β_k.</p></li>
+<li><p><strong>max_dim</strong> – Maximum homological dimension to report (default: max in pairs).</p></li>
 </ul>
-</div>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
-<ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
-</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">{k:</span> <span class="pre">array</span> <span class="pre">of</span> <span class="pre">length</span> <span class="pre">len(thresholds)}</span></code> counting classes with birth ≤ t &lt; death.</p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="filtration.html" class="btn btn-neutral float-left" title="Filtrations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="topology_api.html" class="btn btn-neutral float-right" title="Topology (GF(2))" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

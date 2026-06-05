@@ -94,6 +94,10 @@ Polyhedron and halfspace geometry
      - ``float``
      - ``1e-6``
      - Feasibility tolerance for halfspace containment (:math:`a^\top x + b \le 0`) in checks and related geometry.
+   * - ``TOL_INTERIOR_VERIFY``
+     - ``float``
+     - ``1e-5``
+     - After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than ``TOL_HALFSPACE_CONTAINMENT`` for solver noise).
    * - ``TOL_DEAD_RELU``
      - ``float``
      - ``1e-8``
@@ -163,6 +167,26 @@ Complex search and parallel add
      - ``10000``
      - Default bound for :meth:`~relucent.complex.Complex.plot_cells` when ``bound`` is omitted.
 
+Topology and logging
+~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 28 12 50
+
+   * - Name
+     - Type
+     - Default
+     - Role
+   * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
+     - ``float``
+     - ``2.0``
+     - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.
+   * - ``VERBOSE``
+     - ``int``
+     - ``1``
+     - Package logging level during search and parallel work: ``0`` → WARNING only; ``1`` → INFO (worker counts, meta-graph progress, …). Also adjustable at runtime via :func:`~relucent.config.update_settings`.
+
 Utilities and visualization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -207,8 +231,15 @@ Common property names include ``"halfspaces"``, ``"W"``, ``"b"``,
 
 Examples::
 
-   # Topology-only search (default): SHIs + feasibility only
+   import relucent
+   cx = relucent.Complex(relucent.mlp(widths=[2, 4, 1]))
+
+   # Default search: SHIs plus the standard geometry set (halfspaces, W, b,
+   # finite, center, inradius, interior_point, interior_point_norm, Wl2)
    cx.searcher(max_polys=1000)
+
+   # Topology-only search: SHIs + feasibility only (no extra geometry caches)
+   cx.searcher(max_polys=1000, geometry_properties=[])
 
    # Compute only finite/interior-point info during search
    cx.searcher(

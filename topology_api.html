@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation</title>
+  <title>Relucent Documentation: Topology (GF(2))</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -20,7 +20,8 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="next" title="Utility Functions" href="utilities.html" />
+    <link rel="prev" title="Persistence API" href="persistence.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -33,7 +34,7 @@
 
           
           
-          <a href="#" class="icon icon-home">
+          <a href="index.html" class="icon icon-home">
             relucent
           </a>
 <div role="search">
@@ -105,7 +106,7 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
@@ -257,13 +258,13 @@
 <li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Topology (GF(2))</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
@@ -280,17 +281,17 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">relucent</a>
+          <a href="index.html">relucent</a>
       </nav>
 
       <div class="wy-nav-content">
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Relucent Documentation</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Topology (GF(2))</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/topology_api.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -298,53 +299,134 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <a class="reference internal image-reference" href="_images/title.svg"><img alt="Relucent" class="align-center" src="_images/title.svg" style="width: 420px;" />
-</a>
-<div style="margin-bottom: 1.25rem;"></div><p>Relucent computes and visualizes the polyhedral structure induced by ReLU neural
-networks. It helps you explore activation regions, compute
-their geometric properties, and analyze how they are connected to each other.</p>
-<p>Core capabilities include:</p>
+  <section id="module-relucent.topology">
+<span id="topology-gf-2"></span><h1>Topology (GF(2))<a class="headerlink" href="#module-relucent.topology" title="Link to this heading"></a></h1>
+<p>Topology helpers: Betti numbers over GF(2) for ReLU cell complexes.</p>
+<p>This module implements the “direct boundary matrix” approach described in the
+user-provided pseudocode:</p>
 <ul class="simple">
-<li><p>Distributed local-search routines for discovering activation regions.</p></li>
-<li><p>Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).</p></li>
-<li><p>Complex-level analyses and graph-based views of region adjacency.</p></li>
-<li><p>2D and 3D visualizations using Plotly and matplotlib-backed utilities.</p></li>
-<li><p>Native compatibility with PyTorch models</p></li>
+<li><p>build a chosen subcomplex and close under faces</p></li>
+<li><p>construct boundary operators ∂_k over GF(2)</p></li>
+<li><p>compute Betti numbers from boundary ranks</p></li>
 </ul>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a></li>
-<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
-</ul>
-</div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a></li>
-<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
-</ul>
-</div>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
+<p>Notes:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+<li><p>Coefficients are in GF(2), so orientations are irrelevant.</p></li>
+<li><p>Cells are represented by <a class="reference internal" href="polyhedron.html#relucent.Polyhedron" title="relucent.poly.Polyhedron"><code class="xref py py-class docutils literal notranslate"><span class="pre">relucent.poly.Polyhedron</span></code></a> objects; a codimension-1
+facet of a cell is obtained by setting one nonzero sign entry to 0.</p></li>
+<li><p><a class="reference internal" href="#relucent.topology.get_betti_numbers" title="relucent.topology.get_betti_numbers"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a> uses every codimension-one face incidence encoded in <code class="docutils literal notranslate"><span class="pre">meta</span></code>.
+Truncation and Borel–Moore-style boundaries are handled on <a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a>.</p></li>
+<li><p>Pass <code class="docutils literal notranslate"><span class="pre">verify_chain_complex=True</span></code> to require <code class="docutils literal notranslate"><span class="pre">∂²=0</span></code> on the assembled boundary maps;
+the check uses a packed GF(2) multiply (stacked rows), not dense integer matmuls.</p></li>
 </ul>
+<dl class="py exception">
+<dt class="sig sig-object py" id="relucent.topology.ChainComplexInconsistent">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">ChainComplexInconsistent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">violations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.topology.ChainComplexInconsistent" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">RuntimeError</span></code></p>
+<p>Meta-graph boundary maps do not compose to zero (∂²≠0 over GF(2)).</p>
+<p>In that situation the rank formula <code class="docutils literal notranslate"><span class="pre">β_k</span> <span class="pre">=</span> <span class="pre">n_k</span> <span class="pre">-</span> <span class="pre">rank(∂_k)</span> <span class="pre">-</span> <span class="pre">rank(∂_{k+1})</span></code> is not
+guaranteed to count homology and can even be negative. See <code class="docutils literal notranslate"><span class="pre">violations</span></code> for where
+<code class="docutils literal notranslate"><span class="pre">∂_k</span> <span class="pre">∘</span> <span class="pre">∂_{k+1}</span></code> is nonzero mod 2.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.topology.get_betti_numbers">
+<span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">get_betti_numbers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">meta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">require_shared_faces</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify_chain_complex</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.topology.get_betti_numbers" title="Link to this definition"></a></dt>
+<dd><p>Compute Betti numbers from face incidences in <code class="docutils literal notranslate"><span class="pre">meta</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>meta</strong> – Face poset as a NetworkX <code class="docutils literal notranslate"><span class="pre">MultiDiGraph</span></code> from
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_meta_graph()</span></code> (optionally truncated or
+restricted to finite cells first).</p></li>
+<li><p><strong>require_shared_faces</strong> – If True, only incidences where a codimension-one face has at
+least two cofaces (Borel–Moore-style). Default False counts every meta edge.
+Set by <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_betti_numbers_from_meta()</span></code> when
+<code class="docutils literal notranslate"><span class="pre">compactify=True</span></code>.</p></li>
+<li><p><strong>reduced</strong> – If True, return reduced homology (β̃₀ = β₀ - 1 for nonempty complexes).</p></li>
+<li><p><strong>verify_chain_complex</strong> – If True, require <code class="docutils literal notranslate"><span class="pre">∂_k</span> <span class="pre">∘</span> <span class="pre">∂_{k+1}</span> <span class="pre">=</span> <span class="pre">0</span></code> (mod 2) for every <code class="docutils literal notranslate"><span class="pre">k</span></code>
+where both maps exist; otherwise raise <a class="reference internal" href="#relucent.topology.ChainComplexInconsistent" title="relucent.topology.ChainComplexInconsistent"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a>.</p></li>
+<li><p><strong>verbose</strong> – If True, print short progress lines to stderr.</p></li>
+<li><p><strong>nworkers</strong> – Number of threads to use for ranking independent boundary maps concurrently.
+<code class="docutils literal notranslate"><span class="pre">None</span></code> (default): automatically use one thread per non-trivial map when the C
+backend is available; falls back to sequential for pure-Python rank.
+<code class="docutils literal notranslate"><span class="pre">1</span></code> or <code class="docutils literal notranslate"><span class="pre">0</span></code>: always sequential.  <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>: use up to N threads.
+Parallelism is safe because ctypes releases the GIL during C rank computation,
+so threads truly run concurrently.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Truncation and finite-cell restriction are prepared on
+<a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> before calling this function.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.topology.gf2_matmul_packed_stacked_rows">
+<span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">gf2_matmul_packed_stacked_rows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">left</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ncols_left</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">right</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ncols_right</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#relucent.topology.gf2_matmul_packed_stacked_rows" title="Link to this definition"></a></dt>
+<dd><p>Matrix product <code class="docutils literal notranslate"><span class="pre">left</span> <span class="pre">&#64;</span> <span class="pre">right</span></code> over GF(2) using row-packed <code class="docutils literal notranslate"><span class="pre">uint64</span></code> blocks.</p>
+<p>Both operands use the same layout as <code class="xref py py-func docutils literal notranslate"><span class="pre">_packed_boundary_matrix()</span></code>: each row is a
+bit vector of length <code class="docutils literal notranslate"><span class="pre">ncols_*</span></code> stored in <code class="docutils literal notranslate"><span class="pre">ceil(ncols_*/64)</span></code> little-endian words
+(column <code class="docutils literal notranslate"><span class="pre">j</span></code> lives in bit <code class="docutils literal notranslate"><span class="pre">j</span> <span class="pre">&amp;</span> <span class="pre">63</span></code> of word <code class="docutils literal notranslate"><span class="pre">j</span> <span class="pre">&gt;&gt;</span> <span class="pre">6</span></code>).</p>
+<p>This implements the <strong>stacked-rows</strong> / <code class="docutils literal notranslate"><span class="pre">A</span></code>-as-selector view: row <code class="docutils literal notranslate"><span class="pre">i</span></code> of the
+product is the XOR (sum in GF(2)) of those rows <code class="docutils literal notranslate"><span class="pre">t</span></code> of <code class="docutils literal notranslate"><span class="pre">right</span></code> for which
+<code class="docutils literal notranslate"><span class="pre">left[i,</span> <span class="pre">t]</span> <span class="pre">==</span> <span class="pre">1</span></code>.  No dense <code class="docutils literal notranslate"><span class="pre">int64</span></code> matmul and no full expansion of either
+factor, so ∂² checks scale with column weight of <code class="docutils literal notranslate"><span class="pre">left</span></code> rather than forcing a
+dense <code class="docutils literal notranslate"><span class="pre">O(m</span> <span class="pre">*</span> <span class="pre">n</span> <span class="pre">*</span> <span class="pre">p)</span></code> integer multiply.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>left</strong> – Shape <code class="docutils literal notranslate"><span class="pre">(m,</span> <span class="pre">nwords_L)</span></code> with <code class="docutils literal notranslate"><span class="pre">nwords_L</span> <span class="pre">=</span> <span class="pre">ceil(ncols_left</span> <span class="pre">/</span> <span class="pre">64)</span></code>.</p></li>
+<li><p><strong>right</strong> – Shape <code class="docutils literal notranslate"><span class="pre">(n_mid,</span> <span class="pre">nwords_R)</span></code> with <code class="docutils literal notranslate"><span class="pre">n_mid</span> <span class="pre">==</span> <span class="pre">ncols_left</span></code> (rows of
+<code class="docutils literal notranslate"><span class="pre">right</span></code> index the same <code class="docutils literal notranslate"><span class="pre">t</span></code> as columns of <code class="docutils literal notranslate"><span class="pre">left</span></code>) and
+<code class="docutils literal notranslate"><span class="pre">nwords_R</span> <span class="pre">=</span> <span class="pre">ceil(ncols_right</span> <span class="pre">/</span> <span class="pre">64)</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Packed product of shape <code class="docutils literal notranslate"><span class="pre">(m,</span> <span class="pre">nwords_R)</span></code>, <code class="docutils literal notranslate"><span class="pre">uint64</span></code>.  Bits beyond
+<code class="docutils literal notranslate"><span class="pre">ncols_right</span></code> in the last word may be nonzero; callers that need a strict
+width should use <code class="xref py py-func docutils literal notranslate"><span class="pre">_mask_trailing_bits_in_last_word()</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.topology.gf2_rank_boundary">
+<span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">gf2_rank_boundary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">packed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ncols</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_desc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#relucent.topology.gf2_rank_boundary" title="Link to this definition"></a></dt>
+<dd><p>Rank of a boundary matrix.</p>
+<p>Uses the C backend (<code class="docutils literal notranslate"><span class="pre">_gf2_rank.c</span></code>) when available—typically 100–500×
+faster than the pure-Python path.  The C backend automatically transposes
+tall matrices to reduce column count, which speeds up ∂₁ and ∂₃.
+Falls back gracefully to pure Python if the C library could not be
+compiled or loaded.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.topology.gf2_rank_packed">
+<span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">gf2_rank_packed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">packed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ncols</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_desc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#relucent.topology.gf2_rank_packed" title="Link to this definition"></a></dt>
+<dd><p>Gaussian elimination rank over GF(2) on row-major bit-packed rows (uint64 words).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.topology.gf2_rank_sparse_rowsets">
+<span class="sig-prename descclassname"><span class="pre">relucent.topology.</span></span><span class="sig-name descname"><span class="pre">gf2_rank_sparse_rowsets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">row_sets</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">set</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ncols</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">progress_desc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#relucent.topology.gf2_rank_sparse_rowsets" title="Link to this definition"></a></dt>
+<dd><p>Gaussian elimination rank over GF(2) on sparse row sets.</p>
+<p>Each row is a set of column indices where the matrix entry is 1.  An inverted
+index (column → rows) avoids scanning all rows on every elimination step, which
+matters when boundaries have hundreds of thousands of cells but only a few
+incidences per column.</p>
+</dd></dl>
+
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="persistence.html" class="btn btn-neutral float-left" title="Persistence API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="utilities.html" class="btn btn-neutral float-right" title="Utility Functions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation</title>
+  <title>Relucent Documentation: Topology and Persistent Homology</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -20,7 +20,8 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="next" title="Configuration" href="configuration.html" />
+    <link rel="prev" title="Search Geometry and Cache Strategy" href="search_geometry.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -33,7 +34,7 @@
 
           
           
-          <a href="#" class="icon icon-home">
+          <a href="index.html" class="icon icon-home">
             relucent
           </a>
 <div role="search">
@@ -45,7 +46,7 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
@@ -76,12 +77,12 @@
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="topology.html#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology.html#graph-representations">Graph representations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology.html#betti-numbers">Betti numbers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology.html#persistent-homology-workflow">Persistent homology workflow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Topology and Persistent Homology</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-representations">Graph representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#betti-numbers">Betti numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#persistent-homology-workflow">Persistent homology workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#performance">Performance</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
@@ -280,17 +281,17 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">relucent</a>
+          <a href="index.html">relucent</a>
       </nav>
 
       <div class="wy-nav-content">
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Relucent Documentation</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Topology and Persistent Homology</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/topology.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -298,53 +299,152 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <a class="reference internal image-reference" href="_images/title.svg"><img alt="Relucent" class="align-center" src="_images/title.svg" style="width: 420px;" />
-</a>
-<div style="margin-bottom: 1.25rem;"></div><p>Relucent computes and visualizes the polyhedral structure induced by ReLU neural
-networks. It helps you explore activation regions, compute
-their geometric properties, and analyze how they are connected to each other.</p>
-<p>Core capabilities include:</p>
+  <section id="topology-and-persistent-homology">
+<h1>Topology and Persistent Homology<a class="headerlink" href="#topology-and-persistent-homology" title="Link to this heading"></a></h1>
+<p>Relucent can compute <strong>Betti numbers</strong> and <strong>persistent homology</strong> over
+<strong>GF(2)</strong> on the face poset of a discovered ReLU polyhedral (sub)complex. These
+routines build on the same meta-graph convention as contraction and dual-graph
+analysis: a codimension-one face of a cell is obtained by zeroing one supporting
+hyperplane index (SHI) in the cell’s sign sequence.</p>
+<p>This is an experimental, research-oriented API. <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code>
+and <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_persistent_homology()</span></code> emit a collaboration
+<code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> unless you set <code class="docutils literal notranslate"><span class="pre">DISABLE_RESEARCH_WARNING=1</span></code>.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<p><strong>Complete exploration.</strong> Local search methods like BFS are sufficient for computing topology <em>only if they run to completion</em>.
+Missing neighbors can leave the meta-graph short of a
+closed cellular complex, which breaks <code class="docutils literal notranslate"><span class="pre">∂²</span> <span class="pre">=</span> <span class="pre">0</span></code> for the GF(2) boundary maps.</p>
+<p><strong>Geometry for filtrations.</strong> Built-in filtrations such as
+<a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration" title="relucent.filtration.AffineOutputFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a> and
+<a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration" title="relucent.filtration.TrainingDistanceFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a> need interior points on
+cells. Either compute geometry during search (done by default) or run
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">compute_geometric_properties()</span></code> afterward with
+<code class="docutils literal notranslate"><span class="pre">properties=[&quot;interior_point&quot;,</span> <span class="pre">&quot;finite&quot;]</span></code> (and <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;b&quot;</span></code> when affine
+outputs are required).</p>
+</section>
+<section id="graph-representations">
+<h2>Graph representations<a class="headerlink" href="#graph-representations" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> class exposes three related graph views:</p>
 <ul class="simple">
-<li><p>Distributed local-search routines for discovering activation regions.</p></li>
-<li><p>Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).</p></li>
-<li><p>Complex-level analyses and graph-based views of region adjacency.</p></li>
-<li><p>2D and 3D visualizations using Plotly and matplotlib-backed utilities.</p></li>
-<li><p>Native compatibility with PyTorch models</p></li>
+<li><p><strong>Dual graph</strong> (<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_dual_graph()</span></code>): adjacency of
+top-dimensional cells only.</p></li>
+<li><p><strong>Chain complex</strong> (<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code>): iterated
+contraction to lower-dimensional boundary complexes.</p></li>
+<li><p><strong>Meta-graph</strong> (<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_meta_graph()</span></code>): face poset
+over all cell dimensions, used by Betti and persistence code.</p></li>
 </ul>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a></li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a></li>
-<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a></li>
-</ul>
-</div>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a></li>
-<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a></li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
-</ul>
-</div>
-<section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
+</section>
+<section id="betti-numbers">
+<h2>Betti numbers<a class="headerlink" href="#betti-numbers" title="Link to this heading"></a></h2>
+<p><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code> builds a meta-graph, applies
+the chosen homology convention, and returns <code class="docutils literal notranslate"><span class="pre">{dimension:</span> <span class="pre">β_k}</span></code>.</p>
+<p><strong>``compactify``</strong> selects how unbounded cells are handled:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">False</span></code> (default): <strong>combinatorial truncation</strong> at infinity via
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">truncate_meta_graph()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">True</span></code>: <strong>Borel–Moore</strong> style boundaries (only faces with at least two
+cofaces contribute to incidence).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;one_point&quot;</span></code>: <strong>one-point compactification</strong> via
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">one_point_compactify_meta_graph()</span></code>.</p></li>
 </ul>
+<blockquote>
+<div><p>Note: <code class="docutils literal notranslate"><span class="pre">compactify=True</span></code> is deprecated and will be replaced with <code class="docutils literal notranslate"><span class="pre">compactify=&quot;bm&quot;</span></code> in a future release.</p>
+</div></blockquote>
+<p><strong>``respect_finite``</strong>: restrict to the subcomplex of cells with <code class="docutils literal notranslate"><span class="pre">finite</span> <span class="pre">is</span> <span class="pre">True</span></code>
+(no truncation).</p>
+<p><strong>``verify_chain_complex``</strong>: when <code class="docutils literal notranslate"><span class="pre">True</span></code>, require <code class="docutils literal notranslate"><span class="pre">∂²</span> <span class="pre">=</span> <span class="pre">0</span></code> on the assembled
+boundary maps; raises <a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent" title="relucent.topology.ChainComplexInconsistent"><code class="xref py py-class docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a> if the
+explored complex is incomplete.</p>
+<p><strong>``nworkers``</strong>: thread count for ranking independent boundary maps (<code class="docutils literal notranslate"><span class="pre">None</span></code>
+auto-selects when the optional C GF(2) backend is available).</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">relucent.filtration</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConstantFiltration</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">relucent.persistence</span><span class="w"> </span><span class="kn">import</span> <span class="n">betti_at_filtration_end</span><span class="p">,</span> <span class="n">compute_persistent_homology</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">widths</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+<span class="c1"># We append a final ReLU to the model so that the constructed complex includes it&#39;s decision boundary.</span>
+<span class="c1"># See the Network Definitions section for more details.</span>
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">relucent</span><span class="o">.</span><span class="n">add_output_relu</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+
+<span class="c1"># Decision boundary of the last ReLU neuron (contracted chain complex)</span>
+<span class="n">db</span> <span class="o">=</span> <span class="n">cplx</span><span class="o">.</span><span class="n">get_boundary_complex</span><span class="p">(</span><span class="n">cplx</span><span class="o">.</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="n">betti</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">get_betti_numbers</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">betti</span><span class="p">)</span>  <span class="c1"># e.g. {0: 1}</span>
+
+<span class="c1"># Cross-check via persistent homology with a constant filtration</span>
+<span class="n">diagram</span> <span class="o">=</span> <span class="n">compute_persistent_homology</span><span class="p">(</span>
+    <span class="n">db</span><span class="p">,</span>
+    <span class="n">ConstantFiltration</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span>
+    <span class="n">lower_star</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ph_betti</span> <span class="o">=</span> <span class="n">betti_at_filtration_end</span><span class="p">(</span><span class="n">diagram</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">betti</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">ph_betti</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">betti</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">ph_betti</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="persistent-homology-workflow">
+<h2>Persistent homology workflow<a class="headerlink" href="#persistent-homology-workflow" title="Link to this heading"></a></h2>
+<p><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_persistent_homology()</span></code> accepts any
+<a class="reference internal" href="filtration.html#relucent.filtration.Filtration" title="relucent.filtration.Filtration"><code class="xref py py-class docutils literal notranslate"><span class="pre">Filtration</span></code></a> and returns a
+<a class="reference internal" href="persistence.html#relucent.persistence.PersistenceDiagram" title="relucent.persistence.PersistenceDiagram"><code class="xref py py-class docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a>.</p>
+<p>Built-in filtrations:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="filtration.html#relucent.filtration.ConstantFiltration" title="relucent.filtration.ConstantFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">ConstantFiltration</span></code></a> — all cells enter at one value.
+Use <code class="docutils literal notranslate"><span class="pre">lower_star=False</span></code> to match static Betti numbers on the same complex.</p></li>
+<li><p><a class="reference internal" href="filtration.html#relucent.filtration.LogitSublevelFiltration" title="relucent.filtration.LogitSublevelFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">LogitSublevelFiltration</span></code></a> — sublevel sets of a scalar
+logit (last output or class difference).</p></li>
+<li><p><a class="reference internal" href="filtration.html#relucent.filtration.AffineOutputFiltration" title="relucent.filtration.AffineOutputFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a> — general affine output
+functional on each cell.</p></li>
+<li><p><a class="reference internal" href="filtration.html#relucent.filtration.NeuronActivationFiltration" title="relucent.filtration.NeuronActivationFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">NeuronActivationFiltration</span></code></a> — combinatorial
+filtration by ReLU sign on a chosen SHI.</p></li>
+<li><p><a class="reference internal" href="filtration.html#relucent.filtration.TrainingDistanceFiltration" title="relucent.filtration.TrainingDistanceFiltration"><code class="xref py py-class docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a> — distance from a cell
+representative point to training data.</p></li>
+</ul>
+<p>Lower-star extension (<a class="reference internal" href="filtration.html#relucent.filtration.lower_star_extension" title="relucent.filtration.lower_star_extension"><code class="xref py py-func docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a>) promotes
+vertex values to higher cells by <code class="docutils literal notranslate"><span class="pre">f(σ)</span> <span class="pre">=</span> <span class="pre">max_{τ</span> <span class="pre">face</span> <span class="pre">of</span> <span class="pre">σ}</span> <span class="pre">f(τ)</span></code> when
+<code class="docutils literal notranslate"><span class="pre">lower_star=True</span></code> (the default for most filtrations).</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">relucent.filtration</span><span class="w"> </span><span class="kn">import</span> <span class="n">LogitSublevelFiltration</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">())</span>
+<span class="n">cplx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">start</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">]]),</span> <span class="n">max_polys</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">get_dual_graph</span><span class="p">(</span><span class="n">require_complete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">cplx</span><span class="o">.</span><span class="n">compute_geometric_properties</span><span class="p">(</span><span class="n">properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;interior_point&quot;</span><span class="p">,</span> <span class="s2">&quot;finite&quot;</span><span class="p">,</span> <span class="s2">&quot;W&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">])</span>
+
+<span class="n">diagram</span> <span class="o">=</span> <span class="n">cplx</span><span class="o">.</span><span class="n">get_persistent_homology</span><span class="p">(</span><span class="n">LogitSublevelFiltration</span><span class="p">())</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">diagram</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+<span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Use <a class="reference internal" href="persistence.html#relucent.persistence.betti_curve" title="relucent.persistence.betti_curve"><code class="xref py py-func docutils literal notranslate"><span class="pre">betti_curve()</span></code></a> to track β_k across filtration
+thresholds, and <a class="reference internal" href="persistence.html#relucent.persistence.betti_at_filtration_end" title="relucent.persistence.betti_at_filtration_end"><code class="xref py py-func docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a> to read
+Betti numbers after all cells have entered.</p>
+</section>
+<section id="performance">
+<h2>Performance<a class="headerlink" href="#performance" title="Link to this heading"></a></h2>
+<p>Boundary-matrix rank computation can use an optional <strong>C extension</strong>
+(<code class="docutils literal notranslate"><span class="pre">relucent._gf2</span></code>), JIT-compiled from <code class="docutils literal notranslate"><span class="pre">_gf2_rank.c</span></code> when a C compiler is
+available. The public flag <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.topology.C_BACKEND_AVAILABLE</span></code> reports
+whether the fast path is loaded; otherwise relucent falls back to pure Python.</p>
+<p>Set <code class="docutils literal notranslate"><span class="pre">verbose=True</span></code> on topology and persistence calls for progress on stderr.
+Package-wide search logging is controlled by <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.VERBOSE</span></code>.</p>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="search_geometry.html" class="btn btn-neutral float-left" title="Search Geometry and Cache Strategy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="configuration.html" class="btn btn-neutral float-right" title="Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
