@@ -1489,7 +1489,7 @@ class Complex:
             if tu in dup_keys and tv in dup_keys:
                 meta.add_edge(tu, tv, **dict(ed))
 
-    def get_meta_graph(self, *, enrich: bool = True, verbose: bool = False) -> nx.MultiDiGraph[Any]:
+    def get_meta_graph(self, *, verify: bool = False, verbose: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
         This method mirrors the face-encoding convention used by relucent's contracted
@@ -1506,16 +1506,11 @@ class Complex:
         codimension-1 face of the former under the SHI-zeroing rule. Edges store:
           - ``shi``: the supporting hyperplane index that was zeroed
 
-        If ``enrich=True`` (default), the returned graph is post-processed with a
-        second pass that propagates boundedness/SHI information downward, in the
-        same spirit as :meth:`contract`. Concretely, for each face node ``f`` with
-        cofaces ``c`` (incoming edges) and edge attributes ``shi(c→f)``, we set:
-
-        - ``finite``: ``any(c.finite for c in cofaces)``
-        - ``shis``: ``intersection((c.shis - {shi(c→f)}) for c in cofaces)``
-
-        These are stored as node attributes on the meta-graph (they do not mutate
-        the underlying :class:`~relucent.poly.Polyhedron` objects).
+        If ``verify=True``, a second pass re-derives boundedness/SHI information
+        from the assembled meta-graph (coface intersections and flip-neighbor
+        filtering), in the same spirit as :meth:`contract`. This is intended for
+        consistency checks and debugging; the default ``verify=False`` uses the
+        combinatorial SHI/boundedness values already computed on chain cells.
 
         For combinatorial truncation (link-at-infinity homology), build the graph with
         this method and call :meth:`truncate_meta_graph` on a copy before
@@ -1546,8 +1541,8 @@ class Complex:
 
         nworkers = process_aware_cpu_count() or 1
         logger.info(
-            "get_meta_graph: starting (enrich=%s, verbose=%s, nworkers=%d)",
-            enrich,
+            "get_meta_graph: starting (verify=%s, verbose=%s, nworkers=%d)",
+            verify,
             verbose,
             nworkers,
         )
@@ -1725,9 +1720,9 @@ class Complex:
 
             meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges)
 
-        if enrich:
-            logger.info("get_meta_graph: enriching (boundedness/SHI propagation)")
-            # Second pass: propagate boundedness/SHI information down the face poset.
+        if verify:
+            logger.info("get_meta_graph: verify pass (re-derive SHIs/boundedness from meta-graph)")
+            # Optional second pass: re-derive boundedness/SHI from the assembled face poset.
             # Traverse high->low so coface attrs are already available.
             cofaces_by_face_by_dim: dict[int, dict[Any, list[tuple[Any, dict[str, Any]]]]] = defaultdict(
                 lambda: defaultdict(list)
@@ -1798,10 +1793,10 @@ class Complex:
                     meta.nodes[face_tag]["shis"] = inferred_shis
 
         logger.info(
-            "get_meta_graph: done (%d nodes, %d edges, enrich=%s)",
+            "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
             meta.number_of_nodes(),
             meta.number_of_edges(),
-            enrich,
+            verify,
         )
         return meta
 
@@ -2001,7 +1996,7 @@ class Complex:
         self._warn_research_use("get_betti_numbers")
         if len(self) == 0:
             return {}
-        meta = self.get_meta_graph(enrich=True, verbose=verbose)
+        meta = self.get_meta_graph(verbose=verbose)
         if not compactify and not respect_finite:
             self.truncate_meta_graph(meta)
         return self.get_betti_numbers_from_meta(

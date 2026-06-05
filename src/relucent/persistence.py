@@ -217,7 +217,7 @@ def compute_persistent_homology(
         return PersistenceDiagram(pairs=(), cell_filtration={})
 
     _verbose_line(verbose, "building meta-graph …")
-    meta = cplx.get_meta_graph(enrich=True, verbose=verbose)
+    meta = cplx.get_meta_graph(verbose=verbose)
     if not compactify and not respect_finite:
         from relucent.complex import Complex
 
