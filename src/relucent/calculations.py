@@ -86,8 +86,8 @@ def _drop_degenerate_halfspaces_tracked(
             if pairs:
                 raise AssertionError(
                     f"Network fails genericity: halfspace rows at original indices {pairs} "
-                    f"are identical (same direction and bias). Two neurons likely have "
-                    f"parallel or anti-parallel weight vectors (e.g. relu(x) and relu(-x))."
+                    + "are identical (same direction and bias). Two neurons likely have "
+                    + "parallel or anti-parallel weight vectors (e.g. relu(x) and relu(-x))."
                 )
 
     if not np.any(deg):

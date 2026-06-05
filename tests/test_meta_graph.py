@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import torch
 
-from relucent import Complex, set_seeds
+from relucent import Complex, Polyhedron, mlp, set_seeds
+from relucent.calculations import get_shis
 from relucent.complex import TRUNCATION_META_SHI
+from relucent.utils import get_env
+from tests.conftest import explore_for_topology
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -166,3 +170,191 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
             assert meta_tr.has_edge(tu, tv)
             shis_dup = [ed.get("shi") for _u, _v, _k, ed in meta_tr.out_edges(tu, keys=True, data=True) if _v == tv]
             assert d.get("shi") in shis_dup
+
+
+def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:
+    """Map tag -> polyhedron for every cell in the contraction chain.
+
+    Each contraction step calls :meth:`Complex.get_dual_graph` and propagates
+    SHIs downward via :meth:`Complex.contract` (intersecting coface SHIs).
+    """
+    chain = cplx.get_chain_complex(verbose=False)
+    return {p.tag: p for cc in chain for p in cc}
+
+
+def _lp_shis(poly: Polyhedron, env) -> list[int]:
+    """Supporting hyperplane indices from a fresh ``get_shis`` LP solve."""
+    poly._shis = None
+    return sorted(int(s) for s in get_shis(poly, env=env))
+
+
+def _finite_from_dual_graph_propagation(
+    cells: dict[bytes, Polyhedron],
+    face_edges: list[tuple[bytes, bytes, int]],
+    top_dim: int,
+) -> dict[bytes, bool]:
+    """Boundedness propagated upward from 1-cells via SHI count + face sweep."""
+    finite: dict[bytes, bool] = {}
+    for dim in range(1, top_dim + 1):
+        for tag, poly in cells.items():
+            if poly.dim != dim:
+                continue
+            if dim == 1:
+                n_shis = len(poly._shis) if poly._shis is not None else 0
+                finite[tag] = n_shis >= 2
+                continue
+            faces = [dst for src, dst, _ in face_edges if src == tag]
+            if not faces:
+                continue
+            if any(not finite[f] for f in faces):
+                finite[tag] = False
+            else:
+                finite[tag] = True
+    return finite
+
+
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
+def test_meta_graph_shis_match_dual_graph_propagation(seeded: int) -> None:
+    """Meta-graph SHIs agree with independent dual-graph downward propagation."""
+    set_seeds(seeded)
+    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    cplx = Complex(net)
+    start = torch.randn(4, dtype=torch.float64)
+    explore_for_topology(cplx, start.numpy(), max_polys=5000)
+
+    meta = cplx.get_meta_graph(enrich=False, verbose=False)
+    dual_cells = _cells_from_dual_graph_propagation(cplx)
+    top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
+    mismatches: list[str] = []
+
+    for tag, attrs in meta.nodes(data=True):
+        dim = int(attrs["dim"])
+        if dim <= 0 or dim >= top_dim:
+            continue
+        dual_poly = dual_cells.get(tag)
+        if dual_poly is None:
+            continue
+        meta_shis = sorted(int(s) for s in attrs["shis"])
+        dual_shis = sorted(int(s) for s in (dual_poly._shis or []))
+        if meta_shis != dual_shis:
+            mismatches.append(f"dim={dim} tag={tag!r}: meta={meta_shis} dual_graph={dual_shis}")
+
+    assert not mismatches, (
+        f"Meta-graph SHIs disagree with dual-graph propagation for {len(mismatches)} cells:\n"
+        + "\n".join(mismatches[:20])
+        + ("\n..." if len(mismatches) > 20 else "")
+    )
+
+
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
+def test_dual_graph_propagated_shis_match_get_shis_lp(seeded: int) -> None:
+    """Dual-graph propagated SHIs on contracted cells match ``get_shis`` LP results.
+
+    After :meth:`Complex.get_meta_graph` runs, we independently rebuild the
+    contraction chain (repeated :meth:`Complex.get_dual_graph` +
+    :meth:`Complex.contract`) and compare each lower-dimensional cell's
+    combinatorially propagated ``_shis`` to a fresh :func:`~relucent.calculations.get_shis`
+    solve.
+
+    A mismatch indicates either a bug in dual-graph / meta-graph SHI propagation
+    or an error in the per-polyhedron SHI LP (e.g. false negatives on k<d cells).
+    """
+    set_seeds(seeded)
+    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    cplx = Complex(net)
+    start = torch.randn(4, dtype=torch.float64)
+    explore_for_topology(cplx, start.numpy(), max_polys=5000)
+
+    cplx.get_meta_graph(enrich=False, verbose=False)
+    dual_cells = _cells_from_dual_graph_propagation(cplx)
+    top_dim = max(p.dim for p in dual_cells.values())
+    env = get_env()
+    mismatches: list[str] = []
+
+    for tag, poly in dual_cells.items():
+        dim = poly.dim
+        if dim <= 0 or dim >= top_dim:
+            continue
+        dual_shis = sorted(int(s) for s in (poly._shis or []))
+        lp_shis = _lp_shis(poly, env)
+        if dual_shis != lp_shis:
+            mismatches.append(f"dim={dim} tag={tag!r}: dual_graph={dual_shis} lp={lp_shis}")
+
+    assert not mismatches, (
+        f"Dual-graph SHIs disagree with LP for {len(mismatches)} cells:\n"
+        + "\n".join(mismatches[:20])
+        + ("\n..." if len(mismatches) > 20 else "")
+    )
+
+
+def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
+    """Meta-graph ``finite`` matches upward propagation from 1-cells on the dual graph."""
+    set_seeds(seeded)
+    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    cplx = Complex(net)
+    start = torch.randn(4, dtype=torch.float64)
+    explore_for_topology(cplx, start.numpy(), max_polys=5000)
+
+    meta = cplx.get_meta_graph(enrich=False, verbose=False)
+    dual_cells = _cells_from_dual_graph_propagation(cplx)
+    top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
+    face_edges = [(u, v, int(d["shi"])) for u, v, d in meta.edges(data=True)]
+    expected_finite = _finite_from_dual_graph_propagation(dual_cells, face_edges, top_dim)
+
+    mismatches: list[str] = []
+    for tag, attrs in meta.nodes(data=True):
+        dim = int(attrs["dim"])
+        if dim <= 0 or dim >= top_dim:
+            continue
+        poly = attrs.get("poly")
+        if poly is None or tag not in expected_finite:
+            continue
+        if poly._finite != expected_finite[tag]:
+            mismatches.append(f"dim={dim} tag={tag!r}: meta_finite={poly._finite} dual_graph_finite={expected_finite[tag]}")
+
+    assert not mismatches, (
+        "Meta-graph finite disagrees with dual-graph upward propagation for "
+        + f"{len(mismatches)} cells:\n"
+        + "\n".join(mismatches[:20])
+        + ("\n..." if len(mismatches) > 20 else "")
+    )
+
+
+@pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
+def test_meta_graph_enriched_shis_match_dual_graph_and_lp(seeded: int) -> None:
+    """Enriched meta-graph SHIs match dual-graph propagation and ``get_shis`` LP."""
+    set_seeds(seeded)
+    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    cplx = Complex(net)
+    start = torch.randn(4, dtype=torch.float64)
+    explore_for_topology(cplx, start.numpy(), max_polys=5000)
+
+    meta = cplx.get_meta_graph(enrich=True, verbose=False)
+    dual_cells = _cells_from_dual_graph_propagation(cplx)
+    top_dim = max(int(attrs["dim"]) for _n, attrs in meta.nodes(data=True))
+    env = get_env()
+    dual_mismatches: list[str] = []
+    lp_mismatches: list[str] = []
+
+    for tag, attrs in meta.nodes(data=True):
+        dim = int(attrs["dim"])
+        if dim <= 0 or dim >= top_dim:
+            continue
+        poly = attrs.get("poly")
+        dual_poly = dual_cells.get(tag)
+        if poly is None or dual_poly is None:
+            continue
+        enriched = sorted(int(s) for s in attrs["shis"])
+        dual_shis = sorted(int(s) for s in (dual_poly._shis or []))
+        if enriched != dual_shis:
+            dual_mismatches.append(f"dim={dim} tag={tag!r}: enriched={enriched} dual_graph={dual_shis}")
+        lp_shis = _lp_shis(poly, env)
+        if enriched != lp_shis:
+            lp_mismatches.append(f"dim={dim} tag={tag!r}: enriched={enriched} lp={lp_shis}")
+
+    assert not dual_mismatches, "Enriched meta-graph SHIs disagree with dual-graph propagation:\n" + "\n".join(dual_mismatches)
+    assert not lp_mismatches, (
+        "Enriched meta-graph SHIs disagree with LP:\n"
+        + "\n".join(lp_mismatches[:20])
+        + ("\n..." if len(lp_mismatches) > 20 else "")
+    )
