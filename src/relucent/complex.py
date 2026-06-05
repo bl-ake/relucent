@@ -57,6 +57,16 @@ RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 # (not a supporting-hyperplane index of the underlying network).
 TRUNCATION_META_SHI: int = -1
 
+# Meta-graph node key / edge label for :meth:`Complex.one_point_compactify_meta_graph`.
+INFINITY_POINT_META_NODE: tuple[str] = ("infty",)
+INFINITY_POINT_META_SHI: int = -2
+
+# ``compactify=False``: combinatorial truncation (``truncate_meta_graph``).
+# ``compactify=True``: Borel–Moore (``require_shared_faces``).
+# ``compactify="one_point"``: one-point compactification.
+# TODO: deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
+CompactifyMode = bool | Literal["one_point"]
+
 # Worker process state — set by set_globals() when used as a pool initializer.
 env: Env | None = None
 _net: ReLUNetwork | None = None
@@ -1489,6 +1499,44 @@ class Complex:
             if tu in dup_keys and tv in dup_keys:
                 meta.add_edge(tu, tv, **dict(ed))
 
+    @staticmethod
+    def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
+        """Augment ``meta`` in place with a single point-at-infinity 0-cell.
+
+        Mirrors ``canonicalpoly2.0/polyhedra/topology.get_coboundary_matrices``: each
+        1-cell whose boundary consists of a single 0-cell (an unbounded end) gains a
+        second incidence to one new 0-cell representing infinity.  Returns whether the
+        infinity node was added.
+        """
+        if meta.number_of_nodes() == 0:
+            return False
+
+        zero_cells = {n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == 0}
+        one_cells = [n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == 1]
+        if not one_cells or not zero_cells:
+            return False
+
+        needing_infinity: list[Any] = []
+        for u in one_cells:
+            n_zero = sum(1 for _u, v, _ in meta.out_edges(u, data=True) if v in zero_cells)
+            if n_zero == 1:
+                needing_infinity.append(u)
+        if not needing_infinity:
+            return False
+
+        if INFINITY_POINT_META_NODE not in meta:
+            meta.add_node(
+                INFINITY_POINT_META_NODE,
+                dim=0,
+                finite=True,
+                infinity_point=True,
+                ss=None,
+                shis=[],
+            )
+        for u in needing_infinity:
+            meta.add_edge(u, INFINITY_POINT_META_NODE, shi=INFINITY_POINT_META_SHI)
+        return True
+
     def get_meta_graph(self, *, verify: bool = False, verbose: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
@@ -1936,7 +1984,7 @@ class Complex:
         meta: nx.MultiDiGraph[Any],
         *,
         reduced: bool = False,
-        compactify: bool = False,
+        compactify: CompactifyMode = False,
         respect_finite: bool = False,
         verify_chain_complex: bool = False,
         verbose: bool = False,
@@ -1946,10 +1994,12 @@ class Complex:
 
         Args:
             meta: Output of :meth:`get_meta_graph`, optionally passed through
-                :meth:`truncate_meta_graph` when ``compactify=False`` and not
-                ``respect_finite``.
-            compactify: If True, use a Borel–Moore-style boundary (only faces shared by
-                at least two cofaces). If False, use every face incidence in ``meta``.
+                :meth:`truncate_meta_graph` or :meth:`one_point_compactify_meta_graph`.
+            compactify: Homology convention. ``False``: combinatorial truncation
+                (caller should apply :meth:`truncate_meta_graph` first unless
+                ``respect_finite``). ``True``: Borel–Moore (only faces with at least
+                two cofaces). ``"one_point"``: one-point compactification at infinity
+                (caller should apply :meth:`one_point_compactify_meta_graph` first).
             respect_finite: If True, restrict to the subcomplex of cells with ``finite is True``
                 (no truncation). Other flags are forwarded to :func:`relucent.topology.get_betti_numbers`.
             nworkers: Forwarded to :func:`relucent.topology.get_betti_numbers`; controls
@@ -1965,7 +2015,7 @@ class Complex:
                 return {}
         return get_betti_numbers(
             meta,
-            require_shared_faces=compactify,
+            require_shared_faces=compactify is True,
             reduced=reduced,
             verify_chain_complex=verify_chain_complex,
             verbose=verbose,
@@ -1976,7 +2026,7 @@ class Complex:
         self,
         *,
         reduced: bool = False,
-        compactify: bool = False,
+        compactify: CompactifyMode = False,
         respect_finite: bool = False,
         verify_chain_complex: bool = False,
         verbose: bool = False,
@@ -1989,6 +2039,9 @@ class Complex:
         stderr progress from meta-graph construction and boundary maps.
 
         Args:
+            compactify: ``False`` applies combinatorial truncation at infinity;
+                ``True`` uses Borel–Moore face incidences; ``"one_point"`` adds an
+                extra 0-cell at infinity for unbounded 1-cell ends.
             nworkers: Number of threads for ranking independent boundary maps concurrently.
                 ``None`` (default): auto (one thread per map when the C backend is available).
                 ``1``: always sequential.  See :func:`relucent.topology.get_betti_numbers`.
@@ -1997,7 +2050,9 @@ class Complex:
         if len(self) == 0:
             return {}
         meta = self.get_meta_graph(verbose=verbose)
-        if not compactify and not respect_finite:
+        if compactify == "one_point":
+            self.one_point_compactify_meta_graph(meta)
+        elif not compactify and not respect_finite:
             self.truncate_meta_graph(meta)
         return self.get_betti_numbers_from_meta(
             meta,
