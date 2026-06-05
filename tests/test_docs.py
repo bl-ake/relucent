@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from relucent import set_seeds
 from tests.doc_snippets import (
     DOCS_DIR,
     README_PATH,
@@ -67,6 +68,7 @@ def test_quickstart_snippets() -> None:
 def test_topology_snippets() -> None:
     snippets = extract_rst_python_blocks(_rst("topology.rst"))
     assert len(snippets) == 2
+    set_seeds(0)
     exec_snippet(snippets[0])
     ns = exec_snippet(snippets[1])
     assert "diagram" in ns

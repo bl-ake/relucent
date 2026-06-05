@@ -6,6 +6,7 @@ def test_top_level_imports():
         Complex,
         Polyhedron,
         SSManager,
+        add_output_relu,
         convert,
         get_env,
         mlp,
@@ -16,6 +17,7 @@ def test_top_level_imports():
     assert Complex is not None
     assert Polyhedron is not None
     assert SSManager is not None
+    assert callable(add_output_relu)
     assert callable(convert)
     assert callable(get_env)
     assert callable(mlp)

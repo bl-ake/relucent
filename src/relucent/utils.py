@@ -31,6 +31,7 @@ __all__ = [
     "BlockingQueue",
     "NonBlockingQueue",
     "UpdatablePriorityQueue",
+    "add_output_relu",
     "close_env",
     "encode_ss",
     "get_env",
@@ -608,22 +609,6 @@ def split_sequential(
             nn2 contains the remaining layers.
     """
     if isinstance(model, TorchMLP):
-
-        def _infer_torch_widths(
-            layers: OrderedDict[str, nn.Module],
-            *,
-            fallback_input_width: int,
-        ) -> list[int]:
-            widths: list[int] = []
-            for layer in layers.values():
-                if isinstance(layer, nn.Linear):
-                    if not widths:
-                        widths.append(int(layer.in_features))
-                    widths.append(int(layer.out_features))
-            if widths:
-                return widths
-            return [int(fallback_input_width)]
-
         layers1: OrderedDict[str, nn.Module] = OrderedDict()
         layers2: OrderedDict[str, nn.Module] = OrderedDict()
         current_layers = layers1
@@ -631,8 +616,8 @@ def split_sequential(
             current_layers[name] = layer
             if name == split_layer:
                 current_layers = layers2
-        widths1 = _infer_torch_widths(layers1, fallback_input_width=int(model.widths[0]))
-        widths2 = _infer_torch_widths(layers2, fallback_input_width=int(widths1[-1]))
+        widths1 = _infer_torch_widths_from_layers(layers1, fallback_input_width=int(model.widths[0]))
+        widths2 = _infer_torch_widths_from_layers(layers2, fallback_input_width=int(widths1[-1]))
         return TorchMLP(layers1, widths1), TorchMLP(layers2, widths2)
 
     layers1_c: OrderedDict[str, LinearLayer | ReLULayer | FlattenLayer] = OrderedDict()
@@ -648,6 +633,84 @@ def split_sequential(
         input_shape=tuple(int(v) for v in nn1(np.zeros((1,) + model.input_shape, dtype=np.float64)).squeeze().shape),
     )
     return nn1, nn2
+
+
+def _infer_torch_widths_from_layers(
+    layers: OrderedDict[str, nn.Module],
+    *,
+    fallback_input_width: int,
+) -> list[int]:
+    widths: list[int] = []
+    for layer in layers.values():
+        if isinstance(layer, nn.Linear):
+            if not widths:
+                widths.append(int(layer.in_features))
+            widths.append(int(layer.out_features))
+    if widths:
+        return widths
+    return [int(fallback_input_width)]
+
+
+def add_output_relu(model: Any) -> Any:
+    """Append a ReLU activation after the final linear layer.
+
+    Classifiers are often trained without a ReLU on the output neuron. For
+    topology analysis of the decision boundary, treating that boundary as the
+    zero level set of the last ReLU pre-activation requires appending a final
+    ReLU while keeping all earlier weights unchanged.
+
+    Args:
+        model: A :class:`TorchMLP`, plain :class:`torch.nn.Sequential`, or
+            :class:`~relucent.model.ReLUNetwork`.
+
+    Returns:
+        A new network of the same type with one additional ReLU layer after the
+        final linear layer.
+
+    Raises:
+        ValueError: If the network is empty, already ends with ReLU, or its
+            final layer is not linear.
+    """
+    if isinstance(model, TorchMLP):
+        items = list(model.named_children())
+        if not items:
+            raise ValueError("Network has no layers")
+        last_name, last_layer = items[-1]
+        if isinstance(last_layer, nn.ReLU):
+            raise ValueError("Network already ends with a ReLU layer")
+        if not isinstance(last_layer, nn.Linear):
+            raise ValueError(f"Expected final layer to be Linear, got {type(last_layer)}")
+        new_layers = OrderedDict(items)
+        new_layers[f"{last_name}_relu"] = nn.ReLU()
+        return TorchMLP(new_layers, list(model.widths))
+
+    if isinstance(model, nn.Sequential):
+        items = list(model.named_children())
+        if not items:
+            raise ValueError("Network has no layers")
+        last_name, last_layer = items[-1]
+        if isinstance(last_layer, nn.ReLU):
+            raise ValueError("Network already ends with a ReLU layer")
+        if not isinstance(last_layer, nn.Linear):
+            raise ValueError(f"Expected final layer to be Linear, got {type(last_layer)}")
+        new_layers = OrderedDict(items)
+        new_layers[f"{last_name}_relu"] = nn.ReLU()
+        fallback_width = int(getattr(last_layer, "in_features", 0))
+        return TorchMLP(new_layers, _infer_torch_widths_from_layers(new_layers, fallback_input_width=fallback_width))
+
+    items = list(model.layers.items())
+    if not items:
+        raise ValueError("Network has no layers")
+    last_name, last_layer = items[-1]
+    if isinstance(last_layer, ReLULayer):
+        raise ValueError("Network already ends with a ReLU layer")
+    if not isinstance(last_layer, LinearLayer):
+        raise ValueError(f"Expected final layer to be Linear, got {type(last_layer)}")
+    new_layers = OrderedDict(items)
+    new_layers[f"{last_name}_relu"] = ReLULayer()
+    out = ReLUNetwork(new_layers, input_shape=model.input_shape)
+    out.trained_on = model.trained_on
+    return out
 
 
 def normalize_weights(model: Any) -> Any:

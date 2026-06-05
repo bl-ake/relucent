@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from .convert_model import convert
     from .poly import Polyhedron
     from .ss import SSManager
-    from .utils import get_env, mlp, set_seeds, split_sequential
+    from .utils import add_output_relu, get_env, mlp, set_seeds, split_sequential
     from .vis import get_colors, plot_complex, plot_polyhedron
 
 __all__ = [
@@ -37,6 +37,7 @@ __all__ = [
     "convert",
     "get_colors",
     "get_env",
+    "add_output_relu",
     "mlp",
     "plot_complex",
     "plot_polyhedron",
@@ -51,6 +52,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "convert": ("relucent.convert_model", "convert"),
     "get_colors": ("relucent.vis", "get_colors"),
     "get_env": ("relucent.utils", "get_env"),
+    "add_output_relu": ("relucent.utils", "add_output_relu"),
     "mlp": ("relucent.utils", "mlp"),
     "plot_complex": ("relucent.vis", "plot_complex"),
     "plot_polyhedron": ("relucent.vis", "plot_polyhedron"),

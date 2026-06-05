@@ -7,11 +7,13 @@ import pytest
 import torch
 
 from relucent import mlp
+from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.utils import (
     BlockingQueue,
     NonBlockingQueue,
     TorchMLP,
     UpdatablePriorityQueue,
+    add_output_relu,
     encode_ss,
     get_env,
     normalize_weights,
@@ -173,6 +175,54 @@ class TestSplitSequential:
         nn1, nn2 = split_sequential(net, "fc0")
         assert "fc0" in nn1.layers
         assert "fc1" in nn2.layers or "relu0" in nn2.layers
+
+
+class TestAddOutputRelu:
+    def test_torch_mlp_appends_relu(self, seeded):
+        assert seeded is not None
+        net = mlp(widths=[2, 4, 1], add_last_relu=False)
+        assert isinstance(net, TorchMLP)
+        topo = add_output_relu(net)
+        assert isinstance(topo, TorchMLP)
+        assert topo is not net
+        assert list(topo.children())[-1].__class__.__name__ == "ReLU"
+        assert topo.widths == net.widths
+
+    def test_preserves_linear_outputs_before_relu(self, seeded):
+        assert seeded is not None
+        net = mlp(widths=[3, 5, 1], add_last_relu=False)
+        assert isinstance(net, TorchMLP)
+        topo = add_output_relu(net)
+        x = torch.randn(4, 3, device=net.device, dtype=net.dtype)
+        pre_relu = net(x)
+        post_relu = topo(x)
+        assert torch.allclose(post_relu, torch.relu(pre_relu))
+
+    def test_already_has_output_relu_raises(self, seeded):
+        assert seeded is not None
+        net = mlp(widths=[2, 4, 1], add_last_relu=True)
+        assert isinstance(net, TorchMLP)
+        with pytest.raises(ValueError, match="already ends with a ReLU"):
+            add_output_relu(net)
+
+    def test_relu_network(self, seeded):
+        assert seeded is not None
+        layers = {
+            "fc0": LinearLayer(
+                weight=np.random.randn(4, 2).astype(np.float64),
+                bias=np.random.randn(1, 4).astype(np.float64),
+            ),
+            "relu0": ReLULayer(),
+            "fc1": LinearLayer(
+                weight=np.random.randn(1, 4).astype(np.float64),
+                bias=np.random.randn(1, 1).astype(np.float64),
+            ),
+        }
+        net = ReLUNetwork(layers, input_shape=(2,))
+        topo = add_output_relu(net)
+        assert isinstance(topo, ReLUNetwork)
+        assert isinstance(list(topo.layers.values())[-1], ReLULayer)
+        assert topo.num_relus == net.num_relus + 1
 
 
 class TestNormalizeWeights:
