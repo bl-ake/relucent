@@ -57,8 +57,6 @@ def _drop_degenerate_halfspaces_tracked(
     b = halfspaces[:, -1]
     norms = np.linalg.norm(a, axis=1)
     deg = norms < tol_normal
-    if not np.any(deg):
-        return halfspaces, np.arange(n_old, dtype=np.intp)
 
     if np.any(b[deg] > tol_bias):
         bad = np.flatnonzero(deg & (b > tol_bias)).tolist()
@@ -69,6 +67,31 @@ def _drop_degenerate_halfspaces_tracked(
     kept = np.flatnonzero(~deg)
     old_to_new = np.full(n_old, -1, dtype=np.intp)
     old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
+
+    if cfg.CAREFUL_MODE and kept.size > 1:
+        # Check for fully identical rows (same halfspace repeated from two neurons).
+        # Rows with the same direction but different bias are a sign-pattern coincidence
+        # that get_shis handles correctly (the tighter constraint wins). Only exact
+        # duplicates (same a AND b, gram of full-row-normalised vectors == 1) cause
+        # silent SHI mis-detection.
+        hs_kept = halfspaces[kept]
+        row_norms = np.linalg.norm(hs_kept, axis=1, keepdims=True)
+        row_norms = np.where(row_norms < tol_normal, 1.0, row_norms)
+        hs_normed = hs_kept / row_norms  # normalise full row (a AND b)
+        gram = hs_normed @ hs_normed.T
+        np.fill_diagonal(gram, 0.0)
+        if np.any(gram > 1.0 - tol_normal):
+            ij = np.argwhere(gram > 1.0 - tol_normal)
+            pairs = [(int(kept[r]), int(kept[c])) for r, c in ij if r < c]
+            if pairs:
+                raise AssertionError(
+                    f"Network fails genericity: halfspace rows at original indices {pairs} "
+                    f"are identical (same direction and bias). Two neurons likely have "
+                    f"parallel or anti-parallel weight vectors (e.g. relu(x) and relu(-x))."
+                )
+
+    if not np.any(deg):
+        return halfspaces, np.arange(n_old, dtype=np.intp)
     return halfspaces[~deg], old_to_new
 
 
