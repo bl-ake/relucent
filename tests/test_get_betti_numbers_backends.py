@@ -155,7 +155,7 @@ def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatc
     """Public :meth:`~relucent.complex.Complex.get_betti_numbers`` matches topology module."""
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
-    meta = db.get_meta_graph(enrich=True, verbose=False)
+    meta = db.get_meta_graph(verbose=False)
     Complex.truncate_meta_graph(meta)
     via_topology = get_betti_numbers(meta)
     via_complex = db.get_betti_numbers(compactify=False)

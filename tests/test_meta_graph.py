@@ -49,7 +49,7 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     chain = db.get_chain_complex(verbose=False)
     assert len(chain) >= 1
 
-    meta = db.get_meta_graph(enrich=True, verbose=False)
+    meta = db.get_meta_graph(verbose=False)
 
     # Meta-graph should contain every cell across the contraction chain.
     expected_nodes = {p.tag for cc in chain for p in cc}
@@ -98,7 +98,7 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
 
     db = cplx.get_boundary_complex(cplx.n - 1)
 
-    meta_plain = db.get_meta_graph(enrich=True, verbose=False)
+    meta_plain = db.get_meta_graph(verbose=False)
     meta_tr = meta_plain.copy()
     Complex.truncate_meta_graph(meta_tr)
 
@@ -139,7 +139,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
 
-    meta_plain = cplx.get_meta_graph(enrich=True, verbose=False)
+    meta_plain = cplx.get_meta_graph(verbose=False)
     meta_tr = meta_plain.copy()
     Complex.truncate_meta_graph(meta_tr)
 
@@ -222,7 +222,7 @@ def test_meta_graph_shis_match_dual_graph_propagation(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    meta = cplx.get_meta_graph(enrich=False, verbose=False)
+    meta = cplx.get_meta_graph(verbose=False)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
     mismatches: list[str] = []
@@ -265,7 +265,7 @@ def test_dual_graph_propagated_shis_match_get_shis_lp(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    cplx.get_meta_graph(enrich=False, verbose=False)
+    cplx.get_meta_graph(verbose=False)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(p.dim for p in dual_cells.values())
     env = get_env()
@@ -295,7 +295,7 @@ def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    meta = cplx.get_meta_graph(enrich=False, verbose=False)
+    meta = cplx.get_meta_graph(verbose=False)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
     face_edges = [(u, v, int(d["shi"])) for u, v, d in meta.edges(data=True)]
@@ -321,15 +321,15 @@ def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
 
 
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
-def test_meta_graph_enriched_shis_match_dual_graph_and_lp(seeded: int) -> None:
-    """Enriched meta-graph SHIs match dual-graph propagation and ``get_shis`` LP."""
+def test_meta_graph_verify_shis_match_dual_graph_and_lp(seeded: int) -> None:
+    """Verify-pass meta-graph SHIs match dual-graph propagation and ``get_shis`` LP."""
     set_seeds(seeded)
     net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    meta = cplx.get_meta_graph(enrich=True, verbose=False)
+    meta = cplx.get_meta_graph(verify=True, verbose=False)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(int(attrs["dim"]) for _n, attrs in meta.nodes(data=True))
     env = get_env()
@@ -344,17 +344,19 @@ def test_meta_graph_enriched_shis_match_dual_graph_and_lp(seeded: int) -> None:
         dual_poly = dual_cells.get(tag)
         if poly is None or dual_poly is None:
             continue
-        enriched = sorted(int(s) for s in attrs["shis"])
+        verified = sorted(int(s) for s in attrs["shis"])
         dual_shis = sorted(int(s) for s in (dual_poly._shis or []))
-        if enriched != dual_shis:
-            dual_mismatches.append(f"dim={dim} tag={tag!r}: enriched={enriched} dual_graph={dual_shis}")
+        if verified != dual_shis:
+            dual_mismatches.append(f"dim={dim} tag={tag!r}: verify={verified} dual_graph={dual_shis}")
         lp_shis = _lp_shis(poly, env)
-        if enriched != lp_shis:
-            lp_mismatches.append(f"dim={dim} tag={tag!r}: enriched={enriched} lp={lp_shis}")
+        if verified != lp_shis:
+            lp_mismatches.append(f"dim={dim} tag={tag!r}: verify={verified} lp={lp_shis}")
 
-    assert not dual_mismatches, "Enriched meta-graph SHIs disagree with dual-graph propagation:\n" + "\n".join(dual_mismatches)
+    assert not dual_mismatches, "Verify-pass meta-graph SHIs disagree with dual-graph propagation:\n" + "\n".join(
+        dual_mismatches
+    )
     assert not lp_mismatches, (
-        "Enriched meta-graph SHIs disagree with LP:\n"
+        "Verify-pass meta-graph SHIs disagree with LP:\n"
         + "\n".join(lp_mismatches[:20])
         + ("\n..." if len(lp_mismatches) > 20 else "")
     )
