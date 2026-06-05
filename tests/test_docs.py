@@ -85,7 +85,7 @@ def test_search_geometry_snippets() -> None:
 
 def test_network_definitions_snippets() -> None:
     snippets = extract_rst_python_blocks(_rst("network_definitions.rst"))
-    assert len(snippets) == 4
+    assert len(snippets) == 5
     for snippet in snippets:
         ns = exec_snippet(snippet)
         assert "cplx" in ns
