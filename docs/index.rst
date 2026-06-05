@@ -28,6 +28,7 @@ Core capabilities include:
    quickstart
    network_definitions
    search_geometry
+   topology
    configuration
 
 .. toctree::
@@ -36,6 +37,9 @@ Core capabilities include:
 
    complex
    polyhedron
+   filtration
+   persistence
+   topology_api
    utilities
 
 Indices and tables

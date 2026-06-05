@@ -1545,14 +1545,13 @@ class Complex:
         obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
 
         Nodes correspond to cells across dimensions k=0..d and are keyed by the
-        polyhedron's stable ``tag``. Each node stores:
-          - ``poly``: a representative :class:`~relucent.poly.Polyhedron`
-          - ``dim``: the cell dimension k
-          - ``ss``: the cell's sign-sequence array (numpy)
+        polyhedron's stable ``tag``. Each node stores ``poly`` (a representative
+        :class:`~relucent.poly.Polyhedron`), ``dim`` (the cell dimension k), and
+        ``ss`` (the cell's sign-sequence array as numpy).
 
         Directed edges go from a k-cell to a (k-1)-cell whenever the latter is a
-        codimension-1 face of the former under the SHI-zeroing rule. Edges store:
-          - ``shi``: the supporting hyperplane index that was zeroed
+        codimension-1 face of the former under the SHI-zeroing rule. Each edge
+        stores ``shi``, the supporting hyperplane index that was zeroed.
 
         If ``verify=True``, a second pass re-derives boundedness/SHI information
         from the assembled meta-graph (coface intersections and flip-neighbor
