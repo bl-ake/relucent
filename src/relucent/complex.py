@@ -236,6 +236,14 @@ def _known_bounded(poly: Polyhedron) -> bool:
     return bool(poly._finite_computed and poly._finite is True)
 
 
+def _meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
+    """SHI list stored on meta-graph nodes (dual-graph / propagated ``_shis``)."""
+    shis = poly._shis
+    if shis is not None:
+        return sorted(int(s) for s in shis)
+    return list(_ss_face_crossing_indices(np.asarray(poly.ss_np)))
+
+
 def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
     if poly.dim == 0:
         finite: bool | None = True
@@ -248,8 +256,20 @@ def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
         "dim": int(poly.dim),
         "ss": np.asarray(poly.ss_np),
         "finite": finite,
-        "shis": sorted(int(s) for s in getattr(poly, "shis", [])),
+        "shis": _meta_node_shis_for_meta_node(poly),
     }
+
+
+def _ss_face_crossing_indices(ss: np.ndarray) -> tuple[int, ...]:
+    """Combinatorial codimension-one crossings: zero any nonzero SS entry.
+
+    Uses the sign-sequence face rule (same as zeroing a supporting hyperplane in the
+    cubical complex) without consulting propagated ``_shis``. Propagated SHI lists can
+    be shrunk by coface intersection and flip-neighbor filtering, which omits valid
+    face incidences and breaks ``∂² = 0``.
+    """
+    row = np.asarray(ss, dtype=np.int8).ravel()
+    return tuple(int(i) for i in np.flatnonzero(row != 0))
 
 
 def _collect_meta_face_edges(
@@ -1551,7 +1571,10 @@ class Complex:
 
         Directed edges go from a k-cell to a (k-1)-cell whenever the latter is a
         codimension-1 face of the former under the SHI-zeroing rule. Each edge
-        stores ``shi``, the supporting hyperplane index that was zeroed.
+        stores ``shi``, the supporting hyperplane index that was zeroed. Face
+        discovery uses every nonzero sign-sequence entry (combinatorial), not only
+        propagated ``_shis`` lists, so incomplete coface SHI intersection cannot
+        drop valid incidences.
 
         If ``verify=True``, a second pass re-derives boundedness/SHI information
         from the assembled meta-graph (coface intersections and flip-neighbor
@@ -1655,7 +1678,7 @@ class Complex:
             if int(k) <= 0:
                 continue
             valid_face_tags = set(lookup.keys())
-            cells = [(p.tag, np.asarray(p.ss_np), tuple(int(s) for s in p.shis)) for p in c_k]
+            cells = [(p.tag, np.asarray(p.ss_np), _ss_face_crossing_indices(np.asarray(p.ss_np))) for p in c_k]
             use_parallel = len(cells) >= _META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
                 logger.info(
