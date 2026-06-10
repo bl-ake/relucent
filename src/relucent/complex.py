@@ -236,8 +236,47 @@ def _known_bounded(poly: Polyhedron) -> bool:
     return bool(poly._finite_computed and poly._finite is True)
 
 
+# ---------------------------------------------------------------------------
+# SHI propagation: three roles (do not conflate)
+# ---------------------------------------------------------------------------
+#
+# Relucent applies different SHI rules depending on the job.  Using one rule
+# everywhere breaks either the contraction chain or meta-graph face incidence.
+#
+# 1. **Contraction / dual graph** (:meth:`Complex.contract`, :meth:`get_dual_graph`)
+#    - Face construction: coface SHI intersection minus the crossing index
+#      (:meth:`Complex._codim_one_face_kwargs`).
+#    - Post-filter: drop SHIs with no same-dimension flip neighbor in the slice
+#      (:func:`_filter_complex_shis_by_flip_neighbor`).
+#    - :meth:`get_dual_graph` walks ``poly.shis`` to wire the next contraction
+#      level.  Replacing coface intersection with full SS flip-neighbor
+#      membership adds spurious dual edges and extra cells (see
+#      ``tests/test_meta_graph_shi_regression.py``).
+#
+# 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
+#    - Try zeroing every ``ss_i != 0`` (:func:`_ss_face_crossing_indices`), not
+#      propagated ``_shis``.  Coface intersection over-shrinks node metadata and
+#      would omit valid incidences, breaking ``∂² = 0``.
+#    - An edge is kept only when the zeroed face tag exists in the chain lookup.
+#
+# 3. **Meta-graph node metadata** (:func:`_meta_node_shis_for_meta_node`,
+#    :func:`_compute_contracted_shis_top_down`)
+#    - Node ``shis`` attributes and boundedness heuristics use propagated
+#      ``_shis`` (from search, contraction, or the top-down safety net).  This
+#      list can be a strict subset of SS crossings; that is expected and does
+#      not govern edge assembly.
+#
+# See ``negative-betti-meta-graph-bug.md`` for the original failure mode.
+
+
 def _meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
-    """SHI list stored on meta-graph nodes (dual-graph / propagated ``_shis``)."""
+    """SHI list stored on meta-graph **nodes** (role 3: propagated metadata).
+
+    Uses ``poly._shis`` when set (from search or :meth:`Complex.contract`).
+    Falls back to :func:`_ss_face_crossing_indices` only when ``_shis`` is
+    missing.  This is **not** the rule for meta-graph face **edges**; see the
+    module comment above role 2.
+    """
     shis = poly._shis
     if shis is not None:
         return sorted(int(s) for s in shis)
@@ -261,12 +300,13 @@ def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
 
 
 def _ss_face_crossing_indices(ss: np.ndarray) -> tuple[int, ...]:
-    """Combinatorial codimension-one crossings: zero any nonzero SS entry.
+    """Candidate SHI indices for meta-graph face **edges** (role 2).
 
-    Uses the sign-sequence face rule (same as zeroing a supporting hyperplane in the
-    cubical complex) without consulting propagated ``_shis``. Propagated SHI lists can
-    be shrunk by coface intersection and flip-neighbor filtering, which omits valid
-    face incidences and breaks ``∂² = 0``.
+    Combinatorial codimension-one crossings: every index with ``ss_i != 0``.
+    Used when assembling :meth:`Complex.get_meta_graph` face incidences, **not**
+    when building the contraction chain (:meth:`Complex._codim_one_face_kwargs`).
+    Propagated ``_shis`` can be a strict subset after coface intersection; using
+    only ``_shis`` for edge discovery omits valid faces and breaks ``∂² = 0``.
     """
     row = np.asarray(ss, dtype=np.int8).ravel()
     return tuple(int(i) for i in np.flatnonzero(row != 0))
@@ -276,7 +316,11 @@ def _collect_meta_face_edges(
     cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
     valid_face_tags: set[bytes],
 ) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
-    """Return face edges (src, dst, shi) and dst tags discovered for one chunk of k-cells."""
+    """Return face edges (src, dst, shi) for one chunk of k-cells (role 2).
+
+    The ``shis`` tuple on each cell should come from
+    :func:`_ss_face_crossing_indices`, not from propagated ``poly._shis``.
+    """
     edges: list[tuple[bytes, bytes, int]] = []
     extra_tags: list[bytes] = []
     for src_tag, ss, shis in cells:
@@ -479,7 +523,12 @@ def _filter_shi_candidates(
 
 
 def _filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
-    """Drop SHIs on each cell of ``cplx`` with no same-dimension flip neighbor.
+    """Post-process contracted-slice ``_shis`` after :meth:`Complex.contract` (role 1).
+
+    Drops SHIs on each cell with no same-dimension flip neighbor.  Called at the
+    end of :meth:`Complex.contract` and :meth:`Complex.get_boundary_complex`.
+    Do not replace with full SS flip-neighbor membership; see the module comment
+    above role 1.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -498,17 +547,20 @@ def _filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
 
 
 def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
-    """Compute SHIs and finite hints for contracted cells missing ``_shis``.
+    """Fill missing ``_shis`` and boundedness hints on chain cells (role 3).
 
     The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
-    dual-graph intersection and flip-neighbor filtering.  This pass is a safety
-    net for any contracted cell that still lacks ``_shis`` (e.g. faces discovered
-    only when assembling the meta-graph).  For each such face:
+    coface intersection and flip-neighbor filtering (role 1).  This pass is a
+    safety net for contracted cells that still lack ``_shis``.  It does **not**
+    drive meta-graph face-edge discovery; that uses
+    :func:`_ss_face_crossing_indices` (role 2).
+
+    For each face still missing ``_shis``:
 
         SHI(face) = filter_flip( ∩{ SHI(coface) \\ {crossing_shi} : coface ⊃ face } )
 
     In :data:`~relucent.config.CAREFUL_MODE`, an :exc:`AssertionError` is raised
-    if any k-dim cell (k ≥ 1) ends up with fewer than k SHIs after propagation,
+    if any k-dim cell (k > 1) ends up with fewer than k SHIs after propagation,
     which indicates false negatives in the original maximal-cell SHI computation.
 
     Args:
@@ -1371,6 +1423,12 @@ class Complex:
         Candidate SHIs are the intersection of coface SHI sets minus the crossing
         index; :meth:`contract` post-filters these via
         :func:`_filter_complex_shis_by_flip_neighbor`.
+
+        Do not replace this with SS flip-neighbor membership: ``get_dual_graph``
+        iterates ``poly.shis`` when building the next contraction level, and
+        expanding ``_shis`` beyond the coface intersection creates spurious cells
+        and breaks ``∂² = 0``.  Meta-graph **face edges** use
+        :func:`_ss_face_crossing_indices` instead; see ``negative-betti-meta-graph-bug.md``.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1419,6 +1477,12 @@ class Complex:
 
     def contract(self, verbose: bool = False) -> Complex:
         """Contract the maximal cells in the complex.
+
+        Each codimension-one face is keyed by zeroing one dual-graph SHI in the
+        sign sequence.  Face ``shis`` kwargs come from coface intersection
+        (:meth:`_codim_one_face_kwargs`, role 1), then
+        :func:`_filter_complex_shis_by_flip_neighbor`.  The next
+        :meth:`get_dual_graph` call on the result iterates those ``_shis`` lists.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
@@ -1571,10 +1635,16 @@ class Complex:
 
         Directed edges go from a k-cell to a (k-1)-cell whenever the latter is a
         codimension-1 face of the former under the SHI-zeroing rule. Each edge
-        stores ``shi``, the supporting hyperplane index that was zeroed. Face
-        discovery uses every nonzero sign-sequence entry (combinatorial), not only
-        propagated ``_shis`` lists, so incomplete coface SHI intersection cannot
-        drop valid incidences.
+        stores ``shi``, the supporting hyperplane index that was zeroed.
+
+        **SHI rules (see module comment above the meta-graph helpers):**
+
+        - Face **edges**: :func:`_ss_face_crossing_indices` — try every
+          ``ss_i != 0`` (role 2).  Do not use propagated ``_shis`` here; coface
+          intersection can omit valid incidences and break ``∂² = 0``.
+        - Node **metadata** (``shis`` attr, 1-cell boundedness): propagated
+          ``poly._shis`` from :meth:`contract` plus :func:`_compute_contracted_shis_top_down`
+          (role 3).  This metadata can be a strict subset of SS crossings.
 
         If ``verify=True``, a second pass re-derives boundedness/SHI information
         from the assembled meta-graph (coface intersections and flip-neighbor
@@ -1672,7 +1742,7 @@ class Complex:
         )
         _compute_contracted_shis_top_down(by_dim)
 
-        # Discover k -> k-1 face incidences once; reuse when assembling the meta-graph.
+        # Role 2: face edges from SS crossings, not propagated _shis (see module comment).
         edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
         for k, c_k in sorted(by_dim.items(), reverse=True):
             if int(k) <= 0:
@@ -2364,6 +2434,13 @@ class Complex:
         The dual graph represents the connectivity structure of the complex,
         where nodes are polyhedra and edges connect adjacent polyhedra (those
         sharing a supporting hyperplane).
+
+        Edges are discovered by flipping each entry of ``poly.shis`` (role 1).
+        Those lists come from search (top dimension) or from
+        :meth:`_codim_one_face_kwargs` plus
+        :func:`_filter_complex_shis_by_flip_neighbor` after contraction.  Do not
+        expand them to full SS flip-neighbor membership before a further
+        :meth:`contract` — see the module comment above the meta-graph helpers.
 
         Args:
             relabel: If True, nodes are indexed by integers matching self.index2poly
