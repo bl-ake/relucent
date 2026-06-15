@@ -25,6 +25,7 @@ from relucent.utils import (
     get_mp_context,
     process_aware_cpu_count,
 )
+from relucent.worker_context import get_worker_context, set_worker_context
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -149,16 +150,14 @@ def search_calculations(
     Computes Chebyshev data (``finite`` / ``center`` / ``inradius``), SHIs, and any
     optional geometry caches requested by the caller.
     """
-    from relucent import complex as cx
-
-    assert cx._net is not None, "set_globals must be used as pool initializer"
+    ctx = get_worker_context()
     ss = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
-    p = Polyhedron(cx._net, ss)
+    p = Polyhedron(ctx.net, ss)
 
     props = _search_geometry_props(geometry_properties)
     try:
-        p.get_geometry(props, env=cx.env)
+        p.get_geometry(props, env=ctx.env)
     except ValueError as error:
         return error, *rest
 
@@ -166,13 +165,13 @@ def search_calculations(
         return "Polyhedron is infeasible (empty).", *rest
 
     try:
-        _enforce_min_search_inradius(p, env=cx.env)
+        _enforce_min_search_inradius(p, env=ctx.env)
     except ValueError as error:
         return error, *rest
 
     try:
         if p._shis is None:
-            result = get_shis(p, env=cx.env, **kwargs)
+            result = get_shis(p, env=ctx.env, **kwargs)
             p._shis = result[0] if isinstance(result, tuple) else result
     except ValueError as error:
         return error, *rest
@@ -188,18 +187,16 @@ def geometric_calculations(
     geometry_properties: Iterable[str] | None = None,
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
-    from relucent import complex as cx
-
-    assert cx._net is not None, "set_globals must be used as pool initializer"
+    ctx = get_worker_context()
     ss, shis, poly_index, *rest = task
-    p = Polyhedron(cx._net, ss, shis=shis)
+    p = Polyhedron(ctx.net, ss, shis=shis)
     props = _resolve_geometry_properties(geometry_properties, default_all=True)
     try:
-        p.get_geometry(props, env=cx.env)
+        p.get_geometry(props, env=ctx.env)
     except ValueError as error:
         return error, poly_index, *rest
     try:
-        _enforce_min_search_inradius(p, env=cx.env)
+        _enforce_min_search_inradius(p, env=ctx.env)
     except ValueError as error:
         return error, poly_index, *rest
 
@@ -226,8 +223,6 @@ def parallel_compute_geometric_properties(
             (default) shows worker count and a progress bar.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
     """
-    from relucent.complex import set_globals
-
     if verbose is None:
         verbose = cfg.VERBOSE
 
@@ -241,7 +236,7 @@ def parallel_compute_geometric_properties(
     tasks = [(poly.ss_np, poly._shis, i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
     computed = 0
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
         for result in tqdm(
             pool.imap_unordered(
                 partial(
@@ -302,7 +297,6 @@ def parallel_add(
         verbose = cfg.VERBOSE
     if bound is None:
         bound = cfg.DEFAULT_PARALLEL_ADD_BOUND
-    from relucent.complex import set_globals
 
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
@@ -313,7 +307,7 @@ def parallel_add(
         sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
 
     tasks = [(ss, None, i) for i, ss in enumerate(sss)]
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net,)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net,)) as pool:
         results = pool.map(
             partial(
                 geometric_calculations,
@@ -350,16 +344,14 @@ def get_ip(
         tuple: If successful, returns (neighbor_polyhedron, shi). If a ValueError
             occurs, returns (error, None).
     """
-    from relucent import complex as cx
-
+    ctx = get_worker_context()
     try:
         ss = p.ss_np.copy()
         ss[0, shi] = -ss[0, shi]
-        assert cx._net is not None, "set_globals must be used as pool initializer"
-        n = Polyhedron(cx._net, ss)
+        n = Polyhedron(ctx.net, ss)
         for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
             with contextlib.suppress(ValueError):
-                n._interior_point = n.get_interior_point(env=cx.env, max_radius=max_radius)
+                n._interior_point = n.get_interior_point(env=ctx.env, max_radius=max_radius)
         return n, shi
     except ValueError as e:
         return e, shi
@@ -385,30 +377,28 @@ def astar_calculations(
         tuple: If successful, returns (Polyhedron, *rest). If an exception occurs
             during SHI computation, returns (Polyhedron, error, *rest).
     """
-    from relucent import complex as cx
-
+    ctx = get_worker_context()
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     if p._net is None:
-        assert cx._net is not None, "set_globals must be used as pool initializer"
-        p._net = cx._net
+        p._net = ctx.net
 
     try:
-        p.get_geometry(SEARCH_REQUIRED_GEOMETRY_PROPERTIES, env=cx.env)
+        p.get_geometry(SEARCH_REQUIRED_GEOMETRY_PROPERTIES, env=ctx.env)
     except ValueError as error:
         return p, error, *rest
     if p.finite is None:
         return p, ValueError("Polyhedron is infeasible (empty)."), *rest
     try:
-        _enforce_min_search_inradius(p, env=cx.env)
+        _enforce_min_search_inradius(p, env=ctx.env)
     except ValueError as error:
         return p, error, *rest
     if p._interior_point is None:
-        p._interior_point = p.get_interior_point(env=cx.env)
+        p._interior_point = p.get_interior_point(env=ctx.env)
 
     try:
         if p._shis is None:
-            result = get_shis(p, env=cx.env, **kwargs)
+            result = get_shis(p, env=ctx.env, **kwargs)
             p._shis = result[0] if isinstance(result, tuple) else result
     except Exception as error:
         return p, error, *rest
@@ -442,7 +432,9 @@ def searcher(
     See Complex.bfs(), Complex.dfs(), and Complex.random_walk() for examples.
 
     Args:
-        cx: The polyhedral complex.
+        cx: The polyhedral complex (a :class:`~relucent.complex.Complex` instance).
+            This is **not** the ``relucent.complex`` module used by worker processes;
+            workers read :func:`~relucent.worker_context.get_worker_context` instead.
         start: Starting point (torch.Tensor / np.ndarray / array-like) or a
             Polyhedron, or None (defaults to origin). Defaults to None.
         max_depth: Maximum search depth (number of hyperplane crossings).
@@ -476,8 +468,6 @@ def searcher(
     Raises:
         ValueError: If the start point lies on a hyperplane (has zero in SS).
     """
-    from relucent.complex import set_globals
-
     if verbose is None:
         verbose = cfg.VERBOSE
 
@@ -588,7 +578,7 @@ def searcher(
             "Complete": True,
         }
 
-    with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
+    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
         try:
             for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
                 partial(
@@ -797,8 +787,6 @@ def hamming_astar(
     Raises:
         ValueError: If the start point lies exactly on a neuron's boundary.
     """
-    from relucent.complex import set_globals
-
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
 
@@ -881,9 +869,13 @@ def hamming_astar(
 
     pool = None
     try:
-        set_globals(cx._net)
+        set_worker_context(cx._net)
         if nworkers > 1:
-            pool = get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False, num_threads))
+            pool = get_mp_context().Pool(
+                nworkers,
+                initializer=set_worker_context,
+                initargs=(cx._net, False, num_threads),
+            )
         for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
             if len(item) >= 2 and isinstance(item[1], Exception):
                 # Useful when debugging spawn-related issues on macOS/Windows.
