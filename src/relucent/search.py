@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from relucent.complex import Complex
 
 __all__ = [
+    "ALL_GEOMETRY_PROPERTIES",
+    "SEARCH_REQUIRED_GEOMETRY_PROPERTIES",
     "astar_calculations",
     "get_ip",
     "greedy_path",
@@ -40,7 +42,12 @@ __all__ = [
     "searcher",
 ]
 
-DEFAULT_GEOMETRY_PROPERTIES: tuple[str, ...] = (
+# Chebyshev center/inradius (and boundedness) are always computed during search
+# workers because SHI reliability checks depend on them.
+SEARCH_REQUIRED_GEOMETRY_PROPERTIES: tuple[str, ...] = ("finite", "center", "inradius")
+
+# Every cache/property name supported by :meth:`~relucent.poly.Polyhedron.get_geometry`.
+ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "halfspaces",
     "W",
     "b",
@@ -51,25 +58,72 @@ DEFAULT_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "interior_point",
     "interior_point_norm",
     "Wl2",
+    "hs",
+    "vertices",
+    "ch",
+    "volume",
 )
 
 
-def _normalize_geometry_properties(properties: Iterable[str] | None) -> tuple[str, ...]:
-    if properties is None:
-        return DEFAULT_GEOMETRY_PROPERTIES
-    return tuple(dict.fromkeys(str(p).strip() for p in properties if str(p).strip()))
+def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
+    """Fail fast when a search-discovered cell is thinner than ``MIN_SEARCH_INRADIUS``.
+
+    Skips 0-cells (vertices), infeasible regions, and unbounded cells.
+    """
+    if poly.dim == 0:
+        return
+    if poly.finite is not True:
+        return
+    if poly._inradius is None:
+        poly._ensure_chebyshev_center(env=env)
+    inradius = poly._inradius
+    if inradius is None or inradius == float("inf"):
+        return
+    min_r = cfg.MIN_SEARCH_INRADIUS
+    if inradius < min_r:
+        raise ValueError(
+            f"Polyhedron inradius {inradius:.4e} is below MIN_SEARCH_INRADIUS ({min_r:.4e}). "
+            + "A cell this thin (often with neighbors equally thin across a shared face) "
+            + "can leave opposing halfspaces within the SHI objective tolerance after "
+            + "relaxation; tighten scaling or lower RELUCENT_TOL_SHI_OBJECTIVE."
+        )
+
+
+def _finalize_worker_geometry(p: Polyhedron, properties: Iterable[str]) -> None:
+    """Retain caches listed in *properties*; drop other heavy worker caches."""
+    requested = {str(name).strip() for name in properties if str(name).strip()}
+
+    if not (requested & {"halfspaces", "halfspaces_np"}):
+        p._halfspaces = None
+        p._halfspaces_np = None
+    if "W" not in requested:
+        p._w = None
+    if "b" not in requested:
+        p._b = None
+
+    qhull_props = {"hs", "vertices", "ch", "volume"}
+    if not (requested & qhull_props):
+        p._hs = None
+        p._vertices = None
+        p._ch = None
+        p._volume = None
+        p._attempted_compute_properties = False
+    elif "volume" not in requested:
+        p._volume = None
+
+    if requested & {"halfspaces", "halfspaces_np", "W", "b"}:
+        p._preserve_cache_on_pickle = True
 
 
 def search_calculations(
     task: np.ndarray | torch.Tensor | tuple[Any, ...],
     geometry_properties: Iterable[str] | None = None,
-    keep_caches: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, ...]:
     """Worker function for neighbor enumeration in search.
 
-    This intentionally computes only what the traversal needs:
-    feasibility and supporting halfspace indices (SHIs).
+    Computes Chebyshev data (``finite`` / ``center`` / ``inradius``), SHIs, and any
+    optional geometry caches requested by the caller.
     """
     from relucent import complex as cx
 
@@ -78,8 +132,21 @@ def search_calculations(
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(cx._net, ss)
 
-    if not p.feasible:
+    props = tuple(
+        dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *(geometry_properties or ())))
+    )
+    try:
+        p.get_geometry(props, env=cx.env)
+    except ValueError as error:
+        return error, *rest
+
+    if p.finite is None:
         return "Polyhedron is infeasible (empty).", *rest
+
+    try:
+        _enforce_min_search_inradius(p, env=cx.env)
+    except ValueError as error:
+        return error, *rest
 
     try:
         if p._shis is None:
@@ -88,17 +155,7 @@ def search_calculations(
     except ValueError as error:
         return error, *rest
 
-    props = _normalize_geometry_properties(geometry_properties)
-    if props:
-        try:
-            p.get_geometry(props, env=cx.env)
-        except ValueError as error:
-            return error, *rest
-
-    if keep_caches:
-        p._preserve_cache_on_pickle = True
-    else:
-        p.clean_data()
+    _finalize_worker_geometry(p, props)
     if isinstance(p._shis, list):
         random.shuffle(p._shis)
     return (p, *rest)
@@ -107,7 +164,6 @@ def search_calculations(
 def geometric_calculations(
     task: tuple[np.ndarray, list[int] | None, int] | tuple[Any, ...],
     geometry_properties: Iterable[str] | None = None,
-    keep_caches: bool = False,
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
     from relucent import complex as cx
@@ -115,16 +171,21 @@ def geometric_calculations(
     assert cx._net is not None, "set_globals must be used as pool initializer"
     ss, shis, poly_index, *rest = task
     p = Polyhedron(cx._net, ss, shis=shis)
-    props = _normalize_geometry_properties(geometry_properties)
+    props = (
+        ALL_GEOMETRY_PROPERTIES
+        if geometry_properties in (None, "All")
+        else geometry_properties
+    )
     try:
         p.get_geometry(props, env=cx.env)
     except ValueError as error:
         return error, poly_index, *rest
+    try:
+        _enforce_min_search_inradius(p, env=cx.env)
+    except ValueError as error:
+        return error, poly_index, *rest
 
-    if keep_caches:
-        p._preserve_cache_on_pickle = True
-    else:
-        p.clean_data()
+    _finalize_worker_geometry(p, props)
     return (p, poly_index, *rest)
 
 
@@ -132,7 +193,6 @@ def parallel_compute_geometric_properties(
     cx: "Complex",
     nworkers: int | None = None,
     geometry_properties: Iterable[str] | None = None,
-    keep_caches: bool = False,
     verbose: int | None = None,
 ) -> dict[str, Any]:
     """Compute selected properties for all existing polyhedra in parallel.
@@ -140,9 +200,10 @@ def parallel_compute_geometric_properties(
     Args:
         cx: Complex whose polyhedra should be updated.
         nworkers: Number of worker processes to use.
-        geometry_properties: Iterable of cache/property names to compute.
-            If None, defaults to :data:`DEFAULT_GEOMETRY_PROPERTIES`.
-        keep_caches: If True, keep heavy caches during worker serialization.
+        geometry_properties: Iterable of cache/property names to compute and
+            retain on each polyhedron. If None, computes
+            :data:`ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for the same full
+            geometry set.
         verbose: Controls progress output. ``0`` silences all output; ``1``
             (default) shows worker count and a progress bar.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
@@ -168,7 +229,6 @@ def parallel_compute_geometric_properties(
                 partial(
                     geometric_calculations,
                     geometry_properties=geometry_properties,
-                    keep_caches=keep_caches,
                 ),
                 tasks,
             ),
@@ -193,6 +253,7 @@ def parallel_add(
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float | None = None,
+    geometry_properties: Iterable[str] | None = None,
     verbose: int | None = None,
 ) -> list[Polyhedron | None]:
     """Add multiple polyhedra from data points using parallel processing.
@@ -207,6 +268,10 @@ def parallel_add(
             of CPU cores. Defaults to None.
         bound: Constraint radius for numerical stability when computing halfspaces.
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
+        geometry_properties: Iterable of cache/property names to compute and retain
+            on each polyhedron. If None, computes
+            :data:`ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for the same full
+            geometry set.
         verbose: Controls progress output. ``0`` silences all output; ``1``
             (default) shows worker count and progress bars.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
@@ -234,8 +299,7 @@ def parallel_add(
         results = pool.map(
             partial(
                 geometric_calculations,
-                geometry_properties=DEFAULT_GEOMETRY_PROPERTIES,
-                keep_caches=False,
+                geometry_properties=geometry_properties,
             ),
             tqdm(tasks, desc="Adding Polys", mininterval=5, disable=not verbose),
         )
@@ -311,8 +375,16 @@ def astar_calculations(
         assert cx._net is not None, "set_globals must be used as pool initializer"
         p._net = cx._net
 
+    try:
+        p.get_geometry(SEARCH_REQUIRED_GEOMETRY_PROPERTIES, env=cx.env)
+    except ValueError as error:
+        return p, error, *rest
     if p.finite is None:
-        raise ValueError("Polyhedron is infeasible (empty).")
+        return p, ValueError("Polyhedron is infeasible (empty)."), *rest
+    try:
+        _enforce_min_search_inradius(p, env=cx.env)
+    except ValueError as error:
+        return p, error, *rest
     if p._interior_point is None:
         p._interior_point = p.get_interior_point(env=cx.env)
 
@@ -340,7 +412,6 @@ def searcher(
     cube_radius: float | None = None,
     cube_mode: str = "unrestricted",
     geometry_properties: Iterable[str] | None = None,
-    keep_caches: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Search for polyhedra in the complex by discovering neighbors.
@@ -370,12 +441,10 @@ def searcher(
             (default) shows worker count and a progress bar.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
         geometry_properties: Iterable of polyhedron cache/property names to
-            compute for each discovered polyhedron. Defaults to
-            :data:`DEFAULT_GEOMETRY_PROPERTIES` (all non-SciPy geometry caches).
-            Pass an empty iterable for topology-only search.
-        keep_caches: If True, retain heavy caches (such as
-            ``halfspaces``, ``W``, and ``b``) when worker polyhedra are sent
-            back to the parent process. Defaults to False.
+            compute and retain for each discovered polyhedron. Defaults to
+            topology-only search. Pass ``"All"`` to compute
+            every supported property. ``finite``, ``center``, and ``inradius`` are
+            always computed regardless of this argument.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
     Returns:
@@ -396,6 +465,8 @@ def searcher(
 
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
+
+    geometry_properties = ALL_GEOMETRY_PROPERTIES if geometry_properties == "All" else geometry_properties
 
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
@@ -465,6 +536,10 @@ def searcher(
     result = get_shis(start, bound=bound, **kwargs)
     assert isinstance(result, list)
     start._shis = result
+    _finalize_worker_geometry(
+        start,
+        (*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *(geometry_properties or ())),
+    )
     for shi in start.shis:
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
@@ -489,6 +564,17 @@ def searcher(
     unprocessed = len(queue)
     depth = 0
 
+    if unprocessed == 0:
+        queue.close()
+        pbar.close()
+        return {
+            "Search Depth": depth,
+            "Avg # Facets Uncorrected": rolling_average,
+            "Search Time": pbar.format_dict["elapsed"],
+            "Bad SHI Computations": bad_shi_computations,
+            "Complete": True,
+        }
+
     with get_mp_context().Pool(nworkers, initializer=set_globals, initargs=(cx._net, False)) as pool:
         try:
             for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
@@ -496,7 +582,6 @@ def searcher(
                     search_calculations,
                     bound=bound,
                     geometry_properties=geometry_properties,
-                    keep_caches=keep_caches,
                     **kwargs,
                 ),
                 queue,
@@ -512,6 +597,7 @@ def searcher(
                             stacklevel=2,
                         )
                     if unprocessed == 0 or len(cx) >= max_polys:
+                        queue.close()
                         break
                     continue
 
@@ -520,6 +606,7 @@ def searcher(
 
                 if cube_mode != "unrestricted" and not _apply_cube_filter(p):
                     if unprocessed == 0 or len(cx) >= max_polys:
+                        queue.close()
                         break
                     continue
 
@@ -554,6 +641,7 @@ def searcher(
                 )
 
                 if unprocessed == 0 or len(cx) >= max_polys:
+                    queue.close()
                     break
         except Exception:
             raise

@@ -7,3 +7,4 @@
 - project lower-dim polyhedra for SHI calculations
 - deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
 - Standardize `Polyhedron`'s property computations, make sure `ensure_chebyshev_center` only runs once.
+- Make it so that geometry calculation errors don't interrupt the searcher/adder.

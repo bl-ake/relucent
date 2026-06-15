@@ -150,6 +150,19 @@ TOL_HALFSPACE_NORMAL: float = _env_float("TOL_HALFSPACE_NORMAL", 1e-12)
 GUROBI_SHI_BEST_OBJ_STOP: float = _env_float("GUROBI_SHI_BEST_OBJ_STOP", 1e-6)
 GUROBI_SHI_BEST_BD_STOP: float = _env_float("GUROBI_SHI_BEST_BD_STOP", -1e-6)
 
+# Minimum SHI LP objective (margin along hyperplane i after relaxing that face) to
+# certify a supporting hyperplane. The objective is in the same units as halfspace
+# slacks a^T x + b. Values near zero (e.g. 1e-18) are floating-point noise and
+# correspond to sign patterns with no open cell at this tolerance; default matches
+# :data:`GUROBI_SHI_BEST_OBJ_STOP` and :data:`TOL_SHI_HYPERPLANE`.
+TOL_SHI_OBJECTIVE: float = _env_float("TOL_SHI_OBJECTIVE", 1e-8)
+
+# During complex search (BFS/A*), raise if a discovered cell's Chebyshev inradius is
+# below this floor.  Defaults to half of :data:`TOL_SHI_OBJECTIVE` so that when a thin
+# cell is sandwiched between similarly thin neighbors, SHI LPs are not operating in a
+# regime where opposing halfspaces can sit within tolerance of the relaxed boundary.
+MIN_SEARCH_INRADIUS: float = _env_float("MIN_SEARCH_INRADIUS", TOL_SHI_OBJECTIVE / 2)
+
 # In 2D cell plotting (``Polyhedron.plot_cells`` when ``ambient_dim == 2``), halfspace normal
 # components below this are treated as zero
 # (e.g. nearly vertical line: |w[1]| < TOL_NEARLY_VERTICAL).
@@ -232,6 +245,7 @@ __all__ = [
     "GUROBI_SHI_BEST_BD_STOP",
     "GUROBI_SHI_BEST_OBJ_STOP",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
+    "MIN_SEARCH_INRADIUS",
     "MAX_RADIUS",
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",
@@ -243,6 +257,7 @@ __all__ = [
     "TOL_HALFSPACE_NORMAL",
     "TOL_NEARLY_VERTICAL",
     "TOL_SHI_HYPERPLANE",
+    "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
     "VERBOSE",
     "VERTEX_TRUST_THRESHOLD",
