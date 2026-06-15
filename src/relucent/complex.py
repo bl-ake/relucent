@@ -547,13 +547,14 @@ def _filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
 
 
 def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
-    """Fill missing ``_shis`` and boundedness hints on chain cells (role 3).
+    """Fill missing ``_shis`` on chain cells (role 3).
 
     The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
     coface intersection and flip-neighbor filtering (role 1).  This pass is a
     safety net for contracted cells that still lack ``_shis``.  It does **not**
     drive meta-graph face-edge discovery; that uses
-    :func:`_ss_face_crossing_indices` (role 2).
+    :func:`_ss_face_crossing_indices` (role 2).  Boundedness is classified
+    separately via the 1-cell SHI-count rule and :func:`_classify_finite_ascending`.
 
     For each face still missing ``_shis``:
 
@@ -573,10 +574,8 @@ def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
         if k - 1 not in by_dim:
             continue
 
-        # For each (k-1)-dim face: accumulate the SHI intersection over all
-        # cofaces, and track whether any coface is known to be bounded.
+        # For each (k-1)-dim face: accumulate the SHI intersection over all cofaces.
         face_shis: dict[bytes, set[int]] = {}
-        face_any_bounded: dict[bytes, bool] = {}
 
         for coface in by_dim[k]:
             if coface._shis is None:
@@ -589,7 +588,6 @@ def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
                 continue
 
             ss_coface = np.asarray(coface.ss_np, dtype=np.int8).ravel()
-            coface_bounded = coface._finite_computed and coface._finite is True
 
             for shi in coface._shis:
                 ss_face = ss_coface.copy()
@@ -599,13 +597,10 @@ def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
                 contrib = set(coface._shis) - {shi}
                 if face_tag not in face_shis:
                     face_shis[face_tag] = contrib.copy()
-                    face_any_bounded[face_tag] = coface_bounded
                 else:
                     face_shis[face_tag] &= contrib
-                    if coface_bounded:
-                        face_any_bounded[face_tag] = True
 
-        # Apply the computed SHIs and finite hints to the (k-1)-dim cells.
+        # Apply the computed SHIs to the (k-1)-dim cells.
         face_lookup = {p.tag: p for p in by_dim[k - 1]}
         neighbor_tags = set(face_lookup.keys())
         n_set = 0
@@ -616,9 +611,6 @@ def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
             if face._shis is None:
                 face._shis = _filter_shi_candidates(face.ss_np, shis, neighbor_tags=neighbor_tags)
                 n_set += 1
-            if not face._finite_computed and face_any_bounded.get(face_tag, False):
-                face._finite = True
-                face._finite_computed = True
 
         if n_set:
             logger.info(
@@ -1103,6 +1095,7 @@ class Complex:
         points: Iterable[torch.Tensor | np.ndarray],
         nworkers: int | None = None,
         bound: float | None = None,
+        geometry_properties: Iterable[str] | None = None,
         verbose: int | None = None,
         **kwargs: Any,
     ) -> list[Polyhedron | None]:
@@ -1117,6 +1110,10 @@ class Complex:
                 of CPU cores. Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
                 Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
+            geometry_properties: Iterable of cache/property names to compute and
+                retain on each polyhedron. If None, computes
+                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for
+                the same full geometry set.
             verbose: Controls progress output. ``0`` silences all output; ``1``
                 (default) shows worker count and progress bars.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
@@ -1133,6 +1130,7 @@ class Complex:
             points,
             nworkers=nworkers,
             bound=bound,
+            geometry_properties=geometry_properties,
             verbose=verbose,
             **kwargs,
         )
@@ -1149,7 +1147,6 @@ class Complex:
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
         geometry_properties: Iterable[str] | None = None,
-        keep_caches: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Search for polyhedra in the complex by discovering neighbors.
@@ -1179,12 +1176,10 @@ class Complex:
                 (default) shows worker count and a progress bar.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
             geometry_properties: Iterable of polyhedron cache/property names to
-                compute for each discovered polyhedron during search. If None,
-                uses the default non-SciPy geometry set. Pass an empty iterable
-                for topology-only search.
-            keep_caches: If True, keep caches such as ``halfspaces``,
-                ``W``, and ``b`` when polyhedra are returned from worker
-                processes. Defaults to False.
+                compute and retain for each discovered polyhedron during search. If None,
+                performs topology-only search (no optional caches). Pass ``"All"`` to
+                compute every supported cache. ``finite``, ``center``, and
+                ``inradius`` are always computed.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -1212,7 +1207,6 @@ class Complex:
             cube_radius=cube_radius,
             cube_mode=cube_mode,
             geometry_properties=geometry_properties,
-            keep_caches=keep_caches,
             **kwargs,
         )
 
@@ -1220,7 +1214,6 @@ class Complex:
         self,
         nworkers: int | None = None,
         properties: Iterable[str] | None = None,
-        keep_caches: bool = False,
         verbose: int | None = None,
     ) -> dict[str, Any]:
         """Compute selected polyhedron caches in parallel.
@@ -1229,10 +1222,9 @@ class Complex:
 
         Args:
             nworkers: Number of worker processes (defaults to CPU count).
-            properties: Iterable of cache/property names to compute. If None,
-                uses relucent's default non-SciPy geometric set.
-            keep_caches: If True, retain heavy caches (halfspaces/W/b) after
-                worker transfer; otherwise they are cleaned to reduce memory.
+            properties: Iterable of cache/property names to compute and retain.
+                If None, computes :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
+                Pass ``"All"`` for the same full geometry set.
             verbose: Controls progress output. ``0`` silences all output; ``1``
                 (default) shows worker count and a progress bar.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
@@ -1241,7 +1233,6 @@ class Complex:
             self,
             nworkers=nworkers,
             geometry_properties=properties,
-            keep_caches=keep_caches,
             verbose=verbose,
         )
 
@@ -1439,8 +1430,6 @@ class Complex:
             "dim": ambient - codim,
             "_ambient_dim": ambient,
         }
-        if _known_bounded(p1) or _known_bounded(p2):
-            poly_kwargs["finite"] = True
         return poly_kwargs
 
     def get_boundary_cells(self, i: int, verbose: bool = False) -> set[Polyhedron]:
@@ -1792,6 +1781,15 @@ class Complex:
             for face_tag in set(extra_tags):
                 if face_tag not in lookup and face_tag in self.tag2poly:
                     lookup[face_tag] = self.tag2poly[face_tag]
+
+        # Drop any stale finite hints on contracted cells before combinatorial
+        # classification.  Boundedness is not monotone downward (a bounded coface
+        # may still have unbounded faces), so hints from contraction must not
+        # short-circuit the ascending sweep.
+        for p in all_chain_polys:
+            if 0 < p.dim < top_dim:
+                p._finite_computed = False
+                p._finite = None
 
         # Step 1: classify all 1-dim cells from their SHI count.
         # A 1-cell is bounded iff it has 2 SHIs (both endpoints are hyperplanes);

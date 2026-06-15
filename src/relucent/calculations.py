@@ -833,7 +833,7 @@ def get_shis(
             model.close()
             raise KeyboardInterrupt
         if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
-            if model.objVal > 0:
+            if model.objVal > cfg.TOL_SHI_OBJECTIVE:
                 x_amb = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
                 dists = A_orig @ x_amb + b_orig
                 if dists[(dists > 0)].sum() >= 1 + tol:

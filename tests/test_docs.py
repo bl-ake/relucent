@@ -94,9 +94,12 @@ def test_network_definitions_snippets() -> None:
 
 def test_configuration_snippets() -> None:
     snippets = extract_rst_literal_python_blocks(_rst("configuration.rst"))
-    assert len(snippets) == 3
+    assert len(snippets) == 2
     exec_snippet(snippets[0])
-    exec_snippet(snippets[1])
-    ns = exec_snippet(snippets[2])
-    assert "cx" in ns
-    assert len(ns["cx"]) > 0  # populated by cx.searcher(...) calls in the snippet
+    ns = exec_snippet(snippets[1])
+    import relucent.config as cfg
+
+    assert cfg.TOL_HALFSPACE_CONTAINMENT == 1e-7
+    assert cfg.MAX_RADIUS == 500
+    assert cfg.DEFAULT_SEARCH_BOUND == 1e7
+    assert "update_settings" in ns

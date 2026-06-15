@@ -717,6 +717,10 @@ class Polyhedron:
             _ = self.halfspaces
         if "finite" in requested or "center" in requested or "inradius" in requested:
             _ = self.finite
+        if "center" in requested:
+            _ = self.center
+        if "inradius" in requested:
+            _ = self.inradius
         if "interior_point" in requested and self._interior_point is None:
             self._interior_point = self.get_interior_point(env=env)
         if "interior_point_norm" in requested:
@@ -899,7 +903,7 @@ class Polyhedron:
         if not self._finite_computed:
             _ = self.finite
         elif self._finite is True and self._center is None:
-            self._ensure_chebyshev_center()
+            self._ensure_chebyshev_center()  # TODO: Make sure this only happens once
         return self._center
 
     @property
@@ -932,6 +936,8 @@ class Polyhedron:
         if self._finite_computed:
             return self._finite
         center, inradius = self.get_center_inradius()
+        self._center = center
+        self._inradius = inradius
         if center is not None:
             self._finite = True
         elif inradius is None:

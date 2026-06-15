@@ -515,9 +515,9 @@ class BlockingQueue(Generic[T, Q]):
             self.lock.notify()
 
     def close(self) -> None:
-        self.closed = True
         with self.lock:
-            self.lock.notify()
+            self.closed = True
+            self.lock.notify_all()
 
     def __len__(self) -> int:
         with self.lock:
