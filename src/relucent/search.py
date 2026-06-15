@@ -38,6 +38,7 @@ __all__ = [
     "hamming_astar",
     "parallel_compute_geometric_properties",
     "parallel_add",
+    "retain_geometry_caches",
     "search_calculations",
     "searcher",
 ]
@@ -89,11 +90,37 @@ def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
         )
 
 
-def _finalize_worker_geometry(p: Polyhedron, properties: Iterable[str]) -> None:
-    """Retain caches listed in *properties*; drop other heavy worker caches."""
-    requested = {str(name).strip() for name in properties if str(name).strip()}
+def _resolve_geometry_properties(
+    geometry_properties: Iterable[str] | str | None,
+    *,
+    default_all: bool = False,
+) -> tuple[str, ...]:
+    """Normalize ``geometry_properties`` to a deduplicated property-name tuple."""
+    if geometry_properties == "All":
+        return ALL_GEOMETRY_PROPERTIES
+    if geometry_properties is None:
+        return ALL_GEOMETRY_PROPERTIES if default_all else ()
+    if isinstance(geometry_properties, str):
+        name = geometry_properties.strip()
+        return (name,) if name else ()
+    return tuple(dict.fromkeys(str(name).strip() for name in geometry_properties if str(name).strip()))
 
-    if not (requested & {"halfspaces", "halfspaces_np"}):
+
+def _search_geometry_props(
+    geometry_properties: Iterable[str] | str | None = None,
+) -> tuple[str, ...]:
+    """Search worker properties: required topology geometry plus optional caches."""
+    optional = _resolve_geometry_properties(geometry_properties, default_all=False)
+    return tuple(dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *optional)))
+
+
+def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
+    """Retain geometry caches listed in *properties*; drop other heavy caches."""
+    requested = {str(name).strip() for name in properties if str(name).strip()}
+    if "halfspaces_np" in requested:
+        requested.add("halfspaces")
+
+    if "halfspaces" not in requested:
         p._halfspaces = None
         p._halfspaces_np = None
     if "W" not in requested:
@@ -110,9 +137,6 @@ def _finalize_worker_geometry(p: Polyhedron, properties: Iterable[str]) -> None:
         p._attempted_compute_properties = False
     elif "volume" not in requested:
         p._volume = None
-
-    if requested & {"halfspaces", "halfspaces_np", "W", "b"}:
-        p._preserve_cache_on_pickle = True
 
 
 def search_calculations(
@@ -132,9 +156,7 @@ def search_calculations(
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(cx._net, ss)
 
-    props = tuple(
-        dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *(geometry_properties or ())))
-    )
+    props = _search_geometry_props(geometry_properties)
     try:
         p.get_geometry(props, env=cx.env)
     except ValueError as error:
@@ -155,7 +177,7 @@ def search_calculations(
     except ValueError as error:
         return error, *rest
 
-    _finalize_worker_geometry(p, props)
+    retain_geometry_caches(p, props)
     if isinstance(p._shis, list):
         random.shuffle(p._shis)
     return (p, *rest)
@@ -171,11 +193,7 @@ def geometric_calculations(
     assert cx._net is not None, "set_globals must be used as pool initializer"
     ss, shis, poly_index, *rest = task
     p = Polyhedron(cx._net, ss, shis=shis)
-    props = (
-        ALL_GEOMETRY_PROPERTIES
-        if geometry_properties in (None, "All")
-        else geometry_properties
-    )
+    props = _resolve_geometry_properties(geometry_properties, default_all=True)
     try:
         p.get_geometry(props, env=cx.env)
     except ValueError as error:
@@ -185,7 +203,7 @@ def geometric_calculations(
     except ValueError as error:
         return error, poly_index, *rest
 
-    _finalize_worker_geometry(p, props)
+    retain_geometry_caches(p, props)
     return (p, poly_index, *rest)
 
 
@@ -394,7 +412,7 @@ def astar_calculations(
             p._shis = result[0] if isinstance(result, tuple) else result
     except Exception as error:
         return p, error, *rest
-    p.clean_data()
+    retain_geometry_caches(p, SEARCH_REQUIRED_GEOMETRY_PROPERTIES)
     assert isinstance(p._shis, list), "get_shis() returns a list"
     random.shuffle(p._shis)
     return p, *rest
@@ -466,8 +484,6 @@ def searcher(
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
 
-    geometry_properties = ALL_GEOMETRY_PROPERTIES if geometry_properties == "All" else geometry_properties
-
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
     elif cube_mode != "unrestricted":
@@ -536,10 +552,7 @@ def searcher(
     result = get_shis(start, bound=bound, **kwargs)
     assert isinstance(result, list)
     start._shis = result
-    _finalize_worker_geometry(
-        start,
-        (*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *(geometry_properties or ())),
-    )
+    retain_geometry_caches(start, _search_geometry_props(geometry_properties))
     for shi in start.shis:
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
