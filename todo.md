@@ -6,3 +6,4 @@
 - fix torch support for model.py
 - project lower-dim polyhedra for SHI calculations
 - deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
+- Standardize `Polyhedron`'s property computations, make sure `ensure_chebyshev_center` only runs once.
