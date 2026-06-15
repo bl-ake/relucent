@@ -10,8 +10,8 @@ coface-intersected ``shis`` in kwargs plus flip-neighbor filtering
 full SS flip-neighbor membership to ``_shis`` before further contractions would
 add spurious dual-graph edges and break ``∂² = 0``.
 
-Cases ``batch_deep_2`` and ``batch_deep_51`` from ``analysis/compare_betti_codebases``
-exhibited the latter failure under the incorrect WIP.
+Deep uniform MLPs with seeds 2 and 51 exhibited the latter failure under the
+incorrect WIP.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
     ("name", "architecture", "seed", "chain_sizes", "meta_edges", "betti"),
     [
         (
-            "batch_deep_2",
+            "deep_2441_seed2",
             [2, 4, 4, 1],
             2,
             [(43, 2), (75, 1), (33, 0)],
@@ -39,7 +39,7 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
             {0: 1, 2: 1},
         ),
         (
-            "batch_deep_51",
+            "deep_3431_seed51",
             [3, 4, 3, 1],
             51,
             [(65, 3), (151, 2), (119, 1), (32, 0)],
