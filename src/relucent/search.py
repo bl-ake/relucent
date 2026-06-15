@@ -67,6 +67,29 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
 )
 
 
+def _neighbor_tag_for_flip(ss: np.ndarray | torch.Tensor, shi: int) -> bytes:
+    """Sign-sequence tag obtained by flipping one SHI coordinate."""
+    flipped = np.asarray(ss, dtype=np.int8).copy()
+    flipped[0, shi] *= -1
+    return encode_ss(flipped)
+
+
+def _cancel_pending_neighbor(
+    cx: "Complex",
+    *,
+    pending_neighbors: dict[bytes, list[tuple[int, int]]],
+    node: Polyhedron,
+    shi: int,
+) -> None:
+    """Drop a failed in-flight neighbor and SHIs that deferred queueing for it."""
+    failed_tag = _neighbor_tag_for_flip(node.ss_np, shi)
+    node.remove_shi(shi)
+    for waiter_index, waiter_shi in pending_neighbors.pop(failed_tag, []):
+        waiter = cast(Polyhedron, cx.index2poly[waiter_index])
+        if waiter_shi in waiter._shis:
+            waiter._shis.remove(waiter_shi)
+
+
 def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
     """Fail fast when a search-discovered cell is thinner than ``MIN_SEARCH_INRADIUS``.
 
@@ -511,7 +534,9 @@ def searcher(
         p._halfspaces_np = bounded_halfspaces
         return p.feasible
 
-    found_tags: set[bytes] = set()
+    # Keys are neighbor tags with an in-flight discovery task; values list polys
+    # that deferred queueing because discovery was already pending.
+    pending_neighbors: dict[bytes, list[tuple[int, int]]] = {}
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
         logger.info("searcher running on %d workers", nworkers)
@@ -536,18 +561,19 @@ def searcher(
             "Bad SHI Computations": [],
             "Complete": True,
         }
-    found_tags.add(encode_ss(start.ss_np))
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
     result = get_shis(start, bound=bound, **kwargs)
     assert isinstance(result, list)
     start._shis = result
     retain_geometry_caches(start, _search_geometry_props(geometry_properties))
+    start_index = cx.ssm[start.ss_np]
     for shi in start.shis:
         new_ss = start.ss_np.copy()
         new_ss[0, shi] *= -1
-        found_tags.add(encode_ss(new_ss))
-        queue.push((new_ss, shi, 1, cx.ssm[start.ss_np]))
+        tag = encode_ss(new_ss)
+        pending_neighbors[tag] = []
+        queue.push((new_ss, shi, 1, start_index))
 
     rolling_average = len(start.shis)
     bad_shi_computations = []
@@ -593,7 +619,12 @@ def searcher(
                 node = cast(Polyhedron, cx.index2poly[node_index])
                 if not isinstance(p, Polyhedron):
                     bad_shi_computations.append((node, shi, depth, str(p)))
-                    node.remove_shi(shi)
+                    _cancel_pending_neighbor(
+                        cx,
+                        pending_neighbors=pending_neighbors,
+                        node=node,
+                        shi=shi,
+                    )
                     if node.num_shis < min(cx.dim, cx.n):
                         warnings.warn(
                             RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
@@ -608,12 +639,19 @@ def searcher(
                     p._net = cx._net
 
                 if cube_mode != "unrestricted" and not _apply_cube_filter(p):
+                    _cancel_pending_neighbor(
+                        cx,
+                        pending_neighbors=pending_neighbors,
+                        node=node,
+                        shi=shi,
+                    )
                     if unprocessed == 0 or len(cx) >= max_polys:
                         queue.close()
                         break
                     continue
 
                 p = cx.add_polyhedron(p)
+                pending_neighbors.pop(encode_ss(p.ss_np), None)
 
                 if getattr(p, "warnings", None):
                     for warning in p.warnings:
@@ -628,10 +666,15 @@ def searcher(
                             ss = p.ss_np.copy()
                             ss[0, new_shi] *= -1
                             tag = encode_ss(ss)
-                            if tag not in found_tags:
-                                found_tags.add(tag)
-                                queue.push((ss, new_shi, depth + 1, cx.ssm[p.ss_np]))
+                            if tag in cx.tag2poly:
+                                continue
+                            poly_index = cx.ssm[p.ss_np]
+                            if tag not in pending_neighbors:
+                                pending_neighbors[tag] = []
+                                queue.push((ss, new_shi, depth + 1, poly_index))
                                 unprocessed += 1
+                            else:
+                                pending_neighbors[tag].append((poly_index, new_shi))
 
                 pbar.update(n=len(cx) - pbar.n)
                 rolling_average = (rolling_average * (len(cx) - 1) + len(p.shis)) / len(cx)
