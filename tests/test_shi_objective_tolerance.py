@@ -367,6 +367,9 @@ class TestStripNetworkBfs:
         # Parallel ReLU thresholds produce nearly duplicate halfspace rows at fat
         # start regions; the strip geometry is intentional for inradius testing.
         monkeypatch.setattr(cfg, "CAREFUL_MODE", False)
+        # Spawned workers (macOS default) re-import config and read RELUCENT_* env
+        # vars; CI sets RELUCENT_CAREFUL_MODE=1, so patch the env as well as cfg.
+        monkeypatch.setenv("RELUCENT_CAREFUL_MODE", "0")
 
     def test_bfs_rejects_thin_strip_neighbor_and_completes(self):
         from collections import deque
