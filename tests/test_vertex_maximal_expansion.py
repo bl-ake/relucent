@@ -103,8 +103,8 @@ def test_contract_vertices_expand_to_maximal_cells(
 
 def test_tolerance_sweep_does_not_revive_encoding_phantom() -> None:
     """A canonical-only phantom SS stays infeasible under loose relucent tolerances."""
-    # Sign pattern from analysis/compare_betti_codebases batch_deep_2: feasible in
-    # canonical get_ssr but empty for relucent's ReLU sign semantics.
+    # Sign pattern for mlp([2, 4, 4, 1], seed=2): feasible in canonical get_ssr but
+    # empty for relucent's ReLU sign semantics.
     phantom = (-1, -1, -1, 1, -1, -1, 1, 1, -1)
     set_seeds(2)
     cplx = Complex(mlp([2, 4, 4, 1], add_last_relu=True, init="uniform"))
