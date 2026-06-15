@@ -82,7 +82,6 @@ class Polyhedron:
         self._ss_np: np.ndarray | None = None
 
         self._attempted_compute_properties: bool = False
-        self._preserve_cache_on_pickle: bool = False
         self._ambient_dim: int | None = None
 
         for key, value in kwargs.items():
@@ -666,27 +665,6 @@ class Polyhedron:
             **kwargs,
         )
 
-    def clean_data(self) -> None:
-        """Clear cached data to reduce memory usage.
-
-        Drops large tensors (halfspaces, ``W``, ``b``) and Qhull-derived geometry
-        (``_hs``, vertices, hull, volume). Resets ``_attempted_compute_properties`` so
-        :func:`~relucent.calculations.compute_properties` can run again. Keeps the sign
-        sequence, interior-point cache, and lightweight Chebyshev classification
-        (``finite``, ``center``, ``inradius``, and related flags) so search/plotting
-        need not redo Gurobi Chebyshev solves after a cleanup pass.
-        """
-        self._halfspaces = None
-        self._w = None
-        self._b = None
-        self._hs = None
-        self._halfspaces_np = None
-        self._vertices = None
-        self._ch = None
-        self._volume = None
-        self._attempted_compute_properties = False
-        # self._interior_point = None ## TODO: Does this slow down things?
-
     def get_geometry(
         self,
         properties: Iterable[str],
@@ -788,14 +766,17 @@ class Polyhedron:
                 constraint a^T x + b <= 0.
         """
         if self._halfspaces is None:
-            from relucent.calculations import get_hs
+            if self._halfspaces_np is not None:
+                self._halfspaces = self._halfspaces_np
+            else:
+                from relucent.calculations import get_hs
 
-            halfspaces, W, b, num_dead_relus = get_hs(self)
-            self._halfspaces = halfspaces
-            self._w = W
-            self._b = b
-            self._halfspaces_np = None
-            self._num_dead_relus = num_dead_relus
+                halfspaces, W, b, num_dead_relus = get_hs(self)
+                self._halfspaces = halfspaces
+                self._w = W
+                self._b = b
+                self._halfspaces_np = None
+                self._num_dead_relus = num_dead_relus
         assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
         return self._halfspaces
 
@@ -1041,7 +1022,6 @@ class Polyhedron:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
-        self._preserve_cache_on_pickle = False
         if self._finite is True and self._center is None:
             self._finite_computed = False
 
@@ -1064,16 +1044,10 @@ class Polyhedron:
             "codim": self.codim,
             "dim": self.dim,
             "_ambient_dim": self._ambient_dim,
+            "_halfspaces_np": self._halfspaces_np,
+            "_w": self._w,
+            "_b": self._b,
         }
-        if self._preserve_cache_on_pickle:
-            state.update(
-                {
-                    "_halfspaces": self._halfspaces,
-                    "_halfspaces_np": self._halfspaces_np,
-                    "_w": self._w,
-                    "_b": self._b,
-                }
-            )
         return state
 
     def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:

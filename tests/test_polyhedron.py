@@ -177,8 +177,10 @@ class TestPolyhedronOps:
         assert n >= 0
 
 
-class TestPolyhedronCleanData:
-    def test_clean_data_clears_caches(self, seeded):
+class TestPolyhedronRetainGeometryCaches:
+    def test_retain_geometry_caches_clears_heavy_caches(self, seeded):
+        from relucent.search import retain_geometry_caches
+
         assert seeded is not None
         net = mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
@@ -187,7 +189,7 @@ class TestPolyhedronCleanData:
         _ = p.halfspaces
         _ = p.W
         _ = p.b
-        p.clean_data()
+        retain_geometry_caches(p, ())
         assert p._halfspaces is None
         assert p._w is None
         assert p._b is None

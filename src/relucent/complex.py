@@ -26,6 +26,7 @@ from relucent.search import greedy_path as _greedy_path_fn
 from relucent.search import hamming_astar as _hamming_astar_fn
 from relucent.search import parallel_add as _parallel_add_fn
 from relucent.search import parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn
+from relucent.search import retain_geometry_caches
 from relucent.search import searcher as _searcher_fn
 from relucent.ss import SSManager
 from relucent.utils import (
@@ -1082,13 +1083,13 @@ class Complex:
         return self.add_ss(self.point2ss(data), check_exists=check_exists, **kwargs)
 
     def clean_data(self) -> None:
-        """Clean cached data from all polyhedra in the complex.
+        """Drop heavy geometry caches from all polyhedra in the complex.
 
-        This method calls clean_data() on each polyhedron, which removes most of their
-        computed data.
+        Retains lightweight search data (sign sequence, SHIs, Chebyshev
+        classification, and interior points) on each polyhedron.
         """
         for poly in self:
-            poly.clean_data()
+            retain_geometry_caches(poly, ())
 
     def parallel_add(
         self,

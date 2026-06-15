@@ -176,9 +176,9 @@ def test_solve_radius_equalities_only_unique_point():
     assert r == 0.0
 
 
-def test_finalize_worker_geometry_retains_requested_heavy_caches(seeded):
+def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
     """Requested geometry properties are kept; unrequested heavy caches are dropped."""
-    from relucent.search import _finalize_worker_geometry
+    from relucent.search import retain_geometry_caches
 
     assert seeded is not None
     net = mlp(widths=[2, 4, 1])
@@ -186,13 +186,12 @@ def test_finalize_worker_geometry_retains_requested_heavy_caches(seeded):
     p = cplx.add_point(np.zeros((1, 2)))
     p.get_geometry(["halfspaces", "W", "b", "interior_point"])
 
-    _finalize_worker_geometry(p, ["halfspaces", "W", "b"])
+    retain_geometry_caches(p, ["halfspaces", "W", "b"])
     assert p._halfspaces is not None
     assert p._w is not None
     assert p._b is not None
-    assert p._preserve_cache_on_pickle is True
 
-    _finalize_worker_geometry(p, ["interior_point"])
+    retain_geometry_caches(p, ["interior_point"])
     assert p._halfspaces is None
     assert p._w is None
     assert p._b is None
@@ -219,6 +218,6 @@ def test_search_all_geometry_properties_retains_caches(seeded):
     cplx = Complex(net)
     cplx.bfs(max_polys=3, nworkers=1, verbose=0, geometry_properties="All")
     for poly in cplx:
-        assert poly._halfspaces is not None
         assert poly._w is not None
         assert poly._b is not None
+        assert poly._halfspaces is not None or poly._halfspaces_np is not None
