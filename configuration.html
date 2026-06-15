@@ -64,14 +64,13 @@
 <li class="toctree-l2"><a class="reference internal" href="network_definitions.html#append-a-final-relu-for-decision-boundary-topology">5) Append A Final ReLU For Decision-Boundary Topology</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Cache Strategy</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Memory Management</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#default-behavior">Default behavior</a></li>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#important-tradeoff">Important tradeoff</a></li>
 <li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-only-search">Topology-only search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-focused-search-default">Topology-focused search (default)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#full-geometry-during-search">Full geometry during search</a></li>
 <li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
-<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#keep-heavy-caches-after-worker-transfer">Keep heavy caches after worker transfer</a></li>
 <li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
 </ul>
 </li>
@@ -102,7 +101,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#search-time-cache-controls">Search-time cache controls</a></li>
 </ul>
 </li>
 </ul>
@@ -159,7 +157,6 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.clean_data"><code class="docutils literal notranslate"><span class="pre">Polyhedron.clean_data()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_vertices()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
@@ -419,17 +416,22 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code> / <code class="docutils literal notranslate"><span class="pre">-1e-6</span></code></p></td>
 <td><p>Gurobi early-stop tolerances for the SHI MIP models.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_OBJECTIVE</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
+<td><p>Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-10</span></code></p></td>
 <td><p>2D plotting: halfspace normals with small <code class="docutils literal notranslate"><span class="pre">w[1]</span></code> are treated as vertical.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
 <td><p>Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">allclose</span></code> atol when verifying halfspace <code class="docutils literal notranslate"><span class="pre">(A,</span> <span class="pre">b)</span></code> against network outputs.</p></td>
@@ -460,32 +462,37 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">[0.01,</span> <span class="pre">0.1,</span> <span class="pre">1,</span> <span class="pre">10,</span> <span class="pre">100]</span></code></p></td>
 <td><p>Radii tried in order when locating an interior point for a neighbor in <code class="xref py py-func docutils literal notranslate"><span class="pre">get_ip()</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PARALLEL_ADD_BOUND</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MIN_SEARCH_INRADIUS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_OBJECTIVE</span> <span class="pre">/</span> <span class="pre">2</span></code></p></td>
+<td><p>During BFS/A* search, raise if a discovered cell’s Chebyshev inradius is below this floor.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PARALLEL_ADD_BOUND</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
 <td><p>Default halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">parallel_add()</span></code> and <code class="xref py py-meth docutils literal notranslate"><span class="pre">parallel_add()</span></code>.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_SEARCH_BOUND</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_SEARCH_BOUND</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
 <td><p>Default halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">searcher()</span></code>, <code class="xref py py-func docutils literal notranslate"><span class="pre">hamming_astar()</span></code>, and matching <a class="reference internal" href="complex.html#relucent.Complex" title="relucent.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> methods.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">0.9</span></code></p></td>
 <td><p>Weight on Euclidean-distance bias in the A* heuristic.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_MARGIN_FACTOR</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_MARGIN_FACTOR</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1.1</span></code></p></td>
 <td><p>Axis margin multiplier when deriving plot extent from interior points.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_DEFAULT_MAXCOORD</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_DEFAULT_MAXCOORD</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
 <td><p>Fallback axis half-extent when no interior points exist (2D complex plots).</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_COMPLEX_PLOT_BOUND</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_COMPLEX_PLOT_BOUND</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
 <td><p>Default bound for <code class="xref py py-meth docutils literal notranslate"><span class="pre">plot_cells()</span></code> when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted.</p></td>
@@ -571,48 +578,6 @@ constants.</p>
 
 <p>Valid keys for <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a> are the names listed in
 <code class="docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>, except <code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself.</p>
-</section>
-<section id="search-time-cache-controls">
-<h2>Search-time cache controls<a class="headerlink" href="#search-time-cache-controls" title="Link to this heading"></a></h2>
-<p>Search and post-processing APIs now accept explicit cache/property lists, so you
-can control exactly what gets computed:</p>
-<ul class="simple">
-<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.searcher()</span></code> takes <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> and
-<code class="docutils literal notranslate"><span class="pre">keep_caches</span></code>.</p></li>
-<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.compute_geometric_properties()</span></code> takes
-<code class="docutils literal notranslate"><span class="pre">properties</span></code> and <code class="docutils literal notranslate"><span class="pre">keep_caches</span></code>.</p></li>
-<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.complex.Complex.get_poly_attrs()</span></code> precomputes only the
-attributes requested in <code class="docutils literal notranslate"><span class="pre">attrs</span></code>.</p></li>
-</ul>
-<p>Common property names include <code class="docutils literal notranslate"><span class="pre">&quot;halfspaces&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;b&quot;</span></code>,
-<code class="docutils literal notranslate"><span class="pre">&quot;num_dead_relus&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;finite&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;center&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;inradius&quot;</span></code>,
-<code class="docutils literal notranslate"><span class="pre">&quot;interior_point&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;interior_point_norm&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;vertices&quot;</span></code>,
-<code class="docutils literal notranslate"><span class="pre">&quot;hs&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ch&quot;</span></code>, and <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code>.</p>
-<p>Examples:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
-<span class="n">cx</span> <span class="o">=</span> <span class="n">relucent</span><span class="o">.</span><span class="n">Complex</span><span class="p">(</span><span class="n">relucent</span><span class="o">.</span><span class="n">mlp</span><span class="p">(</span><span class="n">widths</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span><span class="p">]))</span>
-
-<span class="c1"># Default search: SHIs plus the standard geometry set (halfspaces, W, b,</span>
-<span class="c1"># finite, center, inradius, interior_point, interior_point_norm, Wl2)</span>
-<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-
-<span class="c1"># Topology-only search: SHIs + feasibility only (no extra geometry caches)</span>
-<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[])</span>
-
-<span class="c1"># Compute only finite/interior-point info during search</span>
-<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span>
-    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;finite&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point&quot;</span><span class="p">,</span> <span class="s2">&quot;interior_point_norm&quot;</span><span class="p">],</span>
-<span class="p">)</span>
-
-<span class="c1"># Keep heavy caches (halfspaces/W/b) when workers return polyhedra</span>
-<span class="n">cx</span><span class="o">.</span><span class="n">searcher</span><span class="p">(</span>
-    <span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-    <span class="n">geometry_properties</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;halfspaces&quot;</span><span class="p">,</span> <span class="s2">&quot;W&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;finite&quot;</span><span class="p">],</span>
-    <span class="n">keep_caches</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-</div>
 </section>
 </section>
 

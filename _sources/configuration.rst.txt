@@ -114,6 +114,10 @@ Polyhedron and halfspace geometry
      - ``float``
      - ``1e-6`` / ``-1e-6``
      - Gurobi early-stop tolerances for the SHI MIP models.
+   * - ``TOL_SHI_OBJECTIVE``
+     - ``float``
+     - ``1e-6``
+     - Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).
    * - ``TOL_NEARLY_VERTICAL``
      - ``float``
      - ``1e-10``
@@ -142,6 +146,10 @@ Complex search and parallel add
      - ``list[float]``
      - ``[0.01, 0.1, 1, 10, 100]``
      - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.get_ip`.
+   * - ``MIN_SEARCH_INRADIUS``
+     - ``float``
+     - ``TOL_SHI_OBJECTIVE / 2``
+     - During BFS/A* search, raise if a discovered cell's Chebyshev inradius is below this floor.
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
@@ -210,46 +218,3 @@ API
 
 Valid keys for :func:`~relucent.config.update_settings` are the names listed in
 ``relucent.config.__all__``, except ``update_settings`` itself.
-
-Search-time cache controls
---------------------------
-
-Search and post-processing APIs now accept explicit cache/property lists, so you
-can control exactly what gets computed:
-
-- :meth:`relucent.complex.Complex.searcher` takes ``geometry_properties`` and
-  ``keep_caches``.
-- :meth:`relucent.complex.Complex.compute_geometric_properties` takes
-  ``properties`` and ``keep_caches``.
-- :meth:`relucent.complex.Complex.get_poly_attrs` precomputes only the
-  attributes requested in ``attrs``.
-
-Common property names include ``"halfspaces"``, ``"W"``, ``"b"``,
-``"num_dead_relus"``, ``"finite"``, ``"center"``, ``"inradius"``,
-``"interior_point"``, ``"interior_point_norm"``, ``"Wl2"``, ``"vertices"``,
-``"hs"``, ``"ch"``, and ``"volume"``.
-
-Examples::
-
-   import relucent
-   cx = relucent.Complex(relucent.mlp(widths=[2, 4, 1]))
-
-   # Default search: SHIs plus the standard geometry set (halfspaces, W, b,
-   # finite, center, inradius, interior_point, interior_point_norm, Wl2)
-   cx.searcher(max_polys=1000)
-
-   # Topology-only search: SHIs + feasibility only (no extra geometry caches)
-   cx.searcher(max_polys=1000, geometry_properties=[])
-
-   # Compute only finite/interior-point info during search
-   cx.searcher(
-       max_polys=1000,
-       geometry_properties=["finite", "interior_point", "interior_point_norm"],
-   )
-
-   # Keep heavy caches (halfspaces/W/b) when workers return polyhedra
-   cx.searcher(
-       max_polys=1000,
-       geometry_properties=["halfspaces", "W", "b", "finite"],
-       keep_caches=True,
-   )
