@@ -219,9 +219,9 @@ def compute_persistent_homology(
     _verbose_line(verbose, "building meta-graph …")
     meta = cplx.get_meta_graph(verbose=verbose)
     if not compactify and not respect_finite:
-        from relucent.complex import Complex
+        from relucent.meta_graph import truncate_meta_graph
 
-        Complex.truncate_meta_graph(meta)
+        truncate_meta_graph(meta)
 
     raw_values = filtration.values_for_meta(meta)
     use_lower_star = filtration.lower_star if lower_star is None else lower_star

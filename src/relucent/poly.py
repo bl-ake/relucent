@@ -12,9 +12,15 @@ from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 import relucent.config as cfg
 from relucent._torch_compat import torch
+from relucent.calculations import (
+    _affine_null_basis,
+    compute_properties,
+    get_hs,
+    get_shis,
+    solve_radius,
+)
 from relucent.model import ReLUNetwork
 from relucent.utils import encode_ss, get_env
-from relucent.vis import bounded_plot_geometry, plot_polyhedron
 
 __all__ = ["Polyhedron"]
 
@@ -257,8 +263,6 @@ class Polyhedron:
             interior_point = np.asarray(self._center).squeeze()
         else:
             env = env or get_env()
-            from relucent.calculations import solve_radius
-
             interior_point = solve_radius(
                 env,
                 self.halfspaces_np[:],
@@ -291,8 +295,6 @@ class Polyhedron:
             pt = self._interior_point_from_equalities()
             return pt.reshape(-1, 1), 0.0
         env = env or get_env()
-        from relucent.calculations import solve_radius
-
         center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)
         return center, inradius
 
@@ -339,8 +341,6 @@ class Polyhedron:
                 )
             halfspaces = halfspaces[~deg]
         env = env or get_env()
-        from relucent.calculations import solve_radius
-
         feasible = solve_radius(env, halfspaces, max_radius=bound, zero_indices=self.zero_indices)[0] is not None
         if feasible:
             return halfspaces
@@ -492,8 +492,6 @@ class Polyhedron:
                 zero_idx = zero_idx[zero_idx >= 0]
 
         # Recompute interior point
-        from relucent.calculations import solve_radius
-
         int_point, _ = solve_radius(
             get_env(),
             bounded_halfspaces,
@@ -512,8 +510,6 @@ class Polyhedron:
         # HalfspaceIntersection expects a full-dimensional interior. For k<d cells
         # (equalities induced by zero sign entries), project to nullspace coords.
         if zero_idx.size > 0:
-            from relucent.calculations import _affine_null_basis
-
             x0, null_basis, ineq_mask = _affine_null_basis(bounded_halfspaces, zero_idx)
 
             if null_basis.shape[1] == 0:
@@ -613,6 +609,8 @@ class Polyhedron:
         self,
         bound: float,
     ) -> tuple[str, np.ndarray] | None:
+        from relucent.vis import bounded_plot_geometry
+
         return bounded_plot_geometry(self, bound)
 
     def plot_cells(
@@ -643,6 +641,8 @@ class Polyhedron:
             plot_kwargs["fill"] = fill
             plot_kwargs["plot_halfspaces"] = plot_halfspaces
             plot_kwargs["halfspace_shade"] = halfspace_shade
+        from relucent.vis import plot_polyhedron
+
         return plot_polyhedron(self, plot_mode="cells", **plot_kwargs)
 
     def plot_graph(
@@ -655,6 +655,8 @@ class Polyhedron:
     ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
         if bound is None:
             bound = cfg.DEFAULT_PLOT_BOUND
+        from relucent.vis import plot_polyhedron
+
         return plot_polyhedron(
             self,
             plot_mode="graph",
@@ -713,9 +715,16 @@ class Polyhedron:
 
     def _compute_qhull_geometry(self, qhull_mode: str | None = None) -> None:
         """Compute Qhull-derived geometry caches (hs/vertices/ch/volume)."""
-        from relucent.calculations import compute_properties
-
         compute_properties(self, qhull_mode=qhull_mode)
+
+    def _ensure_affine_data(self, *, force_numpy: bool = False) -> None:
+        """Populate halfspace and affine-map caches via :func:`~relucent.calculations.get_hs`."""
+        halfspaces, w, b, num_dead_relus = get_hs(self, force_numpy=force_numpy)
+        self._halfspaces = halfspaces
+        self._w = w
+        self._b = b
+        self._halfspaces_np = None
+        self._num_dead_relus = num_dead_relus
 
     @property
     def vertices(self) -> np.ndarray | None:
@@ -769,14 +778,7 @@ class Polyhedron:
             if self._halfspaces_np is not None:
                 self._halfspaces = self._halfspaces_np
             else:
-                from relucent.calculations import get_hs
-
-                halfspaces, W, b, num_dead_relus = get_hs(self)
-                self._halfspaces = halfspaces
-                self._w = W
-                self._b = b
-                self._halfspaces_np = None
-                self._num_dead_relus = num_dead_relus
+                self._ensure_affine_data()
         assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
         return self._halfspaces
 
@@ -801,14 +803,7 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Transformation matrix.
         """
         if self._w is None:
-            from relucent.calculations import get_hs
-
-            halfspaces, W, b, num_dead_relus = get_hs(self)
-            self._halfspaces = halfspaces
-            self._w = W
-            self._b = b
-            self._halfspaces_np = None
-            self._num_dead_relus = num_dead_relus
+            self._ensure_affine_data()
         assert isinstance(self._w, (torch.Tensor, np.ndarray))
         return self._w
 
@@ -820,14 +815,7 @@ class Polyhedron:
             torch.Tensor or np.ndarray: Bias vector.
         """
         if self._b is None:
-            from relucent.calculations import get_hs
-
-            halfspaces, W, b, num_dead_relus = get_hs(self)
-            self._halfspaces = halfspaces
-            self._w = W
-            self._b = b
-            self._halfspaces_np = None
-            self._num_dead_relus = num_dead_relus
+            self._ensure_affine_data()
         assert isinstance(self._b, (torch.Tensor, np.ndarray))
         return self._b
 
@@ -839,15 +827,7 @@ class Polyhedron:
             int: Count of ReLU neurons that are always inactive for this polyhedron.
         """
         if self._num_dead_relus is None:
-            force_numpy = isinstance(self._halfspaces, np.ndarray)
-            from relucent.calculations import get_hs
-
-            halfspaces, W, b, num_dead_relus = get_hs(self, force_numpy=force_numpy)
-            self._halfspaces = halfspaces
-            self._w = W
-            self._b = b
-            self._halfspaces_np = None
-            self._num_dead_relus = num_dead_relus
+            self._ensure_affine_data(force_numpy=isinstance(self._halfspaces, np.ndarray))
         assert self._num_dead_relus is not None
         return self._num_dead_relus
 
@@ -941,8 +921,6 @@ class Polyhedron:
     def shis(self) -> list[int]:
         """Supporting halfspace indices (SHIs)."""
         if self._shis is None:
-            from relucent.calculations import get_shis
-
             self._shis = get_shis(self)
         assert isinstance(self._shis, list)
         return self._shis

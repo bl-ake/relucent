@@ -336,15 +336,19 @@ class TestMinSearchInradiusGuard:
 
     def test_1d_relu_strip_triggers_search_worker_guard(self, env):
         """Two parallel ReLU thresholds spaced by eps give a strip with inradius eps/2."""
-        import relucent.complex as cx
         from relucent import Complex
+        from relucent.worker_context import set_worker_context
 
         eps = 1e-9
         assert eps / 2 < cfg.MIN_SEARCH_INRADIUS
 
         net = _make_1d_strip_net(eps)
-        cx._net = net
-        cx.env = env
+        set_worker_context(net)
+        # Tests run in the main process; workers normally set context via pool initializer.
+        from relucent.worker_context import _context
+
+        assert _context is not None
+        _context.env = env
 
         thin = Complex(net).add_point(np.array([eps / 2], dtype=np.float64))
         assert thin.inradius is not None
@@ -411,7 +415,7 @@ class TestStripNetworkBfs:
         assert len(cplx) >= 2
 
 
-def test_shi_objective_diagnostic_table(env, capsys):
+def test_shi_objective_diagnostic_table(env):
     """Print per-face objectives for a thin slab (visible with ``pytest -s``)."""
     height = 1e-8
     hs = _thin_rectangle_halfspaces(height=height)

@@ -4,23 +4,32 @@ import os
 import pickle
 import random
 import warnings
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator
-from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 from typing import Any, Literal, Self, overload
 
 import networkx as nx
 import numpy as np
 import plotly.graph_objects as go
-from gurobipy import Env
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent import meta_graph as mg
 from relucent._logging import logger
 from relucent._torch_compat import TORCH_AVAILABLE, torch
+from relucent.complex_graph import (
+    contract_dual_graph_for_shi,
+    delete_ss_columns,
+    net_without_last_ss_layer_neuron,
+)
 from relucent.convert_model import convert
-from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
+from relucent.meta_graph import (
+    INFINITY_POINT_META_NODE,
+    INFINITY_POINT_META_SHI,
+    TRUNCATION_META_SHI,
+)
+from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.poly import Polyhedron
 from relucent.search import greedy_path as _greedy_path_fn
 from relucent.search import hamming_astar as _hamming_astar_fn
@@ -32,14 +41,16 @@ from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
     encode_ss,
-    get_env,
-    get_mp_context,
-    get_thread_env,
     process_aware_cpu_count,
 )
-from relucent.vis import get_colors, plot_complex
 
-__all__ = ["Complex", "IncompleteDualGraphError"]
+__all__ = [
+    "Complex",
+    "INFINITY_POINT_META_NODE",
+    "INFINITY_POINT_META_SHI",
+    "IncompleteDualGraphError",
+    "TRUNCATION_META_SHI",
+]
 
 
 class IncompleteDualGraphError(ValueError):
@@ -54,610 +65,11 @@ class IncompleteDualGraphError(ValueError):
 
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
-# ``shi`` edge attribute for truncation incidences in :meth:`Complex.truncate_meta_graph`
-# (not a supporting-hyperplane index of the underlying network).
-TRUNCATION_META_SHI: int = -1
-
-# Meta-graph node key / edge label for :meth:`Complex.one_point_compactify_meta_graph`.
-INFINITY_POINT_META_NODE: tuple[str] = ("infty",)
-INFINITY_POINT_META_SHI: int = -2
-
 # ``compactify=False``: combinatorial truncation (``truncate_meta_graph``).
 # ``compactify=True``: Borel–Moore (``require_shared_faces``).
 # ``compactify="one_point"``: one-point compactification.
 # TODO: deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
 CompactifyMode = bool | Literal["one_point"]
-
-# Worker process state — set by set_globals() when used as a pool initializer.
-env: Env | None = None
-_net: ReLUNetwork | None = None
-dim: int = 0
-get_vol_calc: bool = True
-
-
-def set_globals(get_net: ReLUNetwork, get_volumes: bool = True, num_threads: int | None = None) -> None:
-    """Initialize global variables for worker processes in multiprocessing.
-
-    This function should only be used as an initializer for multiprocessing pools,
-    never called directly by the main process. It sets up the network, environment,
-    and volume calculation settings that worker processes need.
-
-    Args:
-        get_net: The neural network object to be used by worker processes.
-        get_volumes: Whether to compute volumes for polyhedra when input dimension <= 6.
-            Defaults to True.
-
-    Example:
-        >>> import multiprocessing as mp
-        >>> with mp.Pool(nworkers, initializer=set_globals, initargs=(net,)) as pool:
-        ...     # Use pool for parallel processing
-        ...     pass
-    """
-    global env
-    env = get_env(num_threads=num_threads)
-    global _net
-    _net = get_net
-    global dim
-    dim = int(np.prod(_net.input_shape))
-    global get_vol_calc
-    get_vol_calc = get_volumes
-
-
-def _delete_ss_columns(ss: np.ndarray | torch.Tensor, deleted_shis: Iterable[int]) -> np.ndarray | torch.Tensor:
-    axis = int(ss.ndim - 1)
-    for shi in sorted(set(int(s) for s in deleted_shis), reverse=True):
-        if isinstance(ss, np.ndarray):
-            ss = np.delete(ss, shi, axis=axis)
-        elif TORCH_AVAILABLE and isinstance(ss, torch.Tensor):
-            keep = [i for i in range(ss.shape[axis]) if i != shi]
-            ss = ss.index_select(axis, torch.tensor(keep, device=ss.device))
-        else:
-            raise TypeError(f"Unsupported ss type: {type(ss)}")
-    return ss
-
-
-def _contract_dual_graph_for_shi(
-    graph: nx.Graph[int],
-    deleted_shi: int,
-) -> tuple[nx.Graph[int], dict[int, int]]:
-    """Quotient a relabeled dual graph by edges with ``shi == deleted_shi``.
-
-    Returns the contracted graph (nodes ``0 .. n-1``) and a map from each new
-    node to a representative old node id.
-    """
-    parent = {node: node for node in graph.nodes}
-
-    def find(node: int) -> int:
-        while parent[node] != node:
-            parent[node] = parent[parent[node]]
-            node = parent[node]
-        return node
-
-    def union(a: int, b: int) -> None:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[max(ra, rb)] = min(ra, rb)
-
-    for u, v, data in graph.edges(data=True):
-        if data.get("shi") == deleted_shi:
-            union(u, v)
-
-    roots = sorted({find(node) for node in graph.nodes})
-    root_to_new = {root: i for i, root in enumerate(roots)}
-    old_representative = {root_to_new[root]: root for root in roots}
-    node_map = {node: root_to_new[find(node)] for node in graph.nodes}
-
-    contracted = nx.Graph()
-    contracted.add_nodes_from(range(len(roots)))
-    for u, v, data in graph.edges(data=True):
-        shi = data.get("shi")
-        if shi == deleted_shi:
-            continue
-        a, b = node_map[u], node_map[v]
-        if a == b:
-            continue
-        if shi is None:
-            continue
-        new_shi = shi - 1 if shi > deleted_shi else shi
-        if contracted.has_edge(a, b):
-            assert contracted.edges[a, b]["shi"] == new_shi
-        else:
-            contracted.add_edge(a, b, shi=new_shi)
-    return contracted, old_representative
-
-
-def _net_remove_ss_layer_and_following_relu(net: ReLUNetwork, ss_layer_idx: int) -> ReLUNetwork:
-    """Remove a width-1 linear layer and the ReLU immediately after it."""
-    items = list(net.layers.items())
-    relu_idx = ss_layer_idx + 1
-    if relu_idx >= len(items) or not isinstance(items[relu_idx][1], ReLULayer):
-        raise ValueError(f"Layer index {ss_layer_idx} is not immediately followed by a ReLU.")
-    removed_linear = items[ss_layer_idx][1]
-    if not isinstance(removed_linear, LinearLayer):
-        raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
-    n_removed_outputs = int(removed_linear.weight.shape[0])
-
-    new_items: list[tuple[str, Layer]] = []
-    skip_next_relu = False
-    for i, (name, layer) in enumerate(items):
-        if i == ss_layer_idx:
-            skip_next_relu = True
-            continue
-        if skip_next_relu and i == relu_idx:
-            skip_next_relu = False
-            continue
-        if skip_next_relu:
-            raise RuntimeError("Expected ReLU immediately after removed linear layer.")
-        if i == relu_idx + 1 and isinstance(layer, LinearLayer):
-            weight = np.delete(layer.weight, np.arange(n_removed_outputs), axis=1)
-            new_items.append((name, LinearLayer(weight=weight, bias=layer.bias)))
-        else:
-            new_items.append((name, layer))
-    return ReLUNetwork(OrderedDict(new_items), input_shape=net.input_shape)
-
-
-def _net_without_last_ss_layer_neuron(
-    net: ReLUNetwork,
-    ss_layer_idx: int,
-    neuron_idx: int,
-) -> ReLUNetwork:
-    """Return a copy of ``net`` with one neuron removed from the given ReLU hidden layer."""
-    layer = list(net.layers.values())[ss_layer_idx]
-    if not isinstance(layer, LinearLayer):
-        raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
-    if int(layer.weight.shape[0]) == 1:
-        return _net_remove_ss_layer_and_following_relu(net, ss_layer_idx)
-
-    items = list(net.layers.items())
-    new_items: list[tuple[str, Layer]] = []
-    delete_column_from_next_linear = False
-    for i, (name, layer) in enumerate(items):
-        if i == ss_layer_idx and isinstance(layer, LinearLayer):
-            weight = np.delete(layer.weight, neuron_idx, axis=0)
-            bias = np.delete(layer.bias, neuron_idx, axis=1)
-            new_items.append((name, LinearLayer(weight=weight, bias=bias)))
-            delete_column_from_next_linear = True
-        elif delete_column_from_next_linear and isinstance(layer, LinearLayer):
-            weight = np.delete(layer.weight, neuron_idx, axis=1)
-            new_items.append((name, LinearLayer(weight=weight, bias=layer.bias)))
-            delete_column_from_next_linear = False
-        else:
-            new_items.append((name, layer))
-    return ReLUNetwork(OrderedDict(new_items), input_shape=net.input_shape)
-
-
-# Parallelize meta-graph face discovery above this many k-cells (per dimension).
-_META_FACE_PARALLEL_MIN_CELLS = 64
-
-
-def _known_bounded(poly: Polyhedron) -> bool:
-    """True when boundedness is already known (no Chebyshev LP needed)."""
-    if poly.dim == 0:
-        return True
-    return bool(poly._finite_computed and poly._finite is True)
-
-
-# ---------------------------------------------------------------------------
-# SHI propagation: three roles (do not conflate)
-# ---------------------------------------------------------------------------
-#
-# Relucent applies different SHI rules depending on the job.  Using one rule
-# everywhere breaks either the contraction chain or meta-graph face incidence.
-#
-# 1. **Contraction / dual graph** (:meth:`Complex.contract`, :meth:`get_dual_graph`)
-#    - Face construction: coface SHI intersection minus the crossing index
-#      (:meth:`Complex._codim_one_face_kwargs`).
-#    - Post-filter: drop SHIs with no same-dimension flip neighbor in the slice
-#      (:func:`_filter_complex_shis_by_flip_neighbor`).
-#    - :meth:`get_dual_graph` walks ``poly.shis`` to wire the next contraction
-#      level.  Replacing coface intersection with full SS flip-neighbor
-#      membership adds spurious dual edges and extra cells (see
-#      ``tests/test_meta_graph_shi_regression.py``).
-#
-# 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
-#    - Try zeroing every ``ss_i != 0`` (:func:`_ss_face_crossing_indices`), not
-#      propagated ``_shis``.  Coface intersection over-shrinks node metadata and
-#      would omit valid incidences, breaking ``∂² = 0``.
-#    - An edge is kept only when the zeroed face tag exists in the chain lookup.
-#
-# 3. **Meta-graph node metadata** (:func:`_meta_node_shis_for_meta_node`,
-#    :func:`_compute_contracted_shis_top_down`)
-#    - Node ``shis`` attributes and boundedness heuristics use propagated
-#      ``_shis`` (from search, contraction, or the top-down safety net).  This
-#      list can be a strict subset of SS crossings; that is expected and does
-#      not govern edge assembly.
-#
-# See ``negative-betti-meta-graph-bug.md`` for the original failure mode.
-
-
-def _meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
-    """SHI list stored on meta-graph **nodes** (role 3: propagated metadata).
-
-    Uses ``poly._shis`` when set (from search or :meth:`Complex.contract`).
-    Falls back to :func:`_ss_face_crossing_indices` only when ``_shis`` is
-    missing.  This is **not** the rule for meta-graph face **edges**; see the
-    module comment above role 2.
-    """
-    shis = poly._shis
-    if shis is not None:
-        return sorted(int(s) for s in shis)
-    return list(_ss_face_crossing_indices(np.asarray(poly.ss_np)))
-
-
-def _meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
-    if poly.dim == 0:
-        finite: bool | None = True
-    elif poly._finite_computed:
-        finite = poly._finite
-    else:
-        finite = poly.finite
-    return {
-        "poly": poly,
-        "dim": int(poly.dim),
-        "ss": np.asarray(poly.ss_np),
-        "finite": finite,
-        "shis": _meta_node_shis_for_meta_node(poly),
-    }
-
-
-def _ss_face_crossing_indices(ss: np.ndarray) -> tuple[int, ...]:
-    """Candidate SHI indices for meta-graph face **edges** (role 2).
-
-    Combinatorial codimension-one crossings: every index with ``ss_i != 0``.
-    Used when assembling :meth:`Complex.get_meta_graph` face incidences, **not**
-    when building the contraction chain (:meth:`Complex._codim_one_face_kwargs`).
-    Propagated ``_shis`` can be a strict subset after coface intersection; using
-    only ``_shis`` for edge discovery omits valid faces and breaks ``∂² = 0``.
-    """
-    row = np.asarray(ss, dtype=np.int8).ravel()
-    return tuple(int(i) for i in np.flatnonzero(row != 0))
-
-
-def _collect_meta_face_edges(
-    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
-    valid_face_tags: set[bytes],
-) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
-    """Return face edges (src, dst, shi) for one chunk of k-cells (role 2).
-
-    The ``shis`` tuple on each cell should come from
-    :func:`_ss_face_crossing_indices`, not from propagated ``poly._shis``.
-    """
-    edges: list[tuple[bytes, bytes, int]] = []
-    extra_tags: list[bytes] = []
-    for src_tag, ss, shis in cells:
-        ss_arr = np.asarray(ss)
-        row = ss_arr[0]
-        for shi in shis:
-            shi_i = int(shi)
-            old = row[shi_i]
-            row[shi_i] = 0
-            face_tag = ss_arr.astype(np.int8, copy=False).ravel().tobytes()
-            row[shi_i] = old
-            if face_tag not in valid_face_tags:
-                continue
-            edges.append((src_tag, face_tag, shi_i))
-            extra_tags.append(face_tag)
-    return edges, extra_tags
-
-
-def _parallel_collect_meta_face_edges(
-    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
-    valid_face_tags: set[bytes],
-    *,
-    nworkers: int,
-) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
-    n = len(cells)
-    chunk_size = max(n // (nworkers * 4), 1)
-    chunks = [cells[i : i + chunk_size] for i in range(0, n, chunk_size)]
-    edges: list[tuple[bytes, bytes, int]] = []
-    extra_tags: list[bytes] = []
-    with get_mp_context().Pool(nworkers) as pool:
-        for chunk_edges, chunk_extras in pool.starmap(
-            _collect_meta_face_edges,
-            [(chunk, valid_face_tags) for chunk in chunks],
-        ):
-            edges.extend(chunk_edges)
-            extra_tags.extend(chunk_extras)
-    return edges, extra_tags
-
-
-def _classify_finite_ascending(
-    by_dim: dict[int, Complex],
-    lookup: dict[bytes, Polyhedron],
-    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
-) -> int:
-    """Classify ``_finite`` for contracted cells by an ascending sweep.
-
-    Starting from 1-dim cells (whose ``_finite`` must already be set via the
-    SHI-count heuristic), proceeds dimension by dimension from k = 2 upward:
-
-    * k-dim cell is **unbounded** if ANY (k-1)-dim face is unbounded.
-    * k-dim cell is **bounded** if ALL (k-1)-dim faces are bounded.
-
-    Because every (k-1)-dim cell is already classified before the k-dim pass
-    (induction from the 1-dim base case), this single ascending sweep fully
-    classifies all contracted cells without LP.
-
-    Returns the total number of cells newly classified.
-    """
-    total = 0
-    for k in sorted(by_dim.keys()):
-        if k <= 1:
-            continue  # 1-dim already handled; 0-dim always bounded
-        if k not in edges_by_dim:
-            continue
-
-        # Build coface_tag → set of face_tags at this level.
-        coface_faces: dict[bytes, set[bytes]] = defaultdict(set)
-        for coface_tag, face_tag, _ in edges_by_dim[k][0]:
-            coface_faces[coface_tag].add(face_tag)
-
-        for coface_tag, face_tags in coface_faces.items():
-            coface = lookup.get(coface_tag)
-            if coface is None or coface._finite_computed:
-                continue
-
-            all_bounded = True
-            any_unbounded = False
-            for ft in face_tags:
-                face = lookup.get(ft)
-                if face is not None and face._finite_computed:
-                    if face._finite is False:
-                        any_unbounded = True
-                        break
-                    if face._finite is not True:
-                        all_bounded = False
-                else:
-                    all_bounded = False  # face unknown → can't conclude bounded
-
-            if any_unbounded:
-                coface._finite = False
-                coface._finite_computed = True
-                total += 1
-            elif all_bounded:
-                coface._finite = True
-                coface._finite_computed = True
-                total += 1
-
-    return total
-
-
-def _propagate_finite_from_coface_edges(
-    lookup: dict[bytes, Polyhedron],
-    edges: Iterable[tuple[bytes, bytes, int]],
-) -> None:
-    """Mark faces as bounded when any codimension-1 coface is already known bounded."""
-    for u, v, _ in edges:
-        face = lookup.get(v)
-        if face is None or face._finite_computed:
-            continue
-        coface = lookup.get(u)
-        if coface is not None and _known_bounded(coface):
-            face._finite = True
-            face._finite_computed = True
-
-
-def _propagate_unbounded_from_face_edges(
-    lookup: dict[bytes, Polyhedron],
-    edges: Iterable[tuple[bytes, bytes, int]],
-) -> None:
-    """Mark cofaces as unbounded when any codimension-1 face is already known unbounded."""
-    for u, v, _ in edges:
-        coface = lookup.get(u)
-        if coface is None or coface._finite_computed:
-            continue
-        face = lookup.get(v)
-        if face is not None and face._finite_computed and face._finite is False:
-            coface._finite = False
-            coface._finite_computed = True
-
-
-def _classify_finite(poly: Polyhedron, env: Any) -> None:
-    """Resolve ``poly.finite`` via Chebyshev, without caching center/inradius.
-
-    No-ops when boundedness is already known (``_finite_computed`` is set or
-    ``dim == 0``). 0-cells are handled by :meth:`~relucent.poly.Polyhedron._apply_zero_cell_finite_hint`
-    at construction, but this is a safe fallback.
-    """
-    if poly._finite_computed or poly.dim == 0:
-        return
-    center, inradius = poly.get_center_inradius(env=env)
-    if center is not None:
-        poly._finite = True
-    elif inradius is None:
-        poly._finite = None
-    elif inradius == float("inf"):
-        poly._finite = False
-    else:
-        raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
-    poly._finite_computed = True
-
-
-def _precompute_finite(polys: list[Polyhedron], nworkers: int) -> None:
-    """Classify ``poly.finite`` for a list of polyhedra.
-
-    Skips polys with ``_finite_computed`` already set (including ``finite=True`` hints
-    from coface propagation or construction). Gurobi releases the GIL during LP solves,
-    so a :class:`~concurrent.futures.ThreadPoolExecutor` gives genuine parallelism
-    without pickling overhead; each thread uses its own
-    :func:`~relucent.utils.get_thread_env`.
-    """
-    pending = [p for p in polys if not p._finite_computed]
-    if not pending:
-        return
-
-    if nworkers <= 1:
-        env = get_env()
-        for poly in pending:
-            _classify_finite(poly, env)
-        return
-
-    def _worker(poly: Polyhedron) -> None:
-        _classify_finite(poly, get_thread_env())
-
-    with ThreadPoolExecutor(max_workers=nworkers) as executor:
-        list(executor.map(_worker, pending))
-
-
-def _filter_shi_candidates(
-    ss: np.ndarray,
-    candidates: Iterable[int],
-    *,
-    neighbor_tags: set[bytes],
-) -> list[int]:
-    """Keep SHIs whose sign-flip neighbor exists among ``neighbor_tags``.
-
-    A candidate ``shi`` is retained only when flipping ``ss[shi]`` yields the tag
-    of another cell at the same dimension in the contracted complex.
-    """
-    row = np.asarray(ss, dtype=np.int8).ravel()
-    kept: list[int] = []
-    for shi in candidates:
-        shi_i = int(shi)
-        if shi_i >= row.shape[0] or row[shi_i] == 0:
-            continue
-        flipped = row.copy()
-        flipped[shi_i] = -flipped[shi_i]
-        if flipped.tobytes() in neighbor_tags:
-            kept.append(shi_i)
-    return sorted(kept)
-
-
-def _filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
-    """Post-process contracted-slice ``_shis`` after :meth:`Complex.contract` (role 1).
-
-    Drops SHIs on each cell with no same-dimension flip neighbor.  Called at the
-    end of :meth:`Complex.contract` and :meth:`Complex.get_boundary_complex`.
-    Do not replace with full SS flip-neighbor membership; see the module comment
-    above role 1.
-
-    Returns the number of cells whose ``_shis`` list was changed.
-    """
-    if len(cplx) == 0:
-        return 0
-    neighbor_tags = {p.tag for p in cplx}
-    n_changed = 0
-    for poly in cplx:
-        if poly._shis is None:
-            continue
-        filtered = _filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
-        if filtered != list(poly._shis):
-            poly._shis = filtered
-            n_changed += 1
-    return n_changed
-
-
-def _compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
-    """Fill missing ``_shis`` on chain cells (role 3).
-
-    The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
-    coface intersection and flip-neighbor filtering (role 1).  This pass is a
-    safety net for contracted cells that still lack ``_shis``.  It does **not**
-    drive meta-graph face-edge discovery; that uses
-    :func:`_ss_face_crossing_indices` (role 2).  Boundedness is classified
-    separately via the 1-cell SHI-count rule and :func:`_classify_finite_ascending`.
-
-    For each face still missing ``_shis``:
-
-        SHI(face) = filter_flip( ∩{ SHI(coface) \\ {crossing_shi} : coface ⊃ face } )
-
-    In :data:`~relucent.config.CAREFUL_MODE`, an :exc:`AssertionError` is raised
-    if any k-dim cell (k > 1) ends up with fewer than k SHIs after propagation,
-    which indicates false negatives in the original maximal-cell SHI computation.
-
-    Args:
-        by_dim: Mapping from dimension to Complex (chain complex).  Top-dim cells
-            must have ``_shis`` already set by the searcher.
-    """
-    for k in sorted(by_dim.keys(), reverse=True):
-        if k <= 0:
-            continue
-        if k - 1 not in by_dim:
-            continue
-
-        # For each (k-1)-dim face: accumulate the SHI intersection over all cofaces.
-        face_shis: dict[bytes, set[int]] = {}
-
-        for coface in by_dim[k]:
-            if coface._shis is None:
-                logger.warning(
-                    "get_meta_graph: dim-%d cell is missing _shis (tag=%r); "
-                    + "its contracted faces will have incomplete SHI information",
-                    k,
-                    coface.tag[:8],
-                )
-                continue
-
-            ss_coface = np.asarray(coface.ss_np, dtype=np.int8).ravel()
-
-            for shi in coface._shis:
-                ss_face = ss_coface.copy()
-                ss_face[shi] = 0
-                face_tag = ss_face.tobytes()
-
-                contrib = set(coface._shis) - {shi}
-                if face_tag not in face_shis:
-                    face_shis[face_tag] = contrib.copy()
-                else:
-                    face_shis[face_tag] &= contrib
-
-        # Apply the computed SHIs to the (k-1)-dim cells.
-        face_lookup = {p.tag: p for p in by_dim[k - 1]}
-        neighbor_tags = set(face_lookup.keys())
-        n_set = 0
-        for face_tag, shis in face_shis.items():
-            face = face_lookup.get(face_tag)
-            if face is None:
-                continue
-            if face._shis is None:
-                face._shis = _filter_shi_candidates(face.ss_np, shis, neighbor_tags=neighbor_tags)
-                n_set += 1
-
-        if n_set:
-            logger.info(
-                "get_meta_graph: top-down pass set SHIs for %d dim-%d cells (no LP)",
-                n_set,
-                k - 1,
-            )
-
-        if cfg.CAREFUL_MODE:
-            for face in by_dim[k - 1]:
-                if face._shis is None:
-                    continue
-                n_shis = len(face._shis)
-                # A k-dim cell needs ≥ k SHIs to be geometrically consistent.
-                # 1-dim cells can legitimately have 0 or 1 SHIs (full lines or
-                # rays), so the assertion only applies to k > 1.
-                if (k - 1) > 1 and n_shis < (k - 1):
-                    raise AssertionError(
-                        f"get_meta_graph: dim-{k - 1} cell has only {n_shis} SHIs "
-                        + f"(expected ≥ {k - 1}). This indicates false negatives in the "
-                        + f"maximal-cell SHI computation. Tag: {face.tag!r}"
-                    )
-
-
-# def _precompute_shis(polys: list[Polyhedron], nworkers: int) -> None:
-#     """Recompute supporting hyperplane indices via LP for meta-graph face incidence.
-
-#     Search may cache a strict superset of true SHIs; the meta-graph needs LP-accurate
-#     SHI lists before zeroing entries to discover codimension-one faces.
-#     """
-#     if not polys:
-#         return
-
-#     from relucent.calculations import get_shis
-
-#     if nworkers <= 1:
-#         env = get_env()
-#         for poly in polys:
-#             poly._shis = get_shis(poly, env=env)
-#         return
-
-#     def _worker(poly: Polyhedron) -> None:
-#         poly._shis = get_shis(poly, env=get_thread_env())
-
-#     with ThreadPoolExecutor(max_workers=nworkers) as executor:
-#         list(executor.map(_worker, polys))
 
 
 class Complex:
@@ -885,7 +297,7 @@ class Complex:
             raise ValueError(f"neuron_idx must be in [0, {n_neurons}), got {neuron_idx} for the last ReLU layer.")
 
         deleted_shi = self._deleted_shi_for_last_layer_neuron(neuron_idx)
-        new_net = _net_without_last_ss_layer_neuron(self._net, last_ss_layer, neuron_idx)
+        new_net = net_without_last_ss_layer_neuron(self._net, last_ss_layer, neuron_idx)
         out = Complex(new_net)
         out.net = new_net if isinstance(self.net, ReLUNetwork) else self.net
 
@@ -893,11 +305,11 @@ class Complex:
         if dual.number_of_nodes() == 0:
             return out
 
-        contracted, old_rep = _contract_dual_graph_for_shi(dual, deleted_shi)
+        contracted, old_rep = contract_dual_graph_for_shi(dual, deleted_shi)
         for component in nx.connected_components(contracted):
             sub = contracted.subgraph(component).copy()
             source = min(component)
-            initial_ss = _delete_ss_columns(self.index2poly[old_rep[source]].ss_np, [deleted_shi])
+            initial_ss = delete_ss_columns(self.index2poly[old_rep[source]].ss_np, [deleted_shi])
             out.recover_from_dual_graph(sub, initial_ss, source=source, copy=True)
 
         return out
@@ -1414,13 +826,13 @@ class Complex:
 
         Candidate SHIs are the intersection of coface SHI sets minus the crossing
         index; :meth:`contract` post-filters these via
-        :func:`_filter_complex_shis_by_flip_neighbor`.
+        :func:`mg.filter_complex_shis_by_flip_neighbor`.
 
         Do not replace this with SS flip-neighbor membership: ``get_dual_graph``
         iterates ``poly.shis`` when building the next contraction level, and
         expanding ``_shis`` beyond the coface intersection creates spurious cells
         and breaks ``∂² = 0``.  Meta-graph **face edges** use
-        :func:`_ss_face_crossing_indices` instead; see ``negative-betti-meta-graph-bug.md``.
+        :func:`mg.ss_face_crossing_indices` instead; see ``negative-betti-meta-graph-bug.md``.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1462,7 +874,7 @@ class Complex:
             self.get_boundary_cells(i, verbose=verbose), desc="Getting Boundary Complex", delay=1, disable=not verbose
         ):
             cplx.add_polyhedron(poly, check_exists=False)
-        _filter_complex_shis_by_flip_neighbor(cplx)
+        mg.filter_complex_shis_by_flip_neighbor(cplx)
         return cplx
 
     def contract(self, verbose: bool = False) -> Complex:
@@ -1471,7 +883,7 @@ class Complex:
         Each codimension-one face is keyed by zeroing one dual-graph SHI in the
         sign sequence.  Face ``shis`` kwargs come from coface intersection
         (:meth:`_codim_one_face_kwargs`, role 1), then
-        :func:`_filter_complex_shis_by_flip_neighbor`.  The next
+        :func:`mg.filter_complex_shis_by_flip_neighbor`.  The next
         :meth:`get_dual_graph` call on the result iterates those ``_shis`` lists.
 
         Raises:
@@ -1487,7 +899,7 @@ class Complex:
                 **self._codim_one_face_kwargs(p1, p2, int(shi)),
             )
 
-        _filter_complex_shis_by_flip_neighbor(new_complex)
+        mg.filter_complex_shis_by_flip_neighbor(new_complex)
         return new_complex
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
@@ -1517,99 +929,17 @@ class Complex:
     @staticmethod
     def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
         """Return the subcomplex induced by nodes with ``finite is True``."""
-        finite = [n for n, a in meta.nodes(data=True) if a.get("finite", None) is True]
-        return meta.subgraph(finite).copy()
+        return mg.finite_cells_subgraph(meta)
 
     @staticmethod
     def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
-        """Augment ``meta`` in place with combinatorial truncation at infinity.
-
-        Every node's ``ss`` gains a trailing ``1`` (strictly inside the truncation halfspace).
-        The induced subgraph on nodes with ``finite is False`` (unbounded cells) is duplicated:
-        each copy has trailing ``0`` on ``ss``, dimension decremented by one, and node keys
-        ``("trunc", tag)``. Face edges among duplicates mirror the induced subgraph; each
-        original unbounded node ``n`` gains an edge ``n → ("trunc", n)`` with ``shi`` equal to
-        :data:`TRUNCATION_META_SHI`. Duplicates are not created for 0-cells.
-        """
-        if meta.number_of_nodes() == 0:
-            return
-
-        unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
-        ub_faces = meta.subgraph(unbounded).copy()
-
-        def _ss_with_extra_bit(ss: np.ndarray, bit: int) -> np.ndarray:
-            a = np.asarray(ss)
-            dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
-            return np.hstack([a, np.full((a.shape[0], 1), bit, dtype=dt)])
-
-        for attrs in meta.nodes.values():
-            if (ss0 := attrs.get("ss")) is not None:
-                attrs["ss"] = _ss_with_extra_bit(np.asarray(ss0), 1)
-
-        dup_keys: set[Any] = set()
-        for orig in unbounded:
-            oa = meta.nodes[orig]
-            k = int(oa.get("dim", -1))
-            ss_in = oa.get("ss")
-            if k <= 0 or ss_in is None:
-                continue
-            dup = ("trunc", orig)
-            ss_on_cut = np.asarray(ss_in).copy()
-            ss_on_cut[..., -1] = 0
-            dup_keys.add(dup)
-            meta.add_node(
-                dup,
-                poly=oa.get("poly"),
-                dim=k - 1,
-                ss=ss_on_cut,
-                finite=True,
-                shis=list(oa.get("shis", [])),
-                truncation_duplicate=True,
-            )
-            meta.add_edge(orig, dup, shi=TRUNCATION_META_SHI)
-
-        for u, v, ed in ub_faces.edges(data=True):
-            tu, tv = ("trunc", u), ("trunc", v)
-            if tu in dup_keys and tv in dup_keys:
-                meta.add_edge(tu, tv, **dict(ed))
+        """Augment ``meta`` in place with combinatorial truncation at infinity."""
+        mg.truncate_meta_graph(meta)
 
     @staticmethod
     def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
-        """Augment ``meta`` in place with a single point-at-infinity 0-cell.
-
-        Mirrors ``canonicalpoly2.0/polyhedra/topology.get_coboundary_matrices``: each
-        1-cell whose boundary consists of a single 0-cell (an unbounded end) gains a
-        second incidence to one new 0-cell representing infinity.  Returns whether the
-        infinity node was added.
-        """
-        if meta.number_of_nodes() == 0:
-            return False
-
-        zero_cells = {n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == 0}
-        one_cells = [n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == 1]
-        if not one_cells or not zero_cells:
-            return False
-
-        needing_infinity: list[Any] = []
-        for u in one_cells:
-            n_zero = sum(1 for _u, v, _ in meta.out_edges(u, data=True) if v in zero_cells)
-            if n_zero == 1:
-                needing_infinity.append(u)
-        if not needing_infinity:
-            return False
-
-        if INFINITY_POINT_META_NODE not in meta:
-            meta.add_node(
-                INFINITY_POINT_META_NODE,
-                dim=0,
-                finite=True,
-                infinity_point=True,
-                ss=None,
-                shis=[],
-            )
-        for u in needing_infinity:
-            meta.add_edge(u, INFINITY_POINT_META_NODE, shi=INFINITY_POINT_META_SHI)
-        return True
+        """Augment ``meta`` in place with a single point-at-infinity 0-cell."""
+        return mg.one_point_compactify_meta_graph(meta)
 
     def get_meta_graph(self, *, verify: bool = False, verbose: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
@@ -1629,11 +959,11 @@ class Complex:
 
         **SHI rules (see module comment above the meta-graph helpers):**
 
-        - Face **edges**: :func:`_ss_face_crossing_indices` — try every
+        - Face **edges**: :func:`mg.ss_face_crossing_indices` — try every
           ``ss_i != 0`` (role 2).  Do not use propagated ``_shis`` here; coface
           intersection can omit valid incidences and break ``∂² = 0``.
         - Node **metadata** (``shis`` attr, 1-cell boundedness): propagated
-          ``poly._shis`` from :meth:`contract` plus :func:`_compute_contracted_shis_top_down`
+          ``poly._shis`` from :meth:`contract` plus :func:`mg.compute_contracted_shis_top_down`
           (role 3).  This metadata can be a strict subset of SS crossings.
 
         If ``verify=True``, a second pass re-derives boundedness/SHI information
@@ -1730,7 +1060,7 @@ class Complex:
             "get_meta_graph: computing SHIs for %d contracted cells via top-down propagation (no LP)",
             len(all_chain_polys) - len(top_dim_cells),
         )
-        _compute_contracted_shis_top_down(by_dim)
+        mg.compute_contracted_shis_top_down(by_dim)
 
         # Role 2: face edges from SS crossings, not propagated _shis (see module comment).
         edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
@@ -1738,8 +1068,8 @@ class Complex:
             if int(k) <= 0:
                 continue
             valid_face_tags = set(lookup.keys())
-            cells = [(p.tag, np.asarray(p.ss_np), _ss_face_crossing_indices(np.asarray(p.ss_np))) for p in c_k]
-            use_parallel = len(cells) >= _META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
+            cells = [(p.tag, np.asarray(p.ss_np), mg.ss_face_crossing_indices(np.asarray(p.ss_np))) for p in c_k]
+            use_parallel = len(cells) >= mg.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
                 logger.info(
                     "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
@@ -1747,14 +1077,14 @@ class Complex:
                     nworkers,
                     len(cells),
                 )
-                edges, extra_tags = _parallel_collect_meta_face_edges(
+                edges, extra_tags = mg.parallel_collect_meta_face_edges(
                     cells,
                     valid_face_tags,
                     nworkers=nworkers,
                 )
             else:
-                if len(cells) < _META_FACE_PARALLEL_MIN_CELLS:
-                    face_mode = f"sequential (cells < {_META_FACE_PARALLEL_MIN_CELLS})"
+                if len(cells) < mg.META_FACE_PARALLEL_MIN_CELLS:
+                    face_mode = f"sequential (cells < {mg.META_FACE_PARALLEL_MIN_CELLS})"
                 elif nworkers <= 1:
                     face_mode = "sequential (nworkers <= 1)"
                 else:
@@ -1766,7 +1096,7 @@ class Complex:
                     len(cells),
                 )
                 if verbose:
-                    edges, extra_tags = _collect_meta_face_edges(
+                    edges, extra_tags = mg.collect_meta_face_edges(
                         list(
                             tqdm(
                                 cells,
@@ -1777,7 +1107,7 @@ class Complex:
                         valid_face_tags,
                     )
                 else:
-                    edges, extra_tags = _collect_meta_face_edges(cells, valid_face_tags)
+                    edges, extra_tags = mg.collect_meta_face_edges(cells, valid_face_tags)
             edges_by_dim[int(k)] = (edges, extra_tags)
             for face_tag in set(extra_tags):
                 if face_tag not in lookup and face_tag in self.tag2poly:
@@ -1816,7 +1146,7 @@ class Complex:
         # induction guarantees this sweep fully classifies all contracted cells:
         #   • unbounded if ANY (k-1)-face is unbounded
         #   • bounded   if ALL (k-1)-faces are bounded
-        n_ascending = _classify_finite_ascending(by_dim, lookup, edges_by_dim)
+        n_ascending = mg.classify_finite_ascending(by_dim, lookup, edges_by_dim)
         if n_ascending:
             logger.info(
                 "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
@@ -1841,7 +1171,7 @@ class Complex:
 
         for _k, c_k in sorted(by_dim.items(), reverse=True):
             for p in c_k:
-                meta.add_node(p.tag, **_meta_node_attrs(p))
+                meta.add_node(p.tag, **mg.meta_node_attrs(p))
 
         # Add cached face edges k -> k-1.
         for k in sorted(by_dim.keys(), reverse=True):
@@ -1852,9 +1182,9 @@ class Complex:
             known_nodes = set(meta.nodes)
             new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes]
             if new_face_tags:
-                _propagate_finite_from_coface_edges(lookup, edges)
+                mg.propagate_finite_from_coface_edges(lookup, edges)
             for face_tag in new_face_tags:
-                meta.add_node(face_tag, **_meta_node_attrs(lookup[face_tag]))
+                meta.add_node(face_tag, **mg.meta_node_attrs(lookup[face_tag]))
             known_nodes.update(new_face_tags)
 
             meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges)
@@ -1885,7 +1215,7 @@ class Complex:
                     # None/False → True when any coface is known bounded.
                     # We cannot safely infer False: two unbounded cofaces can share
                     # a bounded face (the crossed hyperplane may cut off all rays).
-                    # Use meta-node ``finite`` (set by _meta_node_attrs) — not ``poly.finite``.
+                    # Use meta-node ``finite`` (set by mg.meta_node_attrs) — not ``poly.finite``.
                     if any(meta.nodes[u].get("finite") is True for u, _ in in_edges):
                         meta.nodes[face_tag]["finite"] = True
                         face_poly = meta.nodes[face_tag].get("poly")
@@ -1914,7 +1244,7 @@ class Complex:
                     }
                     face_poly = meta.nodes[face_tag].get("poly")
                     if face_poly is not None:
-                        filtered_shis = _filter_shi_candidates(
+                        filtered_shis = mg.filter_shi_candidates(
                             face_poly.ss_np,
                             inferred_shis,
                             neighbor_tags=dim_tags,
@@ -1924,7 +1254,7 @@ class Complex:
                     elif dim_tags:
                         ss_node = meta.nodes[face_tag].get("ss")
                         if ss_node is not None:
-                            inferred_shis = _filter_shi_candidates(
+                            inferred_shis = mg.filter_shi_candidates(
                                 np.asarray(ss_node),
                                 inferred_shis,
                                 neighbor_tags=dim_tags,
@@ -2437,7 +1767,7 @@ class Complex:
         Edges are discovered by flipping each entry of ``poly.shis`` (role 1).
         Those lists come from search (top dimension) or from
         :meth:`_codim_one_face_kwargs` plus
-        :func:`_filter_complex_shis_by_flip_neighbor` after contraction.  Do not
+        :func:`mg.filter_complex_shis_by_flip_neighbor` after contraction.  Do not
         expand them to full SS flip-neighbor membership before a further
         :meth:`contract` — see the module comment above the meta-graph helpers.
 
@@ -2503,6 +1833,8 @@ class Complex:
                 + "get_meta_graph(), or get_boundary_complex()."
             )
         if plot:
+            from relucent.vis import get_colors
+
             if match_locations:
                 if self.dim != 2:
                     raise ValueError("Polyhedra must be 2D to match locations")
@@ -2654,6 +1986,8 @@ class Complex:
             plot_kwargs["fill_mode"] = "filled"
         elif plot_mode == "graph":
             plot_kwargs["project"] = project
+
+        from relucent.vis import plot_complex
 
         return plot_complex(
             self,

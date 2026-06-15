@@ -1,11 +1,12 @@
 """Regression tests for meta-graph SHI / face-incidence fixes.
 
 Face **edges** in :meth:`~relucent.complex.Complex.get_meta_graph` must use every
-nonzero sign-sequence entry (:func:`~relucent.complex._ss_face_crossing_indices`),
+nonzero sign-sequence entry (:func:`~relucent.meta_graph.ss_face_crossing_indices`),
 not propagated ``_shis`` lists that coface intersection can shrink.
 
 Face **construction** in :meth:`~relucent.complex.Complex.contract` must keep
-coface-intersected ``shis`` in kwargs plus flip-neighbor filtering: assigning
+coface-intersected ``shis`` in kwargs plus flip-neighbor filtering
+(:func:`~relucent.meta_graph.filter_complex_shis_by_flip_neighbor`): assigning
 full SS flip-neighbor membership to ``_shis`` before further contractions would
 add spurious dual-graph edges and break ``∂² = 0``.
 
