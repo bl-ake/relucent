@@ -34,6 +34,8 @@ __all__ = [
     "add_output_relu",
     "close_env",
     "encode_ss",
+    "flip_ss_at_shi",
+    "flip_ss_at_shi_inplace",
     "get_env",
     "get_mp_context",
     "get_thread_env",
@@ -291,6 +293,27 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
 
     ss = ss.astype(np.int8, copy=False)
     return ss.ravel().tobytes()
+
+
+def flip_ss_at_shi_inplace(ss: np.ndarray, shi: int) -> None:
+    """Negate coordinate ``shi`` of ``ss`` in place.
+
+    Call twice on the same ``shi`` to restore the original sign sequence.  Useful
+    when iterating many SHIs over one working copy (e.g. dual-graph construction).
+    """
+    ss.ravel()[int(shi)] *= -1
+
+
+def flip_ss_at_shi(ss: np.ndarray | torch.Tensor, shi: int) -> np.ndarray:
+    """Return a copy of ``ss`` with coordinate ``shi`` negated.
+
+    Codimension-1 neighbors across supporting hyperplane ``shi`` differ by this flip.
+    """
+    if isinstance(ss, torch.Tensor):
+        ss = ss.detach().cpu().numpy()
+    flipped = np.asarray(ss, dtype=np.int8).copy()
+    flip_ss_at_shi_inplace(flipped, shi)
+    return flipped
 
 
 def get_env(num_threads: int | None = None) -> Env:

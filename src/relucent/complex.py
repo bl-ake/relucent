@@ -31,16 +31,31 @@ from relucent.meta_graph import (
 )
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.poly import Polyhedron
-from relucent.search import greedy_path as _greedy_path_fn
-from relucent.search import hamming_astar as _hamming_astar_fn
-from relucent.search import parallel_add as _parallel_add_fn
-from relucent.search import parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn
-from relucent.search import retain_geometry_caches
-from relucent.search import searcher as _searcher_fn
+from relucent.search import (
+    ALL_GEOMETRY_PROPERTIES,
+    retain_geometry_caches,
+)
+from relucent.search import (
+    greedy_path as _greedy_path_fn,
+)
+from relucent.search import (
+    hamming_astar as _hamming_astar_fn,
+)
+from relucent.search import (
+    parallel_add as _parallel_add_fn,
+)
+from relucent.search import (
+    parallel_compute_geometric_properties as _parallel_compute_geometric_properties_fn,
+)
+from relucent.search import (
+    searcher as _searcher_fn,
+)
 from relucent.ss import SSManager
 from relucent.utils import (
     BlockingQueue,
     encode_ss,
+    flip_ss_at_shi,
+    flip_ss_at_shi_inplace,
     process_aware_cpu_count,
 )
 
@@ -508,7 +523,7 @@ class Complex:
         points: Iterable[torch.Tensor | np.ndarray],
         nworkers: int | None = None,
         bound: float | None = None,
-        geometry_properties: Iterable[str] | None = None,
+        geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
         verbose: int | None = None,
         **kwargs: Any,
     ) -> list[Polyhedron | None]:
@@ -524,9 +539,8 @@ class Complex:
             bound: Constraint radius for numerical stability when computing halfspaces.
                 Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
             geometry_properties: Iterable of cache/property names to compute and
-                retain on each polyhedron. If None, computes
-                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for
-                the same full geometry set.
+                retain on each polyhedron. Defaults to
+                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
             verbose: Controls progress output. ``0`` silences all output; ``1``
                 (default) shows worker count and progress bars.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
@@ -589,10 +603,11 @@ class Complex:
                 (default) shows worker count and a progress bar.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
             geometry_properties: Iterable of polyhedron cache/property names to
-                compute and retain for each discovered polyhedron during search. If None,
-                performs topology-only search (no optional caches). Pass ``"All"`` to
-                compute every supported cache. ``finite``, ``center``, and
-                ``inradius`` are always computed.
+                compute and retain for each discovered polyhedron during search.
+                ``None`` (default) performs topology-only search. Pass
+                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a subset for
+                optional caches. ``finite``, ``center``, and ``inradius`` are always
+                computed.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -626,7 +641,7 @@ class Complex:
     def compute_geometric_properties(
         self,
         nworkers: int | None = None,
-        properties: Iterable[str] | None = None,
+        properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
         verbose: int | None = None,
     ) -> dict[str, Any]:
         """Compute selected polyhedron caches in parallel.
@@ -636,8 +651,7 @@ class Complex:
         Args:
             nworkers: Number of worker processes (defaults to CPU count).
             properties: Iterable of cache/property names to compute and retain.
-                If None, computes :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
-                Pass ``"All"`` for the same full geometry set.
+                Defaults to :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
             verbose: Controls progress output. ``0`` silences all output; ``1``
                 (default) shows worker count and a progress bar.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
@@ -755,8 +769,8 @@ class Complex:
         Args:
             start: Starting data point as torch.Tensor or np.ndarray.
             end: Ending data point as torch.Tensor or np.ndarray.
-            nworkers: Number of worker processes for parallel computation.
-                Defaults to 1.
+            nworkers: Number of worker processes for parallel neighbor evaluation.
+                ``None`` (default) uses ``min(CPU count, number of ReLU units)``.
             bound: Constraint radius for numerical stability when computing halfspaces.
                 Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             max_polys: Maximum number of polyhedra to explore during search.
@@ -1809,16 +1823,16 @@ class Complex:
                 graph.add_node(poly, label=str(poly))
         missing: list[tuple[np.ndarray, int, Polyhedron]] = []
         for poly in tqdm(graph.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
-            ss = poly.ss_np.copy()
+            ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
             for shi in poly.shis:
                 if cfg.CAREFUL_MODE:
-                    assert ss[0, shi] != 0
-                ss[0, shi] *= -1
+                    assert ss.ravel()[shi] != 0
+                flip_ss_at_shi_inplace(ss, shi)
                 try:
                     graph.add_edge(poly, self[ss], shi=shi)
                 except KeyError:
                     missing.append((ss.copy(), shi, poly))
-                ss[0, shi] *= -1
+                flip_ss_at_shi_inplace(ss, shi)
 
         if len(missing) > 0 and max_dim == self.dim and not require_complete:
             warnings.warn(
@@ -1918,11 +1932,9 @@ class Complex:
             total=graph.number_of_nodes() - 1,
         ):
             poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
-            poly2_ss = poly1.ss_np.copy()
             if cfg.CAREFUL_MODE:
-                assert poly2_ss[0, shi] != 0
-            poly2_ss[0, shi] *= -1
-            poly2 = self.add_ss(poly2_ss, check_exists=False)
+                assert poly1.ss_np.ravel()[shi] != 0
+            poly2 = self.add_ss(flip_ss_at_shi(poly1.ss_np, shi), check_exists=False)
             graph.nodes[edge[1]]["poly"] = poly2
 
         # Populate each polyhedron's ``_shis`` from the full dual graph in a

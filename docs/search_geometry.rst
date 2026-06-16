@@ -14,7 +14,7 @@ some geometric properties, such as ``volume``, rely on this data, so you can cho
 The ``geometry_properties`` option lets you choose between:
 
 1. **Default search** (topology-only: SHIs, ``finite``, ``center``, and ``inradius`` only).
-2. **Full geometry search** (pass ``"All"``).
+2. **Full geometry search** (pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`).
 3. **Custom in-search geometry** (a chosen subset of optional geometric properties).
 4. **Two-phase pipelines** (topology first, then a targeted geometry pass).
 
@@ -28,10 +28,9 @@ required geometry for adjacency and feasibility, namely ``finite``, ``center``, 
 If you then run a command like ``cplx.compute_geometric_properties(properties=["volume"])``, relucent will 
 have to recompute the h-representation / affine map for each region, which can be slow.
 
-Pass ``"All"`` to compute every property supported by
+Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` to compute every property supported by
 :meth:`~relucent.poly.Polyhedron.get_geometry` (including Qhull-derived
-``vertices``, ``volume``). The full list is
-:data:`relucent.search.ALL_GEOMETRY_PROPERTIES`.
+``vertices``, ``volume``).
 
 Any property listed in ``geometry_properties`` is retained on each polyhedron after the search is complete.
 Properties that are not listed may have their heavy data dropped to
@@ -47,7 +46,7 @@ In practice:
 
 - Use the **default** (topology-only) for large frontier growth when you only need
   adjacency or meta-graph structure.
-- Pass **``"All"``** or a **custom geometry set** when downstream steps immediately
+- Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a **custom geometry set** when downstream steps immediately
   need those values (for example, filtrations that read interior points or affine
   maps).
 
@@ -73,7 +72,9 @@ Full geometry during search
 
 .. code-block:: python
 
-   cplx.bfs(max_polys=1000, geometry_properties="All")
+   from relucent.search import ALL_GEOMETRY_PROPERTIES
+
+   cplx.bfs(max_polys=1000, geometry_properties=ALL_GEOMETRY_PROPERTIES)
 
 Compute selected geometry during search
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,7 +98,7 @@ Useful property names
 
 Examples of valid names for ``geometry_properties`` / ``properties``:
 
-- ``"All"`` — every supported property (see :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`)
+- :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` — every supported property
 - ``"halfspaces"``, ``"halfspaces_np"``, ``"W"``, ``"b"``, ``"num_dead_relus"``
 - ``"interior_point"``, ``"interior_point_norm"``
 - ``"Wl2"``, ``"vertices"``, ``"hs"`` (SciPy's HalfspaceIntersection), ``"ch"`` (SciPy's ConvexHull), ``"volume"``

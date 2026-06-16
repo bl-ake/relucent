@@ -20,7 +20,7 @@ from relucent.calculations import (
     solve_radius,
 )
 from relucent.model import ReLUNetwork
-from relucent.utils import encode_ss, get_env
+from relucent.utils import encode_ss, flip_ss_at_shi, get_env
 
 __all__ = ["Polyhedron"]
 
@@ -368,10 +368,9 @@ class Polyhedron:
         Returns:
             Polyhedron: The neighbor polyhedron.
         """
-        ss = self.ss_np.copy()
-        if ss[0, shi] == 0:
+        if self.ss_np.ravel()[shi] == 0:
             raise ValueError(f"SHI {shi} contains the polyhedron, cannot get neighbor")
-        ss[0, shi] = -ss[0, shi]
+        ss = flip_ss_at_shi(self.ss_np, shi)
         # If this Polyhedron was constructed directly from explicit halfspaces (no net),
         # preserve them when flipping an inequality sign. The feasible region in input
         # space is the same; only the sign sequence label changes.
@@ -1025,6 +1024,7 @@ class Polyhedron:
             "_halfspaces_np": self._halfspaces_np,
             "_w": self._w,
             "_b": self._b,
+            "bound": self.bound,
         }
         return state
 

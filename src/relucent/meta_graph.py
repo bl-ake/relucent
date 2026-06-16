@@ -13,7 +13,7 @@ import numpy as np
 import relucent.config as cfg
 from relucent._logging import logger
 from relucent.poly import Polyhedron
-from relucent.utils import get_env, get_mp_context, get_thread_env
+from relucent.utils import encode_ss, flip_ss_at_shi, get_env, get_mp_context, get_thread_env
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -337,9 +337,7 @@ def filter_shi_candidates(
         shi_i = int(shi)
         if shi_i >= row.shape[0] or row[shi_i] == 0:
             continue
-        flipped = row.copy()
-        flipped[shi_i] = -flipped[shi_i]
-        if flipped.tobytes() in neighbor_tags:
+        if encode_ss(flip_ss_at_shi(row, shi_i)) in neighbor_tags:
             kept.append(shi_i)
     return sorted(kept)
 

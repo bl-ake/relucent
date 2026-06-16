@@ -212,11 +212,13 @@ def test_default_search_is_topology_only(seeded):
 
 
 def test_search_all_geometry_properties_retains_caches(seeded):
-    """Passing All computes and retains optional geometry caches during search."""
+    """Passing ALL_GEOMETRY_PROPERTIES computes and retains optional geometry caches during search."""
+    from relucent.search import ALL_GEOMETRY_PROPERTIES
+
     assert seeded is not None
     net = mlp(widths=[2, 4, 1])
     cplx = Complex(net)
-    cplx.bfs(max_polys=3, nworkers=1, verbose=0, geometry_properties="All")
+    cplx.bfs(max_polys=3, nworkers=1, verbose=0, geometry_properties=ALL_GEOMETRY_PROPERTIES)
     for poly in cplx:
         assert poly._w is not None
         assert poly._b is not None
