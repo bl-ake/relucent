@@ -308,7 +308,7 @@ some geometric properties, such as <code class="docutils literal notranslate"><s
 <p>The <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> option lets you choose between:</p>
 <ol class="arabic simple">
 <li><p><strong>Default search</strong> (topology-only: SHIs, <code class="docutils literal notranslate"><span class="pre">finite</span></code>, <code class="docutils literal notranslate"><span class="pre">center</span></code>, and <code class="docutils literal notranslate"><span class="pre">inradius</span></code> only).</p></li>
-<li><p><strong>Full geometry search</strong> (pass <code class="docutils literal notranslate"><span class="pre">&quot;All&quot;</span></code>).</p></li>
+<li><p><strong>Full geometry search</strong> (pass <code class="xref py py-data docutils literal notranslate"><span class="pre">ALL_GEOMETRY_PROPERTIES</span></code>).</p></li>
 <li><p><strong>Custom in-search geometry</strong> (a chosen subset of optional geometric properties).</p></li>
 <li><p><strong>Two-phase pipelines</strong> (topology first, then a targeted geometry pass).</p></li>
 </ol>
@@ -321,10 +321,9 @@ and related search methods), search is <strong>topology-only</strong>: workers c
 required geometry for adjacency and feasibility, namely <code class="docutils literal notranslate"><span class="pre">finite</span></code>, <code class="docutils literal notranslate"><span class="pre">center</span></code>, <code class="docutils literal notranslate"><span class="pre">inradius</span></code>, and SHIs.
 If you then run a command like <code class="docutils literal notranslate"><span class="pre">cplx.compute_geometric_properties(properties=[&quot;volume&quot;])</span></code>, relucent will
 have to recompute the h-representation / affine map for each region, which can be slow.</p>
-<p>Pass <code class="docutils literal notranslate"><span class="pre">&quot;All&quot;</span></code> to compute every property supported by
+<p>Pass <code class="xref py py-data docutils literal notranslate"><span class="pre">ALL_GEOMETRY_PROPERTIES</span></code> to compute every property supported by
 <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_geometry()</span></code> (including Qhull-derived
-<code class="docutils literal notranslate"><span class="pre">vertices</span></code>, <code class="docutils literal notranslate"><span class="pre">volume</span></code>). The full list is
-<code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.search.ALL_GEOMETRY_PROPERTIES</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">vertices</span></code>, <code class="docutils literal notranslate"><span class="pre">volume</span></code>).</p>
 <p>Any property listed in <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> is retained on each polyhedron after the search is complete.
 Properties that are not listed may have their heavy data dropped to
 save memory (for example, requesting only <code class="docutils literal notranslate"><span class="pre">interior_point_norm</span></code> does not retain
@@ -339,7 +338,7 @@ saves substantial time and memory.</p></li>
 <ul class="simple">
 <li><p>Use the <strong>default</strong> (topology-only) for large frontier growth when you only need
 adjacency or meta-graph structure.</p></li>
-<li><p>Pass <strong>``”All”``</strong> or a <strong>custom geometry set</strong> when downstream steps immediately
+<li><p>Pass <code class="xref py py-data docutils literal notranslate"><span class="pre">ALL_GEOMETRY_PROPERTIES</span></code> or a <strong>custom geometry set</strong> when downstream steps immediately
 need those values (for example, filtrations that read interior points or affine
 maps).</p></li>
 </ul>
@@ -359,7 +358,9 @@ maps).</p></li>
 </section>
 <section id="full-geometry-during-search">
 <h3>Full geometry during search<a class="headerlink" href="#full-geometry-during-search" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">geometry_properties</span><span class="o">=</span><span class="s2">&quot;All&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">relucent.search</span><span class="w"> </span><span class="kn">import</span> <span class="n">ALL_GEOMETRY_PROPERTIES</span>
+
+<span class="n">cplx</span><span class="o">.</span><span class="n">bfs</span><span class="p">(</span><span class="n">max_polys</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">geometry_properties</span><span class="o">=</span><span class="n">ALL_GEOMETRY_PROPERTIES</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -384,7 +385,7 @@ maps).</p></li>
 <h2>Useful property names<a class="headerlink" href="#useful-property-names" title="Link to this heading"></a></h2>
 <p>Examples of valid names for <code class="docutils literal notranslate"><span class="pre">geometry_properties</span></code> / <code class="docutils literal notranslate"><span class="pre">properties</span></code>:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;All&quot;</span></code> — every supported property (see <code class="xref py py-data docutils literal notranslate"><span class="pre">ALL_GEOMETRY_PROPERTIES</span></code>)</p></li>
+<li><p><code class="xref py py-data docutils literal notranslate"><span class="pre">ALL_GEOMETRY_PROPERTIES</span></code> — every supported property</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;halfspaces&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;halfspaces_np&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;W&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;b&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;num_dead_relus&quot;</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;interior_point&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;interior_point_norm&quot;</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;vertices&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;hs&quot;</span></code> (SciPy’s HalfspaceIntersection), <code class="docutils literal notranslate"><span class="pre">&quot;ch&quot;</span></code> (SciPy’s ConvexHull), <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code></p></li>
