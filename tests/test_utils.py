@@ -15,6 +15,8 @@ from relucent.utils import (
     UpdatablePriorityQueue,
     add_output_relu,
     encode_ss,
+    flip_ss_at_shi,
+    flip_ss_at_shi_inplace,
     get_env,
     normalize_weights,
     set_seeds,
@@ -48,6 +50,35 @@ class TestEncodeSs:
         a = np.array([[1, -1, 0]])
         b = np.array([[1, -1, 0]])
         assert encode_ss(a) == encode_ss(b)
+
+
+class TestFlipSsAtShi:
+    def test_flips_coordinate(self):
+        ss = np.array([[1, -1, 0, 1]], dtype=np.int8)
+        flipped = flip_ss_at_shi(ss, 1)
+        assert flipped.shape == ss.shape
+        assert flipped[0, 1] == 1
+        assert encode_ss(flipped) == encode_ss(np.array([[1, 1, 0, 1]], dtype=np.int8))
+
+    def test_does_not_mutate_input(self):
+        ss = np.array([[1, -1]], dtype=np.int8)
+        original = ss.copy()
+        flip_ss_at_shi(ss, 0)
+        assert np.array_equal(ss, original)
+
+    def test_torch(self):
+        ss = torch.tensor([[1.0, -1.0, 0.0]])
+        flipped = flip_ss_at_shi(ss, 1)
+        assert isinstance(flipped, np.ndarray)
+        assert flipped[0, 1] == 1
+
+    def test_inplace_toggle_restores(self):
+        ss = np.array([[1, -1, 0]], dtype=np.int8)
+        original = ss.copy()
+        flip_ss_at_shi_inplace(ss, 1)
+        assert ss[0, 1] == 1
+        flip_ss_at_shi_inplace(ss, 1)
+        assert np.array_equal(ss, original)
 
 
 class TestGetEnv:

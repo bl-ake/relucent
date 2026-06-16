@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 import relucent.config as cfg
 from relucent._torch_compat import TORCH_AVAILABLE, torch
 from relucent.model import FlattenLayer, LinearLayer, ReLULayer
-from relucent.utils import get_env
+from relucent.utils import flip_ss_at_shi, get_env
 
 if TYPE_CHECKING:
     from relucent.poly import Polyhedron
@@ -389,11 +389,9 @@ def adjacent_polyhedra(
     """
     ps: set[Polyhedron] = set()
     for shi in poly.shis:
-        if poly.ss_np[0, shi] == 0:
+        if poly.ss_np.ravel()[shi] == 0:
             continue
-        ss = poly.ss_np.copy()
-        ss[0, shi] = -ss[0, shi]
-        ps.add(ss2poly(ss))
+        ps.add(ss2poly(flip_ss_at_shi(poly.ss_np, shi)))
     return ps
 
 

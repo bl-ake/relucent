@@ -22,10 +22,11 @@ from relucent.utils import (
     NonBlockingQueue,
     UpdatablePriorityQueue,
     encode_ss,
+    flip_ss_at_shi,
     get_mp_context,
     process_aware_cpu_count,
 )
-from relucent.worker_context import get_worker_context, set_worker_context
+from relucent.worker_context import get_worker_context, set_worker_context, worker_context_scope
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -67,27 +68,20 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
 )
 
 
-def _neighbor_tag_for_flip(ss: np.ndarray | torch.Tensor, shi: int) -> bytes:
-    """Sign-sequence tag obtained by flipping one SHI coordinate."""
-    flipped = np.asarray(ss, dtype=np.int8).copy()
-    flipped[0, shi] *= -1
-    return encode_ss(flipped)
-
-
 def _cancel_pending_neighbor(
     cx: "Complex",
-    *,
     pending_neighbors: dict[bytes, list[tuple[int, int]]],
     node: Polyhedron,
     shi: int,
 ) -> None:
     """Drop a failed in-flight neighbor and SHIs that deferred queueing for it."""
-    failed_tag = _neighbor_tag_for_flip(node.ss_np, shi)
-    node.remove_shi(shi)
+    failed_tag = encode_ss(flip_ss_at_shi(node.ss_np, shi))
+    node.remove_shi(shi)  # don't keep retrying a bad flip from this cell
     for waiter_index, waiter_shi in pending_neighbors.pop(failed_tag, []):
-        waiter = cast(Polyhedron, cx.index2poly[waiter_index])
-        if waiter_shi in waiter._shis:
-            waiter._shis.remove(waiter_shi)
+        waiter = cx.index2poly[waiter_index]
+        shis = waiter._shis
+        if shis is not None and waiter_shi in shis:
+            shis.remove(waiter_shi)
 
 
 def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
@@ -114,123 +108,109 @@ def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
         )
 
 
-def _resolve_geometry_properties(
-    geometry_properties: Iterable[str] | str | None,
-    *,
-    default_all: bool = False,
-) -> tuple[str, ...]:
-    """Normalize ``geometry_properties`` to a deduplicated property-name tuple."""
-    if geometry_properties == "All":
-        return ALL_GEOMETRY_PROPERTIES
-    if geometry_properties is None:
-        return ALL_GEOMETRY_PROPERTIES if default_all else ()
-    if isinstance(geometry_properties, str):
-        name = geometry_properties.strip()
-        return (name,) if name else ()
-    return tuple(dict.fromkeys(str(name).strip() for name in geometry_properties if str(name).strip()))
-
-
-def _search_geometry_props(
-    geometry_properties: Iterable[str] | str | None = None,
-) -> tuple[str, ...]:
-    """Search worker properties: required topology geometry plus optional caches."""
-    optional = _resolve_geometry_properties(geometry_properties, default_all=False)
-    return tuple(dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *optional)))
-
-
 def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
     """Retain geometry caches listed in *properties*; drop other heavy caches."""
+    # Workers only need what search asked for; drop the rest to keep IPC payloads small.
     requested = {str(name).strip() for name in properties if str(name).strip()}
     if "halfspaces_np" in requested:
-        requested.add("halfspaces")
-
-    if "halfspaces" not in requested:
-        p._halfspaces = None
-        p._halfspaces_np = None
-    if "W" not in requested:
-        p._w = None
-    if "b" not in requested:
-        p._b = None
-
+        requested.add("halfspaces")  # np view and list form are paired
+    for name, attrs in (("halfspaces", ("_halfspaces", "_halfspaces_np")), ("W", ("_w",)), ("b", ("_b",))):
+        if name not in requested:
+            for attr in attrs:
+                setattr(p, attr, None)
+    # Qhull objects are the heaviest; clear the whole cluster unless something needs them.
     qhull_props = {"hs", "vertices", "ch", "volume"}
     if not (requested & qhull_props):
-        p._hs = None
-        p._vertices = None
-        p._ch = None
-        p._volume = None
+        p._hs = p._vertices = p._ch = p._volume = None
         p._attempted_compute_properties = False
     elif "volume" not in requested:
         p._volume = None
 
 
+def _worker_prepare_poly(
+    p: Polyhedron,
+    props: tuple[str, ...],
+    *,
+    env: Any,
+    shis_kwargs: dict[str, Any] | None = None,
+    need_interior: bool = False,
+    shuffle_shis: bool = False,
+) -> Exception | None:
+    """Compute geometry (and optionally SHIs) on *p*. Return an error, or None on success."""
+    try:
+        p.get_geometry(props, env=env)
+    except ValueError as error:
+        return error
+    if p.finite is None:
+        return ValueError("Polyhedron is infeasible (empty).")
+    try:
+        _enforce_min_search_inradius(p, env=env)
+    except ValueError as error:
+        return error
+    if need_interior and p._interior_point is None:
+        p._interior_point = p.get_interior_point(env=env)
+    if shis_kwargs is not None:
+        try:
+            if p._shis is None:
+                result = get_shis(p, env=env, **shis_kwargs)
+                p._shis = result[0] if isinstance(result, tuple) else result
+        except Exception as error:
+            return error
+    retain_geometry_caches(p, props)
+    if shuffle_shis and isinstance(p._shis, list):
+        random.shuffle(p._shis)  # spreads load when many workers race on the same parent
+    return None
+
+
+def _apply_cube_filter(p: Polyhedron, cube_mode: str, cube_radius: float) -> bool:
+    """Return whether *p* should be kept under the cube filter (possibly clipping it)."""
+    try:
+        bounded = p.get_bounded_halfspaces(cube_radius)
+    except ValueError:
+        # Outside the box entirely — keep only if we're explicitly hunting exterior cells.
+        return cube_mode == "exclude"
+    if cube_mode == "intersect":
+        return True  # tag as intersecting the box but don't rewrite halfspaces
+    if cube_mode == "exclude":
+        return False  # drop anything that touches the box
+    p._halfspaces = bounded  # type: ignore[assignment]  # clipped: replace with bounded form
+    p._halfspaces_np = bounded
+    return p.feasible
+
+
 def search_calculations(
     task: np.ndarray | torch.Tensor | tuple[Any, ...],
-    geometry_properties: Iterable[str] | None = None,
+    geometry_properties: tuple[str, ...] = SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
     **kwargs: Any,
 ) -> tuple[Any, ...]:
-    """Worker function for neighbor enumeration in search.
-
-    Computes Chebyshev data (``finite`` / ``center`` / ``inradius``), SHIs, and any
-    optional geometry caches requested by the caller.
-    """
+    """Worker for neighbor enumeration: Chebyshev geometry, SHIs, and optional caches."""
     ctx = get_worker_context()
     ss = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     p = Polyhedron(ctx.net, ss)
-
-    props = _search_geometry_props(geometry_properties)
-    try:
-        p.get_geometry(props, env=ctx.env)
-    except ValueError as error:
-        return error, *rest
-
-    if p.finite is None:
-        return "Polyhedron is infeasible (empty).", *rest
-
-    try:
-        _enforce_min_search_inradius(p, env=ctx.env)
-    except ValueError as error:
-        return error, *rest
-
-    try:
-        if p._shis is None:
-            result = get_shis(p, env=ctx.env, **kwargs)
-            p._shis = result[0] if isinstance(result, tuple) else result
-    except ValueError as error:
-        return error, *rest
-
-    retain_geometry_caches(p, props)
-    if isinstance(p._shis, list):
-        random.shuffle(p._shis)
+    if err := _worker_prepare_poly(p, geometry_properties, env=ctx.env, shis_kwargs=kwargs, shuffle_shis=True):
+        return err, *rest  # parent treats non-Polyhedron first slot as failure
     return (p, *rest)
 
 
 def geometric_calculations(
     task: tuple[np.ndarray, list[int] | None, int] | tuple[Any, ...],
-    geometry_properties: Iterable[str] | None = None,
+    geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
+    bound: float | None = None,
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
     ctx = get_worker_context()
     ss, shis, poly_index, *rest = task
-    p = Polyhedron(ctx.net, ss, shis=shis)
-    props = _resolve_geometry_properties(geometry_properties, default_all=True)
-    try:
-        p.get_geometry(props, env=ctx.env)
-    except ValueError as error:
-        return error, poly_index, *rest
-    try:
-        _enforce_min_search_inradius(p, env=ctx.env)
-    except ValueError as error:
-        return error, poly_index, *rest
-
-    retain_geometry_caches(p, props)
+    p = Polyhedron(ctx.net, ss, shis=shis, bound=bound)
+    if err := _worker_prepare_poly(p, tuple(geometry_properties), env=ctx.env):
+        return err, poly_index, *rest
     return (p, poly_index, *rest)
 
 
 def parallel_compute_geometric_properties(
     cx: "Complex",
     nworkers: int | None = None,
-    geometry_properties: Iterable[str] | None = None,
+    geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
     verbose: int | None = None,
 ) -> dict[str, Any]:
     """Compute selected properties for all existing polyhedra in parallel.
@@ -239,9 +219,8 @@ def parallel_compute_geometric_properties(
         cx: Complex whose polyhedra should be updated.
         nworkers: Number of worker processes to use.
         geometry_properties: Iterable of cache/property names to compute and
-            retain on each polyhedron. If None, computes
-            :data:`ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for the same full
-            geometry set.
+            retain on each polyhedron. Defaults to
+            :data:`ALL_GEOMETRY_PROPERTIES`.
         verbose: Controls progress output. ``0`` silences all output; ``1``
             (default) shows worker count and a progress bar.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
@@ -289,7 +268,7 @@ def parallel_add(
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float | None = None,
-    geometry_properties: Iterable[str] | None = None,
+    geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
     verbose: int | None = None,
 ) -> list[Polyhedron | None]:
     """Add multiple polyhedra from data points using parallel processing.
@@ -305,9 +284,7 @@ def parallel_add(
         bound: Constraint radius for numerical stability when computing halfspaces.
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
         geometry_properties: Iterable of cache/property names to compute and retain
-            on each polyhedron. If None, computes
-            :data:`ALL_GEOMETRY_PROPERTIES`. Pass ``"All"`` for the same full
-            geometry set.
+            on each polyhedron. Defaults to :data:`ALL_GEOMETRY_PROPERTIES`.
         verbose: Controls progress output. ``0`` silences all output; ``1``
             (default) shows worker count and progress bars.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
@@ -324,10 +301,10 @@ def parallel_add(
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
         logger.info("parallel_add using %d workers", nworkers)
-    sss = []
-    for p in tqdm(points, desc="Getting SSs", mininterval=5, disable=not verbose):
-        s = cx.point2ss(p)
-        sss.append(s.detach().cpu().numpy() if isinstance(s, torch.Tensor) else s)
+    sss = [
+        (s.detach().cpu().numpy() if isinstance(s := cx.point2ss(p), torch.Tensor) else s)
+        for p in tqdm(points, desc="Getting SSs", mininterval=5, disable=not verbose)
+    ]  # materialize SSs up front so pool tasks are plain numpy arrays
 
     tasks = [(ss, None, i) for i, ss in enumerate(sss)]
     with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net,)) as pool:
@@ -335,6 +312,7 @@ def parallel_add(
             partial(
                 geometric_calculations,
                 geometry_properties=geometry_properties,
+                bound=bound,
             ),
             tqdm(tasks, desc="Adding Polys", mininterval=5, disable=not verbose),
         )
@@ -352,26 +330,11 @@ def get_ip(
     p: Polyhedron,
     shi: int,
 ) -> tuple[Polyhedron, int] | tuple[ValueError, int]:
-    """Get an interior point for a neighbor polyhedron across a supporting hyperplane.
-
-    This function is used by the A* search algorithm to find interior points for
-    neighboring polyhedra. It flips the element of the sign sequence at the specified
-    supporting hyperplane index (SHI) and attempts to find an interior point,
-    increasing the search radius if necessary.
-
-    Args:
-        p: The source Polyhedron object.
-        shi: The index of the supporting hyperplane to cross.
-
-    Returns:
-        tuple: If successful, returns (neighbor_polyhedron, shi). If a ValueError
-            occurs, returns (error, None).
-    """
+    """Flip one SHI in *p*'s sign sequence and find an interior point for the neighbor."""
     ctx = get_worker_context()
     try:
-        ss = p.ss_np.copy()
-        ss[0, shi] = -ss[0, shi]
-        n = Polyhedron(ctx.net, ss)
+        n = Polyhedron(ctx.net, flip_ss_at_shi(p.ss_np, shi))
+        # Neighbor may be skinny; try progressively larger bounding boxes until one works.
         for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
             with contextlib.suppress(ValueError):
                 n._interior_point = n.get_interior_point(env=ctx.env, max_radius=max_radius)
@@ -384,50 +347,22 @@ def astar_calculations(
     task: Polyhedron | tuple[Any, ...],
     **kwargs: Any,
 ) -> tuple[Any, ...]:
-    """Worker function for computing polyhedron properties in A* search.
-
-    Similar to search_calculations, but specifically designed for A* search algorithm.
-    Computes center, inradius, interior point, and supporting hyperplane indices
-    for polyhedra during pathfinding.
-
-    Args:
-        task: Either a Polyhedron object or a tuple containing (Polyhedron, ...)
-            with additional data to be passed through.
-        **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`, such as
-            'bound'.
-
-    Returns:
-        tuple: If successful, returns (Polyhedron, *rest). If an exception occurs
-            during SHI computation, returns (Polyhedron, error, *rest).
-    """
+    """Worker for A* search: geometry, interior point, and SHIs on a polyhedron."""
     ctx = get_worker_context()
     p = task[0] if isinstance(task, tuple) else task
     rest = task[1:] if isinstance(task, tuple) else ()
     if p._net is None:
         p._net = ctx.net
-
-    try:
-        p.get_geometry(SEARCH_REQUIRED_GEOMETRY_PROPERTIES, env=ctx.env)
-    except ValueError as error:
-        return p, error, *rest
-    if p.finite is None:
-        return p, ValueError("Polyhedron is infeasible (empty)."), *rest
-    try:
-        _enforce_min_search_inradius(p, env=ctx.env)
-    except ValueError as error:
-        return p, error, *rest
-    if p._interior_point is None:
-        p._interior_point = p.get_interior_point(env=ctx.env)
-
-    try:
-        if p._shis is None:
-            result = get_shis(p, env=ctx.env, **kwargs)
-            p._shis = result[0] if isinstance(result, tuple) else result
-    except Exception as error:
-        return p, error, *rest
-    retain_geometry_caches(p, SEARCH_REQUIRED_GEOMETRY_PROPERTIES)
+    if err := _worker_prepare_poly(
+        p,
+        SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
+        env=ctx.env,
+        shis_kwargs=kwargs,
+        need_interior=True,  # heuristic needs interior points for tie-breaking
+        shuffle_shis=True,
+    ):
+        return p, err, *rest  # keep the poly so the parent can log which node failed
     assert isinstance(p._shis, list), "get_shis() returns a list"
-    random.shuffle(p._shis)
     return p, *rest
 
 
@@ -474,10 +409,10 @@ def searcher(
             (default) shows worker count and a progress bar.  When ``None``,
             falls back to :data:`relucent.config.VERBOSE`.
         geometry_properties: Iterable of polyhedron cache/property names to
-            compute and retain for each discovered polyhedron. Defaults to
-            topology-only search. Pass ``"All"`` to compute
-            every supported property. ``finite``, ``center``, and ``inradius`` are
-            always computed regardless of this argument.
+            compute and retain for each discovered polyhedron. ``None`` (default)
+            performs topology-only search. Pass
+            :data:`ALL_GEOMETRY_PROPERTIES` or a subset to retain optional caches.
+            ``finite``, ``center``, and ``inradius`` are always computed.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
     Returns:
@@ -507,32 +442,11 @@ def searcher(
         warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.", stacklevel=2)
         cube_radius = None
 
-    def _poly_intersects_cube(p: Polyhedron) -> bool:
-        try:
-            p.get_bounded_halfspaces(cast(float, cube_radius))
-            return True
-        except ValueError:
-            return False
-
-    def _apply_cube_filter(p: Polyhedron) -> bool:
-        """Apply the cube filter to a polyhedron.
-
-        Returns True if the polyhedron should be kept (and possibly clipped),
-        or False if it should be discarded from the search.
-        """
-        intersects = _poly_intersects_cube(p)
-
-        if cube_mode == "intersect":
-            return intersects
-        if cube_mode == "exclude":
-            return not intersects
-
-        if not intersects:
-            return False
-        bounded_halfspaces = p.get_bounded_halfspaces(cast(float, cube_radius))
-        p._halfspaces = bounded_halfspaces  # type: ignore[assignment]
-        p._halfspaces_np = bounded_halfspaces
-        return p.feasible
+    search_props = (
+        SEARCH_REQUIRED_GEOMETRY_PROPERTIES
+        if geometry_properties is None
+        else tuple(dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *geometry_properties)))
+    )
 
     # Keys are neighbor tags with an in-flight discovery task; values list polys
     # that deferred queueing because discovery was already pending.
@@ -552,7 +466,7 @@ def searcher(
         start = cx.add_polyhedron(start)
     else:
         start = cx.add_point(start)
-    if cube_mode != "unrestricted" and not _apply_cube_filter(start):
+    if cube_mode != "unrestricted" and not _apply_cube_filter(start, cube_mode, cast(float, cube_radius)):
         queue.close()
         return {
             "Search Depth": 0,
@@ -566,17 +480,16 @@ def searcher(
     result = get_shis(start, bound=bound, **kwargs)
     assert isinstance(result, list)
     start._shis = result
-    retain_geometry_caches(start, _search_geometry_props(geometry_properties))
+    retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
+    # Seed the frontier: each task is (neighbor ss, shi crossed, depth, parent index).
     for shi in start.shis:
-        new_ss = start.ss_np.copy()
-        new_ss[0, shi] *= -1
-        tag = encode_ss(new_ss)
-        pending_neighbors[tag] = []
-        queue.push((new_ss, shi, 1, start_index))
+        ss = flip_ss_at_shi(start.ss_np, shi)
+        pending_neighbors[encode_ss(ss)] = []
+        queue.push((ss, shi, 1, start_index))
 
     rolling_average = len(start.shis)
-    bad_shi_computations = []
+    bad_shi_computations: list[Any] = []
     pbar = tqdm(
         desc="Search Progress",
         mininterval=5,
@@ -592,120 +505,100 @@ def searcher(
 
     unprocessed = len(queue)
     depth = 0
+    search_time = 0.0
 
-    if unprocessed == 0:
+    if unprocessed > 0:
+        with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
+            try:
+                for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
+                    partial(
+                        search_calculations,
+                        bound=bound,
+                        geometry_properties=search_props,
+                        **kwargs,
+                    ),
+                    queue,
+                ):
+                    unprocessed -= 1
+                    node = cast(Polyhedron, cx.index2poly[node_index])
+                    if not isinstance(p, Polyhedron):
+                        bad_shi_computations.append((node, shi, depth, str(p)))
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        if node.num_shis < min(cx.dim, cx.n):
+                            warnings.warn(
+                                RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
+                                stacklevel=2,
+                            )
+                        if unprocessed == 0 or len(cx) >= max_polys:
+                            break
+                        continue
+
+                    if p._net is None:
+                        p._net = cx._net
+
+                    if cube_mode != "unrestricted" and not _apply_cube_filter(p, cube_mode, cast(float, cube_radius)):
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        if unprocessed == 0 or len(cx) >= max_polys:
+                            break
+                        continue
+
+                    p = cx.add_polyhedron(p)
+                    pending_neighbors.pop(encode_ss(p.ss_np), None)  # this tag is no longer "in flight"
+
+                    if getattr(p, "warnings", None):
+                        for warning in p.warnings:
+                            try:
+                                warnings.warn(warning, stacklevel=2)
+                            except Exception as e:
+                                logger.warning("%s %s %s", warning, type(warning), e)
+
+                    if depth < max_depth:
+                        poly_index = cx.ssm[p.ss_np]
+                        for new_shi in p.shis:
+                            if new_shi != shi and len(cx) < max_polys:
+                                ss = flip_ss_at_shi(p.ss_np, new_shi)
+                                tag = encode_ss(ss)
+                                if tag in cx.tag2poly:
+                                    continue
+                                if tag not in pending_neighbors:
+                                    pending_neighbors[tag] = []
+                                    queue.push((ss, new_shi, depth + 1, poly_index))
+                                    unprocessed += 1
+                                else:
+                                    # Same neighbor already queued — remember who was waiting.
+                                    pending_neighbors[tag].append((poly_index, new_shi))
+
+                    pbar.update(n=len(cx) - pbar.n)
+                    rolling_average = (rolling_average * (len(cx) - 1) + len(p.shis)) / len(cx)
+
+                    assert isinstance(p._shis, list)
+                    pbar.set_postfix_str(
+                        f"Depth: {depth}  Unprocessed: {unprocessed} Mistakes: {len(bad_shi_computations)}"
+                        + f" Mean Facets: {rolling_average:.2f}",
+                        refresh=False,
+                    )
+
+                    if unprocessed == 0 or len(cx) >= max_polys:
+                        break
+            finally:
+                queue.close()
+                search_time = pbar.format_dict["elapsed"]
+                pbar.close()
+                # imap_unordered can't be cancelled cleanly on early break; kill workers.
+                pool.terminate()
+                pool.join()
+    else:
         queue.close()
+        search_time = pbar.format_dict["elapsed"]
         pbar.close()
-        return {
-            "Search Depth": depth,
-            "Avg # Facets Uncorrected": rolling_average,
-            "Search Time": pbar.format_dict["elapsed"],
-            "Bad SHI Computations": bad_shi_computations,
-            "Complete": True,
-        }
 
-    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
-        try:
-            for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
-                partial(
-                    search_calculations,
-                    bound=bound,
-                    geometry_properties=geometry_properties,
-                    **kwargs,
-                ),
-                queue,
-            ):
-                unprocessed -= 1
-                node = cast(Polyhedron, cx.index2poly[node_index])
-                if not isinstance(p, Polyhedron):
-                    bad_shi_computations.append((node, shi, depth, str(p)))
-                    _cancel_pending_neighbor(
-                        cx,
-                        pending_neighbors=pending_neighbors,
-                        node=node,
-                        shi=shi,
-                    )
-                    if node.num_shis < min(cx.dim, cx.n):
-                        warnings.warn(
-                            RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
-                            stacklevel=2,
-                        )
-                    if unprocessed == 0 or len(cx) >= max_polys:
-                        queue.close()
-                        break
-                    continue
-
-                if p._net is None:
-                    p._net = cx._net
-
-                if cube_mode != "unrestricted" and not _apply_cube_filter(p):
-                    _cancel_pending_neighbor(
-                        cx,
-                        pending_neighbors=pending_neighbors,
-                        node=node,
-                        shi=shi,
-                    )
-                    if unprocessed == 0 or len(cx) >= max_polys:
-                        queue.close()
-                        break
-                    continue
-
-                p = cx.add_polyhedron(p)
-                pending_neighbors.pop(encode_ss(p.ss_np), None)
-
-                if getattr(p, "warnings", None):
-                    for warning in p.warnings:
-                        try:
-                            warnings.warn(warning, stacklevel=2)
-                        except Exception as e:
-                            logger.warning("%s %s %s", warning, type(warning), e)
-
-                if depth < max_depth:
-                    for new_shi in p.shis:
-                        if new_shi != shi and len(cx) < max_polys:
-                            ss = p.ss_np.copy()
-                            ss[0, new_shi] *= -1
-                            tag = encode_ss(ss)
-                            if tag in cx.tag2poly:
-                                continue
-                            poly_index = cx.ssm[p.ss_np]
-                            if tag not in pending_neighbors:
-                                pending_neighbors[tag] = []
-                                queue.push((ss, new_shi, depth + 1, poly_index))
-                                unprocessed += 1
-                            else:
-                                pending_neighbors[tag].append((poly_index, new_shi))
-
-                pbar.update(n=len(cx) - pbar.n)
-                rolling_average = (rolling_average * (len(cx) - 1) + len(p.shis)) / len(cx)
-
-                assert isinstance(p._shis, list)
-                pbar.set_postfix_str(
-                    f"Depth: {depth}  Unprocessed: {unprocessed} Mistakes: {len(bad_shi_computations)}"
-                    + f" Mean Facets: {rolling_average:.2f}",
-                    refresh=False,
-                )
-
-                if unprocessed == 0 or len(cx) >= max_polys:
-                    queue.close()
-                    break
-        except Exception:
-            raise
-        finally:
-            queue.close()
-            pbar.close()
-            pool.terminate()
-            pool.join()
-
-    search_info = {
+    return {
         "Search Depth": depth,
         "Avg # Facets Uncorrected": rolling_average,
-        "Search Time": pbar.format_dict["elapsed"],
+        "Search Time": search_time,
         "Bad SHI Computations": bad_shi_computations,
         "Complete": unprocessed == 0,
     }
-
-    return search_info
 
 
 def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None) -> list[Polyhedron]:
@@ -715,26 +608,17 @@ def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
 
+    # Indices where start and end disagree on sign — must flip an even number to match.
     diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).ravel()).ravel().tolist())
 
     if not start._shis:
         get_shis(start)
     shis_set = set(start.shis)
-    groupa = shis_set & diffs
-    groupb = shis_set - diffs
-    for shi in list(groupa):
-        new_ss = start.ss_np.copy()
-        new_ss[0, shi] *= -1
-        next_poly = cx.ss2poly(new_ss)
-        rest = _greedy_path_helper(cx, next_poly, end, diffs - {shi})
-        if rest is not None:
-            return [start] + rest
-    for shi in list(groupb):
-        new_ss = start.ss_np.copy()
-        new_ss[0, shi] *= -1
-        next_poly = cx.ss2poly(new_ss)
-        rest = _greedy_path_helper(cx, next_poly, end, diffs | {shi})
-        if rest is not None:
+    groupa = shis_set & diffs  # flip toward the goal (removes one diff)
+    groupb = shis_set - diffs  # detour: flip away, then recurse with that diff added back
+    for shi, next_diffs in [(s, diffs - {s}) for s in groupa] + [(s, diffs | {s}) for s in groupb]:
+        rest = _greedy_path_helper(cx, cx.ss2poly(flip_ss_at_shi(start.ss_np, shi)), end, next_diffs)
+        if rest:
             return [start] + rest
     return []
 
@@ -785,8 +669,8 @@ def hamming_astar(
         cx: The polyhedral complex.
         start: Starting data point as torch.Tensor or np.ndarray.
         end: Ending data point as torch.Tensor or np.ndarray.
-        nworkers: Number of worker processes for parallel computation.
-            Defaults to 1.
+        nworkers: Number of worker processes for parallel neighbor evaluation.
+            ``None`` (default) uses ``min(CPU count, number of ReLU units)``.
         bound: Constraint radius for numerical stability when computing halfspaces.
             Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
         max_polys: Maximum number of polyhedra to explore during search.
@@ -861,13 +745,16 @@ def hamming_astar(
     if (start_poly.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
 
-    nhs = len(start_poly.halfspaces)
-    nworkers = min(cast(int, nworkers if isinstance(nworkers, int) else (process_aware_cpu_count() or 1)), nhs)
+    # Can't use more workers than there are SHIs to hand out per expansion step.
+    if nworkers is None:
+        nworkers = process_aware_cpu_count() or 1
+    nworkers = min(int(nworkers), cx.n)
 
     cameFrom: dict[Polyhedron, Polyhedron] = {}
     gScore = defaultdict(lambda: float("inf"))
     fScore = defaultdict(lambda: float("inf"))
 
+    # Iterable queue: map(astar_calculations, openSet) blocks on pop until neighbors are pushed.
     openSet = NonBlockingQueue(
         queue_class=UpdatablePriorityQueue,
         pop=lambda pq: pq.pop(),
@@ -886,7 +773,7 @@ def hamming_astar(
 
     bad_shi_computations = []
     pbar = tqdm(
-        desc="Search Progress" + (str(show_pbar) if show_pbar is not True else ""),
+        desc="Search Progress",
         mininterval=1,
         leave=True,
         total=max_polys if max_polys != float("inf") else None,
@@ -895,7 +782,7 @@ def hamming_astar(
     pbar.update(n=1)
 
     depth = 0
-    neighbor: Polyhedron | ValueError | None = None
+    goal_reached: Polyhedron | None = None
     min_dist = float("inf")
     best_seen_hamming = hamming_start_goal
     lower_bound_optimal_length = hamming_start_goal
@@ -907,95 +794,97 @@ def hamming_astar(
         if p.interior_point is None or end_poly.interior_point is None:
             raise ValueError("Interior point not found")
         dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
-        bias = -1 / (1 + dist)
+        bias = -1 / (1 + dist)  # small nudge toward geometrically closer regions at equal Hamming
         return hamming + cfg.ASTAR_BIAS_WEIGHT * bias
 
     pool = None
-    try:
-        set_worker_context(cx._net)
-        if nworkers > 1:
-            pool = get_mp_context().Pool(
-                nworkers,
-                initializer=set_worker_context,
-                initargs=(cx._net, False, num_threads),
-            )
-        for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
-            if len(item) >= 2 and isinstance(item[1], Exception):
-                # Useful when debugging spawn-related issues on macOS/Windows.
-                if os.environ.get("RELUCENT_DEBUG_ASTAR"):
-                    err = item[1]
-                    logger.debug("A* SHI computation failed: %s: %s", type(err).__name__, err)
-                bad_shi_computations.append(item)
-                continue
+    with worker_context_scope(cx._net, get_volumes=False, num_threads=num_threads):
+        try:
+            if nworkers > 1:
+                pool = get_mp_context().Pool(
+                    nworkers,
+                    initializer=set_worker_context,
+                    initargs=(cx._net, False, num_threads),
+                )
+            # Each pop runs geometry+SHIs on a candidate before we expand its neighbors.
+            for item in map(partial(astar_calculations, bound=bound, **kwargs), openSet):
+                if len(item) >= 2 and isinstance(item[1], Exception):
+                    # Useful when debugging spawn-related issues on macOS/Windows.
+                    if os.environ.get("RELUCENT_DEBUG_ASTAR"):
+                        err = item[1]
+                        logger.debug("A* SHI computation failed: %s: %s", type(err).__name__, err)
+                    bad_shi_computations.append(item)
+                    continue
 
-            assert len(item) > 0
-            p = cast(Polyhedron, item[0])
-            expanded += 1
-            depth = int(gScore[p])
-            p_hamming = int((p.ss_np != end_poly.ss_np).sum())
-            best_seen_hamming = min(best_seen_hamming, p_hamming)
-            lower_bound_optimal_length = min(lower_bound_optimal_length, int(gScore[p]) + p_hamming)
+                assert len(item) > 0
+                p = cast(Polyhedron, item[0])
+                expanded += 1
+                depth = int(gScore[p])
+                p_hamming = int((p.ss_np != end_poly.ss_np).sum())
+                best_seen_hamming = min(best_seen_hamming, p_hamming)
+                lower_bound_optimal_length = min(lower_bound_optimal_length, int(gScore[p]) + p_hamming)
 
-            if p == end_poly:
-                neighbor = end_poly
-                break
+                if p == end_poly:
+                    goal_reached = end_poly
+                    break
 
-            if nworkers == 1:
-                neighbor_iter = map(partial(get_ip, p), p.shis)
-            else:
-                assert pool is not None
-                neighbor_iter = pool.imap_unordered(
-                    partial(get_ip, p),
-                    p.shis,
-                    chunksize=max(nhs // nworkers, 1),
+                if nworkers == 1:
+                    neighbor_iter = map(partial(get_ip, p), p.shis)
+                else:
+                    assert pool is not None
+                    neighbor_iter = pool.imap_unordered(
+                        partial(get_ip, p),
+                        p.shis,
+                        chunksize=max(cx.n // nworkers, 1),
+                    )
+
+                for candidate, neighbor_shi in neighbor_iter:
+                    if not isinstance(candidate, Polyhedron):
+                        p.remove_shi(neighbor_shi)
+                    else:
+                        generated += 1
+                        tentative_gScore = gScore[p] + 1  # adjacent cells differ in exactly one nonzero ss entry
+                        if candidate._net is None:
+                            candidate._net = cx._net
+                        if tentative_gScore < gScore[candidate]:
+                            cameFrom[candidate] = p
+                            gScore[candidate] = tentative_gScore
+                            dist = heuristic(candidate)
+                            fScore[candidate] = tentative_gScore + dist
+                            if dist < min_dist:
+                                min_dist = dist
+                            neighbor_hamming = int((candidate.ss_np != end_poly.ss_np).sum())
+                            lower_bound_optimal_length = min(
+                                lower_bound_optimal_length, int(tentative_gScore) + neighbor_hamming
+                            )
+                            openSet.push((candidate,), fScore[candidate])
+
+                pbar.update(n=len(cameFrom) - pbar.n)
+                open_len = len(openSet)
+                pbar.set_postfix_str(
+                    f"LB*: {lower_bound_optimal_length} MinHeuristic: {min_dist:.3f} BestHam: {best_seen_hamming} "
+                    + f"Depth: {depth} Open Set: {open_len} "
+                    + f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
+                    refresh=False,
                 )
 
-            for neighbor, neighbor_shi in neighbor_iter:
-                if not isinstance(neighbor, Polyhedron):
-                    p.remove_shi(neighbor_shi)
-                else:
-                    generated += 1
-                    tentative_gScore = gScore[p] + 1  ## The hamming distance between two adjacent polyhedra is always 1
-                    if neighbor._net is None:
-                        neighbor._net = cx._net
-                    if tentative_gScore < gScore[neighbor]:
-                        cameFrom[neighbor] = p
-                        gScore[neighbor] = tentative_gScore
-                        dist = heuristic(neighbor)
-                        fScore[neighbor] = tentative_gScore + dist
-                        if dist < min_dist:
-                            min_dist = dist
-                        neighbor_hamming = int((neighbor.ss_np != end_poly.ss_np).sum())
-                        lower_bound_optimal_length = min(lower_bound_optimal_length, int(tentative_gScore) + neighbor_hamming)
-                        openSet.push((neighbor,), fScore[neighbor])
-
-            pbar.update(n=len(cameFrom) - pbar.n)
-            open_len = len(openSet)
-            pbar.set_postfix_str(
-                f"LB*: {lower_bound_optimal_length} MinHeuristic: {min_dist:.3f} BestHam: {best_seen_hamming} "
-                + f"Depth: {depth} Open Set: {open_len} "
-                + f"Mistakes: {len(bad_shi_computations)} | Finite: {p.finite} # SHIs: {len(p.shis)}",
-                refresh=False,
-            )
-
-            if open_len == 0 or len(cameFrom) >= max_polys:
-                break
-    except Exception:
-        raise
-    finally:
-        if pool is not None:
-            pool.terminate()
-            pool.join()
-        openSet.close()
-        # Same stale-lock guard as in searcher().
-        tqdm.get_lock().locks = []
-        pbar.close()
-    succeeded = neighbor == end_poly
+                if open_len == 0 or len(cameFrom) >= max_polys:
+                    break
+        finally:
+            if pool is not None:
+                pool.terminate()
+                pool.join()
+            openSet.close()
+            # Same stale-lock guard as in searcher().
+            tqdm.get_lock().locks = []
+            pbar.close()
+    succeeded = goal_reached == end_poly
     path: list[Polyhedron] | None
     termination: str
     if succeeded:
         termination = "found"
         path = [end_poly]
+        # Walk cameFrom backward from goal to start.
         while path[-1] != start_poly:
             if cfg.CAREFUL_MODE:
                 assert cameFrom[path[-1]] not in path, path

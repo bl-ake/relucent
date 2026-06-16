@@ -337,26 +337,21 @@ class TestMinSearchInradiusGuard:
     def test_1d_relu_strip_triggers_search_worker_guard(self, env):
         """Two parallel ReLU thresholds spaced by eps give a strip with inradius eps/2."""
         from relucent import Complex
-        from relucent.worker_context import set_worker_context
+        from relucent.worker_context import worker_context_scope
 
         eps = 1e-9
         assert eps / 2 < cfg.MIN_SEARCH_INRADIUS
 
         net = _make_1d_strip_net(eps)
-        set_worker_context(net)
-        # Tests run in the main process; workers normally set context via pool initializer.
-        from relucent.worker_context import _context
+        with worker_context_scope(net) as ctx:
+            ctx.env = env
+            thin = Complex(net).add_point(np.array([eps / 2], dtype=np.float64))
+            assert thin.inradius is not None
+            assert thin.inradius < cfg.MIN_SEARCH_INRADIUS
 
-        assert _context is not None
-        _context.env = env
-
-        thin = Complex(net).add_point(np.array([eps / 2], dtype=np.float64))
-        assert thin.inradius is not None
-        assert thin.inradius < cfg.MIN_SEARCH_INRADIUS
-
-        result = search_calculations((thin.ss_np, 0, 0))
-        assert not isinstance(result[0], Polyhedron)
-        assert "MIN_SEARCH_INRADIUS" in str(result[0])
+            result = search_calculations((thin.ss_np, 0, 0))
+            assert not isinstance(result[0], Polyhedron)
+            assert "MIN_SEARCH_INRADIUS" in str(result[0])
 
 
 class TestStripNetworkBfs:
