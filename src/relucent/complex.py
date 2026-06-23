@@ -919,6 +919,15 @@ class Complex:
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
         """Get the chain complex of the complex.
 
+        After each contraction, cells that are geometrically infeasible are
+        dropped (``interior_point`` raises for them).  Such phantom cells arise
+        when two flip-neighbour k-cells share a combinatorial SHI crossing whose
+        intersection lands outside the feasible halfspace region.  The check is
+        applied uniformly at every contraction level, not only at the 0-cell
+        level.  After removing phantom cells, :func:`~relucent.meta_graph.remove_phantom_shis`
+        cleans up the parent level's ``_shis`` lists so that boundedness
+        heuristics and future dual-graph construction see only surviving faces.
+
         Raises:
             IncompleteDualGraphError: If dual adjacency is incomplete at some dimension;
                 see :meth:`contract`.
@@ -931,11 +940,26 @@ class Complex:
             new_complex = cur.contract(verbose=verbose)
             if len(new_complex) == 0:
                 break
+            # Uniform geometric feasibility filter at every contraction level.
+            n_before = len(new_complex)
+            feasible: Complex = Complex(self.net)
+            for p in new_complex:
+                try:
+                    _ = p.interior_point
+                    feasible.add_polyhedron(p, check_exists=False)
+                except Exception:
+                    pass
+            n_removed = n_before - len(feasible)
+            if n_removed:
+                logger.info(
+                    "get_chain_complex: removed %d infeasible cell(s) " + "(phantom cell(s) from combinatorial contraction)",
+                    n_removed,
+                )
+                mg.remove_phantom_shis(cur, {p.tag for p in feasible})
+            new_complex = feasible
             chain.append(new_complex)
             if verbose:
                 logger.info("Chain: %s, ...", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
-            if new_complex.index2poly[0].dim == 0:
-                break
         if verbose:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain

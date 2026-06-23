@@ -44,6 +44,7 @@ __all__ = [
     "precompute_finite",
     "propagate_finite_from_coface_edges",
     "propagate_unbounded_from_face_edges",
+    "remove_phantom_shis",
     "ss_face_crossing_indices",
     "truncate_meta_graph",
 ]
@@ -62,33 +63,52 @@ def known_bounded(poly: Polyhedron) -> bool:
 # SHI propagation: three roles (do not conflate)
 # ---------------------------------------------------------------------------
 #
-# Relucent applies different SHI rules depending on the job.  Using one rule
-# everywhere breaks either the contraction chain or meta-graph face incidence.
+# All three rules propagate SHIs from higher- to lower-dimensional cells, but
+# each serves a different *consumer* with incompatible correctness requirements.
+# The requirements are in direct tension: role 1 needs conservative SHIs (too
+# many is wrong), role 2 needs complete SHIs (too few is wrong), and role 3
+# needs geometrically accurate SHIs (both over- and under-counting are wrong).
+# No single rule satisfies all three.
 #
 # 1. **Contraction / dual graph** (:meth:`Complex.contract`, :meth:`get_dual_graph`)
-#    - Face construction: coface SHI intersection minus the crossing index
-#      (:meth:`Complex._codim_one_face_kwargs`).
-#    - Post-filter: drop SHIs with no same-dimension flip neighbor in the slice
-#      (:func:`filter_complex_shis_by_flip_neighbor`).
-#    - :meth:`get_dual_graph` walks ``poly.shis`` to wire the next contraction
-#      level.  Replacing coface intersection with full SS flip-neighbor
-#      membership adds spurious dual edges and extra cells (see
-#      ``tests/test_meta_graph_shi_regression.py``).
+#    - Rule: coface SHI intersection minus the crossing index
+#      (:meth:`Complex._codim_one_face_kwargs`), then drop SHIs with no
+#      same-dimension flip neighbor (:func:`filter_complex_shis_by_flip_neighbor`).
+#    - Why conservative: :meth:`get_dual_graph` walks ``poly.shis`` to wire
+#      adjacency for the *next* contraction level.  A spurious SHI whose flip
+#      does not exist in the slice would create a phantom dual edge, pulling in
+#      a cell that is not geometrically present, which breaks ``∂² = 0`` in
+#      subsequent contractions.  Too-few SHIs are safe here: a missing edge
+#      only means a missing adjacency, which is detectable; a phantom cell is
+#      silently wrong.  See ``tests/test_meta_graph_shi_regression.py``.
 #
 # 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
-#    - Try zeroing every ``ss_i != 0`` (:func:`ss_face_crossing_indices`), not
-#      propagated ``_shis``.  Coface intersection over-shrinks node metadata and
-#      would omit valid incidences, breaking ``∂² = 0``.
-#    - An edge is kept only when the zeroed face tag exists in the chain lookup.
+#    - Rule: try zeroing every ``ss_i != 0`` (:func:`ss_face_crossing_indices`);
+#      accept only if the zeroed-SS tag exists in the chain lookup.
+#    - Why complete: propagated ``_shis`` (from role 1) can be a strict subset
+#      of the true active constraints when a face sits on the boundary of the
+#      explored complex and has fewer cofaces than it would in the full tiling.
+#      Coface intersection over-shrinks those SHIs, causing valid face incidences
+#      to be silently skipped, which breaks ``∂² = 0`` in the meta-graph boundary
+#      maps.  The lookup-existence check gates correctness, so trying too many
+#      candidate SHIs is harmless.
 #
 # 3. **Meta-graph node metadata** (:func:`meta_node_shis_for_meta_node`,
 #    :func:`compute_contracted_shis_top_down`)
-#    - Node ``shis`` attributes and boundedness heuristics use propagated
-#      ``_shis`` (from search, contraction, or the top-down safety net).  This
-#      list can be a strict subset of SS crossings; that is expected and does
-#      not govern edge assembly.
+#    - Rule: propagated ``_shis`` (from search, contraction, or the top-down
+#      safety net); falls back to :func:`ss_face_crossing_indices` only when
+#      ``_shis`` is missing entirely.
+#    - Why accurate: the SHI count drives the 1-cell boundedness heuristic
+#      (``len(_shis) >= 2`` ⟺ bounded segment, not a ray or full line).
+#      Using role 2's broad candidate set would overcount and mis-classify
+#      rays/lines as bounded, propagating wrong ``finite`` values upward through
+#      :func:`classify_finite_ascending`.  Using role 1's intersection alone is
+#      correct for interior cells but would undercount at complex boundaries for
+#      the same reason as role 2.  This list is therefore a strict subset of SS
+#      crossings by design and does not govern face-edge assembly.
 #
-# See ``negative-betti-meta-graph-bug.md`` for the original failure mode.
+# See ``tests/test_meta_graph_shi_regression.py`` for the regression that
+# motivates role 1, and ``get_meta_graph`` docstring for the role 2 failure mode.
 
 
 def meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
@@ -350,6 +370,11 @@ def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
     Do not replace with full SS flip-neighbor membership; see the module comment
     above role 1.
 
+    Geometric feasibility of the induced lower-dimensional face is handled
+    separately by the post-filter in :meth:`~relucent.complex.Complex.get_chain_complex`,
+    which calls :func:`remove_phantom_shis` on the parent level after removing
+    any infeasible child cells.
+
     Returns the number of cells whose ``_shis`` list was changed.
     """
     if len(cplx) == 0:
@@ -362,6 +387,51 @@ def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
         filtered = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
         if filtered != list(poly._shis):
             poly._shis = filtered
+            n_changed += 1
+    return n_changed
+
+
+def remove_phantom_shis(
+    parent_complex: Complex,
+    surviving_child_tags: set[bytes],
+) -> int:
+    """Remove SHIs from parent cells whose induced child face was filtered out.
+
+    Called by :meth:`~relucent.complex.Complex.get_chain_complex` after the
+    uniform feasibility post-filter removes infeasible cells from a contracted
+    child complex.  Ensures each parent cell's ``_shis`` list only references
+    faces that exist in ``surviving_child_tags``.
+
+    This keeps ``_shis`` accurate for two consumers:
+
+    - **Boundedness heuristics** (e.g. the 1-cell SHI-count rule: ``len(shis)``
+      determines whether a 1-cell is a segment, ray, or line).  A stale phantom
+      SHI inflates this count and mis-classifies rays as bounded segments.
+    - **Future** :meth:`~relucent.complex.Complex.get_dual_graph` **calls**: the
+      method walks ``poly.shis`` to wire adjacency for the next contraction level.
+      Phantom entries would produce spurious dual-graph edges and break ``∂² = 0``.
+
+    Args:
+        parent_complex: The contracted complex one level above the filtered child.
+        surviving_child_tags: ``encode_ss`` tags of cells that survived filtering.
+
+    Returns:
+        Number of cells in ``parent_complex`` whose ``_shis`` was modified.
+    """
+    n_changed = 0
+    for poly in parent_complex:
+        if poly._shis is None:
+            continue
+        ss_row = np.asarray(poly.ss_np, dtype=np.int8).ravel().copy()
+        new_shis: list[int] = []
+        for shi_i in poly._shis:
+            old = ss_row[shi_i]
+            ss_row[shi_i] = 0
+            if ss_row.tobytes() in surviving_child_tags:
+                new_shis.append(shi_i)
+            ss_row[shi_i] = old
+        if new_shis != list(poly._shis):
+            poly._shis = new_shis
             n_changed += 1
     return n_changed
 
