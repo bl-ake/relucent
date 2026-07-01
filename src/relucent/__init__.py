@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 __all__ = [
     "__version__",
     "Complex",
+    "NonGenericArrangementError",
     "Polyhedron",
     "SSManager",
     "config",
@@ -47,6 +48,7 @@ __all__ = [
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Complex": ("relucent.complex", "Complex"),
+    "NonGenericArrangementError": ("relucent.meta_graph", "NonGenericArrangementError"),
     "Polyhedron": ("relucent.poly", "Polyhedron"),
     "SSManager": ("relucent.ss", "SSManager"),
     "convert": ("relucent.convert_model", "convert"),

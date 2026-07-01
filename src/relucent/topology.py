@@ -49,6 +49,7 @@ except Exception:
 
 __all__ = [
     "ChainComplexInconsistent",
+    "ConnectedComponentsMismatch",
     "C_BACKEND_AVAILABLE",
     "get_betti_numbers",
     "gf2_matmul_packed_stacked_rows",
@@ -83,6 +84,44 @@ class ChainComplexInconsistent(RuntimeError):
             parts = [f"k={v['k']} (∂_{v['k']}∘∂_{v['k'] + 1}): nnz={v['nnz']} shape={v['shape']}" for v in violations]
             message = "Meta-graph is not a cellular chain complex over GF(2): " + "; ".join(parts)
         super().__init__(message)
+
+
+class ConnectedComponentsMismatch(RuntimeError):
+    """Rank-formula β₀ disagrees with the graph component count.
+
+    This typically indicates half-edges in a truncated complex, where ``rank(∂₁)``
+    is inflated and the algebraic formula no longer counts path-connected components.
+    """
+
+    def __init__(self, rank_beta0: int, graph_beta0: int) -> None:
+        self.rank_beta0 = rank_beta0
+        self.graph_beta0 = graph_beta0
+        super().__init__(
+            f"β₀ from rank formula ({rank_beta0}) != graph components ({graph_beta0}). "
+            + "The chain complex has half-edges; use verify_connected_components=True to surface this."
+        )
+
+
+def _count_weakly_connected_components(meta: Any) -> int:
+    """Count path-connected components of the meta-graph (edges treated as undirected)."""
+    neighbors: dict[object, list[object]] = {n: [] for n in meta.nodes()}
+    for u, v in meta.edges():
+        neighbors[u].append(v)
+        neighbors[v].append(u)
+    visited: set[object] = set()
+    count = 0
+    for start in meta.nodes():
+        if start in visited:
+            continue
+        count += 1
+        stack = [start]
+        while stack:
+            node = stack.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            stack.extend(neighbors[node])
+    return count
 
 
 def _packed_boundary_matrix(
@@ -414,6 +453,7 @@ def get_betti_numbers(
     require_shared_faces: bool = False,
     reduced: bool = False,
     verify_chain_complex: bool = False,
+    verify_connected_components: bool = False,
     verbose: bool = False,
     nworkers: int | None = None,
 ) -> dict[int, int]:
@@ -430,6 +470,10 @@ def get_betti_numbers(
         reduced: If True, return reduced homology (β̃₀ = β₀ - 1 for nonempty complexes).
         verify_chain_complex: If True, require ``∂_k ∘ ∂_{k+1} = 0`` (mod 2) for every ``k``
             where both maps exist; otherwise raise :class:`ChainComplexInconsistent`.
+        verify_connected_components: If True, require rank-formula β₀ to agree with the
+            number of path-connected components when ``kmin == 0``; otherwise raise
+            :class:`ConnectedComponentsMismatch`. When False (default), β₀ is always set
+            from graph connectivity for ``kmin == 0``.
         verbose: If True, print short progress lines to stderr.
         nworkers: Number of threads to use for ranking independent boundary maps concurrently.
             ``None`` (default): automatically use one thread per non-trivial map when the C
@@ -441,6 +485,15 @@ def get_betti_numbers(
     Note:
         Truncation and finite-cell restriction are prepared on
         :class:`~relucent.complex.Complex` before calling this function.
+
+        When the complex has no 0-cells (``kmin > 0``), the lowest-dimensional
+        Betti number is keyed by ``kmin`` rather than ``0``.  For example, a
+        boundary complex consisting only of 1- and 2-cells returns ``{1: n}``
+        where ``n`` is the number of connected components of the 1-skeleton.
+
+        When ``kmin == 0``, β₀ is the number of path-connected components of the
+        meta-graph (not necessarily the rank formula), which remains correct for
+        truncated complexes with half-edges.
     """
     if meta.number_of_nodes() == 0:
         return {}
@@ -449,7 +502,8 @@ def get_betti_numbers(
         verbose,
         f"get_betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
         + f"require_shared_faces={require_shared_faces} reduced={reduced} "
-        + f"verify_chain_complex={verify_chain_complex}",
+        + f"verify_chain_complex={verify_chain_complex} "
+        + f"verify_connected_components={verify_connected_components}",
     )
 
     nodes_by_dim: dict[int, list[object]] = {}
@@ -571,9 +625,19 @@ def get_betti_numbers(
     beta: dict[int, int] = {}
     for k in range(kmin, kmax + 1):
         n_k = len(nodes_by_dim.get(k, []))
-        r_dk = boundary_rank.get(k, 0) if k >= 1 else 0
+        r_dk = boundary_rank.get(k, 0) if k > kmin else 0
         r_dk1 = boundary_rank.get(k + 1, 0) if k < kmax else 0
         beta[k] = int(n_k - r_dk - r_dk1)
+
+    if kmin == 0:
+        n_cc = _count_weakly_connected_components(meta)
+        rank_beta0 = beta.get(0, 0)
+        if verify_connected_components and rank_beta0 != n_cc:
+            raise ConnectedComponentsMismatch(rank_beta0, n_cc)
+        if n_cc > 0:
+            beta[0] = n_cc
+        elif 0 in beta and beta[0] == 0:
+            beta.pop(0)
 
     if reduced and int(beta.get(0, 0)) > 0:
         # Reduced homology: β̃0 = β0 - 1 (when β0 is represented explicitly).

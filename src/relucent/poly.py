@@ -95,15 +95,78 @@ class Polyhedron:
 
         self._apply_zero_cell_finite_hint()
 
-    def _apply_zero_cell_finite_hint(self) -> None:
-        """Mark 0-cells (vertices) as bounded without a Chebyshev LP."""
-        hs = self._halfspaces_np
-        if hs is None and self._halfspaces is not None:
+    def _get_cached_halfspaces_np(self) -> np.ndarray | None:
+        """Return the cached halfspace matrix as a NumPy array without triggering lazy computation.
+
+        Unlike :attr:`halfspaces_np`, this method does not call :func:`get_hs` if the
+        halfspace matrix has not yet been computed.  Returns ``None`` when halfspaces are
+        unavailable, so callers can skip optional checks without paying the cost of a
+        Gurobi LP.
+
+        The result is written back to ``_halfspaces_np`` so repeated calls (e.g. once
+        per SHI candidate in :meth:`is_shi_face_feasible`) pay the tensor-to-numpy
+        conversion cost only once.
+        """
+        if self._halfspaces_np is not None:
+            return self._halfspaces_np
+        if self._halfspaces is not None:
             raw = self._halfspaces
             if isinstance(raw, np.ndarray):
-                hs = raw
-            elif isinstance(raw, torch.Tensor):
-                hs = raw.detach().cpu().numpy()
+                self._halfspaces_np = raw
+                return raw
+            if isinstance(raw, torch.Tensor):
+                result = raw.detach().cpu().numpy()
+                self._halfspaces_np = result
+                return result
+        return None
+
+    @staticmethod
+    def _halfspace_point(hs: np.ndarray, eq_indices: np.ndarray) -> np.ndarray | None:
+        """Attempt to find the point defined by treating ``eq_indices`` rows as equalities.
+
+        Solves the linear system ``hs[eq_indices, :-1] @ x = -hs[eq_indices, -1]`` via
+        least-squares.  Two checks are applied:
+
+        1. **Residual check** (equality rows): ``‖a_eq @ x − b_eq‖ ≤ TOL_INTERIOR_VERIFY``
+           (relative to ``‖b_eq‖``).  A large residual means the equality system is
+           inconsistent — no such point exists.
+        2. **Slack check** (inequality rows only): each row *not* in ``eq_indices`` must
+           satisfy ``a_i @ x + b_i ≤ TOL_HALFSPACE_CONTAINMENT``.  Equality rows are
+           excluded because their satisfaction is already covered by the residual check
+           with the intentionally looser ``TOL_INTERIOR_VERIFY`` tolerance; applying the
+           stricter ``TOL_HALFSPACE_CONTAINMENT`` to them could reject valid points when
+           the lstsq residual is in the ``(TOL_HALFSPACE_CONTAINMENT, TOL_INTERIOR_VERIFY]``
+           range.
+
+        Returns:
+            The feasible point as a 1-D float64 array, or ``None`` if the equality
+            system is inconsistent or the candidate point violates any inequality
+            halfspace.
+        """
+        H = np.asarray(hs, dtype=np.float64)
+        eq = H[eq_indices]
+        a_eq = eq[:, :-1]
+        b_eq = -eq[:, -1]
+        x, *_ = np.linalg.lstsq(a_eq, b_eq, rcond=None)
+        x = np.asarray(x, dtype=np.float64).reshape(-1)
+        if a_eq.size > 0:
+            res = float(np.linalg.norm(a_eq @ x - b_eq))
+            scale = max(1.0, float(np.linalg.norm(b_eq)))
+            if res > float(cfg.TOL_INTERIOR_VERIFY) * scale:
+                return None
+        n_rows = H.shape[0]
+        n_eq = len(eq_indices)
+        if n_rows > n_eq:
+            eq_mask = np.zeros(n_rows, dtype=bool)
+            eq_mask[np.asarray(eq_indices, dtype=np.intp)] = True
+            ineq_slacks = H[~eq_mask, :-1] @ x + H[~eq_mask, -1]
+            if np.any(ineq_slacks > float(cfg.TOL_HALFSPACE_CONTAINMENT)):
+                return None
+        return x
+
+    def _apply_zero_cell_finite_hint(self) -> None:
+        """Mark 0-cells (vertices) as bounded without a Chebyshev LP."""
+        hs = self._get_cached_halfspaces_np()
         if hs is None:
             return
         ambient = int(hs.shape[1] - 1)
@@ -121,23 +184,54 @@ class Polyhedron:
         zidx = self.zero_indices
         if zidx.size == 0:
             raise ValueError("0-cell has no equality (zero) constraints in its sign sequence")
-        eq = hs[zidx]
-        a_eq = eq[:, :-1]
-        b_eq = -eq[:, -1].ravel()
-        x, *_ = np.linalg.lstsq(a_eq, b_eq, rcond=None)
-        x = np.asarray(x, dtype=np.float64).reshape(-1)
-        if a_eq.size > 0:
-            res = float(np.linalg.norm(a_eq @ x - b_eq))
-            scale = max(1.0, float(np.linalg.norm(b_eq)))
-            if res > float(cfg.TOL_INTERIOR_VERIFY) * scale:
-                raise ValueError("0-cell equality system is infeasible")
-        ineq_idx = self.non_zero_indices
-        if ineq_idx.size > 0:
-            ineq = hs[ineq_idx]
-            slacks = ineq[:, :-1] @ x + ineq[:, -1]
-            if np.any(slacks > float(cfg.TOL_HALFSPACE_CONTAINMENT)):
-                raise ValueError("0-cell candidate point violates active inequalities")
+        x = self._halfspace_point(hs, zidx)
+        if x is None:
+            raise ValueError("0-cell halfspace system is infeasible or candidate point violates active inequalities")
         return x
+
+    def is_shi_face_feasible(self, shi: int) -> bool:
+        """Check whether zeroing SHI ``shi`` produces a geometrically feasible face.
+
+        For 1-cells (whose faces are 0-cells, i.e., points), the induced vertex is
+        the unique solution of the current equality constraints extended by hyperplane
+        ``shi``.  Feasibility reduces to linear-system consistency, which is checked
+        cheaply via :meth:`_halfspace_point` (numpy lstsq + slack test, no LP).
+
+        For all other dimensions this method returns ``True`` without checking.  Faces
+        of k-cells with k > 1 are themselves polytopes; checking their feasibility
+        requires finding an interior point via LP.  In practice the flip-neighbour
+        filter (role 1 in :mod:`relucent.meta_graph`) prevents phantom cells at
+        dimensions > 0, so this check is not needed there.
+
+        **Invariant**: every 1-cell that passes through the contraction pipeline
+        (via :meth:`~relucent.complex.Complex._codim_one_face_kwargs`) is constructed
+        with ``halfspaces`` set from its coface, so halfspaces are always available.
+        A ``ValueError`` is raised when this invariant is violated (i.e. a 1-cell is
+        encountered without cached halfspaces), which indicates the cell was
+        constructed outside the normal contraction pipeline.
+
+        Note:
+            The ``dim != 1`` early-return is mathematically fundamental.  A 0-cell is a
+            point and its feasibility is equivalent to the consistency of a linear
+            system, the only dimension where a cheap (non-LP) check is exact.  All
+            callers should delegate this check to this method rather than reproducing the
+            dimension guard elsewhere.
+
+        Raises:
+            ValueError: If ``self.dim == 1`` and no halfspaces are cached.
+        """
+        if self.dim != 1:
+            return True
+        hs = self._get_cached_halfspaces_np()
+        if hs is None:
+            raise ValueError(
+                f"Polyhedron {self!r} is a 1-cell but has no cached halfspaces. "
+                + "Cells entering the contraction pipeline via _codim_one_face_kwargs "
+                + "always receive halfspaces from their coface; missing halfspaces "
+                + "indicates the cell was constructed outside the normal pipeline."
+            )
+        active = np.array(list(self.zero_indices) + [shi], dtype=np.intp)
+        return self._halfspace_point(hs, active) is not None
 
     def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """Return an integer-typed sign sequence (values in {-1, 0, 1})."""

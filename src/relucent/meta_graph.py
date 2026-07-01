@@ -24,19 +24,40 @@ TRUNCATION_META_SHI: int = -1
 INFINITY_POINT_META_NODE: tuple[str] = ("infty",)
 INFINITY_POINT_META_SHI: int = -2
 
+
+class CubicalConsistencyError(ValueError):
+    """Dual-graph or incidence data violates the cubical face-star convention."""
+
+
+class CubicalAmbiguityError(CubicalConsistencyError):
+    """More than two top-dimensional cells share one codimension-one face tag."""
+
+
+class NonGenericArrangementError(ValueError):
+    """Geometric genericity / transversality is violated (degenerate endpoints or junctions)."""
+
+
 __all__ = [
     "INFINITY_POINT_META_NODE",
     "INFINITY_POINT_META_SHI",
     "TRUNCATION_META_SHI",
+    "CubicalAmbiguityError",
+    "CubicalConsistencyError",
+    "NonGenericArrangementError",
     "classify_finite",
     "classify_finite_ascending",
     "collect_meta_face_edges",
     "compute_contracted_shis_top_down",
+    "contracted_shis_from_coface_intersection",
+    "dual_edges_top_dim",
+    "face_tag",
     "filter_complex_shis_by_flip_neighbor",
     "filter_shi_candidates",
     "finite_cells_subgraph",
+    "flip_tag",
     "known_bounded",
     "META_FACE_PARALLEL_MIN_CELLS",
+    "meta_face_edges",
     "meta_node_attrs",
     "meta_node_shis_for_meta_node",
     "one_point_compactify_meta_graph",
@@ -44,9 +65,12 @@ __all__ = [
     "precompute_finite",
     "propagate_finite_from_coface_edges",
     "propagate_unbounded_from_face_edges",
-    "remove_phantom_shis",
+    "ss_crossings",
     "ss_face_crossing_indices",
+    "sync_shis_from_dual_graph",
     "truncate_meta_graph",
+    "verify_arrangement_genericity",
+    "verify_dual_graph_cubical",
 ]
 
 META_FACE_PARALLEL_MIN_CELLS = 64
@@ -60,55 +84,287 @@ def known_bounded(poly: Polyhedron) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# SHI propagation: three roles (do not conflate)
+# Cubical incidence engine — one SS+lookup source, derived views
 # ---------------------------------------------------------------------------
 #
-# All three rules propagate SHIs from higher- to lower-dimensional cells, but
-# each serves a different *consumer* with incompatible correctness requirements.
-# The requirements are in direct tension: role 1 needs conservative SHIs (too
-# many is wrong), role 2 needs complete SHIs (too few is wrong), and role 3
-# needs geometrically accurate SHIs (both over- and under-counting are wrong).
-# No single rule satisfies all three.
+# Primitives (:func:`ss_crossings`, :func:`face_tag`, :func:`flip_tag`) are purely
+# combinatorial.  Consumers take *derived views*:
 #
-# 1. **Contraction / dual graph** (:meth:`Complex.contract`, :meth:`get_dual_graph`)
-#    - Rule: coface SHI intersection minus the crossing index
-#      (:meth:`Complex._codim_one_face_kwargs`), then drop SHIs with no
-#      same-dimension flip neighbor (:func:`filter_complex_shis_by_flip_neighbor`).
-#    - Why conservative: :meth:`get_dual_graph` walks ``poly.shis`` to wire
-#      adjacency for the *next* contraction level.  A spurious SHI whose flip
-#      does not exist in the slice would create a phantom dual edge, pulling in
-#      a cell that is not geometrically present, which breaks ``∂² = 0`` in
-#      subsequent contractions.  Too-few SHIs are safe here: a missing edge
-#      only means a missing adjacency, which is detectable; a phantom cell is
-#      silently wrong.  See ``tests/test_meta_graph_shi_regression.py``.
+# - **Dual graph** (:func:`dual_edges_top_dim`): group top cells by shared face tag.
+# - **Meta-graph face edges** (:func:`meta_face_edges` / :func:`collect_meta_face_edges`):
+#   zero each ``ss_i != 0``; keep edge iff face tag exists in lookup.
+# - **Contraction metadata** (:func:`contracted_shis_from_coface_intersection`):
+#   coface SHI intersection minus crossing, flip-neighbor filtered (conservative).
+# - **Node metadata** (:func:`meta_node_shis_for_meta_node`): propagated ``_shis``.
+#
+# The historical "three roles" tension is expressed as filter stacks on the same
+# cubical primitives, not unrelated SHI lists.
+#
+# 1. **Contraction face kwargs** (:meth:`Complex._codim_one_face_kwargs`)
+#    - Rule: coface SHI intersection minus crossing, then flip-neighbor filter.
+#    - Conservative: expanding beyond coface intersection creates phantom cells.
 #
 # 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
-#    - Rule: try zeroing every ``ss_i != 0`` (:func:`ss_face_crossing_indices`);
-#      accept only if the zeroed-SS tag exists in the chain lookup.
-#    - Why complete: propagated ``_shis`` (from role 1) can be a strict subset
-#      of the true active constraints when a face sits on the boundary of the
-#      explored complex and has fewer cofaces than it would in the full tiling.
-#      Coface intersection over-shrinks those SHIs, causing valid face incidences
-#      to be silently skipped, which breaks ``∂² = 0`` in the meta-graph boundary
-#      maps.  The lookup-existence check gates correctness, so trying too many
-#      candidate SHIs is harmless.
+#    - Rule: :func:`ss_crossings` + lookup existence (complete for ``∂² = 0``).
 #
-# 3. **Meta-graph node metadata** (:func:`meta_node_shis_for_meta_node`,
-#    :func:`compute_contracted_shis_top_down`)
-#    - Rule: propagated ``_shis`` (from search, contraction, or the top-down
-#      safety net); falls back to :func:`ss_face_crossing_indices` only when
-#      ``_shis`` is missing entirely.
-#    - Why accurate: the SHI count drives the 1-cell boundedness heuristic
-#      (``len(_shis) >= 2`` ⟺ bounded segment, not a ray or full line).
-#      Using role 2's broad candidate set would overcount and mis-classify
-#      rays/lines as bounded, propagating wrong ``finite`` values upward through
-#      :func:`classify_finite_ascending`.  Using role 1's intersection alone is
-#      correct for interior cells but would undercount at complex boundaries for
-#      the same reason as role 2.  This list is therefore a strict subset of SS
-#      crossings by design and does not govern face-edge assembly.
+# 3. **Meta-graph node metadata** (:func:`meta_node_shis_for_meta_node`)
+#    - Propagated ``_shis`` for boundedness heuristics; strict subset of crossings.
 #
-# See ``tests/test_meta_graph_shi_regression.py`` for the regression that
-# motivates role 1, and ``get_meta_graph`` docstring for the role 2 failure mode.
+# See ``tests/test_meta_graph_shi_regression.py`` and ``negative-betti-meta-graph-bug.md``.
+
+
+def ss_crossings(ss: np.ndarray) -> tuple[int, ...]:
+    """Combinatorial codimension-one crossings: every index with ``ss_i != 0``."""
+    return ss_face_crossing_indices(ss)
+
+
+def face_tag(ss: np.ndarray, shi: int) -> bytes:
+    """Tag of the codimension-one face obtained by zeroing ``shi`` in ``ss``."""
+    ss_arr = np.asarray(ss, dtype=np.int8)
+    row = ss_arr.reshape(-1).copy()
+    row[int(shi)] = 0
+    return encode_ss(row.reshape(ss_arr.shape))
+
+
+def flip_tag(ss: np.ndarray, shi: int) -> bytes:
+    """Tag of the same-dimension neighbor across hyperplane ``shi``."""
+    row = np.asarray(ss, dtype=np.int8).ravel()
+    return encode_ss(flip_ss_at_shi(row, int(shi)).reshape(np.asarray(ss).shape))
+
+
+def dual_edges_top_dim(
+    cells: Iterable[Polyhedron],
+    neighbor_tags: set[bytes],
+    *,
+    top_dim: int | None = None,
+) -> tuple[list[tuple[Polyhedron, Polyhedron, int]], list[tuple[Polyhedron, int]]]:
+    """Cubical dual edges for top-dimensional cells.
+
+    For ``top_dim == 1``, pairs cells sharing a combinatorial 0-face tag.  For
+    ``top_dim >= 2``, pairs cells that are flip neighbors across an existing
+    ``ss_i != 0`` crossing (combinatorial cubical adjacency).
+    """
+    cell_list = list(cells)
+    if not cell_list:
+        return [], []
+    if top_dim is None:
+        top_dim = int(cell_list[0].dim)
+    if int(top_dim) == 1:
+        return _dual_edges_one_dim(cell_list), []
+    return _dual_edges_flip_neighbors(cell_list, neighbor_tags), []
+
+
+def _dual_edges_flip_neighbors(
+    cell_list: list[Polyhedron],
+    neighbor_tags: set[bytes],
+) -> list[tuple[Polyhedron, Polyhedron, int]]:
+    tag_to_poly = {p.tag: p for p in cell_list}
+    edges: list[tuple[Polyhedron, Polyhedron, int]] = []
+    seen: set[tuple[bytes, bytes]] = set()
+    for u in cell_list:
+        ss = np.asarray(u.ss_np)
+        for shi in ss_crossings(ss):
+            shi_i = int(shi)
+            vt = flip_tag(ss, shi_i)
+            if vt not in neighbor_tags:
+                continue
+            v = tag_to_poly.get(vt)
+            if v is None or u.tag == v.tag:
+                continue
+            lo, hi = (u.tag, v.tag) if u.tag < v.tag else (v.tag, u.tag)
+            if (lo, hi) in seen:
+                continue
+            seen.add((lo, hi))
+            edges.append((u, v, shi_i))
+    return edges
+
+
+def _dual_edges_one_dim(
+    cell_list: list[Polyhedron],
+) -> list[tuple[Polyhedron, Polyhedron, int]]:
+    face_to_witness: dict[bytes, dict[bytes, int]] = defaultdict(dict)
+    for poly in cell_list:
+        ss = np.asarray(poly.ss_np)
+        for shi in ss_crossings(ss):
+            shi_i = int(shi)
+            ft = face_tag(ss, shi_i)
+            face_to_witness[ft][poly.tag] = shi_i
+
+    tag_to_poly = {p.tag: p for p in cell_list}
+    edges: list[tuple[Polyhedron, Polyhedron, int]] = []
+    seen: set[tuple[bytes, bytes]] = set()
+    for _ft, witnesses in face_to_witness.items():
+        if len(witnesses) > 2:
+            if cfg.CAREFUL_MODE:
+                logger.warning(
+                    "Skipping dual edge for 0-face with %d incident 1-cells (expected <= 2).",
+                    len(witnesses),
+                )
+            continue
+        if len(witnesses) != 2:
+            continue
+        (tag_u, shi_u), (tag_v, _) = list(witnesses.items())
+        u, v = tag_to_poly[tag_u], tag_to_poly[tag_v]
+        lo, hi = (u.tag, v.tag) if u.tag < v.tag else (v.tag, u.tag)
+        if (lo, hi) in seen:
+            continue
+        seen.add((lo, hi))
+        edges.append((u, v, shi_u))
+    return edges
+
+
+def meta_face_edges(
+    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
+    valid_face_tags: set[bytes],
+) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
+    """Assemble meta-graph face edges from SS crossings (delegates to collector)."""
+    return collect_meta_face_edges(cells, valid_face_tags)
+
+
+def contracted_shis_from_coface_intersection(
+    ss: np.ndarray,
+    coface_shis_sets: Iterable[set[int]],
+    crossing_shi: int,
+    *,
+    neighbor_tags: set[bytes],
+) -> list[int]:
+    """Conservative contracted-cell SHIs: ∩(SHI(coface) \\ {crossing}), flip-filtered."""
+    sets = [set(s) - {int(crossing_shi)} for s in coface_shis_sets]
+    if not sets:
+        return []
+    inferred = set.intersection(*sets) if len(sets) > 1 else sets[0].copy()
+    return filter_shi_candidates(ss, inferred, neighbor_tags=neighbor_tags)
+
+
+def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
+    """Populate ``poly._shis`` on nodes from dual-graph edge ``shi`` attributes."""
+    shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
+    for u, v, data in graph.edges(data=True):
+        shi = data.get("shi")
+        if shi is None:
+            continue
+        shis_per_node[u].append(int(shi))
+        shis_per_node[v].append(int(shi))
+    for node, shis in shis_per_node.items():
+        poly = node if isinstance(node, Polyhedron) else None
+        if poly is None and isinstance(graph.nodes[node], dict):
+            poly = graph.nodes[node].get("poly")
+        if isinstance(poly, Polyhedron):
+            poly._shis = sorted(set(shis))
+
+
+def verify_dual_graph_cubical(
+    cells: Iterable[Polyhedron],
+    graph: nx.Graph[Any],
+    *,
+    top_dim: int,
+) -> None:
+    """Layer-1 check: each dual edge's ``shi`` zeroes to a shared face tag."""
+    if top_dim <= 0:
+        return
+    endtags: dict[bytes, set[bytes]] = {}
+    if top_dim == 1:
+        for p in cells:
+            if int(p.dim) != 1:
+                continue
+            endtags[p.tag] = {face_tag(np.asarray(p.ss_np), int(shi)) for shi in ss_crossings(p.ss_np)}
+        for u, v in graph.edges():
+            inter = endtags.get(u.tag, set()) & endtags.get(v.tag, set())
+            if len(inter) != 1:
+                raise CubicalConsistencyError(
+                    "Dual-graph edge "
+                    + f"({u.tag!r}, {v.tag!r}) is inconsistent with 0-face tags: "
+                    + f"|intersection|={len(inter)}."
+                )
+        return
+
+    for u, v, shi in graph.edges(data="shi"):
+        if shi is None:
+            raise CubicalConsistencyError("Dual-graph edge is missing 'shi' attribute.")
+        ss_u = np.asarray(u.ss_np)
+        ft_u = face_tag(ss_u, int(shi))
+        ss_v = np.asarray(v.ss_np)
+        ft_v = face_tag(ss_v, int(shi))
+        if ft_u != ft_v:
+            raise CubicalConsistencyError(
+                "Dual-graph edge " + f"shi={int(shi)} does not induce a common face tag on ({u.tag!r}, {v.tag!r})."
+            )
+
+
+def _quantize_point_for_genericity(pt: np.ndarray) -> tuple[int, ...]:
+    vec = np.asarray(pt, dtype=np.float64).ravel()
+    scale = max(1.0, float(np.max(np.abs(vec))))
+    step = float(cfg.TOL_INTERIOR_VERIFY) * scale
+    return tuple(int(round(float(x) / step)) for x in vec)
+
+
+def _one_cell_endpoint_map(poly: Polyhedron) -> dict[bytes, tuple[int, np.ndarray]]:
+    """Map combinatorial 0-face tags to ``(witness shi, geometric point)`` for a 1-cell."""
+    if int(poly.dim) != 1:
+        return {}
+    out: dict[bytes, tuple[int, np.ndarray]] = {}
+    ss = np.asarray(poly.ss_np)
+    hs = np.asarray(poly.halfspaces_np)
+    for shi in ss_crossings(ss):
+        shi_i = int(shi)
+        active = np.array(list(poly.zero_indices) + [shi_i], dtype=np.intp)
+        pt = poly._halfspace_point(hs, active)
+        if pt is None:
+            continue
+        out[face_tag(ss, shi_i)] = (shi_i, np.asarray(pt, dtype=np.float64).reshape(-1))
+    return out
+
+
+## TODO: Move to topology.py
+def verify_arrangement_genericity(polys: Iterable[Polyhedron]) -> None:
+    """Layer-2 geometric check for 1-dimensional arrangements (transversality)."""
+    cells = [p for p in polys if int(p.dim) == 1]
+    if not cells:
+        return
+
+    endpoint_maps = {p.tag: _one_cell_endpoint_map(p) for p in cells}
+
+    for poly in cells:
+        ep_map = endpoint_maps[poly.tag]
+        if not ep_map:
+            continue
+        geom_buckets: dict[tuple[int, ...], list[bytes]] = defaultdict(list)
+        for tag, (_shi, pt) in ep_map.items():
+            geom_buckets[_quantize_point_for_genericity(pt)].append(tag)
+        if len(geom_buckets) < len(ep_map):
+            raise NonGenericArrangementError(
+                "1-cell "
+                + f"{poly!r} has {len(ep_map)} combinatorial endpoint(s) but only "
+                + f"{len(geom_buckets)} distinct geometric location(s); hyperplanes likely "
+                + "concur at a vertex. Try a later training epoch or a non-degenerate "
+                + "initialization."
+            )
+
+    for i, left in enumerate(cells):
+        left_map = endpoint_maps[left.tag]
+        left_geom = {_quantize_point_for_genericity(pt) for _shi, pt in left_map.values()}
+        left_tags = set(left_map)
+        for right in cells[i + 1 :]:
+            right_map = endpoint_maps[right.tag]
+            right_geom = {_quantize_point_for_genericity(pt) for _shi, pt in right_map.values()}
+            right_tags = set(right_map)
+            shared_geom = left_geom & right_geom
+            shared_tags = left_tags & right_tags
+            if not shared_geom:
+                continue
+            if len(shared_tags) == 0:
+                raise NonGenericArrangementError(
+                    "1-cells "
+                    + f"{left!r} and {right!r} share a geometric endpoint but no combinatorial "
+                    + "0-face tag (non-transversal junction). Try a later training epoch or "
+                    + "more exploration."
+                )
+            if len(shared_tags) > 1:
+                raise NonGenericArrangementError(
+                    "1-cells "
+                    + f"{left!r} and {right!r} share {len(shared_tags)} combinatorial 0-face "
+                    + "tags; adjacency is ambiguous."
+                )
 
 
 def meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
@@ -167,17 +423,13 @@ def collect_meta_face_edges(
     extra_tags: list[bytes] = []
     for src_tag, ss, shis in cells:
         ss_arr = np.asarray(ss)
-        row = ss_arr[0]
         for shi in shis:
             shi_i = int(shi)
-            old = row[shi_i]
-            row[shi_i] = 0
-            face_tag = ss_arr.astype(np.int8, copy=False).ravel().tobytes()
-            row[shi_i] = old
-            if face_tag not in valid_face_tags:
+            ft = face_tag(ss_arr, shi_i)
+            if ft not in valid_face_tags:
                 continue
-            edges.append((src_tag, face_tag, shi_i))
-            extra_tags.append(face_tag)
+            edges.append((src_tag, ft, shi_i))
+            extra_tags.append(ft)
     return edges, extra_tags
 
 
@@ -365,15 +617,13 @@ def filter_shi_candidates(
 def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
     """Post-process contracted-slice ``_shis`` after :meth:`Complex.contract` (role 1).
 
-    Drops SHIs on each cell with no same-dimension flip neighbor.  Called at the
-    end of :meth:`Complex.contract` and :meth:`Complex.get_boundary_complex`.
-    Do not replace with full SS flip-neighbor membership; see the module comment
-    above role 1.
+    Drops SHIs on each cell with no same-dimension flip neighbour, then applies
+    :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible` to remove any SHI whose
+    induced face would be geometrically infeasible.  Called at the end of
+    :meth:`Complex.contract` and :meth:`Complex.get_boundary_complex`.
 
-    Geometric feasibility of the induced lower-dimensional face is handled
-    separately by the post-filter in :meth:`~relucent.complex.Complex.get_chain_complex`,
-    which calls :func:`remove_phantom_shis` on the parent level after removing
-    any infeasible child cells.
+    Do not replace with full SS flip-neighbour membership; see the module comment
+    above role 1.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -385,53 +635,9 @@ def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
         if poly._shis is None:
             continue
         filtered = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
+        filtered = [s for s in filtered if poly.is_shi_face_feasible(s)]
         if filtered != list(poly._shis):
             poly._shis = filtered
-            n_changed += 1
-    return n_changed
-
-
-def remove_phantom_shis(
-    parent_complex: Complex,
-    surviving_child_tags: set[bytes],
-) -> int:
-    """Remove SHIs from parent cells whose induced child face was filtered out.
-
-    Called by :meth:`~relucent.complex.Complex.get_chain_complex` after the
-    uniform feasibility post-filter removes infeasible cells from a contracted
-    child complex.  Ensures each parent cell's ``_shis`` list only references
-    faces that exist in ``surviving_child_tags``.
-
-    This keeps ``_shis`` accurate for two consumers:
-
-    - **Boundedness heuristics** (e.g. the 1-cell SHI-count rule: ``len(shis)``
-      determines whether a 1-cell is a segment, ray, or line).  A stale phantom
-      SHI inflates this count and mis-classifies rays as bounded segments.
-    - **Future** :meth:`~relucent.complex.Complex.get_dual_graph` **calls**: the
-      method walks ``poly.shis`` to wire adjacency for the next contraction level.
-      Phantom entries would produce spurious dual-graph edges and break ``∂² = 0``.
-
-    Args:
-        parent_complex: The contracted complex one level above the filtered child.
-        surviving_child_tags: ``encode_ss`` tags of cells that survived filtering.
-
-    Returns:
-        Number of cells in ``parent_complex`` whose ``_shis`` was modified.
-    """
-    n_changed = 0
-    for poly in parent_complex:
-        if poly._shis is None:
-            continue
-        ss_row = np.asarray(poly.ss_np, dtype=np.int8).ravel().copy()
-        new_shis: list[int] = []
-        for shi_i in poly._shis:
-            old = ss_row[shi_i]
-            ss_row[shi_i] = 0
-            if ss_row.tobytes() in surviving_child_tags:
-                new_shis.append(shi_i)
-            ss_row[shi_i] = old
-        if new_shis != list(poly._shis):
-            poly._shis = new_shis
             n_changed += 1
     return n_changed
 
@@ -482,20 +688,20 @@ def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
             for shi in coface._shis:
                 ss_face = ss_coface.copy()
                 ss_face[shi] = 0
-                face_tag = ss_face.tobytes()
+                ft = face_tag(coface.ss_np, int(shi))
 
                 contrib = set(coface._shis) - {shi}
-                if face_tag not in face_shis:
-                    face_shis[face_tag] = contrib.copy()
+                if ft not in face_shis:
+                    face_shis[ft] = contrib.copy()
                 else:
-                    face_shis[face_tag] &= contrib
+                    face_shis[ft] &= contrib
 
         # Apply the computed SHIs to the (k-1)-dim cells.
         face_lookup = {p.tag: p for p in by_dim[k - 1]}
         neighbor_tags = set(face_lookup.keys())
         n_set = 0
-        for face_tag, shis in face_shis.items():
-            face = face_lookup.get(face_tag)
+        for face_tag_key, shis in face_shis.items():
+            face = face_lookup.get(face_tag_key)
             if face is None:
                 continue
             if face._shis is None:
