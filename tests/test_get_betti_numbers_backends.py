@@ -29,7 +29,7 @@ def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
     (k-1)-cells to represent face incidences, matching the convention expected by
     :func:`get_betti_numbers`.
     """
-    g: nx.MultiDiGraph[Any] = nx.MultiDiGraph[Any]()
+    g: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for src_dim, src_id, tgt_id in dim_edges:
         src = (src_dim, src_id)
         tgt = (src_dim - 1, tgt_id)
@@ -43,7 +43,7 @@ def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
 
 def _isolated_meta(dim: int, n: int) -> nx.MultiDiGraph[Any]:
     """Return a meta-graph with ``n`` isolated nodes of ``dim`` (no edges, no lower cells)."""
-    g: nx.MultiDiGraph[Any] = nx.MultiDiGraph[Any]()
+    g: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for i in range(n):
         g.add_node((dim, i), dim=dim)
     return g
@@ -51,7 +51,7 @@ def _isolated_meta(dim: int, n: int) -> nx.MultiDiGraph[Any]:
 
 def _make_unbounded_two_component_meta() -> nx.MultiDiGraph[Any]:
     """kmin=1 meta-graph with two disconnected groups, all cells unbounded (for truncation)."""
-    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph[Any]()
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)]:
         meta.add_node(
             (dim, idx),
@@ -262,7 +262,7 @@ def test_get_betti_numbers_kmin1_two_components_via_2cells() -> None:
     n₁=4, n₂=2, rank(∂₂)=2 (each 2-cell contributes one independent boundary).
     β₁ = 4 − 0 − 2 = 2.
     """
-    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph[Any]()
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)]:
         meta.add_node((dim, idx), dim=dim)
     # 2-cell (2,0) is bounded by 1-cells (1,0) and (1,1)
@@ -282,7 +282,7 @@ def test_get_betti_numbers_kmin1_single_component() -> None:
     # Chain: C₂ →^{∂₂} C₁;  n₁=4, n₂=3
     # 2-cell (2,0): faces (1,0),(1,1);  (2,1): faces (1,1),(1,2);  (2,2): faces (1,2),(1,3)
     # rank(∂₂) = 3  → β₁ = 4 − 3 = 1
-    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph[Any]()
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1), (2, 2)]:
         meta.add_node((dim, idx), dim=dim)
     meta.add_edge((2, 0), (1, 0), shi=0)
