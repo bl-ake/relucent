@@ -1,10 +1,9 @@
-- different CPWL activations
-- maxout layers (max layers)
-- ensure vis works on windows
-- stress test
 - clean up Poly init
 - fix torch support for model.py
 - project lower-dim polyhedra for SHI calculations
 - deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
-- Standardize `Polyhedron`'s property computations, make sure `ensure_chebyshev_center` only runs once.
+- Standardize code for `Polyhedron`'s property computations / accesses, make sure `ensure_chebyshev_center` only runs once.
 - Make it so that geometry calculation errors don't interrupt the searcher/adder.
+- Make SHI propagation more efficient by only flipping SHIs
+- different CPWL activations
+- maxout layers (max layers)
