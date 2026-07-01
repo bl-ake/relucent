@@ -604,7 +604,7 @@ def _poly_hover_text(poly: object) -> str:
         get_shis = getattr(poly, "shis", None)
         if callable(get_shis):
             try:
-                shis = list(get_shis())
+                shis = list(cast(Iterable[int], get_shis()))
             except Exception:
                 shis = None
     if not shis:

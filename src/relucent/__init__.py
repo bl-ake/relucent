@@ -22,6 +22,7 @@ __version__ = _read_version()
 if TYPE_CHECKING:
     from .complex import Complex
     from .convert_model import convert
+    from .meta_graph import NonGenericArrangementError
     from .poly import Polyhedron
     from .ss import SSManager
     from .utils import add_output_relu, get_env, mlp, set_seeds, split_sequential
