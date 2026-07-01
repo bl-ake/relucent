@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+import networkx as nx
 import numpy as np
 import pytest
 import torch
@@ -17,8 +18,52 @@ import torch.nn as nn
 
 import relucent.topology as topology
 from relucent import Complex, set_seeds
-from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
+from relucent.topology import C_BACKEND_AVAILABLE, ConnectedComponentsMismatch, get_betti_numbers
 from tests.conftest import explore_for_topology
+
+
+def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph:
+    """Build a synthetic meta-graph from (source_dim, source_id, target_id) triples.
+
+    Nodes are (dim, id) pairs with a ``dim`` attribute; edges go from k-cells to
+    (k-1)-cells to represent face incidences, matching the convention expected by
+    :func:`get_betti_numbers`.
+    """
+    g: nx.MultiDiGraph = nx.MultiDiGraph()
+    for src_dim, src_id, tgt_id in dim_edges:
+        src = (src_dim, src_id)
+        tgt = (src_dim - 1, tgt_id)
+        if src not in g:
+            g.add_node(src, dim=src_dim)
+        if tgt not in g:
+            g.add_node(tgt, dim=src_dim - 1)
+        g.add_edge(src, tgt, shi=0)
+    return g
+
+
+def _isolated_meta(dim: int, n: int) -> nx.MultiDiGraph:
+    """Return a meta-graph with ``n`` isolated nodes of ``dim`` (no edges, no lower cells)."""
+    g: nx.MultiDiGraph = nx.MultiDiGraph()
+    for i in range(n):
+        g.add_node((dim, i), dim=dim)
+    return g
+
+
+def _make_unbounded_two_component_meta() -> nx.MultiDiGraph:
+    """kmin=1 meta-graph with two disconnected groups, all cells unbounded (for truncation)."""
+    meta: nx.MultiDiGraph = nx.MultiDiGraph()
+    for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)]:
+        meta.add_node(
+            (dim, idx),
+            dim=dim,
+            finite=False,
+            ss=np.array([[1]], dtype=np.int8),
+        )
+    meta.add_edge((2, 0), (1, 0), shi=0)
+    meta.add_edge((2, 0), (1, 1), shi=1)
+    meta.add_edge((2, 1), (1, 2), shi=0)
+    meta.add_edge((2, 1), (1, 3), shi=1)
+    return meta
 
 
 def _set_gf2_backend(monkeypatch: pytest.MonkeyPatch, *, use_c: bool) -> None:
@@ -186,3 +231,103 @@ def test_get_betti_numbers_parallel_matches_sequential(
     betti_seq = cplx.get_betti_numbers(nworkers=1, **kwargs)
     betti_par = cplx.get_betti_numbers(nworkers=4, **kwargs)
     assert betti_seq == betti_par, f"sequential {betti_seq} != parallel {betti_par} (kwargs={kwargs})"
+
+
+# ---------------------------------------------------------------------------
+# Tests for complexes with kmin > 0 (no 0-cells in the chain)
+# ---------------------------------------------------------------------------
+
+
+def test_get_betti_numbers_kmin1_two_isolated_1cells() -> None:
+    """Two isolated 1-cells (no 0-cells, no 2-cells) → β₁ = 2.
+
+    When kmin = 1 there is no ∂₁ (C₀ = 0), so the "bottom" of the chain is
+    dimension 1.  β_{kmin} = n_{kmin} − rank(∂_{kmin+1}) = 2 − 0 = 2.
+    The result must NOT be an empty dict.
+    """
+    meta = _isolated_meta(dim=1, n=2)
+    betti = get_betti_numbers(meta)
+    assert betti.get(1) == 2, f"expected {{1: 2}}, got {betti}"
+    assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
+
+
+def test_get_betti_numbers_kmin1_two_components_via_2cells() -> None:
+    """kmin = 1 with two groups of 1-cells connected internally by 2-cells.
+
+    Group P: 1-cells (1,0) and (1,1) both face 2-cell (2,0).
+    Group Q: 1-cells (1,2) and (1,3) both face 2-cell (2,1).
+    The two groups are disconnected → β₁ = 2 (two connected components).
+
+    Chain: C₂ →^{∂₂} C₁ →^{∂₁=0} 0
+    n₁=4, n₂=2, rank(∂₂)=2 (each 2-cell contributes one independent boundary).
+    β₁ = 4 − 0 − 2 = 2.
+    """
+    meta: nx.MultiDiGraph = nx.MultiDiGraph()
+    for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)]:
+        meta.add_node((dim, idx), dim=dim)
+    # 2-cell (2,0) is bounded by 1-cells (1,0) and (1,1)
+    meta.add_edge((2, 0), (1, 0), shi=0)
+    meta.add_edge((2, 0), (1, 1), shi=1)
+    # 2-cell (2,1) is bounded by 1-cells (1,2) and (1,3)
+    meta.add_edge((2, 1), (1, 2), shi=0)
+    meta.add_edge((2, 1), (1, 3), shi=1)
+
+    betti = get_betti_numbers(meta)
+    assert betti.get(1) == 2, f"expected β₁=2 (two disconnected groups of 1-cells), got {betti}"
+    assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
+
+
+def test_get_betti_numbers_kmin1_single_component() -> None:
+    """kmin = 1, four 1-cells connected into one component via three 2-cells → β₁ = 1."""
+    # Chain: C₂ →^{∂₂} C₁;  n₁=4, n₂=3
+    # 2-cell (2,0): faces (1,0),(1,1);  (2,1): faces (1,1),(1,2);  (2,2): faces (1,2),(1,3)
+    # rank(∂₂) = 3  → β₁ = 4 − 3 = 1
+    meta: nx.MultiDiGraph = nx.MultiDiGraph()
+    for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1), (2, 2)]:
+        meta.add_node((dim, idx), dim=dim)
+    meta.add_edge((2, 0), (1, 0), shi=0)
+    meta.add_edge((2, 0), (1, 1), shi=1)
+    meta.add_edge((2, 1), (1, 1), shi=0)
+    meta.add_edge((2, 1), (1, 2), shi=1)
+    meta.add_edge((2, 2), (1, 2), shi=0)
+    meta.add_edge((2, 2), (1, 3), shi=1)
+
+    betti = get_betti_numbers(meta)
+    assert betti.get(1) == 1, f"expected β₁=1 (one component), got {betti}"
+    assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
+
+
+def test_get_betti_numbers_kmin0_unaffected() -> None:
+    """When kmin = 0 (0-cells present), behaviour is identical to before the fix.
+
+    Two isolated 0-cells → β₀ = 2 (standard connected-components formula).
+    """
+    meta = _isolated_meta(dim=0, n=2)
+    betti = get_betti_numbers(meta)
+    assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"
+
+
+def test_beta0_truncated_two_components() -> None:
+    """Truncated unbounded complex: β₀ equals graph component count (not rank formula)."""
+    meta = _make_unbounded_two_component_meta()
+    Complex.truncate_meta_graph(meta)
+    betti = get_betti_numbers(meta)
+    assert betti.get(0) == 2, f"expected β₀=2 after truncation, got {betti}"
+
+
+def test_verify_connected_components_raises() -> None:
+    """verify_connected_components surfaces rank-formula vs graph mismatch."""
+    meta = _make_unbounded_two_component_meta()
+    Complex.truncate_meta_graph(meta)
+    with pytest.raises(ConnectedComponentsMismatch) as exc_info:
+        get_betti_numbers(meta, verify_connected_components=True)
+    err = exc_info.value
+    assert err.rank_beta0 == 0
+    assert err.graph_beta0 == 2
+
+
+def test_verify_connected_components_passes_for_proper_complex() -> None:
+    """Proper CW complex: rank formula and graph connectivity agree for β₀."""
+    meta = _isolated_meta(dim=0, n=2)
+    betti = get_betti_numbers(meta, verify_connected_components=True)
+    assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"

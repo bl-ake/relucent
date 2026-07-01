@@ -213,6 +213,23 @@ def test_plot_polyhedron_dispatch_and_validation():
         vis.plot_polyhedron(poly2, plot_mode="unknown")  # pyright: ignore[reportCallIssue,reportArgumentType]
 
 
+def test_apply_poly_trace_label_includes_shis():
+    poly = _poly_with_vertices(
+        ambient_dim=3,
+        ss_np=np.array([[1, 1, 1]]),
+        verts=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+        net=_tiny_nn(3),
+    )
+    poly._shis = [2, 5, 9]
+    trace = go.Mesh3d(x=[0, 1, 0], y=[0, 0, 1], z=[0, 0, 0], i=[0], j=[1], k=[2])
+    vis._apply_poly_trace_label(trace, poly)
+    assert trace.name == f"Polyhedron {poly}"
+    assert trace.hoverinfo == "text"
+    hover = str(trace.hovertext)
+    assert "SHIs:" in hover
+    assert "2" in hover and "5" in hover and "9" in hover
+
+
 def test_color_helpers_and_highlight():
     p1 = _poly_with_vertices(
         ambient_dim=2,
