@@ -590,10 +590,32 @@ def _poly_trace_name(poly: object) -> str:
     return f"Polyhedron {str(poly)}"
 
 
+def _poly_hover_text(poly: object) -> str:
+    """Hover label for a polyhedron trace: name plus SHIs when available."""
+    name = _poly_trace_name(poly)
+    shis: list[int] | None = None
+    cached = getattr(poly, "_shis", None)
+    if cached is not None:
+        try:
+            shis = list(cached)
+        except Exception:
+            shis = None
+    if shis is None:
+        get_shis = getattr(poly, "shis", None)
+        if callable(get_shis):
+            try:
+                shis = list(get_shis())
+            except Exception:
+                shis = None
+    if not shis:
+        return name
+    return f"{name}<br>SHIs: {shis}"
+
+
 def _apply_poly_trace_label(trace: Any, poly: object) -> None:
     name = _poly_trace_name(poly)
     trace.name = name
-    trace.hovertext = name
+    trace.hovertext = _poly_hover_text(poly)
     trace.hoverinfo = "text"
 
 
