@@ -1,7 +1,7 @@
 """Regression tests for meta-graph SHI / face-incidence fixes.
 
 Face **edges** in :meth:`~relucent.complex.Complex.get_meta_graph` must use every
-nonzero sign-sequence entry (:func:`~relucent.meta_graph.ss_face_crossing_indices`),
+nonzero sign-sequence entry (:func:`~relucent.meta_graph.ss_nonzero_indices`),
 not propagated ``_shis`` lists that coface intersection can shrink.
 
 Face **construction** in :meth:`~relucent.complex.Complex.contract` must keep

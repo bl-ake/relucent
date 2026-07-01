@@ -973,7 +973,7 @@ class Complex:
         iterates ``poly.shis`` when building the next contraction level, and
         expanding ``_shis`` beyond the coface intersection creates spurious cells
         and breaks ``∂² = 0``.  Meta-graph **face edges** use
-        :func:`mg.ss_face_crossing_indices` instead; see ``negative-betti-meta-graph-bug.md``.
+        :func:`mg.ss_nonzero_indices` instead; see ``negative-betti-meta-graph-bug.md``.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1112,7 +1112,7 @@ class Complex:
 
         **SHI rules (see module comment above the meta-graph helpers):**
 
-        - Face **edges**: :func:`mg.ss_face_crossing_indices` — try every
+        - Face **edges**: :func:`mg.ss_nonzero_indices` — try every
           ``ss_i != 0`` (role 2).  Do not use propagated ``_shis`` here; coface
           intersection can omit valid incidences and break ``∂² = 0``.
         - Node **metadata** (``shis`` attr, 1-cell boundedness): propagated
@@ -1221,7 +1221,7 @@ class Complex:
             if int(k) <= 0:
                 continue
             valid_face_tags = set(lookup.keys())
-            cells = [(p.tag, np.asarray(p.ss_np), mg.ss_crossings(np.asarray(p.ss_np))) for p in c_k]
+            cells = [(p.tag, np.asarray(p.ss_np), mg.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
             use_parallel = len(cells) >= mg.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
                 logger.info(

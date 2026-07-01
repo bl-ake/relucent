@@ -65,8 +65,7 @@ __all__ = [
     "precompute_finite",
     "propagate_finite_from_coface_edges",
     "propagate_unbounded_from_face_edges",
-    "ss_crossings",
-    "ss_face_crossing_indices",
+    "ss_nonzero_indices",
     "sync_shis_from_dual_graph",
     "truncate_meta_graph",
     "verify_arrangement_genericity",
@@ -87,7 +86,7 @@ def known_bounded(poly: Polyhedron) -> bool:
 # Cubical incidence engine — one SS+lookup source, derived views
 # ---------------------------------------------------------------------------
 #
-# Primitives (:func:`ss_crossings`, :func:`face_tag`, :func:`flip_tag`) are purely
+# Primitives (:func:`ss_nonzero_indices`, :func:`face_tag`, :func:`flip_tag`) are purely
 # combinatorial.  Consumers take *derived views*:
 #
 # - **Dual graph** (:func:`dual_edges_top_dim`): group top cells by shared face tag.
@@ -105,7 +104,7 @@ def known_bounded(poly: Polyhedron) -> bool:
 #    - Conservative: expanding beyond coface intersection creates phantom cells.
 #
 # 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
-#    - Rule: :func:`ss_crossings` + lookup existence (complete for ``∂² = 0``).
+#    - Rule: :func:`ss_nonzero_indices` + lookup existence (complete for ``∂² = 0``).
 #
 # 3. **Meta-graph node metadata** (:func:`meta_node_shis_for_meta_node`)
 #    - Propagated ``_shis`` for boundedness heuristics; strict subset of crossings.
@@ -113,9 +112,20 @@ def known_bounded(poly: Polyhedron) -> bool:
 # See ``tests/test_meta_graph_shi_regression.py`` and ``negative-betti-meta-graph-bug.md``.
 
 
-def ss_crossings(ss: np.ndarray) -> tuple[int, ...]:
-    """Combinatorial codimension-one crossings: every index with ``ss_i != 0``."""
-    return ss_face_crossing_indices(ss)
+def ss_nonzero_indices(ss: np.ndarray) -> tuple[int, ...]:
+    """All sign-sequence indices with ``ss_i != 0``.
+
+    Used when assembling meta-graph face **edges** (role 2): try zeroing each
+    nonzero entry. Also drives dual-graph flip-neighbor adjacency for
+    top-dimensional cells.
+
+    Not used when building the contraction chain
+    (:meth:`Complex._codim_one_face_kwargs`). Propagated ``_shis`` can be a
+    strict subset after coface intersection; using only ``_shis`` for edge
+    discovery omits valid faces and breaks ``∂² = 0``.
+    """
+    row = np.asarray(ss, dtype=np.int8).ravel()
+    return tuple(int(i) for i in np.flatnonzero(row != 0))
 
 
 def face_tag(ss: np.ndarray, shi: int) -> bytes:
@@ -163,7 +173,7 @@ def _dual_edges_flip_neighbors(
     seen: set[tuple[bytes, bytes]] = set()
     for u in cell_list:
         ss = np.asarray(u.ss_np)
-        for shi in ss_crossings(ss):
+        for shi in ss_nonzero_indices(ss):
             shi_i = int(shi)
             vt = flip_tag(ss, shi_i)
             if vt not in neighbor_tags:
@@ -185,7 +195,7 @@ def _dual_edges_one_dim(
     face_to_witness: dict[bytes, dict[bytes, int]] = defaultdict(dict)
     for poly in cell_list:
         ss = np.asarray(poly.ss_np)
-        for shi in ss_crossings(ss):
+        for shi in ss_nonzero_indices(ss):
             shi_i = int(shi)
             ft = face_tag(ss, shi_i)
             face_to_witness[ft][poly.tag] = shi_i
@@ -267,7 +277,7 @@ def verify_dual_graph_cubical(
         for p in cells:
             if int(p.dim) != 1:
                 continue
-            endtags[p.tag] = {face_tag(np.asarray(p.ss_np), int(shi)) for shi in ss_crossings(p.ss_np)}
+            endtags[p.tag] = {face_tag(np.asarray(p.ss_np), int(shi)) for shi in ss_nonzero_indices(p.ss_np)}
         for u, v in graph.edges():
             inter = endtags.get(u.tag, set()) & endtags.get(v.tag, set())
             if len(inter) != 1:
@@ -305,7 +315,7 @@ def _one_cell_endpoint_map(poly: Polyhedron) -> dict[bytes, tuple[int, np.ndarra
     out: dict[bytes, tuple[int, np.ndarray]] = {}
     ss = np.asarray(poly.ss_np)
     hs = np.asarray(poly.halfspaces_np)
-    for shi in ss_crossings(ss):
+    for shi in ss_nonzero_indices(ss):
         shi_i = int(shi)
         active = np.array(list(poly.zero_indices) + [shi_i], dtype=np.intp)
         pt = poly._halfspace_point(hs, active)
@@ -371,14 +381,14 @@ def meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
     """SHI list stored on meta-graph **nodes** (role 3: propagated metadata).
 
     Uses ``poly._shis`` when set (from search or :meth:`Complex.contract`).
-    Falls back to :func:`ss_face_crossing_indices` only when ``_shis`` is
+    Falls back to :func:`ss_nonzero_indices` only when ``_shis`` is
     missing.  This is **not** the rule for meta-graph face **edges**; see the
     module comment above role 2.
     """
     shis = poly._shis
     if shis is not None:
         return sorted(int(s) for s in shis)
-    return list(ss_face_crossing_indices(np.asarray(poly.ss_np)))
+    return list(ss_nonzero_indices(np.asarray(poly.ss_np)))
 
 
 def meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
@@ -397,19 +407,6 @@ def meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
     }
 
 
-def ss_face_crossing_indices(ss: np.ndarray) -> tuple[int, ...]:
-    """Candidate SHI indices for meta-graph face **edges** (role 2).
-
-    Combinatorial codimension-one crossings: every index with ``ss_i != 0``.
-    Used when assembling :meth:`Complex.get_meta_graph` face incidences, **not**
-    when building the contraction chain (:meth:`Complex._codim_one_face_kwargs`).
-    Propagated ``_shis`` can be a strict subset after coface intersection; using
-    only ``_shis`` for edge discovery omits valid faces and breaks ``∂² = 0``.
-    """
-    row = np.asarray(ss, dtype=np.int8).ravel()
-    return tuple(int(i) for i in np.flatnonzero(row != 0))
-
-
 def collect_meta_face_edges(
     cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
     valid_face_tags: set[bytes],
@@ -417,7 +414,7 @@ def collect_meta_face_edges(
     """Return face edges (src, dst, shi) for one chunk of k-cells (role 2).
 
     The ``shis`` tuple on each cell should come from
-    :func:`ss_face_crossing_indices`, not from propagated ``poly._shis``.
+    :func:`ss_nonzero_indices`, not from propagated ``poly._shis``.
     """
     edges: list[tuple[bytes, bytes, int]] = []
     extra_tags: list[bytes] = []
@@ -649,7 +646,7 @@ def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
     coface intersection and flip-neighbor filtering (role 1).  This pass is a
     safety net for contracted cells that still lack ``_shis``.  It does **not**
     drive meta-graph face-edge discovery; that uses
-    :func:`ss_face_crossing_indices` (role 2).  Boundedness is classified
+    :func:`ss_nonzero_indices` (role 2).  Boundedness is classified
     separately via the 1-cell SHI-count rule and :func:`classify_finite_ascending`.
 
     For each face still missing ``_shis``:
