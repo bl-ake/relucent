@@ -169,7 +169,7 @@ def _apply_ambient_boundary_shis(
     """Assign coface-intersection ``_shis`` to every top boundary cell."""
     if len(cx) == 0:
         return
-    nw = nworkers or process_aware_cpu_count()
+    nw = nworkers or process_aware_cpu_count() or 1
     polys = list(cx)
     if nw <= 1 or len(polys) < 32:
         for poly in polys:
@@ -242,7 +242,7 @@ def _finalize_boundary_complex(
     from relucent import meta_graph as mg
 
     n_cells = len(cx)
-    nw = nworkers or process_aware_cpu_count()
+    nw = nworkers or process_aware_cpu_count() or 1
     t0 = time.perf_counter()
     _phase_log(
         "discover finalize: " + f"{n_cells} cells, ambient coface _shis ({nw} workers) ...",

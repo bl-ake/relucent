@@ -252,10 +252,13 @@ def _bulk_add_nogood_constraints(
 
     matrix = sp.csr_matrix((data, (rows, cols)), shape=(n_c, n_y))
     y_target = y_mvar if y_mvar is not None else y_vars
-    constrs = model.addMConstr(matrix, y_target, ">=", rhs)
+    constrs = model.addMConstr(matrix.toarray(), y_target, ">=", rhs)
+    constr_list: Any = constrs
+    for i in range(n_c):
+        constr_list[i].ConstrName = f"{name_prefix}{start_idx + i}"
     if cfg.BOUNDARY_MIP_CUT_PRIORITY_ENABLED and trie_depths is not None:
         for i, depth in enumerate(trie_depths):
-            constrs[i].Priority = int(depth)
+            constr_list[i].Priority = int(depth)
 
     model.update()
     return start_idx + n_c
@@ -394,7 +397,6 @@ def _static_add_exclude_tags(
     name_prefix: str = "exclude_static_",
     start_idx: int = 0,
     verbose: bool = False,
-    nworkers: int | None = None,
 ) -> int:
     tag_list = list(exclude_tags)
     if not tag_list:
@@ -437,7 +439,6 @@ def _compile_exclude_tags(
     net: ReLUNetwork | None = None,
     y_mvar: Any | None = None,
     verbose: bool = False,
-    nworkers: int | None = None,
 ) -> _ExclusionCompileResult:
     """Tiered exclusion compiler: trie compression, then batched static nogoods."""
     result = _ExclusionCompileResult(n_tags=len(exclude_tags))
@@ -509,7 +510,6 @@ def _compile_exclude_tags(
                 name_prefix="exclude_static_",
                 start_idx=start_idx,
                 verbose=verbose,
-                nworkers=nworkers,
             )
             result.n_static_constraints = next_idx - start_idx
             result.static_precompiled = result.n_trie_constraints > 0 or result.n_static_constraints > 0
@@ -921,10 +921,12 @@ def _mip_boundary_witness(
 
     log_path: Path | None = None
     if verbose:
+        call_suffix = f", pricing_call={pricing_call}" if pricing_call is not None else ""
         _pricing_log(
             "boundary pricing MIP: building model "
             + f"(boundary_shi={boundary_shi}, excluded_tags={len(exclude_tags)}, "
-            + f"lazy_callback=True, log_file={log_path.resolve() if log_path is not None else None})",
+            + f"lazy_callback=True{call_suffix}, "
+            + f"log_file={log_path.resolve() if log_path is not None else None})",
             verbose=True,
         )
 

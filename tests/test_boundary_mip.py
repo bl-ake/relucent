@@ -290,7 +290,7 @@ def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch
 
     compile_called = False
 
-    def _fake_compile(*args, **kwargs):
+    def _fake_compile(*_args, **_kwargs):
         nonlocal compile_called
         compile_called = True
         raise AssertionError("_compile_exclude_tags should not run in lazy-only mode")
