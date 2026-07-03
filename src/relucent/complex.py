@@ -1019,6 +1019,61 @@ class Complex:
         cplx.verify_arrangement_genericity()
         return cplx
 
+    @overload
+    def discover_boundary_complex(
+        self,
+        i: int,
+        verbose: bool = False,
+        *,
+        return_stats: Literal[False] = False,
+        **kwargs: Any,
+    ) -> Complex: ...
+
+    @overload
+    def discover_boundary_complex(
+        self,
+        i: int,
+        verbose: bool = False,
+        *,
+        return_stats: Literal[True],
+        **kwargs: Any,
+    ) -> tuple[Complex, Any]: ...
+
+    def discover_boundary_complex(
+        self,
+        i: int,
+        verbose: bool = False,
+        *,
+        return_stats: bool = False,
+        **kwargs: Any,
+    ) -> Complex | tuple[Complex, Any]:
+        """Discover neuron ``i``'s boundary complex without building the full input complex.
+
+        Uses MIP pricing to find new connected components on the slice ``ss[i]=0``,
+        then slice-restricted BFS to complete each component.
+
+        Args:
+            i: Global supporting-hyperplane index (bent hyperplane).
+            verbose: If True, show search progress.
+            return_stats: If True, return ``(complex, stats)`` with timing metadata.
+            **kwargs: Forwarded to :func:`~relucent.boundary_search.discover_boundary_complex`.
+
+        Returns:
+            A new :class:`Complex` of boundary cells, or ``(complex, stats)`` when
+            ``return_stats`` is True.
+        """
+        from relucent.boundary_search import discover_boundary_complex as _discover
+
+        boundary, stats = _discover(
+            self._net,
+            i,
+            verbose=verbose,
+            **kwargs,
+        )
+        if return_stats:
+            return boundary, stats
+        return boundary
+
     def contract(self, verbose: bool = False) -> Complex:
         """Contract the maximal cells in the complex.
 

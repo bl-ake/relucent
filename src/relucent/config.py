@@ -192,6 +192,68 @@ DEFAULT_PARALLEL_ADD_BOUND: float = _env_float("DEFAULT_PARALLEL_ADD_BOUND", 1e8
 # Important for numerical stability; too large can cause solver issues.
 DEFAULT_SEARCH_BOUND: float = _env_float("DEFAULT_SEARCH_BOUND", 1e8)
 
+# Strict-margin tolerance for boundary MIP witness pricing (``z_j = 0`` at ``boundary_shi``,
+# ``|z_j| >= eps`` elsewhere on top-dimensional boundary cells).
+BOUNDARY_MIP_EPS: float = _env_float("BOUNDARY_MIP_EPS", 1e-4)
+
+# When total ReLU width ``n`` is at most this value, try brute-force sign-pattern scan
+# before or after MIP pricing (robust on tiny networks).
+BOUNDARY_PRICING_BRUTE_FORCE_MAX_N: int = _env_int("BOUNDARY_PRICING_BRUTE_FORCE_MAX_N", 18)
+
+# Optional Gurobi time limit (seconds) for a single boundary pricing MIP; ``0`` means no limit.
+BOUNDARY_MIP_TIME_LIMIT: float = _env_float("BOUNDARY_MIP_TIME_LIMIT", 0.0)
+
+# Multiplier applied to the layerwise propagated preactivation bound for pricing MIP ``big-M``.
+BOUNDARY_MIP_BOUND_MARGIN: float = _env_float("BOUNDARY_MIP_BOUND_MARGIN", 10.0)
+
+# Compile ``exclude_tags`` into compressed trie no-goods when at least this many tags
+# are present; set to ``0`` to always compile, or a large value to disable.
+BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS: int = _env_int(
+    "BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS",
+    1000,
+)
+
+# When at least this many tags are excluded, bulk-add per-tag no-goods statically before optimize.
+BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS: int = _env_int(
+    "BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS",
+    1000,
+)
+
+# Static-add all leaf nogoods when trie compression ratio falls below this threshold.
+BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO: float = _env_float(
+    "BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO",
+    2.0,
+)
+
+# Chunk size for batched Gurobi ``addConstrs`` when emitting exclusion nogoods.
+BOUNDARY_MIP_EXCLUSION_BATCH_SIZE: int = _env_int(
+    "BOUNDARY_MIP_EXCLUSION_BATCH_SIZE",
+    4096,
+)
+
+# Workers for parallel nogood spec compilation; ``0`` = auto, ``1`` = serial.
+BOUNDARY_MIP_EXCLUSION_WORKERS: int = _env_int(
+    "BOUNDARY_MIP_EXCLUSION_WORKERS",
+    0,
+)
+
+# Cut ordering for static/lazy nogoods: as_is, tag_lex, layer_major, hamming_median,
+# literal_count_asc, trie_depth_desc, random.
+BOUNDARY_MIP_CUT_ORDER: str = os.environ.get("BOUNDARY_MIP_CUT_ORDER", "tag_lex")
+
+# Bulk matrix emit for static nogoods: auto, on, off (auto uses bulk when n_specs >= 500).
+BOUNDARY_MIP_BULK_NOGOOD_EMIT: str = os.environ.get("BOUNDARY_MIP_BULK_NOGOOD_EMIT", "auto")
+
+# Static nogood wave size; ``0`` = add all constraints before a single optimize.
+BOUNDARY_MIP_STATIC_WAVE_SIZE: int = _env_int("BOUNDARY_MIP_STATIC_WAVE_SIZE", 0)
+
+# When True, assign higher Gurobi priority to trie-compressed / deeper-path cuts.
+BOUNDARY_MIP_CUT_PRIORITY_ENABLED: bool = _env_bool("BOUNDARY_MIP_CUT_PRIORITY_ENABLED", False)
+
+# When ``len(exclude_tags)`` reaches this threshold, skip trie/static precompilation
+# and rely on lazy MIPSOL cuts against the visited-tag set instead.
+BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS: int = _env_int("BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS", 50_000)
+
 # Weight for Euclidean-distance bias in A* heuristic: f = hamming + ASTAR_BIAS_WEIGHT * bias.
 # bias is negative and tends to favor polyhedra closer to the goal in input space.
 ASTAR_BIAS_WEIGHT: float = _env_float("ASTAR_BIAS_WEIGHT", 0.9)
@@ -247,6 +309,20 @@ BLOCKING_QUEUE_WAIT_TIMEOUT: float = _env_float("BLOCKING_QUEUE_WAIT_TIMEOUT", 0
 __all__ = [
     "ASTAR_BIAS_WEIGHT",
     "BLOCKING_QUEUE_WAIT_TIMEOUT",
+    "BOUNDARY_MIP_EPS",
+    "BOUNDARY_MIP_TIME_LIMIT",
+    "BOUNDARY_MIP_BOUND_MARGIN",
+    "BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS",
+    "BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS",
+    "BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO",
+    "BOUNDARY_MIP_EXCLUSION_BATCH_SIZE",
+    "BOUNDARY_MIP_EXCLUSION_WORKERS",
+    "BOUNDARY_MIP_CUT_ORDER",
+    "BOUNDARY_MIP_BULK_NOGOOD_EMIT",
+    "BOUNDARY_MIP_STATIC_WAVE_SIZE",
+    "BOUNDARY_MIP_CUT_PRIORITY_ENABLED",
+    "BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS",
+    "BOUNDARY_PRICING_BRUTE_FORCE_MAX_N",
     "CAREFUL_MODE",
     "DEFAULT_COMPLEX_PLOT_BOUND",
     "DEFAULT_PARALLEL_ADD_BOUND",

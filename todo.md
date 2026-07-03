@@ -1,3 +1,4 @@
+- Remove `CUBICAL_DUAL_GRAPH=False` branch / unused code
 - clean up Poly init
 - fix torch support for model.py
 - project lower-dim polyhedra for SHI calculations
