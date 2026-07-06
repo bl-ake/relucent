@@ -317,3 +317,26 @@ def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch
     assert not compile_called
     assert witness is not None
     assert witness.tag == target
+
+
+def test_pricing_mip_gurobi_log_decoupled_from_verbose():
+    """Gurobi console logging is controlled by BOUNDARY_MIP_GUROBI_LOG, not verbose."""
+    from gurobipy import Model
+
+    from relucent.boundary_mip import _configure_pricing_mip_logging
+    from relucent.config import update_settings
+    from relucent.utils import get_env
+
+    model = Model("pricing_log_test", get_env())
+    try:
+        update_settings(BOUNDARY_MIP_GUROBI_LOG=False)
+        _configure_pricing_mip_logging(model, log_path=None)
+        assert int(model.Params.OutputFlag) == 0
+
+        update_settings(BOUNDARY_MIP_GUROBI_LOG=True)
+        _configure_pricing_mip_logging(model, log_path=None)
+        assert int(model.Params.OutputFlag) == 1
+        assert int(model.Params.LogToConsole) == 1
+    finally:
+        model.close()
+        update_settings(BOUNDARY_MIP_GUROBI_LOG=False)

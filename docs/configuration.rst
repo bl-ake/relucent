@@ -5,6 +5,19 @@ Relucent exposes numeric defaults and tolerances as **module-level attributes** 
 :mod:`relucent.config`. Library code reads these values when routines run, so you
 can tune behavior for your model or hardware without editing source files.
 
+Automatic tolerance defaults
+----------------------------
+
+``import relucent`` computes float64-safe defaults for tolerance settings
+(``TOL_*``, SHI thresholds, etc.) and writes them to :mod:`relucent.config`.
+Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are not overwritten.
+Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the legacy
+literals in :mod:`relucent.config`.
+
+:class:`~relucent.complex.Complex` calls
+:func:`~relucent.numeric_tolerances.apply_tolerances` for its network by default
+(``auto_tolerances=True``). Pass ``auto_tolerances=False`` to skip that step.
+
 Changing settings
 -----------------
 

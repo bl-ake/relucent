@@ -1,3 +1,4 @@
+import os
 import tomllib
 from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
@@ -6,6 +7,16 @@ from typing import TYPE_CHECKING
 
 from . import config
 from .config import update_settings
+from .numeric_tolerances import apply_tolerances
+
+
+def _bootstrap_tolerances() -> None:
+    if os.getenv("RELUCENT_SKIP_NUMERIC_BOOTSTRAP", "0") == "1":
+        return
+    apply_tolerances()
+
+
+_bootstrap_tolerances()
 
 
 def _read_version() -> str:

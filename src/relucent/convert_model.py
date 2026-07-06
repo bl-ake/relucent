@@ -357,7 +357,12 @@ def convert(
             old_y = model(x)
             new_y = torch.as_tensor(new_model(x))
             if cfg.CAREFUL_MODE:
-                assert torch.allclose(old_y, new_y, atol=1e-5, rtol=1e-5)
+                assert torch.allclose(
+                    old_y,
+                    new_y,
+                    atol=cfg.TOL_VERIFY_AB_ATOL,
+                    rtol=cfg.TOL_VERIFY_AB_ATOL,
+                )
         except Exception as e:
             raise ValueError(f"Conversion failed: {e}") from e
         finally:

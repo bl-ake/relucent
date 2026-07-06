@@ -291,7 +291,8 @@ def solve_radius(
             x_feas = np.asarray(x_feas, dtype=np.float64).reshape(dim, 1)
             if A_eq.shape[0] > 0:
                 rnorm = np.linalg.norm(A_eq @ x_feas.ravel() - b_vec)
-                if rnorm > 1e-5 * max(1.0, float(np.linalg.norm(b_vec))):
+                scale = max(1.0, float(np.linalg.norm(b_vec)))
+                if rnorm > float(cfg.TOL_INTERIOR_VERIFY) * scale:
                     return None, None
             # No strict inequalities: feasible set is an affine subspace {x : A_eq x = b}.
             # Relative inradius in that hull is infinite unless the hull is 0-dimensional.
@@ -338,9 +339,10 @@ def solve_radius(
         objVal = model.objVal
         x, y = x.X, float(np.squeeze(y.X))
         model.close()
-        if objVal <= 0 and objVal > -1e-6:
+        verify_tol = float(cfg.TOL_INTERIOR_VERIFY)
+        if objVal <= 0 and objVal > -verify_tol:
             raise ValueError(f"Inradius {objVal:.4e}")
-        if objVal < -1e-6:
+        if objVal < -verify_tol:
             raise ValueError(f"Something has gone horribly wrong: objVal={objVal:.4e}")
         assert isinstance(x, np.ndarray)
         return x, y

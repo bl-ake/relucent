@@ -7,7 +7,7 @@ import warnings
 from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
-from typing import Any, Literal, Self, overload
+from typing import TYPE_CHECKING, Any, Literal, Self, overload
 
 import networkx as nx
 import numpy as np
@@ -60,6 +60,9 @@ from relucent.utils import (
     process_aware_cpu_count,
 )
 
+if TYPE_CHECKING:
+    from relucent.morse import CriticalPoint
+
 __all__ = [
     "Complex",
     "INFINITY_POINT_META_NODE",
@@ -96,18 +99,26 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
-    def __init__(self, net: Any) -> None:
+    def __init__(self, net: Any, *, auto_tolerances: bool = True) -> None:
         """Initialize the complex for a given network.
 
         Args:
             net: Any model convertible to relucent's canonical ``NN``.
                 is to be built and queried.
+            auto_tolerances: When True (default), set :mod:`relucent.config`
+                tolerance values from this network's weight scale via
+                :func:`~relucent.numeric_tolerances.apply_tolerances`.
         """
         original_net = net
         if not isinstance(net, ReLUNetwork):
             net = convert(net)
         self.net = original_net
         self._net = net
+
+        if auto_tolerances:
+            from relucent.numeric_tolerances import apply_tolerances
+
+            apply_tolerances(net=self._net)
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
@@ -1133,6 +1144,103 @@ class Complex:
         if verbose:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
+
+    def partial_derivative_on_1cell(
+        self,
+        one_cell: Polyhedron,
+        from_vertex: Polyhedron,
+        *,
+        value: bool = False,
+    ) -> int | float:
+        """Partial derivative of the network along a 1-cell from a vertex endpoint.
+
+        See :func:`relucent.morse.partial_derivative_on_1cell`.
+        """
+        from relucent.morse import partial_derivative_on_1cell as _pd_1cell
+
+        return _pd_1cell(one_cell, from_vertex, self, value=value)
+
+    def get_critical_points(
+        self,
+        *,
+        require_complete: bool = False,
+        include_degenerate: bool = False,
+        verbose: bool = False,
+    ) -> list[CriticalPoint]:
+        """Return PL Morse critical vertices and their indices in the discovered complex.
+
+        Uses combinatorial edge data (Brooks & Masden, arXiv:2412.18005) and requires a
+        scalar-output network.
+
+        Args:
+            require_complete: If True, require every combinatorial 1-cell incident to
+                each tested vertex to appear in the complex.
+            include_degenerate: If True, include flat / degenerate critical vertices
+                (index ``-1``).
+            verbose: Log chain-complex progress.
+
+        Returns:
+            List of :class:`~relucent.morse.CriticalPoint` records.
+        """
+        from relucent.morse import CriticalPoint, assert_scalar_output, is_pl_critical_vertex
+
+        assert_scalar_output(self._net)
+        chain = self.get_chain_complex(verbose=verbose)
+        if not chain or chain[-1].index2poly[0].dim != 0:
+            return []
+
+        vertex_complex = chain[-1]
+        one_cell_tags: set[bytes] | None = None
+        if require_complete:
+            meta = self.get_meta_graph(verbose=verbose)
+            one_cell_tags = {tag for tag, attrs in meta.nodes(data=True) if int(attrs.get("dim", -1)) == 1}
+
+        results: list[CriticalPoint] = []
+        for vertex in vertex_complex.index2poly:
+            if require_complete and one_cell_tags is not None:
+                # Incident edges are inferred combinatorially; this checks they were discovered.
+                from relucent.utils import encode_ss
+
+                v_ss = vertex.ss_np.ravel()
+                for shi in np.flatnonzero(v_ss == 0):
+                    for sign in (-1, 1):
+                        edge_ss = v_ss.copy()
+                        edge_ss[int(shi)] = sign
+                        tag = encode_ss(edge_ss.reshape(1, -1))
+                        if tag not in one_cell_tags:
+                            raise ValueError(
+                                f"combinatorial 1-cell {tag!r} incident to vertex {vertex.tag!r} "
+                                + "is missing from the discovered complex"
+                            )
+
+            is_critical, index = is_pl_critical_vertex(
+                vertex.ss_np,
+                self._net,
+                ssi2maski=self.ssi2maski,
+                ss_layers=self.ss_layers,
+            )
+            if not is_critical:
+                continue
+            if index is None or (index < 0 and not include_degenerate):
+                continue
+
+            point: np.ndarray | None
+            try:
+                # Interior point is optional; criticality is combinatorial.
+                point = np.asarray(vertex.interior_point, dtype=np.float64).reshape(-1)
+            except (ValueError, TypeError):
+                point = None
+
+            results.append(
+                CriticalPoint(
+                    polyhedron=vertex,
+                    tag=vertex.tag,
+                    ss=vertex.ss_np.copy(),
+                    point=point,
+                    index=int(index),
+                )
+            )
+        return results
 
     @staticmethod
     def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:

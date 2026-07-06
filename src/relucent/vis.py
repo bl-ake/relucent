@@ -130,7 +130,7 @@ def _poly_traces_3d_complex(
     except Exception:
         s = np.array([])
         vh = np.zeros((0, 3))
-    if s.size == 0 or np.all(s < 1e-12):
+    if s.size == 0 or np.all(s < cfg.TOL_HALFSPACE_NORMAL):
         point_kwargs = dict(base_kwargs)
         if line_color is not None:
             marker = dict(point_kwargs.get("marker", {}))
@@ -148,7 +148,7 @@ def _poly_traces_3d_complex(
         )
         return traces
 
-    tol = 1e-6 * s[0]
+    tol = float(cfg.TOL_VERIFY_AB_ATOL) * s[0]
     eff_dim = int(np.sum(s > tol))
     if eff_dim == 1:
         direction = vh[0]
@@ -238,7 +238,9 @@ def _poly_traces_3d_complex(
         normals_n = normals / norms
         offsets_n = offsets / norms.ravel()
 
-        def facets_coplanar(facet_indices: list[int], atol: float = 1e-6) -> bool:
+        def facets_coplanar(facet_indices: list[int], atol: float | None = None) -> bool:
+            if atol is None:
+                atol = float(cfg.TOL_VERIFY_AB_ATOL)
             if not facet_indices:
                 return True
             f0 = facet_indices[0]

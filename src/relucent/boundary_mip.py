@@ -16,7 +16,8 @@ from gurobipy import GRB, Env, Model, quicksum
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
+from relucent._network_scale import count_relu_units, estimate_input_bound, relu_linear_blocks
+from relucent.model import ReLUNetwork
 from relucent.poly import Polyhedron
 from relucent.utils import encode_ss, get_env, get_mp_context, process_aware_cpu_count
 
@@ -73,12 +74,14 @@ def _pricing_log(msg: str, *, verbose: bool) -> None:
         print(msg, flush=True)
 
 
-def _configure_pricing_mip_logging(model: Model, *, verbose: bool, log_path: Path | None) -> None:
-    """Enable Gurobi solver logging for a pricing MIP without mutating the shared env.
+def _configure_pricing_mip_logging(model: Model, *, log_path: Path | None) -> None:
+    """Configure Gurobi solver logging for a pricing MIP without mutating the shared env.
 
-    Model parameters override the cached :func:`~relucent.utils.get_env` defaults.
+    Controlled by :data:`~relucent.config.BOUNDARY_MIP_GUROBI_LOG`, not by the
+    Relucent ``verbose`` flag. Model parameters override the cached
+    :func:`~relucent.utils.get_env` defaults.
     """
-    if verbose:
+    if cfg.BOUNDARY_MIP_GUROBI_LOG:
         model.Params.OutputFlag = 1
         model.Params.LogToConsole = 1
         if log_path is not None:
@@ -123,7 +126,7 @@ def _nogood_linexpr_from_indices(indices: NogoodFlipIndices, y_vars: list[Any]) 
 def _relu_layer_boundaries(net: ReLUNetwork) -> list[tuple[int, int]]:
     boundaries: list[tuple[int, int]] = []
     shi = 0
-    for block in _relu_linear_blocks(net):
+    for block in relu_linear_blocks(net):
         n_out = int(block.weight.shape[0])
         boundaries.append((shi, shi + n_out))
         shi += n_out
@@ -520,37 +523,6 @@ def _compile_exclude_tags(
     return result
 
 
-def _relu_linear_blocks(net: ReLUNetwork) -> list[LinearLayer]:
-    """Linear layers immediately followed by ReLU (sign-sequence layers)."""
-    layers = list(net.layers.values())
-    blocks: list[LinearLayer] = []
-    for i, layer in enumerate(layers):
-        if isinstance(layer, LinearLayer) and i + 1 < len(layers) and isinstance(layers[i + 1], ReLULayer):
-            blocks.append(layer)
-    return blocks
-
-
-def _count_relu_units(net: ReLUNetwork) -> int:
-    return sum(int(layer.weight.shape[0]) for layer in _relu_linear_blocks(net))
-
-
-def _estimate_mip_input_bound(net: ReLUNetwork, *, margin: float) -> float:
-    """Conservative input box radius from layerwise ``|W|_1`` propagation.
-
-    A loose ``big-M`` (e.g. ``DEFAULT_SEARCH_BOUND`` = ``1e8``) lets the pricing
-    MIP admit spurious ReLU sign patterns that fail :class:`~relucent.poly.Polyhedron`
-    feasibility checks. Propagating a preactivation magnitude through the network
-    yields a much tighter box while remaining valid for uniform random init.
-    """
-    radius = 1.0
-    for block in _relu_linear_blocks(net):
-        w = np.asarray(block.weight, dtype=np.float64)
-        b = np.asarray(block.bias, dtype=np.float64).reshape(-1)
-        row_bounds = np.sum(np.abs(w), axis=1) + np.abs(b)
-        radius = float(np.max(row_bounds) * radius)
-    return max(radius * margin, 1.0)
-
-
 def _is_top_boundary_ss(ss: np.ndarray, boundary_shi: int) -> bool:
     row = np.asarray(ss, dtype=np.int8).ravel()
     if row[int(boundary_shi)] != 0:
@@ -582,7 +554,7 @@ def _brute_force_boundary_witness(
     boundary_shi: int,
     exclude_tags: set[bytes],
 ) -> Polyhedron | None:
-    n = _count_relu_units(net)
+    n = count_relu_units(net)
     if n == 0 or boundary_shi >= n or n > cfg.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
         return None
     indices = [j for j in range(n) if j != boundary_shi]
@@ -911,8 +883,8 @@ def _mip_boundary_witness(
     verbose: bool = False,
     pricing_call: int | None = None,
 ) -> Polyhedron | None:
-    blocks = _relu_linear_blocks(net)
-    n = _count_relu_units(net)
+    blocks = relu_linear_blocks(net)
+    n = count_relu_units(net)
     if not (0 <= boundary_shi < n):
         raise ValueError(f"boundary_shi must be in [0, {n}), got {boundary_shi}")
 
@@ -931,7 +903,7 @@ def _mip_boundary_witness(
         )
 
     model = Model("boundary_pricing", env)
-    _configure_pricing_mip_logging(model, verbose=verbose, log_path=log_path)
+    _configure_pricing_mip_logging(model, log_path=log_path)
     if cfg.BOUNDARY_MIP_TIME_LIMIT > 0:
         model.setParam(GRB.Param.TimeLimit, float(cfg.BOUNDARY_MIP_TIME_LIMIT))
     model.Params.LazyConstraints = 1
@@ -1127,7 +1099,7 @@ def price_boundary_witness(
             infeasibility (e.g. time limit without solution, or solver stall).
     """
     exclude_tags = exclude_tags or set()
-    bound = _estimate_mip_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN)) if bound is None else float(bound)
+    bound = estimate_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN)) if bound is None else float(bound)
     env = env or get_env()
     eps = float(cfg.BOUNDARY_MIP_EPS if eps is None else eps)
 
@@ -1139,7 +1111,7 @@ def price_boundary_witness(
         )
         return witness
 
-    n = _count_relu_units(net)
+    n = count_relu_units(net)
     if n <= cfg.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
         _pricing_log(
             "boundary pricing: brute-force found no witness "

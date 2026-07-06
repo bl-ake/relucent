@@ -124,10 +124,10 @@ VERTEX_TRUST_THRESHOLD: float = _env_float("VERTEX_TRUST_THRESHOLD", 1e-6)
 # __contains__, and get_bounded_vertices.
 TOL_HALFSPACE_CONTAINMENT: float = _env_float("TOL_HALFSPACE_CONTAINMENT", 1e-6)
 
-# After Chebyshev / interior LP (Gurobi), max halfspace violation allowed vs.
-# :func:`_drop_degenerate_halfspaces` rows — same set enforced in ``solve_radius``.
-# Slightly looser than :data:`TOL_HALFSPACE_CONTAINMENT` to absorb LP
-# FeasibilityTol and floating-point noise (often platform-dependent).
+# After Chebyshev / interior LP (Gurobi), lstsq residuals in ``solve_radius`` and
+# equality checks in ``Polyhedron._halfspace_point`` use this tolerance (relative to
+# ``||b||`` where applicable). Slightly looser than :data:`TOL_HALFSPACE_CONTAINMENT`
+# to absorb LP FeasibilityTol and floating-point noise (often platform-dependent).
 TOL_INTERIOR_VERIFY: float = _env_float("TOL_INTERIOR_VERIFY", 1e-5)
 
 # Threshold below which a ReLU is considered dead (always off).
@@ -202,6 +202,10 @@ BOUNDARY_PRICING_BRUTE_FORCE_MAX_N: int = _env_int("BOUNDARY_PRICING_BRUTE_FORCE
 
 # Optional Gurobi time limit (seconds) for a single boundary pricing MIP; ``0`` means no limit.
 BOUNDARY_MIP_TIME_LIMIT: float = _env_float("BOUNDARY_MIP_TIME_LIMIT", 0.0)
+
+# When True, emit full Gurobi solver logs during boundary pricing MIPs. Independent of
+# :data:`VERBOSE`, which still controls Relucent progress messages and tqdm bars.
+BOUNDARY_MIP_GUROBI_LOG: bool = _env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
 
 # Multiplier applied to the layerwise propagated preactivation bound for pricing MIP ``big-M``.
 BOUNDARY_MIP_BOUND_MARGIN: float = _env_float("BOUNDARY_MIP_BOUND_MARGIN", 10.0)
@@ -317,6 +321,7 @@ __all__ = [
     "BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO",
     "BOUNDARY_MIP_EXCLUSION_BATCH_SIZE",
     "BOUNDARY_MIP_EXCLUSION_WORKERS",
+    "BOUNDARY_MIP_GUROBI_LOG",
     "BOUNDARY_MIP_CUT_ORDER",
     "BOUNDARY_MIP_BULK_NOGOOD_EMIT",
     "BOUNDARY_MIP_STATIC_WAVE_SIZE",

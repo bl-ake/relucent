@@ -2,12 +2,25 @@
 
 import os
 
+# Keep legacy config defaults for tolerance-sweep tests; package import bootstraps otherwise.
+os.environ.setdefault("RELUCENT_SKIP_NUMERIC_BOOTSTRAP", "1")
+
 import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
 from relucent.config import update_settings
 from relucent.topology import C_BACKEND_AVAILABLE
+
+_complex_init = Complex.__init__
+
+
+def _complex_init_no_auto_tolerances(self, net, *args, **kwargs):
+    kwargs.setdefault("auto_tolerances", False)
+    return _complex_init(self, net, *args, **kwargs)
+
+
+Complex.__init__ = _complex_init_no_auto_tolerances  # type: ignore[method-assign]
 
 
 def explore_for_topology(
