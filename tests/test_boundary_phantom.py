@@ -3,34 +3,32 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import numpy as np
 import pytest
 import torch
 
-from relucent import Complex, set_seeds
+from relucent import Complex, mlp, set_seeds
 from relucent.poly import Polyhedron
+from relucent.utils import TorchMLP
 
 os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
+_BUNDLED_CKPT = Path(__file__).parent / "data" / "synthetic_progress_ckpt0.pt"
 _PHANTOM_SS = np.array([-1, -1, -1, -1, -1, -1, -1, -1, 0], dtype=np.int8).reshape(1, -1)
 _BOUNDARY_SHI = 8
 
 
-def _synthetic_progress_ckpt0_model():
-    try:
-        from analysis.core.experiment_store import ExperimentArray
-        from analysis.paths import ANALYSIS_DIR, BETTI_TRAINING_EXP
-    except ImportError as exc:
-        pytest.skip(f"analysis package not available: {exc}")
-    if not BETTI_TRAINING_EXP.is_dir():
-        pytest.skip(f"experiment directory missing: {BETTI_TRAINING_EXP}")
-    exp = ExperimentArray.load(str(BETTI_TRAINING_EXP), ncached=1)[0]
-    return exp.get_model(
-        device="cpu",
-        root=str(ANALYSIS_DIR),
-        fallback_exp_dir=str(BETTI_TRAINING_EXP),
-    )
+def _synthetic_progress_ckpt0_model() -> TorchMLP:
+    if not _BUNDLED_CKPT.is_file():
+        pytest.skip(f"bundled checkpoint missing: {_BUNDLED_CKPT}")
+    model = mlp(widths=[2, 8, 1], add_last_relu=True)
+    assert isinstance(model, TorchMLP)
+    state_dict = torch.load(_BUNDLED_CKPT, map_location="cpu", weights_only=True)
+    model.load_state_dict(state_dict)
+    model.eval()
+    return model
 
 
 def _populate_input_complex(cplx: Complex) -> None:
