@@ -546,6 +546,10 @@ def _witness_from_ss(
     poly = Polyhedron(net, ss)
     if not poly.feasible:
         return None
+    from relucent.boundary_search import _both_ambient_cofaces_feasible
+
+    if not _both_ambient_cofaces_feasible(poly, boundary_shi):
+        return None
     return poly
 
 

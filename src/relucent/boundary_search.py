@@ -100,6 +100,39 @@ def _ambient_lift_polyhedra(
     return Polyhedron(net, ss_pos), Polyhedron(net, ss_neg)
 
 
+def _both_ambient_cofaces_feasible(poly: Polyhedron, boundary_shi: int) -> bool:
+    """True when lifts to ``ss[boundary_shi]=±1`` are both nonempty."""
+    p_pos, p_neg = _ambient_lift_polyhedra(poly, boundary_shi)
+    return p_pos.feasible and p_neg.feasible
+
+
+def _filter_phantom_boundary_cells(
+    cx: Complex,
+    boundary_shi: int,
+    *,
+    verbose: bool = False,
+) -> int:
+    """Drop slice top cells with only one feasible ambient coface."""
+    from relucent.ss import SSManager
+
+    kept = [p for p in cx if _both_ambient_cofaces_feasible(p, boundary_shi)]
+    dropped = len(cx) - len(kept)
+    if dropped == 0:
+        return 0
+    if verbose:
+        _discovery_log(
+            "discover finalize: dropped " + f"{dropped} phantom boundary cell(s)",
+            verbose=True,
+        )
+    cx.index2poly = kept
+    cx.tag2poly = {p.tag: p for p in kept}
+    cx.ssm = SSManager()
+    for poly in kept:
+        cx.ssm.add(poly.ss_np)
+    cx._dual_graph = None
+    return dropped
+
+
 def _ambient_coface_shis_for_boundary_cell(
     poly: Polyhedron,
     boundary_shi: int,
@@ -261,6 +294,7 @@ def _finalize_boundary_complex(
         "discover finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
         verbose=verbose,
     )
+    _filter_phantom_boundary_cells(cx, boundary_shi, verbose=verbose)
     for poly in cx:
         poly._finite = None
         poly._finite_computed = False
@@ -408,6 +442,12 @@ def boundary_searcher(
 
                     if p._net is None:
                         p._net = cx._net
+
+                    if not _both_ambient_cofaces_feasible(p, boundary_shi):
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        if unprocessed == 0 or len(cx) >= max_polys:
+                            break
+                        continue
 
                     p = cx.add_polyhedron(p)
                     pending_neighbors.pop(encode_ss(p.ss_np), None)
