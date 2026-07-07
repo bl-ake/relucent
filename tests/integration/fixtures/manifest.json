@@ -1,0 +1,221 @@
+{
+  "witnesses": [
+    {
+      "id": "phantom_ckpt0",
+      "file": "ckpt0_d2_w8_nh1.pt",
+      "widths": [
+        2,
+        8,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 0,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {
+        "n_regions": 49,
+        "n_boundary_cells": 12,
+        "truncated_betti": {
+          "0": 1
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 8
+    },
+    {
+      "id": "parity_ckpt10",
+      "file": "ckpt10_d2_w8_nh1.pt",
+      "widths": [
+        2,
+        8,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 10,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {
+        "n_regions": 51,
+        "n_boundary_cells": 14,
+        "truncated_betti": {
+          "0": 1,
+          "1": 1
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 8
+    },
+    {
+      "id": "dual_recovery_4392",
+      "file": "ckpt4392_d4_w8_nh1.pt",
+      "widths": [
+        4,
+        8,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 4392,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {}
+    },
+    {
+      "id": "parity_4630",
+      "file": "ckpt4630_d4_w8_nh2.pt",
+      "widths": [
+        4,
+        8,
+        8,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 4630,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {
+        "n_regions": 6188,
+        "n_boundary_cells": 1844,
+        "truncated_betti": {
+          "0": 1,
+          "1": 430,
+          "2": 2
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 16
+    },
+    {
+      "id": "parity_5065",
+      "file": "ckpt5065_d4_w8_nh4.pt",
+      "widths": [
+        4,
+        8,
+        8,
+        8,
+        8,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 5065,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {
+        "n_regions": 12343,
+        "n_boundary_cells": 656,
+        "truncated_betti": {
+          "0": 1,
+          "1": 59,
+          "2": 7
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 32
+    },
+    {
+      "id": "shi_bound_5303",
+      "file": "ckpt5303_d4_w10_nh1.pt",
+      "widths": [
+        4,
+        10,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 5303,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {}
+    },
+    {
+      "id": "parity_5490",
+      "file": "ckpt5490_d4_w10_nh3.pt",
+      "widths": [
+        4,
+        10,
+        10,
+        10,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 5490,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {}
+    },
+    {
+      "id": "meta_graph_large",
+      "file": "ckpt5795_d4_w10_nh4.pt",
+      "widths": [
+        4,
+        10,
+        10,
+        10,
+        10,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 5795,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {}
+    },
+    {
+      "id": "parity_6013",
+      "file": "ckpt6013_d4_w12_nh1.pt",
+      "widths": [
+        4,
+        12,
+        2
+      ],
+      "add_last_relu": true,
+      "seed": 0,
+      "experiment_key": 6013,
+      "bfs": {
+        "geometry_properties": [
+          "finite"
+        ],
+        "max_polys": 0
+      },
+      "expected": {}
+    }
+  ]
+}

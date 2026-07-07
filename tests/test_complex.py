@@ -13,7 +13,6 @@ import torch.nn as nn
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent.calculations import adjacent_polyhedra
-from relucent.complex import IncompleteDualGraphError
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.utils import TorchMLP
 
@@ -83,7 +82,7 @@ def test_dfs_max_depth_and_shis(seed: int):
     set_seeds(seed)
     model = mlp(widths=[6, 8, 10])
     cplx = Complex(model)
-    result = cplx.dfs(max_depth=2, nworkers=1)
+    result = cplx.dfs(max_depth=2, nworkers=1, verify=False)
     assert result["Search Depth"] == 2
     assert all(poly.shis is not None for poly in cplx)
 
@@ -224,17 +223,18 @@ class TestComplexPointAndSS:
 
 class TestComplexDualGraph:
     def test_contract_raises_on_incomplete_dual(self, small_mlp):
+        from relucent.verify import ComplexNotCompleteError
+
         cplx = Complex(small_mlp)
         cplx.bfs(start=_rand_batch(4), max_polys=30)
-        with pytest.raises(IncompleteDualGraphError, match=r"boundary neighbor"):
+        with pytest.raises(ComplexNotCompleteError):
             cplx.contract(verbose=False)
 
     def test_dual_graph_basic(self, small_mlp):
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=30)
-        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary neighbor"):
-            G = cplx.get_dual_graph()
+        G = cplx.get_dual_graph()
         assert G.number_of_nodes() == len(cplx)
         for _, _, d in G.edges(data=True):
             assert "shi" in d
@@ -243,8 +243,7 @@ class TestComplexDualGraph:
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=15)
-        with pytest.warns(UserWarning, match=r"Dual graph is incomplete\. .* boundary neighbor"):
-            G = cplx.get_dual_graph(relabel=True)
+        G = cplx.get_dual_graph(relabel=True)
         assert set(G.nodes()) == set(range(len(cplx)))
 
 

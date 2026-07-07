@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds, vis
+from relucent.exploration import explore_for_topology
 from relucent.filtration import (
     LogitSublevelFiltration,
     NeuronActivationFiltration,
@@ -24,7 +25,6 @@ from relucent.persistence import (
     betti_curve,
     compute_persistent_homology,
 )
-from tests.conftest import explore_for_topology
 
 
 def _triangle_persistence() -> tuple[list[set[int]], list[float], list[int], list[str]]:

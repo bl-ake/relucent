@@ -13,8 +13,8 @@ import torch
 from relucent import Complex, mlp, set_seeds
 from relucent import config as cfg
 from relucent import meta_graph as mg
+from relucent.exploration import explore_for_topology
 from relucent.utils import encode_ss
-from tests.conftest import explore_for_topology
 from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,

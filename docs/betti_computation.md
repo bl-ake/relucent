@@ -44,15 +44,20 @@ calling [`contract()`](../src/relucent/complex.py).
 
 ### How contraction works
 
-1. Build the **dual graph** — adjacency among cells at the current top dimension
-   ([`get_dual_graph()`](../src/relucent/complex.py) →
-   [`dual_edges_top_dim()`](../src/relucent/meta_graph.py)).
+1. Build the **dual graph** — combinatorial adjacency among cells at the current top
+   dimension ([`get_dual_graph()`](../src/relucent/complex.py) →
+   [`dual_edges_top_dim()`](../src/relucent/meta_graph.py)), then
+   [`sync_shis_from_dual_graph()`](../src/relucent/meta_graph.py) so each cell's
+   `_shis` list matches incident edge labels.
 2. For each dual edge `(cell_a, cell_b, shi)`, zero `shi` in the sign sequence to
    get the tag of their shared `(k−1)`-face.
 3. Create that lower-dimensional cell via `add_ss`, passing SHI metadata from
    [`_codim_one_face_kwargs()`](../src/relucent/complex.py).
-4. Run [`filter_complex_shis_by_flip_neighbor()`](../src/relucent/meta_graph.py)
-   to drop SHIs that would create geometrically impossible faces (phantom 0-cells).
+4. Run [`assign_contracted_shis()`](../src/relucent/meta_graph.py)
+   on the **contracted slice** to assign SHIs from coface intersection once all
+   cells are present. Top-dimensional ambient cells do not use this step; their
+   `_shis` come from the dual graph at search finalize. Infeasible 1-cell faces
+   are dropped earlier in [`_codim_one_face_kwargs()`](../src/relucent/complex.py).
 
 The loop stops when contraction produces 0-cells or an empty complex.
 
@@ -65,8 +70,13 @@ The loop stops when contraction produces 0-cells or an empty complex.
   you can get from one sign sequence to the other by flipping a single nonzero entry.
   This uses [`_dual_edges_flip_neighbors()`](../src/relucent/meta_graph.py).
 
-With default config, `CUBICAL_DUAL_GRAPH=True`, so these cubical rules are always
-used when building the dual graph.
+With default config, top-dimensional cells at ``max_dim >= 2`` (and top-level
+``max_dim == 1`` slices) build edges combinatorially via
+[`dual_edges_top_dim()`](../src/relucent/meta_graph.py) and sync ``_shis`` from
+those edges.  **Contracted** 1-skeleton slices (``max_dim == 1`` but ambient
+``self.dim > 1``) still iterate propagated ``poly.shis`` lists from coface
+intersection — full SS flip-neighbor closure there would add spurious edges and
+break ``∂² = 0``.  The ``cubical`` parameter is retained for API compatibility.
 
 ---
 
@@ -109,12 +119,12 @@ Classification is **combinatorial** on the default path — no linear programs.
 | Dimension | Rule |
 |-----------|------|
 | 0-cells | Always bounded |
-| 1-cells | Bounded if `len(_shis) ≥ 2` (a segment with two hyperplane endpoints). 0 or 1 SHIs means a ray or full line → unbounded |
+| 1-cells | Bounded if at least two distinct combinatorial 0-faces appear in meta face edges ([`classify_one_cells_finite_from_face_edges()`](../src/relucent/meta_graph.py)). One 0-face → ray (unbounded). No 0-faces → geometric check: empty phantoms (`finite is None`) are excluded; feasible full lines are unbounded |
 | k ≥ 2 | Unbounded if **any** `(k−1)`-face is unbounded; bounded if **all** `(k−1)`-faces are bounded ([`classify_finite_ascending()`](../src/relucent/meta_graph.py)) |
 
 Before boundedness is checked, [`compute_contracted_shis_top_down()`](../src/relucent/meta_graph.py)
-fills in `_shis` on contracted cells by propagating from cofaces. Top-dimensional
-cells already have `_shis` from BFS.
+fills in `_shis` on contracted cells by propagating from cofaces (metadata only).
+Top-dimensional cells already have `_shis` from BFS.
 
 ### A note on `_shis` vs the sign sequence
 
@@ -123,7 +133,7 @@ meets a bounding hyperplane). That list can be **smaller** than the set of nonze
 entries in the sign sequence.
 
 That's fine. Face edges always scan the full sign sequence (`ss_nonzero_indices`).
-The `_shis` list is used for boundedness labels and stored as node metadata — not
+The `_shis` list is stored as node metadata — not used for boundedness labels or
 for deciding which face incidences exist.
 
 ---
@@ -180,6 +190,25 @@ Zero entries are dropped from the result.
 
 ---
 
+## Exploration and verification
+
+After a **complete** ambient BFS (`verify=True` by default), relucent:
+
+1. Rebuilds combinatorial dual-graph edges and syncs top-cell `_shis`
+   ([`finalize_ambient_search()`](../src/relucent/exploration.py) via
+   [`Complex.get_dual_graph()`](../src/relucent/complex.py)).
+2. Runs fast invariant checks ([`verify_complex()`](../src/relucent/verify.py)),
+   including an LP facet completeness test when `cplx.complete is True`.
+
+Verification is skipped if `max_polys` is hit before the frontier empties. Check
+`cplx.complete` and `cplx.verified` before calling `contract()` or
+`get_boundary_complex()`.
+
+See the Sphinx guide *Exploration and Verification* (`docs/exploration_verification.rst`)
+for user-facing detail.
+
+---
+
 ## Other options (non-default)
 
 These change behavior when you pass extra flags to `get_betti_numbers()` or
@@ -206,8 +235,8 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 
 | Step | Main functions |
 |------|----------------|
-| Search | `Complex.bfs`, `Polyhedron._shis` populated during exploration |
-| Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `filter_complex_shis_by_flip_neighbor` |
+| Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph` |
+| Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `assign_contracted_shis` |
 | Meta-graph | `get_meta_graph`, `compute_contracted_shis_top_down`, `ss_nonzero_indices`, `face_tag`, `collect_meta_face_edges`, `classify_finite_ascending`, `meta_node_attrs` |
 | Truncation | `truncate_meta_graph` |
 | Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_packed_boundary_matrix`, `gf2_rank_boundary` |

@@ -41,6 +41,7 @@ filterwarnings = [
 markers = [
     "requires_c_gf2: needs compiled relucent._gf2 C extension; skipped when unavailable except RELUCENT_REQUIRE_C_GF2=1",
     "python_gf2: pure-Python GF(2) rank path smoke tests (no C required)",
+    "integration: large opt-in integration tests; set RELUCENT_RUN_INTEGRATION=1",
 ]
 
 [tool.ruff]

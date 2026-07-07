@@ -50,6 +50,15 @@ In practice:
   need those values (for example, filtrations that read interior points or affine
   maps).
 
+Verification and caps
+---------------------
+
+:meth:`~relucent.complex.Complex.bfs` accepts ``verify=True`` by default (see
+:doc:`exploration_verification`). Examples below use ``max_polys`` as a safety cap;
+if search finishes under the cap, verification still runs. If the cap is hit first,
+``complete`` and ``verified`` are ``False``. Pass ``verify=False`` for intentional
+partial exploration.
+
 Common workflows
 ----------------
 

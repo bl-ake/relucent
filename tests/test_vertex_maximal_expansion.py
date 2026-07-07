@@ -14,7 +14,7 @@ import pytest
 
 from relucent import Complex, mlp, set_seeds
 from relucent.config import update_settings
-from tests.conftest import explore_for_topology
+from relucent.exploration import explore_for_topology
 
 
 def _ss_tuple(ss: np.ndarray) -> tuple[int, ...]:

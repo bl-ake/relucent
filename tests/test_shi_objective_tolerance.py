@@ -392,6 +392,7 @@ class TestStripNetworkBfs:
             max_polys=20,
             nworkers=1,
             verbose=0,
+            verify=False,
         )
 
         assert info["Complete"] is True
@@ -406,7 +407,7 @@ class TestStripNetworkBfs:
 
         net = _make_1d_strip_net(eps)
         cplx = Complex(net)
-        info = cplx.bfs(start=np.array([-1.0], dtype=np.float64), max_polys=20, nworkers=1, verbose=0)
+        info = cplx.bfs(start=np.array([-1.0], dtype=np.float64), max_polys=20, nworkers=1, verbose=0, verify=False)
 
         assert info["Complete"] is True
         assert not any("MIN_SEARCH_INRADIUS" in str(entry[-1]) for entry in info["Bad SHI Computations"])

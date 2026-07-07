@@ -14,9 +14,15 @@ and :meth:`~relucent.complex.Complex.get_persistent_homology` emit a collaborati
 Prerequisites
 -------------
 
-**Complete exploration.** Local search methods like BFS are sufficient for computing topology *only if they run to completion*. 
-Missing neighbors can leave the meta-graph short of a
-closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
+**Complete exploration.** Local search methods like BFS are sufficient for computing
+topology *only if they run to completion*. Missing neighbors can leave the meta-graph
+short of a closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
+
+After BFS, check :attr:`~relucent.complex.Complex.complete` and
+:attr:`~relucent.complex.Complex.verified` (see :doc:`exploration_verification`).
+:meth:`~relucent.complex.Complex.contract` and
+:meth:`~relucent.complex.Complex.get_boundary_complex` require a complete, verified
+ambient complex via :meth:`~relucent.complex.Complex.assert_topology_ready`.
 
 **Geometry for filtrations.** Built-in filtrations such as
 :class:`~relucent.filtration.AffineOutputFiltration` and
@@ -77,13 +83,17 @@ Example:
    # We append a final ReLU to the model so that the constructed complex includes it's decision boundary.
    # See the Network Definitions section for more details.
    cplx = relucent.Complex(relucent.add_output_relu(model))
+   # Run to completion; verification is skipped only if max_polys is hit before the frontier empties.
    cplx.bfs(max_polys=500)
 
-   # Decision boundary of the last ReLU neuron (contracted chain complex)
+   # Decision boundary of the last ReLU neuron (requires complete ambient complex)
    db = cplx.get_boundary_complex(cplx.n - 1)
 
    betti = db.get_betti_numbers()
    print(betti)  # e.g. {0: 1}
+
+   # Or discover the boundary directly without a full ambient BFS:
+   # db = cplx.discover_boundary_complex(cplx.n - 1, verbose=False)
 
    # Cross-check via persistent homology with a constant filtration
    diagram = compute_persistent_homology(

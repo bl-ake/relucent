@@ -5,7 +5,6 @@ import os
 # Keep legacy config defaults for tolerance-sweep tests; package import bootstraps otherwise.
 os.environ.setdefault("RELUCENT_SKIP_NUMERIC_BOOTSTRAP", "1")
 
-import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
@@ -22,16 +21,6 @@ def _complex_init_no_auto_tolerances(self, net, *args, **kwargs):
 
 Complex.__init__ = _complex_init_no_auto_tolerances  # type: ignore[method-assign]
 
-
-def explore_for_topology(
-    cplx: Complex,
-    start: np.ndarray,
-    *,
-    max_polys: int = 5000,
-) -> None:
-    """BFS from ``start`` and require a complete top-dimensional dual graph."""
-    cplx.bfs(start=np.asarray(start, dtype=np.float64).reshape(1, -1), max_polys=max_polys)
-    cplx.get_dual_graph(verbose=False, require_complete=True)
 
 
 # All tests run with extra consistency checks (see :data:`relucent.config.CAREFUL_MODE`).

@@ -28,6 +28,8 @@ Core capabilities include:
    quickstart
    network_definitions
    search_geometry
+   search_shi_and_graphs
+   exploration_verification
    topology
    configuration
 
@@ -37,6 +39,8 @@ Core capabilities include:
 
    complex
    polyhedron
+   exploration
+   verify
    filtration
    persistence
    topology_api

@@ -18,8 +18,8 @@ import torch.nn as nn
 
 import relucent.topology as topology
 from relucent import Complex, set_seeds
+from relucent.exploration import explore_for_topology
 from relucent.topology import C_BACKEND_AVAILABLE, ConnectedComponentsMismatch, get_betti_numbers
-from tests.conftest import explore_for_topology
 
 
 def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
