@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# SLURM / local integration-test run artifacts (not part of the package)
+integration_outputs/
+*.slurm.sh
