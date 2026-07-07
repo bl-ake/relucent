@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 import networkx as nx
@@ -13,7 +12,7 @@ import numpy as np
 import relucent.config as cfg
 from relucent._logging import logger
 from relucent.poly import Polyhedron
-from relucent.utils import encode_ss, flip_ss_at_shi, get_env, get_mp_context, get_thread_env
+from relucent.utils import encode_ss, flip_ss_at_shi, get_mp_context
 
 if TYPE_CHECKING:
     from relucent.complex import Complex
@@ -46,25 +45,19 @@ __all__ = [
     "NonGenericArrangementError",
     "classify_finite",
     "classify_finite_ascending",
+    "assign_contracted_shis",
     "collect_meta_face_edges",
     "compute_contracted_shis_top_down",
-    "contracted_shis_from_coface_intersection",
     "dual_edges_top_dim",
     "face_tag",
-    "filter_complex_shis_by_flip_neighbor",
     "filter_shi_candidates",
     "finite_cells_subgraph",
     "flip_tag",
-    "known_bounded",
     "META_FACE_PARALLEL_MIN_CELLS",
-    "meta_face_edges",
     "meta_node_attrs",
-    "meta_node_shis_for_meta_node",
     "one_point_compactify_meta_graph",
     "parallel_collect_meta_face_edges",
-    "precompute_finite",
     "propagate_finite_from_coface_edges",
-    "propagate_unbounded_from_face_edges",
     "ss_nonzero_indices",
     "sync_shis_from_dual_graph",
     "truncate_meta_graph",
@@ -75,13 +68,6 @@ __all__ = [
 META_FACE_PARALLEL_MIN_CELLS = 64
 
 
-def known_bounded(poly: Polyhedron) -> bool:
-    """True when boundedness is already known (no Chebyshev LP needed)."""
-    if poly.dim == 0:
-        return True
-    return bool(poly._finite_computed and poly._finite is True)
-
-
 # ---------------------------------------------------------------------------
 # Cubical incidence engine — one SS+lookup source, derived views
 # ---------------------------------------------------------------------------
@@ -90,23 +76,21 @@ def known_bounded(poly: Polyhedron) -> bool:
 # combinatorial.  Consumers take *derived views*:
 #
 # - **Dual graph** (:func:`dual_edges_top_dim`): group top cells by shared face tag.
-# - **Meta-graph face edges** (:func:`meta_face_edges` / :func:`collect_meta_face_edges`):
+# - **Meta-graph face edges** (:func:`collect_meta_face_edges`):
 #   zero each ``ss_i != 0``; keep edge iff face tag exists in lookup.
-# - **Contraction metadata** (:func:`contracted_shis_from_coface_intersection`):
-#   coface SHI intersection minus crossing, flip-neighbor filtered (conservative).
-# - **Node metadata** (:func:`meta_node_shis_for_meta_node`): propagated ``_shis``.
+# - **Node metadata** (:func:`meta_node_attrs`): propagated ``_shis``.
 #
 # The historical "three roles" tension is expressed as filter stacks on the same
 # cubical primitives, not unrelated SHI lists.
 #
 # 1. **Contraction face kwargs** (:meth:`Complex._codim_one_face_kwargs`)
-#    - Rule: coface SHI intersection minus crossing, then flip-neighbor filter.
-#    - Conservative: expanding beyond coface intersection creates phantom cells.
+#    - Rule: coface SHI intersection minus crossing; 1-cell feasibility at construction.
+#    - :func:`assign_contracted_shis` applies flip-neighbor filter on the full slice.
 #
 # 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
 #    - Rule: :func:`ss_nonzero_indices` + lookup existence (complete for ``∂² = 0``).
 #
-# 3. **Meta-graph node metadata** (:func:`meta_node_shis_for_meta_node`)
+# 3. **Meta-graph node metadata** (:func:`meta_node_attrs`)
 #    - Propagated ``_shis`` for boundedness heuristics; strict subset of crossings.
 #
 # See ``tests/test_meta_graph_shi_regression.py`` and ``negative-betti-meta-graph-bug.md``.
@@ -221,29 +205,6 @@ def _dual_edges_one_dim(
         seen.add((lo, hi))
         edges.append((u, v, shi_u))
     return edges
-
-
-def meta_face_edges(
-    cells: list[tuple[bytes, np.ndarray, tuple[int, ...]]],
-    valid_face_tags: set[bytes],
-) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
-    """Assemble meta-graph face edges from SS crossings (delegates to collector)."""
-    return collect_meta_face_edges(cells, valid_face_tags)
-
-
-def contracted_shis_from_coface_intersection(
-    ss: np.ndarray,
-    coface_shis_sets: Iterable[set[int]],
-    crossing_shi: int,
-    *,
-    neighbor_tags: set[bytes],
-) -> list[int]:
-    """Conservative contracted-cell SHIs: ∩(SHI(coface) \\ {crossing}), flip-filtered."""
-    sets = [set(s) - {int(crossing_shi)} for s in coface_shis_sets]
-    if not sets:
-        return []
-    inferred = set.intersection(*sets) if len(sets) > 1 else sets[0].copy()
-    return filter_shi_candidates(ss, inferred, neighbor_tags=neighbor_tags)
 
 
 def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
@@ -377,20 +338,6 @@ def verify_arrangement_genericity(polys: Iterable[Polyhedron]) -> None:
                 )
 
 
-def meta_node_shis_for_meta_node(poly: Polyhedron) -> list[int]:
-    """SHI list stored on meta-graph **nodes** (role 3: propagated metadata).
-
-    Uses ``poly._shis`` when set (from search or :meth:`Complex.contract`).
-    Falls back to :func:`ss_nonzero_indices` only when ``_shis`` is
-    missing.  This is **not** the rule for meta-graph face **edges**; see the
-    module comment above role 2.
-    """
-    shis = poly._shis
-    if shis is not None:
-        return sorted(int(s) for s in shis)
-    return list(ss_nonzero_indices(np.asarray(poly.ss_np)))
-
-
 def meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
     if poly.dim == 0:
         finite: bool | None = True
@@ -398,12 +345,18 @@ def meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
         finite = poly._finite
     else:
         finite = poly.finite
+    # Node SHIs: propagated _shis when set; else all nonzero ss indices (not edge rule).
+    shis = poly._shis
+    if shis is not None:
+        node_shis: list[int] = sorted(int(s) for s in shis)
+    else:
+        node_shis = list(ss_nonzero_indices(np.asarray(poly.ss_np)))
     return {
         "poly": poly,
         "dim": int(poly.dim),
         "ss": np.asarray(poly.ss_np),
         "finite": finite,
-        "shis": meta_node_shis_for_meta_node(poly),
+        "shis": node_shis,
     }
 
 
@@ -451,6 +404,84 @@ def parallel_collect_meta_face_edges(
     return edges, extra_tags
 
 
+def classify_one_cells_finite_from_face_edges(
+    by_dim: dict[int, Complex],
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
+    lookup: dict[bytes, Polyhedron],
+    *,
+    geometric_infeasible: set[bytes] | None = None,
+) -> tuple[int, set[bytes]]:
+    """Classify ``_finite`` on 1-cells from codimension-one 0-face incidence.
+
+    Uses face edges in ``edges_by_dim[1]`` (sign-sequence zeros), not ``_shis``.
+    1-cells with no combinatorial 0-faces are checked geometrically: empty
+    phantoms get ``_finite is None`` so truncation does not duplicate them.
+
+    Returns ``(n_classified, infeasible_tags)``.
+    """
+    if 1 not in by_dim:
+        return 0, set()
+
+    zero_face_tags: set[bytes] = {p.tag for p in by_dim.get(0, ())}
+    zero_faces_by_coface: dict[bytes, set[bytes]] = defaultdict(set)
+    if 1 in edges_by_dim:
+        for coface_tag, face_tag, _ in edges_by_dim[1][0]:
+            if face_tag in zero_face_tags:
+                zero_faces_by_coface[coface_tag].add(face_tag)
+
+    infeasible = geometric_infeasible
+    if infeasible is None:
+        infeasible = geometric_infeasible_one_cells(by_dim, edges_by_dim)
+    n_classified = 0
+    for p in by_dim[1]:
+        if p._finite_computed:
+            continue
+        if p.tag in infeasible:
+            p._finite = None
+            p._finite_computed = True
+            n_classified += 1
+            continue
+        n_zero = len(zero_faces_by_coface.get(p.tag, ()))
+        if n_zero >= 2:
+            p._finite = True
+        else:
+            p._finite = False
+        p._finite_computed = True
+        n_classified += 1
+    return n_classified, infeasible
+
+
+def geometric_infeasible_one_cells(
+    by_dim: dict[int, Complex],
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
+) -> set[bytes]:
+    """Return 1-cell tags that are geometrically empty (no Chebyshev center).
+
+    Only 1-cells with no combinatorial 0-faces need a geometric check; segments
+    and rays are decided from face incidence alone.
+    """
+    if 1 not in by_dim:
+        return set()
+
+    zero_face_tags = {p.tag for p in by_dim.get(0, ())}
+    zero_faces_by_coface: dict[bytes, set[bytes]] = defaultdict(set)
+    if 1 in edges_by_dim:
+        for coface_tag, face_tag, _ in edges_by_dim[1][0]:
+            if face_tag in zero_face_tags:
+                zero_faces_by_coface[coface_tag].add(face_tag)
+
+    infeasible: set[bytes] = set()
+    for p in by_dim[1]:
+        if len(zero_faces_by_coface.get(p.tag, ())) > 0:
+            continue
+        # Use compute-only Chebyshev; ``poly.finite`` would cache ``_finite`` and
+        # skip combinatorial classification in :func:`classify_one_cells_finite_from_face_edges`.
+        _center, inradius = p.get_center_inradius()
+        if _center is None and inradius is None:
+            infeasible.add(p.tag)
+    return infeasible
+
+
 def classify_finite_ascending(
     by_dim: dict[int, Complex],
     lookup: dict[bytes, Polyhedron],
@@ -458,11 +489,14 @@ def classify_finite_ascending(
 ) -> int:
     """Classify ``_finite`` for contracted cells by an ascending sweep.
 
-    Starting from 1-dim cells (whose ``_finite`` must already be set via the
-    SHI-count heuristic), proceeds dimension by dimension from k = 2 upward:
+    Starting from 1-dim cells (whose ``_finite`` must already be set via
+    :func:`classify_one_cells_finite_from_face_edges`), proceeds dimension by
+    dimension from k = 2 upward:
 
-    * k-dim cell is **unbounded** if ANY (k-1)-dim face is unbounded.
-    * k-dim cell is **bounded** if ALL (k-1)-dim faces are bounded.
+    * k-dim cell is **unbounded** if ANY `(k−1)`-dim face is unbounded.
+    * k-dim cell is **bounded** if ALL `(k−1)`-dim faces are bounded (infeasible
+      faces are ignored; a cell whose faces are exclusively infeasible is itself
+      marked infeasible).
 
     Because every (k-1)-dim cell is already classified before the k-dim pass
     (induction from the 1-dim base case), this single ascending sweep fully
@@ -487,25 +521,32 @@ def classify_finite_ascending(
             if coface is None or coface._finite_computed:
                 continue
 
-            all_bounded = True
-            any_unbounded = False
+            n_bounded = 0
+            n_unbounded = 0
+            n_infeasible = 0
+            unknown = False
             for ft in face_tags:
                 face = lookup.get(ft)
-                if face is not None and face._finite_computed:
-                    if face._finite is False:
-                        any_unbounded = True
-                        break
-                    if face._finite is not True:
-                        all_bounded = False
+                if face is None or not face._finite_computed:
+                    unknown = True
+                    continue
+                if face._finite is False:
+                    n_unbounded += 1
+                elif face._finite is None:
+                    n_infeasible += 1
                 else:
-                    all_bounded = False  # face unknown → can't conclude bounded
+                    n_bounded += 1
 
-            if any_unbounded:
+            if n_unbounded > 0:
                 coface._finite = False
                 coface._finite_computed = True
                 total += 1
-            elif all_bounded:
+            elif n_bounded > 0 and not unknown:
                 coface._finite = True
+                coface._finite_computed = True
+                total += 1
+            elif n_infeasible > 0 and n_bounded == 0 and n_unbounded == 0 and not unknown:
+                coface._finite = None
                 coface._finite_computed = True
                 total += 1
 
@@ -522,24 +563,9 @@ def propagate_finite_from_coface_edges(
         if face is None or face._finite_computed:
             continue
         coface = lookup.get(u)
-        if coface is not None and known_bounded(coface):
+        if coface is not None and (coface.dim == 0 or (coface._finite_computed and coface._finite is True)):
             face._finite = True
             face._finite_computed = True
-
-
-def propagate_unbounded_from_face_edges(
-    lookup: dict[bytes, Polyhedron],
-    edges: Iterable[tuple[bytes, bytes, int]],
-) -> None:
-    """Mark cofaces as unbounded when any codimension-1 face is already known unbounded."""
-    for u, v, _ in edges:
-        coface = lookup.get(u)
-        if coface is None or coface._finite_computed:
-            continue
-        face = lookup.get(v)
-        if face is not None and face._finite_computed and face._finite is False:
-            coface._finite = False
-            coface._finite_computed = True
 
 
 def classify_finite(poly: Polyhedron, env: Any) -> None:
@@ -561,32 +587,6 @@ def classify_finite(poly: Polyhedron, env: Any) -> None:
     else:
         raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
     poly._finite_computed = True
-
-
-def precompute_finite(polys: list[Polyhedron], nworkers: int) -> None:
-    """Classify ``poly.finite`` for a list of polyhedra.
-
-    Skips polys with ``_finite_computed`` already set (including ``finite=True`` hints
-    from coface propagation or construction). Gurobi releases the GIL during LP solves,
-    so a :class:`~concurrent.futures.ThreadPoolExecutor` gives genuine parallelism
-    without pickling overhead; each thread uses its own
-    :func:`~relucent.utils.get_thread_env`.
-    """
-    pending = [p for p in polys if not p._finite_computed]
-    if not pending:
-        return
-
-    if nworkers <= 1:
-        env = get_env()
-        for poly in pending:
-            classify_finite(poly, env)
-        return
-
-    def _worker(poly: Polyhedron) -> None:
-        classify_finite(poly, get_thread_env())
-
-    with ThreadPoolExecutor(max_workers=nworkers) as executor:
-        list(executor.map(_worker, pending))
 
 
 def filter_shi_candidates(
@@ -611,16 +611,13 @@ def filter_shi_candidates(
     return sorted(kept)
 
 
-def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
-    """Post-process contracted-slice ``_shis`` after :meth:`Complex.contract` (role 1).
+def assign_contracted_shis(cplx: Complex) -> int:
+    """Finalize ``_shis`` on a contracted slice (role 1).
 
-    Drops SHIs on each cell with no same-dimension flip neighbour, then applies
-    :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible` to remove any SHI whose
-    induced face would be geometrically infeasible.  Called at the end of
-    :meth:`Complex.contract` and :meth:`Complex.get_boundary_complex`.
-
-    Do not replace with full SS flip-neighbour membership; see the module comment
-    above role 1.
+    Coface-intersected candidates are set at face construction time via
+    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`; this pass applies
+    the flip-neighbor filter once the full slice is known.  Do not replace with
+    full SS flip-neighbor membership; see the module comment above role 1.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -631,10 +628,9 @@ def filter_complex_shis_by_flip_neighbor(cplx: Complex) -> int:
     for poly in cplx:
         if poly._shis is None:
             continue
-        filtered = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
-        filtered = [s for s in filtered if poly.is_shi_face_feasible(s)]
-        if filtered != list(poly._shis):
-            poly._shis = filtered
+        assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
+        if assigned != list(poly._shis):
+            poly._shis = assigned
             n_changed += 1
     return n_changed
 
@@ -643,11 +639,12 @@ def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
     """Fill missing ``_shis`` on chain cells (role 3).
 
     The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
-    coface intersection and flip-neighbor filtering (role 1).  This pass is a
+    coface intersection and :func:`assign_contracted_shis` (role 1).  This pass is a
     safety net for contracted cells that still lack ``_shis``.  It does **not**
     drive meta-graph face-edge discovery; that uses
     :func:`ss_nonzero_indices` (role 2).  Boundedness is classified
-    separately via the 1-cell SHI-count rule and :func:`classify_finite_ascending`.
+    separately via :func:`classify_one_cells_finite_from_face_edges` and
+    :func:`classify_finite_ascending`.
 
     For each face still missing ``_shis``:
 
@@ -701,7 +698,7 @@ def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
             face = face_lookup.get(face_tag_key)
             if face is None:
                 continue
-            if face._shis is None:
+            if not face._shis:
                 face._shis = filter_shi_candidates(face.ss_np, shis, neighbor_tags=neighbor_tags)
                 n_set += 1
 

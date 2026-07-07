@@ -683,6 +683,7 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
+    strict: bool = False,
 ) -> list[int]: ...
 
 
@@ -697,6 +698,7 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
+    strict: bool = False,
 ) -> tuple[list[int], list[dict[str, object]]]: ...
 
 
@@ -710,6 +712,7 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
+    strict: bool = False,
 ) -> list[int] | tuple[list[int], list[dict[str, object]]]:
     """Supporting halfspace indices (SHIs) for ``poly``.
 
@@ -729,6 +732,7 @@ def get_shis(
         env: Gurobi environment; default uses :func:`~relucent.utils.get_env`.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
+        strict: If True, raise :class:`~relucent.verify.ShiProofError` on invalid proofs.
 
     Returns:
         List of SHI indices, or ``(shis, info)`` if ``collect_info`` is truthy.
@@ -841,6 +845,10 @@ def get_shis(
                         f"Invalid Proof for SHI {i}! Violation Sizes: "
                         f"{np.argwhere(dists.ravel() > 0), dists[np.argwhere(dists.ravel() > 0)]}"
                     )
+                    if strict:
+                        from relucent.verify import ShiProofError
+
+                        raise ShiProofError(msg)
                     w = RuntimeWarning(msg)
                     poly.warnings.append(w)
                     warnings.warn(w, stacklevel=2)

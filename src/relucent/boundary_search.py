@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-import warnings
 from collections import deque
 from collections.abc import Iterable
 from functools import partial
@@ -14,9 +13,10 @@ from tqdm.auto import tqdm
 
 import relucent.config as cfg
 from relucent._logging import logger
+from relucent._network_scale import default_polyhedron_bound
 from relucent.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.calculations import get_shis
-from relucent.complex import IncompleteDualGraphError
+from relucent.exploration import finalize_boundary_complex, search_stats_dict
 from relucent.poly import Polyhedron
 from relucent.search import (
     SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
@@ -35,7 +35,6 @@ __all__ = [
     "BoundaryDiscoveryStats",
     "boundary_searcher",
     "discover_boundary_complex",
-    "discover_boundary_component",
 ]
 
 
@@ -53,35 +52,6 @@ def _phase_log(msg: str, *, verbose: bool) -> None:
     logger.info(msg)
     if verbose:
         print(msg, flush=True)
-
-
-def _coface_intersection_shis(
-    coface_a: Polyhedron,
-    coface_b: Polyhedron,
-    crossing_shi: int,
-    *,
-    boundary_shi: int,
-) -> list[int]:
-    """SHI list from coface intersection, matching :meth:`Complex._codim_one_face_kwargs`."""
-    drop = {int(crossing_shi), int(boundary_shi)}
-    return sorted(int(s) for s in (set(coface_a.shis) & set(coface_b.shis) - drop))
-
-
-def _apply_boundary_coface_metadata(
-    coface_a: Polyhedron,
-    coface_b: Polyhedron,
-    crossing_shi: int,
-    *,
-    boundary_shi: int,
-) -> None:
-    """Apply coface-intersection ``_shis`` to both slice cofaces."""
-    edge_shis = _coface_intersection_shis(
-        coface_a,
-        coface_b,
-        crossing_shi,
-        boundary_shi=boundary_shi,
-    )
-    coface_b._shis = edge_shis
 
 
 def _ambient_lift_polyhedra(
@@ -106,33 +76,6 @@ def _both_ambient_cofaces_feasible(poly: Polyhedron, boundary_shi: int) -> bool:
     return p_pos.feasible and p_neg.feasible
 
 
-def _filter_phantom_boundary_cells(
-    cx: Complex,
-    boundary_shi: int,
-    *,
-    verbose: bool = False,
-) -> int:
-    """Drop slice top cells with only one feasible ambient coface."""
-    from relucent.ss import SSManager
-
-    kept = [p for p in cx if _both_ambient_cofaces_feasible(p, boundary_shi)]
-    dropped = len(cx) - len(kept)
-    if dropped == 0:
-        return 0
-    if verbose:
-        _discovery_log(
-            "discover finalize: dropped " + f"{dropped} phantom boundary cell(s)",
-            verbose=True,
-        )
-    cx.index2poly = kept
-    cx.tag2poly = {p.tag: p for p in kept}
-    cx.ssm = SSManager()
-    for poly in kept:
-        cx.ssm.add(poly.ss_np)
-    cx._dual_graph = None
-    return dropped
-
-
 def _ambient_coface_shis_for_boundary_cell(
     poly: Polyhedron,
     boundary_shi: int,
@@ -148,13 +91,13 @@ def _ambient_coface_shis_for_boundary_cell(
     """
     ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
     bshi = int(boundary_shi)
-    if bound is None:
-        bound = cfg.DEFAULT_SEARCH_BOUND
     if int(ss.ravel()[bshi]) != 0:
         raise ValueError(f"Expected ss[{bshi}]=0 on boundary cell, got {ss!r}")
     net = poly._net
     if net is None:
         raise ValueError("boundary cell missing network reference for ambient lift")
+    if bound is None:
+        bound = default_polyhedron_bound(net)
     p_pos, p_neg = _ambient_lift_polyhedra(poly, bshi)
     try:
         shis_pos = get_shis(p_pos, bound=bound, **shis_kwargs)
@@ -178,8 +121,9 @@ def _ambient_boundary_metadata_for_cell(
 ) -> tuple[list[int], Any]:
     """Return ``(_shis, halfspaces)`` matching :meth:`Complex.get_boundary_cells`."""
     bshi = int(boundary_shi)
+    net = poly._net
     if bound is None:
-        bound = cfg.DEFAULT_SEARCH_BOUND
+        bound = cfg.DEFAULT_SEARCH_BOUND if net is None else default_polyhedron_bound(net)
     shis = _ambient_coface_shis_for_boundary_cell(
         poly,
         bshi,
@@ -262,65 +206,6 @@ def _ambient_coface_shis_worker(
     return tag, shis, halfspaces
 
 
-def _finalize_boundary_complex(
-    cx: Complex,
-    boundary_shi: int,
-    *,
-    bound: float | None = None,
-    nworkers: int | None = None,
-    verbose: bool = False,
-    **shis_kwargs: Any,
-) -> None:
-    """Complete ambient SHIs, dual graph, filter SHIs, and verify (matches baseline path)."""
-    from relucent import meta_graph as mg
-
-    n_cells = len(cx)
-    nw = nworkers or process_aware_cpu_count() or 1
-    t0 = time.perf_counter()
-    _phase_log(
-        "discover finalize: " + f"{n_cells} cells, ambient coface _shis ({nw} workers) ...",
-        verbose=verbose,
-    )
-    ambient_shis_kwargs = {k: v for k, v in shis_kwargs.items() if k != "subset"}
-    _apply_ambient_boundary_shis(
-        cx,
-        boundary_shi,
-        bound=bound,
-        nworkers=nw,
-        verbose=verbose,
-        **ambient_shis_kwargs,
-    )
-    _phase_log(
-        "discover finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
-        verbose=verbose,
-    )
-    _filter_phantom_boundary_cells(cx, boundary_shi, verbose=verbose)
-    for poly in cx:
-        poly._finite = None
-        poly._finite_computed = False
-    t2 = time.perf_counter()
-    _phase_log("discover finalize: building dual graph ...", verbose=verbose)
-    cx._dual_graph = cx.get_dual_graph(verbose=verbose, require_complete=True, cubical=False)
-    _phase_log(
-        "discover finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
-        verbose=verbose,
-    )
-    t3 = time.perf_counter()
-    mg.filter_complex_shis_by_flip_neighbor(cx)
-    _phase_log(
-        "discover finalize: SHI filter finished in " + f"{time.perf_counter() - t3:.1f}s",
-        verbose=verbose,
-    )
-    t4 = time.perf_counter()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
-        cx.verify_arrangement_genericity()
-    _phase_log(
-        "discover finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
-        verbose=verbose,
-    )
-
-
 def boundary_searcher(
     cx: Complex,
     boundary_shi: int,
@@ -331,6 +216,7 @@ def boundary_searcher(
     nworkers: int | None = None,
     verbose: int | None = None,
     geometry_properties: Iterable[str] | None = None,
+    verify: bool = True,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """BFS on a bent hyperplane slice with ``ss[boundary_shi] = 0`` fixed.
@@ -345,19 +231,26 @@ def boundary_searcher(
         nworkers: Worker process count.
         verbose: Progress verbosity.
         geometry_properties: Optional geometry caches (default topology-only).
+        verify: When True (default), require complete exploration and run invariant
+            checks at the end. Skipped when exploration hits ``max_polys`` before the
+            frontier is exhausted. Sets ``strict=True`` on SHI LPs.
         **kwargs: Forwarded to :func:`~relucent.calculations.get_shis`.
 
     Returns:
-        Search statistics dict (same keys as :func:`~relucent.search.searcher`).
+        Search statistics dict (same keys as :func:`~relucent.search.searcher`,
+        including ``"Complete"``; ``"Verified"`` is omitted here because certification
+        runs later in :func:`~relucent.exploration.finalize_boundary_complex`).
 
     Raises:
         ValueError: If ``start`` is not a top-dimensional boundary cell.
-        IncompleteDualGraphError: If exploration stops before the dual graph is complete.
     """
     if verbose is None:
         verbose = cfg.VERBOSE
     if bound is None:
-        bound = cfg.DEFAULT_SEARCH_BOUND
+        bound = default_polyhedron_bound(cx._net)
+    shis_kwargs = dict(kwargs)
+    if verify:
+        shis_kwargs["strict"] = True
     if not _is_top_boundary_ss(start.ss_np, boundary_shi):
         raise ValueError(f"Start sign sequence must have ss[{boundary_shi}]=0 as its only zero entry; got {start.ss_np!r}")
 
@@ -366,8 +259,7 @@ def boundary_searcher(
         if geometry_properties is None
         else tuple(dict.fromkeys((*SEARCH_REQUIRED_GEOMETRY_PROPERTIES, *geometry_properties)))
     )
-    shi_subset = [j for j in range(cx.n) if j != boundary_shi]
-    shis_kwargs = dict(kwargs)
+    shi_subset = [j for j in range(cx.n) if j != boundary_shi]  # pinned zero, not a flip facet
     shis_kwargs.setdefault("subset", shi_subset)
 
     pending_neighbors: dict[bytes, list[tuple[int, int]]] = {}
@@ -384,9 +276,10 @@ def boundary_searcher(
     start = cx.add_polyhedron(start, check_exists=False)
     result = get_shis(start, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
-    start._shis = [s for s in result if int(s) != boundary_shi]
+    start._shis = [s for s in result if int(s) != boundary_shi]  # boundary hyperplane is not a facet
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
+    failed_flips: set[tuple[bytes, int]] = set()
 
     for shi in start.shis:
         if shi == boundary_shi:
@@ -411,6 +304,7 @@ def boundary_searcher(
     unprocessed = len(queue)
     depth = 0
     search_time = 0.0
+    depth_limited = False
     t_search = time.perf_counter()
 
     if unprocessed > 0:
@@ -429,13 +323,13 @@ def boundary_searcher(
                     node = cast(Polyhedron, cx.index2poly[node_index])
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
-                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
                         if unprocessed == 0 or len(cx) >= max_polys:
                             break
                         continue
 
                     if not _is_top_boundary_ss(p.ss_np, boundary_shi):
-                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
                         if unprocessed == 0 or len(cx) >= max_polys:
                             break
                         continue
@@ -444,7 +338,7 @@ def boundary_searcher(
                         p._net = cx._net
 
                     if not _both_ambient_cofaces_feasible(p, boundary_shi):
-                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi)
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
                         if unprocessed == 0 or len(cx) >= max_polys:
                             break
                         continue
@@ -456,6 +350,8 @@ def boundary_searcher(
                         poly_index = cx.ssm[p.ss_np]
                         for new_shi in p.shis:
                             if new_shi in (boundary_shi, shi) or len(cx) >= max_polys:
+                                continue
+                            if (p.tag, int(new_shi)) in failed_flips:
                                 continue
                             ss = flip_ss_at_shi(p.ss_np, new_shi)
                             if not _is_top_boundary_ss(ss, boundary_shi):
@@ -469,6 +365,20 @@ def boundary_searcher(
                                 unprocessed += 1
                             else:
                                 pending_neighbors[tag].append((poly_index, new_shi))
+                    elif max_depth != float("inf"):
+                        # Same depth_limited probe as ambient searcher.
+                        for new_shi in p.shis:
+                            if new_shi in (boundary_shi, shi):
+                                continue
+                            if (p.tag, int(new_shi)) in failed_flips:
+                                continue
+                            ss = flip_ss_at_shi(p.ss_np, new_shi)
+                            if not _is_top_boundary_ss(ss, boundary_shi):
+                                continue
+                            tag = encode_ss(ss)
+                            if tag not in cx.tag2poly and tag not in pending_neighbors:
+                                depth_limited = True
+                                break
 
                     pbar.update(n=len(cx) - pbar.n)
                     rolling_average = (rolling_average * (len(cx) - 1) + len(p.shis)) / len(cx)
@@ -490,60 +400,31 @@ def boundary_searcher(
         search_time = time.perf_counter() - t_search
         pbar.close()
 
-    complete = unprocessed == 0 and len(cx) < max_polys
+    hit_cap = max_polys != float("inf") and len(cx) >= max_polys
+    complete = unprocessed == 0 and not hit_cap and not depth_limited
     if not complete:
-        raise IncompleteDualGraphError(
-            f"Boundary slice search incomplete for shi={boundary_shi}: "
-            + f"unprocessed={unprocessed}, cells={len(cx)}, max_polys={max_polys}"
+        # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
+        cx.set_exploration_state(complete=False, verified=False)
+        return search_stats_dict(
+            depth=depth,
+            rolling_average=rolling_average,
+            search_time=search_time,
+            bad_shi_computations=bad_shi_computations,
+            complete=False,
+            verified=False,
         )
 
     for poly in cx:
         poly._finite = None
         poly._finite_computed = False
-    cx.get_dual_graph(verbose=bool(verbose), require_complete=True, cubical=False)
-    return {
-        "Search Depth": depth,
-        "Avg # Facets Uncorrected": rolling_average,
-        "Search Time": search_time,
-        "Bad SHI Computations": bad_shi_computations,
-        "Complete": complete,
-    }
-
-
-def discover_boundary_component(
-    net: ReLUNetwork,
-    boundary_shi: int,
-    exclude_tags: set[bytes],
-    *,
-    bound: float | None = None,
-    nworkers: int | None = None,
-    verbose: int | None = None,
-    **kwargs: Any,
-) -> tuple[Complex, dict[str, Any]] | None:
-    """Discover one connected boundary component not represented in ``exclude_tags``."""
-    from relucent.complex import Complex
-
-    witness = price_boundary_witness(
-        net,
-        boundary_shi,
-        exclude_tags,
-        bound=bound,
-        verbose=bool(verbose),
+    return search_stats_dict(
+        depth=depth,
+        rolling_average=rolling_average,
+        search_time=search_time,
+        bad_shi_computations=bad_shi_computations,
+        complete=True,
+        verified=None,
     )
-    if witness is None:
-        return None
-
-    cx = Complex(net)
-    search_info = boundary_searcher(
-        cx,
-        boundary_shi,
-        witness,
-        bound=bound,
-        nworkers=nworkers,
-        verbose=verbose,
-        **kwargs,
-    )
-    return cx, search_info
 
 
 def discover_boundary_complex(
@@ -553,6 +434,7 @@ def discover_boundary_complex(
     bound: float | None = None,
     nworkers: int | None = None,
     verbose: bool = False,
+    verify: bool = True,
     **kwargs: Any,
 ) -> tuple[Complex, BoundaryDiscoveryStats]:
     """Discover the full boundary complex via MIP pricing + slice BFS per component."""
@@ -607,6 +489,7 @@ def discover_boundary_complex(
             bound=bound,
             nworkers=nworkers,
             verbose=1 if verbose else 0,
+            verify=verify,
             **kwargs,
         )
         n_components += 1
@@ -640,12 +523,13 @@ def discover_boundary_complex(
     )
     t_post = time.perf_counter()
     t_verify = time.perf_counter()
-    _finalize_boundary_complex(
+    finalize_boundary_complex(
         merged,
         boundary_shi,
         bound=bound,
         nworkers=nworkers,
         verbose=verbose,
+        verify=verify,
         **kwargs,
     )
     post_verify_s = time.perf_counter() - t_verify

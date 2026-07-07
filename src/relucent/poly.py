@@ -200,8 +200,9 @@ class Polyhedron:
         For all other dimensions this method returns ``True`` without checking.  Faces
         of k-cells with k > 1 are themselves polytopes; checking their feasibility
         requires finding an interior point via LP.  In practice the flip-neighbour
-        filter (role 1 in :mod:`relucent.meta_graph`) prevents phantom cells at
-        dimensions > 0, so this check is not needed there.
+        filter (role 1 in :mod:`relucent.meta_graph`) and construction-time
+        :meth:`~relucent.complex.Complex._codim_one_face_kwargs` checks prevent
+        phantom cells at dimensions > 0, so this check is not needed there.
 
         **Invariant**: every 1-cell that passes through the contraction pipeline
         (via :meth:`~relucent.complex.Complex._codim_one_face_kwargs`) is constructed
@@ -1014,20 +1015,16 @@ class Polyhedron:
     def shis(self) -> list[int]:
         """Supporting halfspace indices (SHIs)."""
         if self._shis is None:
-            self._shis = get_shis(self)
+            bound = self.bound
+            if bound is None and self._net is not None:
+                from relucent._network_scale import default_polyhedron_bound
+
+                bound = default_polyhedron_bound(self._net)
+            elif bound is None:
+                bound = cfg.DEFAULT_SEARCH_BOUND
+            self._shis = get_shis(self, bound=float(bound))
         assert isinstance(self._shis, list)
         return self._shis
-
-    def remove_shi(self, shi: int) -> None:
-        """Remove a supporting halfspace index from the cached SHI list.
-
-        Raises:
-            ValueError: If ``shi`` is not present in the cached list.
-        """
-        shis = self.shis  # ensure cache is initialized
-        if shi not in shis:
-            raise ValueError(f"Cannot remove SHI {shi}: not present in Polyhedron {self!r} (num_shis={len(shis)})")
-        shis.remove(shi)
 
     @property
     def num_shis(self) -> int:

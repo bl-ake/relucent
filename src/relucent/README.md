@@ -19,6 +19,9 @@ This folder contains the implementation of the `relucent` Python package.
 
 - **`calculations.py`**: Gurobi/Qhull/SHI routines that take a `Polyhedron` (imported eagerly from `poly.py`)
 - **`search.py`**: BFS/DFS/random-walk, `parallel_add`, A* pathfinding, worker entry points
+- **`exploration.py`**: Post-search finalize (dual-graph SHI sync, certification flags)
+- **`verify.py`**: Invariant checks (`verify_complex`, LP completeness, exception types)
+- **`boundary_search.py`**: Slice-restricted BFS and MIP-driven boundary discovery
 - **`worker_context.py`**: Multiprocessing worker state (`set_worker_context`, `get_worker_context`)
 - **`complex_graph.py`**: Dual-graph contraction and network surgery helpers
 - **`meta_graph.py`**: Meta-graph face discovery, boundedness classification, truncation/compactification

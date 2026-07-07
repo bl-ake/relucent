@@ -6,7 +6,12 @@ import numpy as np
 
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 
-__all__ = ["count_relu_units", "estimate_input_bound", "relu_linear_blocks"]
+__all__ = [
+    "count_relu_units",
+    "default_polyhedron_bound",
+    "estimate_input_bound",
+    "relu_linear_blocks",
+]
 
 
 def relu_linear_blocks(net: ReLUNetwork) -> list[LinearLayer]:
@@ -31,3 +36,10 @@ def estimate_input_bound(net: ReLUNetwork, *, margin: float) -> float:
         b = np.asarray(block.bias, dtype=np.float64).reshape(-1)
         radius = float(np.max(np.sum(np.abs(w), axis=1) + np.abs(b)) * radius)
     return max(radius * margin, 1.0)
+
+
+def default_polyhedron_bound(net: ReLUNetwork) -> float:
+    """Network-scaled box radius for SHI LPs (matches boundary MIP pricing)."""
+    import relucent.config as cfg
+
+    return estimate_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN))

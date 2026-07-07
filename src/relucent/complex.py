@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import pickle
 import random
@@ -59,6 +60,11 @@ from relucent.utils import (
     flip_ss_at_shi_inplace,
     process_aware_cpu_count,
 )
+from relucent.verify import (
+    ComplexNotCompleteError,
+    ComplexNotVerifiedError,
+    DualGraphAsymmetricEdgeError,
+)
 
 if TYPE_CHECKING:
     from relucent.morse import CriticalPoint
@@ -70,6 +76,9 @@ __all__ = [
     "IncompleteDualGraphError",
     "NonGenericArrangementError",
     "TRUNCATION_META_SHI",
+    "ComplexNotCompleteError",
+    "ComplexNotVerifiedError",
+    "DualGraphAsymmetricEdgeError",
 ]
 
 
@@ -137,10 +146,65 @@ class Complex:
 
         self._dual_graph: nx.Graph[Polyhedron] | None = None
         self._betti_cache: dict[tuple[bool, CompactifyMode, bool], dict[int, int]] = {}
+        self._complete: bool | None = None
+        self._verified: bool | None = None
 
     def _invalidate_derived_caches(self) -> None:
         self._dual_graph = None
         self._betti_cache.clear()
+        self._complete = None
+        self._verified = None
+
+    @property
+    def complete(self) -> bool | None:
+        """Whether exploration finished without an intentional cap (``None`` if unknown)."""
+        return self._complete
+
+    @property
+    def verified(self) -> bool | None:
+        """Whether the complex passed the last invariant verification (``None`` if unknown)."""
+        return self._verified
+
+    def set_exploration_state(self, *, complete: bool, verified: bool) -> None:
+        """Record exploration / verification status after search or verify."""
+        self._complete = complete
+        self._verified = verified
+
+    def assert_topology_ready(self) -> None:
+        """Require a complete, verified complex before topology routines.
+
+        When exploration did not record flags (e.g. pointwise ``add_point``), run
+        verification on demand and cache the result.
+        """
+        if self._complete is True and self._verified is True:
+            return
+        if self._complete is False:
+            from relucent.verify import ComplexNotCompleteError
+
+            raise ComplexNotCompleteError(
+                "Complex is not complete or failed invariant verification. Explore further "
+                + "(e.g. BFS) or pass an explicit exploration cap (max_polys) to opt into "
+                + "a partial complex."
+            )
+        if self._complete is True and self._verified is not True:
+            from relucent.verify import ComplexNotVerifiedError
+
+            raise ComplexNotVerifiedError(
+                "Complex is complete but not verified. Re-run BFS with verify=True or call " + "verify_complex."
+            )
+        # Flags unknown (e.g. add_point without BFS): verify on demand.
+        from relucent.verify import ComplexNotCompleteError, verify_complex
+
+        try:
+            self.set_exploration_state(complete=True, verified=False)
+            verify_complex(self, level="fast", record_state=True)
+        except Exception as exc:
+            self.set_exploration_state(complete=False, verified=False)
+            raise ComplexNotCompleteError(
+                "Complex is not complete or failed invariant verification. Explore further "
+                + "(e.g. BFS) or pass an explicit exploration cap (max_polys) to opt into "
+                + "a partial complex."
+            ) from exc
 
     def __repr__(self) -> str:
         net_name = type(self._net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -594,6 +658,7 @@ class Complex:
         cube_radius: float | None = None,
         cube_mode: str = "unrestricted",
         geometry_properties: Iterable[str] | None = None,
+        verify: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Search for polyhedra in the complex by discovering neighbors.
@@ -628,6 +693,12 @@ class Complex:
                 :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a subset for
                 optional caches. ``finite``, ``center``, and ``inradius`` are always
                 computed.
+            verify: When True (default), require complete exploration and run invariant
+                checks at the end. Verification is skipped when exploration hits
+                ``max_polys`` before the frontier is exhausted. A finite ``max_depth``
+                cap can leave ``complete=False``; with ``verify=True`` that raises
+                :class:`~relucent.complex.IncompleteDualGraphError` unless the cap
+                was hit. Sets ``strict=True`` on SHI LPs when verifying.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -637,12 +708,17 @@ class Complex:
                 - "Search Time": Elapsed time in seconds
                 - "Bad SHI Computations": List of failed computations
                 - "Complete": Whether search completed (no unprocessed items)
+                - "Verified": Whether invariant checks passed (``None`` if not run)
 
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
+            IncompleteDualGraphError: If ``verify`` is True and exploration stops early
+                for reasons other than hitting ``max_polys``.
         """
         if bound is None:
-            bound = cfg.DEFAULT_SEARCH_BOUND
+            from relucent._network_scale import default_polyhedron_bound
+
+            bound = default_polyhedron_bound(self._net)
         return _searcher_fn(
             self,
             start=start,
@@ -655,6 +731,7 @@ class Complex:
             cube_radius=cube_radius,
             cube_mode=cube_mode,
             geometry_properties=geometry_properties,
+            verify=verify,
             **kwargs,
         )
 
@@ -954,7 +1031,7 @@ class Complex:
         if len(out) > 0:
             from relucent import meta_graph as mg
 
-            mg.filter_complex_shis_by_flip_neighbor(out)
+            mg.assign_contracted_shis(out)
         return out
 
     def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
@@ -977,8 +1054,9 @@ class Complex:
         """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces.
 
         Candidate SHIs are the intersection of coface SHI sets minus the crossing
-        index; :meth:`contract` post-filters these via
-        :func:`mg.filter_complex_shis_by_flip_neighbor`.
+        index.  Infeasible 1-cell faces are dropped at construction time via
+        :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`; the slice is
+        finalized with :func:`mg.assign_contracted_shis`.
 
         Do not replace this with SS flip-neighbor membership: ``get_dual_graph``
         iterates ``poly.shis`` when building the next contraction level, and
@@ -988,22 +1066,43 @@ class Complex:
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
+        face_dim = ambient - codim
+        shi_i = int(shi)
+        candidate_shis = sorted(set(p1.shis) & set(p2.shis) - {shi_i})
+        if face_dim == 1 and p1.halfspaces is not None:
+            new_ss = p1.ss_np.copy()
+            new_ss[0, shi_i] = 0
+            probe = Polyhedron(
+                None,
+                new_ss,
+                halfspaces=p1.halfspaces,
+                codim=codim,
+                dim=face_dim,
+                _ambient_dim=ambient,
+            )
+            candidate_shis = [s for s in candidate_shis if probe.is_shi_face_feasible(int(s))]
         poly_kwargs: dict[str, Any] = {
             "halfspaces": p1.halfspaces,
-            "shis": list(set(p1.shis) & set(p2.shis) - {shi}),
+            "shis": candidate_shis,
             "codim": codim,
-            "dim": ambient - codim,
+            "dim": face_dim,
             "_ambient_dim": ambient,
         }
         return poly_kwargs
 
-    def get_boundary_cells(self, i: int, verbose: bool = False) -> set[Polyhedron]:
+    def get_boundary_cells(self, i: int, verbose: bool = False, *, verify: bool = True) -> set[Polyhedron]:
         """Get all (d-1)-cells in neuron i's BH."""
+        from relucent.boundary_search import _both_ambient_cofaces_feasible
+
         faces = set()
         edges = list(self.get_boundary_edges(i, verbose=verbose))
         for edge in tqdm(edges, desc="Getting Boundary Cells", delay=1, disable=not verbose):
             p1, p2 = edge[0], edge[1]
             shi = int(self.G.edges[edge]["shi"])
+            if verify and (shi not in p1.shis or shi not in p2.shis):
+                raise DualGraphAsymmetricEdgeError(
+                    f"Boundary edge shi={shi} on ({p1!r}, {p2!r}) lacks bidirectional SHI support."
+                )
             new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
             p = self.ss2poly(
@@ -1011,6 +1110,8 @@ class Complex:
                 check_exists=False,
                 **self._codim_one_face_kwargs(p1, p2, shi),
             )
+            if verify and not _both_ambient_cofaces_feasible(p, i):
+                raise ValueError(f"Boundary face {p!r} fails ambient coface feasibility for neuron {i}.")
             faces.add(p)
         return faces
 
@@ -1019,15 +1120,28 @@ class Complex:
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
+            ComplexNotCompleteError: If the input complex is not complete.
+            ComplexNotVerifiedError: If the input complex is not verified.
         """
-        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True, cubical=False)
+        self.assert_topology_ready()
+        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True, verify=True, cubical=False)
         cplx = Complex(self.net)
         for poly in tqdm(
-            self.get_boundary_cells(i, verbose=verbose), desc="Getting Boundary Complex", delay=1, disable=not verbose
+            self.get_boundary_cells(i, verbose=verbose, verify=True),
+            desc="Getting Boundary Complex",
+            delay=1,
+            disable=not verbose,
         ):
             cplx.add_polyhedron(poly, check_exists=False)
-        mg.filter_complex_shis_by_flip_neighbor(cplx)
+        mg.assign_contracted_shis(cplx)
         cplx.verify_arrangement_genericity()
+        from relucent.verify import verify_complex
+
+        if len(cplx) == 0:
+            cplx.set_exploration_state(complete=True, verified=True)
+            return cplx
+        cplx.set_exploration_state(complete=True, verified=False)
+        verify_complex(cplx, level="fast", record_state=True)
         return cplx
 
     @overload
@@ -1091,13 +1205,16 @@ class Complex:
         Each codimension-one face is keyed by zeroing one dual-graph SHI in the
         sign sequence.  Face ``shis`` kwargs come from coface intersection
         (:meth:`_codim_one_face_kwargs`, role 1), then
-        :func:`mg.filter_complex_shis_by_flip_neighbor`.  The next
+        :func:`mg.assign_contracted_shis`.  The next
         :meth:`get_dual_graph` call on the result iterates those ``_shis`` lists.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
+            ComplexNotCompleteError: If this complex is not complete.
+            ComplexNotVerifiedError: If this complex is not verified.
         """
-        G = self.get_dual_graph(verbose=verbose, require_complete=True, cubical=False)
+        self.assert_topology_ready()
+        G = self.get_dual_graph(verbose=verbose, require_complete=True, verify=True, cubical=False)
         new_complex = Complex(self.net)
         for p1, p2, shi in G.edges(data="shi"):
             new_ss = p1.ss_np.copy()
@@ -1107,7 +1224,12 @@ class Complex:
                 **self._codim_one_face_kwargs(p1, p2, int(shi)),
             )
 
-        mg.filter_complex_shis_by_flip_neighbor(new_complex)
+        mg.assign_contracted_shis(new_complex)
+        if len(new_complex) > 0:
+            from relucent.verify import verify_complex
+
+            new_complex.set_exploration_state(complete=True, verified=False)
+            verify_complex(new_complex, level="fast", record_state=True)
         return new_complex
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
@@ -1119,9 +1241,8 @@ class Complex:
 
         Phantom vertices (geometrically infeasible 0-cells that would otherwise arise
         from combinatorial contraction) are prevented upstream:
-        :func:`~relucent.meta_graph.filter_complex_shis_by_flip_neighbor` calls
-        :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible` on each 1-cell SHI
-        candidate before it can propagate to a 0-cell.
+        :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible` at 1-cell construction
+        and :func:`~relucent.meta_graph.assign_contracted_shis` on each slice.
 
         Raises:
             IncompleteDualGraphError: If dual adjacency is incomplete at some dimension;
@@ -1438,23 +1559,22 @@ class Complex:
                 p._finite_computed = False
                 p._finite = None
 
-        # Step 1: classify all 1-dim cells from their SHI count.
-        # A 1-cell is bounded iff it has 2 SHIs (both endpoints are hyperplanes);
-        # 0 or 1 SHIs means it is a full line or a ray (unbounded).
-        if 1 in by_dim:
-            n_from_shis = 0
-            for p in by_dim[1]:
-                if p._finite_computed:
-                    continue
-                n_shis = len(p._shis) if p._shis is not None else 0
-                p._finite = n_shis >= 2
-                p._finite_computed = True
-                n_from_shis += 1
-            if n_from_shis:
-                logger.info(
-                    "get_meta_graph: classified %d 1-cells from SHI count (no LP)",
-                    n_from_shis,
-                )
+        # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
+        n_from_faces, infeasible_one_cells = mg.classify_one_cells_finite_from_face_edges(
+            by_dim,
+            edges_by_dim,
+            lookup,
+        )
+        if infeasible_one_cells:
+            logger.info(
+                "get_meta_graph: %d infeasible 1-cells (no 0-faces, empty geometry)",
+                len(infeasible_one_cells),
+            )
+        if n_from_faces:
+            logger.info(
+                "get_meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
+                n_from_faces,
+            )
 
         # Step 2: ascending sweep — classify k-dim contracted cells (k ≥ 2) using
         # their already-classified (k-1)-dim faces.  Because every 0-dim cell is
@@ -1485,8 +1605,12 @@ class Complex:
                 len(all_chain_polys),
             )
 
+        excluded_tags: set[bytes] = set()
         for _k, c_k in sorted(by_dim.items(), reverse=True):
             for p in c_k:
+                if p.dim > 0 and p._finite_computed and p._finite is None:
+                    excluded_tags.add(p.tag)
+                    continue
                 meta.add_node(p.tag, **mg.meta_node_attrs(p))
 
         # Add cached face edges k -> k-1.
@@ -1496,14 +1620,22 @@ class Complex:
             edges, extra_tags = edges_by_dim[int(k)]
 
             known_nodes = set(meta.nodes)
-            new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes]
+            new_face_tags = [
+                tag
+                for tag in set(extra_tags)
+                if tag not in known_nodes and tag not in excluded_tags
+            ]
             if new_face_tags:
                 mg.propagate_finite_from_coface_edges(lookup, edges)
             for face_tag in new_face_tags:
                 meta.add_node(face_tag, **mg.meta_node_attrs(lookup[face_tag]))
             known_nodes.update(new_face_tags)
 
-            meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges)
+            meta.add_edges_from(
+                (u, v, {"shi": shi})
+                for u, v, shi in edges
+                if u not in excluded_tags and v not in excluded_tags
+            )
 
         if verify:
             logger.info("get_meta_graph: verify pass (re-derive SHIs/boundedness from meta-graph)")
@@ -1697,23 +1829,6 @@ class Complex:
         for k in range(kmin, kmax + 1):
             out[k] = int(ncells.get(k, 0) - boundary_rank.get(k, 0) - boundary_rank.get(k + 1, 0))
         return out
-
-    def _get_truncation_bound(self) -> float:
-        """Choose an L-infinity bounding box radius from polyhedron interior points.
-
-        Per manuscript convention, we set the truncation box using the interior point
-        (one per cell) with the largest max-norm across the complex.
-        """
-        if len(self) == 0:
-            return 1.0
-        max_norm = 0.0
-        for p in self:
-            ip = p.interior_point
-            if ip is None:
-                continue
-            max_norm = max(max_norm, float(np.max(np.abs(np.asarray(ip).reshape(-1)))))
-        # Avoid degenerate bound when everything is near the origin.
-        return float(cfg.PLOT_MARGIN_FACTOR) * max(max_norm, 1.0)
 
     @classmethod
     def get_betti_numbers_from_meta(
@@ -2036,6 +2151,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = False,
         require_complete: bool = False,
+        verify: bool = True,
         cubical: bool | None = None,
     ) -> nx.Graph[Polyhedron]: ...
 
@@ -2053,6 +2169,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = False,
         require_complete: bool = False,
+        verify: bool = True,
         cubical: bool | None = None,
     ) -> nx.Graph[int]: ...
 
@@ -2069,6 +2186,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = True,
         require_complete: bool = False,
+        verify: bool = True,
         cubical: bool | None = None,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
         """Construct the dual graph of the complex.
@@ -2101,6 +2219,8 @@ class Complex:
             require_complete: If True, raise :class:`IncompleteDualGraphError` when
                 boundary neighbors are missing. Defaults to False (emit a warning).
                 Used by :meth:`contract`.
+            verify: If True, require bidirectional ``_shis`` on each edge and run
+                cubical consistency checks. Defaults to True.
 
         Returns:
             networkx.Graph: The dual graph of the complex. Nodes are polyhedra
@@ -2113,6 +2233,8 @@ class Complex:
             IncompleteDualGraphError: If ``require_complete`` is True and boundary
                 neighbors are missing.
         """
+        if len(self) == 0:
+            return nx.Graph()
         max_dim = max(poly.dim for poly in self)
         graph = nx.Graph()
         top_cells: list[Polyhedron] = []
@@ -2122,42 +2244,35 @@ class Complex:
                 top_cells.append(poly)
 
         neighbor_tags = {p.tag for p in top_cells}
-        missing: list[tuple[np.ndarray, int, Polyhedron]] = []
-        use_cubical = (cfg.CUBICAL_DUAL_GRAPH if cubical is None else cubical) and max_dim == 1
-
-        if use_cubical:
+        use_cubical_1d = (cfg.CUBICAL_DUAL_GRAPH if cubical is None else cubical) and max_dim == 1
+        if max_dim >= 2 or int(max_dim) == int(self.dim):
+            # Ambient top dimension: combinatorial flip-neighbor edges, always sync _shis.
             edges, _ = mg.dual_edges_top_dim(top_cells, neighbor_tags, top_dim=max_dim)
             for u, v, shi in edges:
                 graph.add_edge(u, v, shi=shi)
             if top_cells:
-                mg.verify_dual_graph_cubical(top_cells, graph, top_dim=max_dim)
+                mg.sync_shis_from_dual_graph(graph)
+        elif use_cubical_1d:
+            # 1D complex with cubical 0-face sharing; sync _shis only if search left them empty.
+            edges, _ = mg.dual_edges_top_dim(top_cells, neighbor_tags, top_dim=max_dim)
+            for u, v, shi in edges:
+                graph.add_edge(u, v, shi=shi)
             if all(not poly.shis for poly in top_cells):
                 mg.sync_shis_from_dual_graph(graph)
         else:
-            for poly in tqdm(graph.nodes(), desc="Creating Dual Graph", leave=False, disable=not verbose):
+            # Contracted 1-skeleton: walk propagated poly.shis; skip missing flip neighbors.
+            for poly in tqdm(top_cells, desc="Creating Dual Graph", leave=False, disable=not verbose):
                 ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
                 for shi in poly.shis:
                     if cfg.CAREFUL_MODE:
                         assert ss.ravel()[shi] != 0
                     flip_ss_at_shi_inplace(ss, shi)
-                    try:
+                    with contextlib.suppress(KeyError):
                         graph.add_edge(poly, self[ss], shi=shi)
-                    except KeyError:
-                        missing.append((ss.copy(), shi, poly))
                     flip_ss_at_shi_inplace(ss, shi)
 
-        if len(missing) > 0 and max_dim == self.dim and not require_complete:
-            warnings.warn(
-                f"Dual graph is incomplete. {len(missing)} boundary neighbor(s) are missing from the complex."
-                + " Explore further (e.g. BFS/DFS) before topology routines.",
-                stacklevel=2,
-            )
-        if require_complete and len(missing) > 0 and max_dim == self.dim:
-            raise IncompleteDualGraphError(
-                f"Dual graph is incomplete: {len(missing)} boundary neighbor(s) are missing from the "
-                + "complex. Explore further (e.g. BFS/DFS) before contract(), get_chain_complex(), "
-                + "get_meta_graph(), or get_boundary_complex()."
-            )
+        if verify and top_cells:
+            mg.verify_dual_graph_cubical(top_cells, graph, top_dim=max_dim)
         if plot:
             from relucent.vis import get_colors
 
@@ -2202,6 +2317,11 @@ class Complex:
                 graph.edges[edge]["title"] = str(graph.edges[edge]["shi"])
         if plot or relabel:
             graph = nx.relabel_nodes(graph, {poly: i for i, poly in enumerate(self)})
+        if require_complete and int(max_dim) == int(self.dim) and top_cells:
+            # LP completeness check for full ambient top cells only.
+            from relucent.verify import verify_lp_flip_neighbors_in_complex
+
+            verify_lp_flip_neighbors_in_complex(self)
         return graph
 
     def recover_from_dual_graph(
