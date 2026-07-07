@@ -45,9 +45,7 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
             [(50, 3), (106, 2), (74, 1), (17, 0)],
             610,
             {0: 1, 3: 1},
-            marks=pytest.mark.skip(
-                reason="CAREFUL_MODE propagation can flag dim-2 SHI false negatives on this witness"
-            ),
+            marks=pytest.mark.skip(reason="CAREFUL_MODE propagation can flag dim-2 SHI false negatives on this witness"),
         ),
     ],
 )

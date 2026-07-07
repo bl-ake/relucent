@@ -1563,7 +1563,6 @@ class Complex:
         n_from_faces, infeasible_one_cells = mg.classify_one_cells_finite_from_face_edges(
             by_dim,
             edges_by_dim,
-            lookup,
         )
         if infeasible_one_cells:
             logger.info(
@@ -1620,11 +1619,7 @@ class Complex:
             edges, extra_tags = edges_by_dim[int(k)]
 
             known_nodes = set(meta.nodes)
-            new_face_tags = [
-                tag
-                for tag in set(extra_tags)
-                if tag not in known_nodes and tag not in excluded_tags
-            ]
+            new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
             if new_face_tags:
                 mg.propagate_finite_from_coface_edges(lookup, edges)
             for face_tag in new_face_tags:
@@ -1632,9 +1627,7 @@ class Complex:
             known_nodes.update(new_face_tags)
 
             meta.add_edges_from(
-                (u, v, {"shi": shi})
-                for u, v, shi in edges
-                if u not in excluded_tags and v not in excluded_tags
+                (u, v, {"shi": shi}) for u, v, shi in edges if u not in excluded_tags and v not in excluded_tags
             )
 
         if verify:

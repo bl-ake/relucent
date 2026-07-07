@@ -56,12 +56,7 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     meta = db.get_meta_graph(verbose=False)
 
     # Meta-graph should contain every feasible cell across the contraction chain.
-    expected_nodes = {
-        p.tag
-        for cc in chain
-        for p in cc
-        if not (p.dim > 0 and p.finite is None)
-    }
+    expected_nodes = {p.tag for cc in chain for p in cc if not (p.dim > 0 and p.finite is None)}
     assert set(meta.nodes) >= expected_nodes
 
     # Every edge should decrease dimension by exactly 1.
@@ -219,9 +214,7 @@ def _finite_from_dual_graph_propagation(
                 if poly.finite is None:
                     continue
                 zero_faces = {
-                    dst
-                    for src, dst, _ in face_edges
-                    if src == tag and cells.get(dst) is not None and cells[dst].dim == 0
+                    dst for src, dst, _ in face_edges if src == tag and cells.get(dst) is not None and cells[dst].dim == 0
                 }
                 finite[tag] = len(zero_faces) >= 2
                 continue
@@ -256,11 +249,10 @@ def test_classify_one_cells_finite_from_face_edges_empty_shis_two_zero_faces() -
     seg._finite_computed = False
     seg._finite = None
 
-    lookup = {p0.tag: p0, p1.tag: p1, seg.tag: seg}
-    by_dim = {0: [p0, p1], 1: [seg]}  # type: ignore[dict-item]
+    by_dim = {0: [p0, p1], 1: [seg]}
     edges_by_dim = {1: ([(seg.tag, p0.tag, 1), (seg.tag, p1.tag, 2)], [])}
 
-    n = mg.classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim, lookup)[0]
+    n = mg.classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim)[0]
     assert n == 1
     assert seg._finite is True
 
@@ -281,14 +273,12 @@ def test_classify_one_cells_finite_from_face_edges_infeasible_left_none() -> Non
     seg._shis = []
     seg._finite_computed = False
 
-    lookup = {seg.tag: seg}
-    by_dim = {1: [seg]}  # type: ignore[dict-item]
+    by_dim = {1: [seg]}
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}
 
     n = mg.classify_one_cells_finite_from_face_edges(
         by_dim,
         edges_by_dim,
-        lookup,
         geometric_infeasible={seg.tag},
     )[0]
     assert n == 1

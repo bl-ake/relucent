@@ -22,7 +22,6 @@ def _complex_init_no_auto_tolerances(self, net, *args, **kwargs):
 Complex.__init__ = _complex_init_no_auto_tolerances  # type: ignore[method-assign]
 
 
-
 # All tests run with extra consistency checks (see :data:`relucent.config.CAREFUL_MODE`).
 update_settings(CAREFUL_MODE=True)
 

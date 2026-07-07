@@ -65,17 +65,13 @@ def verify_shi_flip_symmetry(cplx: Complex) -> None:
             try:
                 neighbor = cplx[neighbor_ss]
             except KeyError as exc:
-                raise ShiFlipInvariantError(
-                    f"SHI {shi} on {poly!r} has no flip neighbor in the complex."
-                ) from exc
+                raise ShiFlipInvariantError(f"SHI {shi} on {poly!r} has no flip neighbor in the complex.") from exc
             if int(neighbor.dim) != top_dim:
                 raise ShiFlipInvariantError(
                     f"SHI {shi} on {poly!r} flips to wrong dimension {neighbor.dim} (expected {top_dim})."
                 )
             if int(shi) not in neighbor.shis:
-                raise ShiFlipInvariantError(
-                    f"Asymmetric SHI {shi}: listed on {poly!r} but not on flip neighbor {neighbor!r}."
-                )
+                raise ShiFlipInvariantError(f"Asymmetric SHI {shi}: listed on {poly!r} but not on flip neighbor {neighbor!r}.")
 
 
 def verify_dual_graph_edges(
@@ -96,13 +92,9 @@ def verify_dual_graph_edges(
             raise DualGraphAsymmetricEdgeError("Dual-graph edge is missing 'shi' attribute.")
         shi_i = int(shi)
         if shi_i not in u.shis:
-            raise DualGraphAsymmetricEdgeError(
-                f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in u.shis."
-            )
+            raise DualGraphAsymmetricEdgeError(f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in u.shis.")
         if shi_i not in v.shis:
-            raise DualGraphAsymmetricEdgeError(
-                f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in v.shis."
-            )
+            raise DualGraphAsymmetricEdgeError(f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in v.shis.")
     mg.verify_dual_graph_cubical(top_cells, graph, top_dim=top_dim)
 
 
@@ -130,9 +122,7 @@ def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None
         bound = default_polyhedron_bound(poly._net)
     fresh = get_shis(poly, bound=float(bound), strict=True)
     if set(fresh) != set(poly._shis):
-        raise ShiProofError(
-            f"Cached _shis {sorted(poly._shis)} != recomputed {sorted(fresh)} on {poly!r}."
-        )
+        raise ShiProofError(f"Cached _shis {sorted(poly._shis)} != recomputed {sorted(fresh)} on {poly!r}.")
 
 
 def verify_lp_flip_neighbors_in_complex(cplx: Complex) -> None:
@@ -172,9 +162,7 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex) -> None:
                 missing.append(f"LP facet shi={shi_i} on {poly!r} has no neighbor in complex")
                 continue
             if int(neighbor.dim) != top_dim:
-                missing.append(
-                    f"LP facet shi={shi_i} on {poly!r} flips to dim {neighbor.dim} (expected {top_dim})"
-                )
+                missing.append(f"LP facet shi={shi_i} on {poly!r} flips to dim {neighbor.dim} (expected {top_dim})")
     if missing:
         raise IncompleteDualGraphError(
             "Dual graph is incomplete relative to LP facets: "
@@ -204,11 +192,15 @@ def verify_complex(
             cplx._verified = True
         return
 
-    g = graph if graph is not None else cplx.get_dual_graph(
-        verbose=False,
-        require_complete=cplx.complete is True,
-        verify=False,
-        cubical=False,
+    g = (
+        graph
+        if graph is not None
+        else cplx.get_dual_graph(
+            verbose=False,
+            require_complete=cplx.complete is True,
+            verify=False,
+            cubical=False,
+        )
     )
     verify_shi_flip_symmetry(cplx)
     verify_dual_graph_edges(g, cplx)

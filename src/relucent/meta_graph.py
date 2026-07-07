@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import networkx as nx
@@ -405,9 +405,8 @@ def parallel_collect_meta_face_edges(
 
 
 def classify_one_cells_finite_from_face_edges(
-    by_dim: dict[int, Complex],
+    by_dim: Mapping[int, Iterable[Polyhedron]],
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
-    lookup: dict[bytes, Polyhedron],
     *,
     geometric_infeasible: set[bytes] | None = None,
 ) -> tuple[int, set[bytes]]:
@@ -452,7 +451,7 @@ def classify_one_cells_finite_from_face_edges(
 
 
 def geometric_infeasible_one_cells(
-    by_dim: dict[int, Complex],
+    by_dim: Mapping[int, Iterable[Polyhedron]],
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
 ) -> set[bytes]:
     """Return 1-cell tags that are geometrically empty (no Chebyshev center).
@@ -483,7 +482,7 @@ def geometric_infeasible_one_cells(
 
 
 def classify_finite_ascending(
-    by_dim: dict[int, Complex],
+    by_dim: Mapping[int, Iterable[Polyhedron]],
     lookup: dict[bytes, Polyhedron],
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
 ) -> int:
@@ -635,7 +634,7 @@ def assign_contracted_shis(cplx: Complex) -> int:
     return n_changed
 
 
-def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
+def compute_contracted_shis_top_down(by_dim: Mapping[int, Iterable[Polyhedron]]) -> None:
     """Fill missing ``_shis`` on chain cells (role 3).
 
     The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
@@ -655,7 +654,7 @@ def compute_contracted_shis_top_down(by_dim: dict[int, Complex]) -> None:
     which indicates false negatives in the original maximal-cell SHI computation.
 
     Args:
-        by_dim: Mapping from dimension to Complex (chain complex).  Top-dim cells
+        by_dim: Mapping from dimension to cells at that dimension.  Top-dim cells
             must have ``_shis`` already set by the searcher.
     """
     for k in sorted(by_dim.keys(), reverse=True):
