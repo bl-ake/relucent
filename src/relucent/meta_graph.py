@@ -651,7 +651,7 @@ def assign_contracted_shis(cplx: Complex) -> int:
             continue
         else:
             assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
-        if assigned != list(poly._shis):
+        if assigned != poly._shis:
             poly._shis = assigned
             n_changed += 1
     return n_changed
@@ -791,11 +791,7 @@ def complete_truncated_one_cell_boundaries(meta: nx.MultiDiGraph[Any]) -> tuple[
     edges_added = 0
 
     def _zero_neighbors(one_cell: object) -> set[object]:
-        return {
-            v
-            for _u, v, _ in meta.out_edges(one_cell, data=True)
-            if int(meta.nodes[v].get("dim", -1)) == 0
-        }
+        return {v for _u, v, _ in meta.out_edges(one_cell, data=True) if int(meta.nodes[v].get("dim", -1)) == 0}
 
     def _trunc_partner(one_cell: object) -> object | None:
         key = ("trunc", one_cell)

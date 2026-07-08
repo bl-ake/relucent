@@ -173,9 +173,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     for n, a in meta_tr.nodes(data=True):
         if int(a.get("dim", -1)) != 1:
             continue
-        zero_faces = [
-            v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0
-        ]
+        zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
         assert len(zero_faces) == 2, f"1-cell {n!r} should have two 0-face endpoints, got {zero_faces!r}"
 
     for u, v, d in meta_plain.edges(data=True):
