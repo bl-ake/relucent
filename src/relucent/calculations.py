@@ -34,6 +34,26 @@ class DegenerateHalfspaceInfeasibility(ValueError):
     """Near-zero normal with positive bias: :math:`a^\\top x + b \\le 0` is empty when ``||a||≈0`` and ``b>0``."""
 
 
+def _shi_variable_bounds_to_try(bound: float) -> list[float]:
+    """Ordered variable-box radii for the SHI LP; escalate when the first box is too small."""
+    inf = float(GRB.INFINITY)
+    if bound == inf or not np.isfinite(bound):
+        return [inf]
+    candidates = [float(bound)]
+    for radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
+        radius_f = float(radius)
+        if radius_f > bound:
+            candidates.append(radius_f)
+    candidates.append(inf)
+    seen: set[float] = set()
+    ordered: list[float] = []
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            ordered.append(candidate)
+    return ordered
+
+
 def _drop_degenerate_halfspaces_tracked(
     halfspaces: np.ndarray,
     *,
@@ -742,7 +762,6 @@ def get_shis(
     """
     if tol is None:
         tol = cfg.TOL_SHI_HYPERPLANE
-    shis = []
     hs_np = poly.halfspaces_np
     n_orig = int(hs_np.shape[0])
     A_orig = hs_np[:, :-1]
@@ -796,120 +815,147 @@ def get_shis(
         row_lp = {int(r): r for r in range(n_work)}
         k = amb_d
 
-    model = Model("SHIS", env)
-    z = model.addMVar((k, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="z")
-    constrs = model.addConstr(a_red @ z <= -b_red, name="hyperplanes")
-    model.optimize()
-    if model.status != GRB.OPTIMAL:
-        raise ValueError(f"Initial Solve Failed: Model status: {model.status}")
+    candidate_subset = subset or set(range(n_orig)) - set(poly.zero_indices)
+    candidate_subset = set(candidate_subset)
 
-    subset = subset or set(range(n_orig)) - set(poly.zero_indices)
-    subset = set(subset)
-
-    pbar = tqdm(total=len(subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
+    pbar = tqdm(total=len(candidate_subset), desc="Calculating SHIs", leave=False, delay=3, disable=not shi_pbar)
+    shis: list[int] = []
     poly_info: list[dict[str, object]] | None = [] if collect_info else None
-    while subset:
-        i = subset.pop()
-        if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
-            continue
-        wi = int(old_to_new[i])
-        if wi < 0:
-            continue
-        if (A_orig[i] == 0).all():
-            continue
-        j = row_lp.get(wi)
-        if j is None:
-            continue
-        pbar.set_postfix_str(f"#shis: {len(shis)}")
+    bounds_to_try = _shi_variable_bounds_to_try(bound)
+    last_status: int | None = None
+    model: Model | None = None
 
-        # Relax halfspace i (row j in the LP over z); i is the original halfspace index.
-        constrs[j].setAttr("RHS", -b_red[j, 0] + push_size)
-
-        ai = A_orig[i : i + 1, :].T  # (amb_d, 1)
-        c_obj = null_basis.T @ ai  # (k, 1); left-multiply z as (1,k) @ (k,1) for Gurobi
-        const_obj = float((ai.T @ x0).item() + b_orig[i, 0])
-        model.setObjective(c_obj.T @ z + const_obj, GRB.MAXIMIZE)
-        model.params.BestObjStop = cfg.GUROBI_SHI_BEST_OBJ_STOP
-        model.params.BestBdStop = cfg.GUROBI_SHI_BEST_BD_STOP
-        model.optimize()
-
-        if model.status == GRB.INTERRUPTED:
+    for bound_index, attempt_bound in enumerate(bounds_to_try):
+        if model is not None:
             model.close()
-            raise KeyboardInterrupt
-        if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
-            if model.objVal > cfg.TOL_SHI_OBJECTIVE:
-                x_amb = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
-                dists = A_orig @ x_amb + b_orig
-                if dists[(dists > 0)].sum() >= 1 + tol:
-                    msg = (
-                        f"Invalid Proof for SHI {i}! Violation Sizes: "
-                        f"{np.argwhere(dists.ravel() > 0), dists[np.argwhere(dists.ravel() > 0)]}"
-                    )
-                    if strict:
-                        from relucent.verify import ShiProofError
+        model = Model("SHIS", env)
+        z = model.addMVar((k, 1), lb=-attempt_bound, ub=attempt_bound, vtype=GRB.CONTINUOUS, name="z")
+        constrs = model.addConstr(a_red @ z <= -b_red, name="hyperplanes")
+        model.optimize()
+        last_status = model.status
+        if model.status != GRB.OPTIMAL:
+            continue
 
-                        raise ShiProofError(msg)
-                    w = RuntimeWarning(msg)
-                    poly.warnings.append(w)
-                    warnings.warn(w, stacklevel=2)
-                else:
-                    shis.append(i)
+        shis = []
+        if collect_info:
+            poly_info = []
+        subset = set(candidate_subset)
+        box_clipping_suspected = False
+        while subset:
+            i = subset.pop()
+            if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
+                continue
+            wi = int(old_to_new[i])
+            if wi < 0:
+                continue
+            if (A_orig[i] == 0).all():
+                continue
+            j = row_lp.get(wi)
+            if j is None:
+                continue
+            pbar.set_postfix_str(f"#shis: {len(shis)}")
 
-            basis_indices = constrs.CBasis.ravel() != 0
-            if new_method and basis_indices.sum() != k:
-                warnings.warn(
-                    "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
-                    stacklevel=2,
-                )
-            skip_size = 0
-            if new_method and basis_indices.sum() == k:
-                point_shis_np = a_red[basis_indices, :]
-                others_np = a_red[~basis_indices, :]
-                try:
-                    sols_np = np.linalg.solve(point_shis_np, others_np.T)
-                except np.linalg.LinAlgError:
+            # Relax halfspace i (row j in the LP over z); i is the original halfspace index.
+            constrs[j].setAttr("RHS", -b_red[j, 0] + push_size)
+
+            ai = A_orig[i : i + 1, :].T  # (amb_d, 1)
+            c_obj = null_basis.T @ ai  # (k, 1); left-multiply z as (1,k) @ (k,1) for Gurobi
+            const_obj = float((ai.T @ x0).item() + b_orig[i, 0])
+            model.setObjective(c_obj.T @ z + const_obj, GRB.MAXIMIZE)
+            model.params.BestObjStop = cfg.GUROBI_SHI_BEST_OBJ_STOP
+            model.params.BestBdStop = cfg.GUROBI_SHI_BEST_BD_STOP
+            model.optimize()
+
+            if model.status == GRB.INTERRUPTED:
+                model.close()
+                raise KeyboardInterrupt
+            if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
+                x_proof = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
+                x_norm = float(np.linalg.norm(x_proof))
+                if model.objVal > cfg.TOL_SHI_OBJECTIVE:
+                    dists = A_orig @ x_proof + b_orig
+                    if dists[(dists > 0)].sum() >= 1 + tol:
+                        msg = (
+                            f"Invalid Proof for SHI {i}! Violation Sizes: "
+                            f"{np.argwhere(dists.ravel() > 0), dists[np.argwhere(dists.ravel() > 0)]}"
+                        )
+                        if strict:
+                            from relucent.verify import ShiProofError
+
+                            raise ShiProofError(msg)
+                        w = RuntimeWarning(msg)
+                        poly.warnings.append(w)
+                        warnings.warn(w, stacklevel=2)
+                    else:
+                        shis.append(i)
+                elif np.isfinite(attempt_bound) and x_norm >= 0.99 * attempt_bound:
+                    # Objective was clipped by the variable box; retry with a larger bound.
+                    box_clipping_suspected = True
+
+                basis_indices = constrs.CBasis.ravel() != 0
+                if new_method and basis_indices.sum() != k:
                     warnings.warn(
-                        "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                        "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
                         stacklevel=2,
                     )
-                    sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
-                all_correct_np = (sols_np > 0).all(axis=0)
-                if all_correct_np.any():
-                    reduced_idx = np.arange(a_red.shape[0], dtype=np.intp)[~basis_indices][all_correct_np]
-                    work_rows = ineq_rows[reduced_idx]
-                    orig_to_remove = work_to_orig[work_rows]
-                    old_len = len(subset)
-                    subset -= set(int(x) for x in orig_to_remove.tolist() if x >= 0)
-                    new_len = len(subset)
-                    skip_size = old_len - new_len
-        else:
-            raise ValueError(f"Model status: {model.status}")
+                skip_size = 0
+                if new_method and basis_indices.sum() == k:
+                    point_shis_np = a_red[basis_indices, :]
+                    others_np = a_red[~basis_indices, :]
+                    try:
+                        sols_np = np.linalg.solve(point_shis_np, others_np.T)
+                    except np.linalg.LinAlgError:
+                        warnings.warn(
+                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
+                            stacklevel=2,
+                        )
+                        sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
+                    all_correct_np = (sols_np > 0).all(axis=0)
+                    if all_correct_np.any():
+                        reduced_idx = np.arange(a_red.shape[0], dtype=np.intp)[~basis_indices][all_correct_np]
+                        work_rows = ineq_rows[reduced_idx]
+                        orig_to_remove = work_to_orig[work_rows]
+                        old_len = len(subset)
+                        subset -= set(int(x) for x in orig_to_remove.tolist() if x >= 0)
+                        new_len = len(subset)
+                        skip_size = old_len - new_len
+            else:
+                raise ValueError(f"Model status: {model.status}")
 
-        if collect_info:
-            assert poly_info is not None
-            x_proof = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
-            poly_info.append(
-                {
-                    "Objective Value": model.objVal,
-                    "Min Non-Basis Slack": np.min(constrs.Slack[~basis_indices]),
-                    "Status": model.status,
-                    "# Skipped": skip_size,
-                }
-            )
-            if hasattr(model, "objVal"):
-                poly_info[-1]["Objective Value"] = model.objVal
-            if hasattr(model, "objBound"):
-                poly_info[-1]["Objective Bound"] = model.objBound
-            poly_info[-1]["x Norm"] = float(np.linalg.norm(x_proof))
-            if collect_info == "All":
-                poly_info[-1] |= {"Slacks": constrs.Slack, "-b[i]": -b_orig[i], "Status": model.status}
+            if collect_info:
+                assert poly_info is not None
+                poly_info.append(
+                    {
+                        "Objective Value": model.objVal,
+                        "Min Non-Basis Slack": np.min(constrs.Slack[~basis_indices]),
+                        "Status": model.status,
+                        "# Skipped": skip_size,
+                    }
+                )
+                if hasattr(model, "objVal"):
+                    poly_info[-1]["Objective Value"] = model.objVal
+                if hasattr(model, "objBound"):
+                    poly_info[-1]["Objective Bound"] = model.objBound
+                poly_info[-1]["x Norm"] = x_norm
+                if collect_info == "All":
+                    poly_info[-1] |= {"Slacks": constrs.Slack, "-b[i]": -b_orig[i], "Status": model.status}
 
-                poly_info[-1]["Proof"] = x_proof
+                    poly_info[-1]["Proof"] = x_proof
 
-        # Restore halfspace i
-        constrs[j].setAttr("RHS", -b_red[j, 0])
+            # Restore halfspace i
+            constrs[j].setAttr("RHS", -b_red[j, 0])
 
-        pbar.update(n_orig - len(subset) - pbar.n)
+            pbar.update(n_orig - len(subset) - pbar.n)
+
+        if box_clipping_suspected and bound_index + 1 < len(bounds_to_try):
+            continue
+        break
+    else:
+        if model is not None:
+            model.close()
+        raise ValueError(f"Initial Solve Failed: Model status: {last_status}")
+
+    assert model is not None
     model.close()
     if collect_info:
         assert poly_info is not None

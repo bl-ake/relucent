@@ -52,6 +52,7 @@ __all__ = [
     "face_tag",
     "filter_shi_candidates",
     "finite_cells_subgraph",
+    "complete_truncated_one_cell_boundaries",
     "flip_tag",
     "META_FACE_PARALLEL_MIN_CELLS",
     "meta_node_attrs",
@@ -82,8 +83,9 @@ META_FACE_PARALLEL_MIN_CELLS = 64
 # - **Node metadata** (:func:`meta_node_attrs`): derived flip-neighbor SHIs.
 #
 # **Contract path** (``contract`` / ``get_boundary_complex`` only):
-# :meth:`~relucent.complex.Complex._codim_one_face_kwargs` seeds coface-intersection
-# SHIs; :func:`assign_contracted_shis` flip-filters for the contracted dual graph.
+# With :data:`~relucent.config.CUBICAL_DUAL_GRAPH`, :func:`assign_contracted_shis`
+# assigns :func:`cubical_cell_shis`.  Legacy mode seeds coface-intersection SHIs
+# in :meth:`~relucent.complex.Complex._codim_one_face_kwargs`, then flip-filters.
 # Do not reuse that propagation in :meth:`~relucent.complex.Complex.get_meta_graph`.
 #
 # **Meta-graph path** (stateless):
@@ -627,10 +629,12 @@ def assign_contracted_shis(cplx: Complex) -> int:
     """Finalize ``_shis`` on a contracted slice after :meth:`~relucent.complex.Complex.contract`.
 
     Used only on the **contract path** (``contract``, ``get_boundary_complex``).
-    Coface-intersected candidates come from
-    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`; this pass applies the
-    flip-neighbor filter once the full slice is known.  Meta-graph node labels use
-    :func:`cubical_cell_shis` instead — do not call this from :meth:`~relucent.complex.Complex.get_meta_graph`.
+    When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, assigns
+    :func:`cubical_cell_shis` (SS crossings filtered to same-dimension flip
+    neighbors).  Otherwise filters coface-intersected candidates from
+    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`.  Meta-graph node
+    labels use :func:`cubical_cell_shis` as well — do not call this from
+    :meth:`~relucent.complex.Complex.get_meta_graph`.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -639,9 +643,14 @@ def assign_contracted_shis(cplx: Complex) -> int:
     neighbor_tags = {p.tag for p in cplx}
     n_changed = 0
     for poly in cplx:
-        if poly._shis is None:
+        if cfg.CUBICAL_DUAL_GRAPH:
+            assigned = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+            if int(poly.dim) == 1 and poly.halfspaces is not None:
+                assigned = [s for s in assigned if poly.is_shi_face_feasible(int(s))]
+        elif poly._shis is None:
             continue
-        assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
+        else:
+            assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
         if assigned != list(poly._shis):
             poly._shis = assigned
             n_changed += 1
@@ -767,6 +776,91 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
         tu, tv = ("trunc", u), ("trunc", v)
         if tu in dup_keys and tv in dup_keys:
             meta.add_edge(tu, tv, **dict(ed))
+
+    complete_truncated_one_cell_boundaries(meta)
+
+
+def complete_truncated_one_cell_boundaries(meta: nx.MultiDiGraph[Any]) -> tuple[int, int]:
+    """Materialize missing 0-faces so every 1-cell has two 0-cell endpoints in ``meta``.
+
+    After :func:`truncate_meta_graph`, unbounded 1-cells often have only the truncation
+    duplicate as a boundary vertex.  Combinatorially close each open end by linking to an
+    existing 0-face from sign-sequence zeroing when present, otherwise a per-cell endpoint.
+    """
+    nodes_added = 0
+    edges_added = 0
+
+    def _zero_neighbors(one_cell: object) -> set[object]:
+        return {
+            v
+            for _u, v, _ in meta.out_edges(one_cell, data=True)
+            if int(meta.nodes[v].get("dim", -1)) == 0
+        }
+
+    def _trunc_partner(one_cell: object) -> object | None:
+        key = ("trunc", one_cell)
+        return key if key in meta else None
+
+    for one_cell, attrs in list(meta.nodes(data=True)):
+        if int(attrs.get("dim", -1)) != 1:
+            continue
+        ss_in = attrs.get("ss")
+        if ss_in is None:
+            continue
+        ss_arr = np.asarray(ss_in, dtype=np.int8)
+        zero_faces = _zero_neighbors(one_cell)
+
+        # Link to interior 0-cells already present in the meta-graph.
+        for shi in ss_nonzero_indices(ss_arr):
+            if len(zero_faces) >= 2:
+                break
+            ft = face_tag(ss_arr, int(shi))
+            if ft not in meta or int(meta.nodes[ft].get("dim", -1)) != 0:
+                continue
+            if ft in zero_faces:
+                continue
+            meta.add_edge(one_cell, ft, shi=int(shi))
+            zero_faces.add(ft)
+            edges_added += 1
+
+        # Match a face zeroing to the truncation duplicate on the cut (tuple node key).
+        trunc = _trunc_partner(one_cell)
+        if trunc is not None and trunc not in zero_faces:
+            for shi in ss_nonzero_indices(ss_arr):
+                row = ss_arr.reshape(-1).copy()
+                row[int(shi)] = 0
+                trunc_ss = np.asarray(meta.nodes[trunc].get("ss"), dtype=np.int8)
+                if trunc_ss.shape == row.reshape(ss_arr.shape).shape and np.array_equal(trunc_ss, row.reshape(ss_arr.shape)):
+                    meta.add_edge(one_cell, trunc, shi=int(shi))
+                    zero_faces.add(trunc)
+                    edges_added += 1
+                    break
+
+        # One materialized endpoint per still-open end (unique per 1-cell).
+        while len(zero_faces) < 2:
+            mat_key: tuple[str, object, int] = ("mat", one_cell, len(zero_faces))
+            shi = ss_nonzero_indices(ss_arr)[0] if ss_nonzero_indices(ss_arr) else 0
+            row = ss_arr.reshape(-1).copy()
+            row[int(shi)] = 0
+            if mat_key not in meta:
+                meta.add_node(
+                    mat_key,
+                    poly=None,
+                    dim=0,
+                    ss=row.reshape(ss_arr.shape),
+                    finite=True,
+                    shis=[],
+                    materialized_face=True,
+                )
+                nodes_added += 1
+            if mat_key not in zero_faces:
+                meta.add_edge(one_cell, mat_key, shi=int(shi))
+                zero_faces.add(mat_key)
+                edges_added += 1
+            else:
+                break
+
+    return nodes_added, edges_added
 
 
 def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:

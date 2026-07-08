@@ -112,6 +112,7 @@ def test_neuron_activation_filtration_on_diamond(seeded: int):
     thetas = np.linspace(0.0, 2.0 * np.pi, 32, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     db = cplx.get_boundary_complex(cplx.n - 1)
     assert len(db) > 0
 

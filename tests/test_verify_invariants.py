@@ -63,6 +63,21 @@ def test_assert_topology_ready_blocks_unverified() -> None:
         cplx.get_boundary_complex(cplx.n - 1)
 
 
+def test_assert_topology_ready_blocks_add_point_only() -> None:
+    """Point sampling without BFS does not satisfy get_boundary_complex prerequisites."""
+    import torch
+    import torch.nn as nn
+
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    model = nn.Sequential(fc, nn.ReLU())
+    cplx = Complex(model)
+    for x in np.array([[-0.1, 0.0], [0.1, 0.0], [-0.1, 1.0], [0.1, -1.0]]):
+        cplx.add_point(x.reshape(1, -1), check_exists=True)
+    with pytest.raises(ComplexNotCompleteError, match="explore_for_topology|BFS"):
+        cplx.get_boundary_complex(cplx.n - 1)
+
+
 def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     """Top-cell ``_shis`` are re-derived from the dual graph, repairing asymmetric LP cache."""
     from relucent.utils import flip_ss_at_shi

@@ -1,4 +1,5 @@
 - Remove `CUBICAL_DUAL_GRAPH=False` branch / unused code
+- Rework `_shi_variable_bounds_to_try()`
 - clean up Poly init
 - fix torch support for model.py
 - project lower-dim polyhedra for SHI calculations

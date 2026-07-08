@@ -143,6 +143,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
 
     meta_plain = cplx.get_meta_graph(verbose=False)
     meta_tr = meta_plain.copy()
@@ -168,6 +169,14 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
         assert meta_tr.has_edge(n, dk)
         trunc_shis = [ed.get("shi") for _u, _v, _k, ed in meta_tr.out_edges(n, keys=True, data=True) if _v == dk]
         assert TRUNCATION_META_SHI in trunc_shis
+
+    for n, a in meta_tr.nodes(data=True):
+        if int(a.get("dim", -1)) != 1:
+            continue
+        zero_faces = [
+            v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0
+        ]
+        assert len(zero_faces) == 2, f"1-cell {n!r} should have two 0-face endpoints, got {zero_faces!r}"
 
     for u, v, d in meta_plain.edges(data=True):
         if u in ub and v in ub:
@@ -324,39 +333,30 @@ def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
 
 
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
-@pytest.mark.skip(reason="k<d SHI LP facets disagree with combinatorial propagation in both directions")
-def test_dual_graph_propagated_shis_match_get_shis_lp(seeded: int) -> None:
-    """Dual-graph propagated SHIs on contracted cells are a superset of ``get_shis`` LP facets.
-
-    Combinatorial propagation may include adjacencies the per-cell SHI LP misses
-    (false negatives on ``k < d`` cells).  We only flag LP facets absent from
-    the dual-graph propagation.
-    """
+def test_top_dim_lp_shis_subset_of_cubical_derivation(seeded: int) -> None:
+    """LP SHI facets on top-dimensional cells lie in the cubical flip-neighbor set."""
     set_seeds(seeded)
     net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    cplx.get_meta_graph(verbose=False)
-    dual_cells = _cells_from_dual_graph_propagation(cplx)
-    top_dim = max(p.dim for p in dual_cells.values())
+    top = [p for p in cplx if p.dim == cplx.dim]
+    neighbor_tags = {p.tag for p in top}
     env = get_env()
     mismatches: list[str] = []
 
-    for tag, poly in dual_cells.items():
-        dim = poly.dim
-        if dim <= 0 or dim >= top_dim:
-            continue
-        dual_shis = sorted(int(s) for s in (poly._shis or []))
+    for poly in top:
         lp_shis = _lp_shis(poly, env)
         if lp_shis is None:
             continue
-        if set(lp_shis) - set(dual_shis):
-            mismatches.append(f"dim={dim} tag={tag!r}: dual_graph={dual_shis} lp={lp_shis}")
+        cubical = mg.cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+        extra = set(lp_shis) - set(cubical)
+        if extra:
+            mismatches.append(f"tag={poly.tag!r}: lp={lp_shis} cubical={cubical} extra={sorted(extra)}")
 
     assert not mismatches, (
-        f"Dual-graph SHIs disagree with LP for {len(mismatches)} cells:\n"
+        f"LP SHIs not contained in cubical derivation for {len(mismatches)} top cells:\n"
         + "\n".join(mismatches[:20])
         + ("\n..." if len(mismatches) > 20 else "")
     )

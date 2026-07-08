@@ -112,6 +112,7 @@ def _populate_line_boundary(cplx: Complex, *, seed: int) -> Complex:
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, rng.standard_normal((200, 2))]))
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -120,6 +121,7 @@ def _populate_diamond_boundary(cplx: Complex, *, seed: int) -> Complex:
     thetas = np.linspace(0.0, 2.0 * np.pi, 40, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, rng.standard_normal((100, 2))]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -133,8 +135,6 @@ def test_constant_filtration_matches_betti_on_diamond_boundary(seeded: int, comp
 
 @pytest.mark.parametrize("compactify", [False, True])
 def test_constant_filtration_matches_betti_on_line_boundary(seeded: int, compactify: bool):
-    if not compactify:
-        pytest.skip("unbounded line boundary: persistence and truncated Betti conventions diverge")
     set_seeds(seeded)
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
@@ -143,7 +143,16 @@ def test_constant_filtration_matches_betti_on_line_boundary(seeded: int, compact
     assert_betti_match_topology(db, compactify=compactify)
 
 
-@pytest.mark.skip(reason="Full 1D BFS complex: persistence β0 convention diverges from topology (see #TODO)")
+def test_line_boundary_beta0_matches_components(seeded: int) -> None:
+    """Rank β₀ on truncated line boundary agrees with path-component count."""
+    set_seeds(seeded)
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
+    betti = db.get_betti_numbers(verify_connected_components=True)
+    assert betti.get(0, 0) >= 1
+
+
 def test_constant_filtration_matches_betti_on_small_relu_complex(seeded: int):
     set_seeds(seeded)
     model = nn.Sequential(nn.Linear(1, 3), nn.ReLU(), nn.Linear(3, 1), nn.ReLU())

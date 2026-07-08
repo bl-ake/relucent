@@ -170,11 +170,7 @@ class Complex:
         self._verified = verified
 
     def assert_topology_ready(self) -> None:
-        """Require a complete, verified complex before topology routines.
-
-        When exploration did not record flags (e.g. pointwise ``add_point``), run
-        verification on demand and cache the result.
-        """
+        """Require a complete, verified complex before topology routines."""
         if self._complete is True and self._verified is True:
             return
         if self._complete is False:
@@ -191,19 +187,12 @@ class Complex:
             raise ComplexNotVerifiedError(
                 "Complex is complete but not verified. Re-run BFS with verify=True or call " + "verify_complex."
             )
-        # Flags unknown (e.g. add_point without BFS): verify on demand.
-        from relucent.verify import ComplexNotCompleteError, verify_complex
+        from relucent.verify import ComplexNotCompleteError
 
-        try:
-            self.set_exploration_state(complete=True, verified=False)
-            verify_complex(self, level="fast", record_state=True)
-        except Exception as exc:
-            self.set_exploration_state(complete=False, verified=False)
-            raise ComplexNotCompleteError(
-                "Complex is not complete or failed invariant verification. Explore further "
-                + "(e.g. BFS) or pass an explicit exploration cap (max_polys) to opt into "
-                + "a partial complex."
-            ) from exc
+        raise ComplexNotCompleteError(
+            "Complex exploration state is unknown. Run BFS or explore_for_topology first, "
+            + "or set_exploration_state(complete=True, verified=True) for trusted loads."
+        )
 
     def __repr__(self) -> str:
         net_name = type(self._net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -1044,30 +1033,32 @@ class Complex:
 
     def get_boundary_graph(self, i: int, verbose: bool = False) -> nx.Graph[Polyhedron]:
         """Get the induced subgraph of neuron i's BH."""
-        return self.G.subgraph(
-            [edge[0] for edge in self.get_boundary_edges(i, verbose=verbose)]
-            + [edge[1] for edge in self.get_boundary_edges(i, verbose=verbose)]
-        )
+        edges = list(self.get_boundary_edges(i, verbose=verbose))
+        return self.G.subgraph([p for edge in edges for p in edge])
 
     def _codim_one_face_kwargs(self, p1: Polyhedron, p2: Polyhedron, shi: int) -> dict[str, Any]:
         """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces.
 
-        Candidate SHIs are the intersection of coface SHI sets minus the crossing
-        index.  Infeasible 1-cell faces are dropped at construction time via
-        :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`; the slice is
-        finalized with :func:`mg.assign_contracted_shis`.
+        When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, candidate SHIs are
+        all nonzero sign-sequence crossings on the face (role 2), then
+        :func:`mg.assign_contracted_shis` keeps flip neighbors in the slice.
+        Otherwise candidates are the legacy coface SHI intersection minus the
+        crossing index.  Infeasible 1-cell faces are dropped at construction time
+        via :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`.
 
-        Do not replace this with SS flip-neighbor membership: ``get_dual_graph``
-        iterates ``poly.shis`` when building the next contraction level, and
-        expanding ``_shis`` beyond the coface intersection creates spurious cells
-        and breaks ``∂² = 0``.  Meta-graph **face edges** use
-        :func:`mg.ss_nonzero_indices` instead; see ``negative-betti-meta-graph-bug.md``.
+        Meta-graph **face edges** always use :func:`mg.ss_nonzero_indices`; see
+        ``negative-betti-meta-graph-bug.md``.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
         face_dim = ambient - codim
         shi_i = int(shi)
-        candidate_shis = sorted(set(p1.shis) & set(p2.shis) - {shi_i})
+        if cfg.CUBICAL_DUAL_GRAPH:
+            face_ss = p1.ss_np.copy()
+            face_ss[0, shi_i] = 0
+            candidate_shis = list(mg.ss_nonzero_indices(face_ss))
+        else:
+            candidate_shis = sorted(set(p1.shis) & set(p2.shis) - {shi_i})
         if face_dim == 1 and p1.halfspaces is not None:
             new_ss = p1.ss_np.copy()
             new_ss[0, shi_i] = 0
@@ -1202,10 +1193,10 @@ class Complex:
         """Contract the maximal cells in the complex.
 
         Each codimension-one face is keyed by zeroing one dual-graph SHI in the
-        sign sequence.  Face ``shis`` kwargs come from coface intersection
-        (:meth:`_codim_one_face_kwargs`, role 1), then
-        :func:`mg.assign_contracted_shis`.  The next
-        :meth:`get_dual_graph` call on the result iterates those ``_shis`` lists.
+        sign sequence.  Face ``shis`` kwargs come from
+        :meth:`_codim_one_face_kwargs`, then :func:`mg.assign_contracted_shis`.
+        The next :meth:`get_dual_graph` call on the result iterates those ``_shis``
+        lists when :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is False.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.

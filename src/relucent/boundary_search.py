@@ -12,6 +12,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent import meta_graph as mg
 from relucent._logging import logger
 from relucent._network_scale import default_polyhedron_bound
 from relucent.boundary_mip import _is_top_boundary_ss, price_boundary_witness
@@ -85,14 +86,17 @@ def _ambient_coface_shis_for_boundary_cell(
 ) -> list[int]:
     """``_shis`` for a boundary top cell, matching :meth:`Complex.get_boundary_cells`.
 
-    Lifts ``poly`` off the bent hyperplane (``ss[boundary_shi] = ±1``) and takes
-    the coface SHI intersection of the two ambient top cells, as in
-    :meth:`Complex._codim_one_face_kwargs`.
+    When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, returns all nonzero
+    sign-sequence crossings on the slice (finalized by
+    :func:`~relucent.meta_graph.assign_contracted_shis`).  Otherwise lifts
+    ``poly`` off the bent hyperplane and intersects ambient coface SHI sets.
     """
     ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
     bshi = int(boundary_shi)
     if int(ss.ravel()[bshi]) != 0:
         raise ValueError(f"Expected ss[{bshi}]=0 on boundary cell, got {ss!r}")
+    if cfg.CUBICAL_DUAL_GRAPH:
+        return sorted(int(s) for s in mg.ss_nonzero_indices(ss))
     net = poly._net
     if net is None:
         raise ValueError("boundary cell missing network reference for ambient lift")
@@ -143,7 +147,7 @@ def _apply_ambient_boundary_shis(
     verbose: bool = False,
     **shis_kwargs: Any,
 ) -> None:
-    """Assign coface-intersection ``_shis`` to every top boundary cell."""
+    """Assign slice ``_shis`` to every top boundary cell before dual-graph finalize."""
     if len(cx) == 0:
         return
     nw = nworkers or process_aware_cpu_count() or 1
@@ -274,7 +278,12 @@ def boundary_searcher(
     )
 
     start = cx.add_polyhedron(start, check_exists=False)
-    result = get_shis(start, bound=bound, **shis_kwargs)
+    try:
+        result = get_shis(start, bound=bound, **shis_kwargs)
+    except ValueError as exc:
+        if "Initial Solve Failed" not in str(exc):
+            raise
+        result = _ambient_coface_shis_for_boundary_cell(start, boundary_shi, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
     start._shis = [s for s in result if int(s) != boundary_shi]  # boundary hyperplane is not a facet
     retain_geometry_caches(start, search_props)

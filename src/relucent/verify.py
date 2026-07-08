@@ -130,7 +130,6 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex) -> None:
     from relucent._network_scale import default_polyhedron_bound
     from relucent.calculations import get_shis
     from relucent.complex import IncompleteDualGraphError
-    from relucent.model import ReLUNetwork
 
     if len(cplx) == 0:
         return
@@ -142,8 +141,8 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex) -> None:
         if int(poly.dim) != top_dim:
             continue
         bound = poly.bound
-        if bound is None and isinstance(cplx.net, ReLUNetwork):
-            bound = default_polyhedron_bound(cplx.net)
+        if bound is None:
+            bound = default_polyhedron_bound(cplx._net)
         if bound is None:
             continue  # no bound → can't run facet LP
         try:
@@ -211,7 +210,7 @@ def verify_complex(
             if poly._shis is not None:
                 verify_shi_geometry(poly)
     if record_state:
-        complete = True if cplx._complete is None else bool(cplx._complete)  # ad-hoc add_point complexes
+        complete = True if cplx._complete is None else bool(cplx._complete)
         cplx.set_exploration_state(complete=complete, verified=True)
     else:
         cplx._verified = True  # legacy path for direct callers

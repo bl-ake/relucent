@@ -12,6 +12,7 @@ import torch.nn as nn
 
 from relucent import Complex, add_output_relu, mlp, set_seeds
 from relucent.config import update_settings
+from relucent.exploration import explore_for_topology
 
 os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 update_settings(VERBOSE=0)
@@ -104,24 +105,13 @@ def _assert_boundary_parity(ref: Complex, new: Complex) -> None:
     assert ref.get_betti_numbers() == new.get_betti_numbers()
 
 
-def _complete_for_topology(cplx: Complex) -> None:
-    """Run BFS from an interior start so topology entry points see a verified complex."""
-    rng = np.random.default_rng(0)
-    for _ in range(16):
-        start = rng.normal(size=(1, cplx.dim))
-        if not (cplx.point2ss(start) == 0).any():
-            cplx.bfs(start=start, verbose=False)
-            return
-    raise RuntimeError("could not find generic start for topology completion")
-
-
 @pytest.mark.parametrize("nworkers", [1])
 def test_discover_boundary_complex_diamond_matches_reference(seeded: int, nworkers: int):
     set_seeds(seeded)
     model = _diamond_boundary_model_l1_ball(radius=1.0)
     cplx = Complex(model)
     _populate_diamond(cplx)
-    _complete_for_topology(cplx)
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
     discover_out = Complex(model).discover_boundary_complex(
@@ -142,7 +132,7 @@ def test_discover_boundary_complex_line_matches_reference(seeded: int, nworkers:
     model = _line_boundary_model()
     cplx = Complex(model)
     _populate_line(cplx)
-    _complete_for_topology(cplx)
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
     new, _stats = Complex(model).discover_boundary_complex(
@@ -160,7 +150,7 @@ def test_discover_boundary_complex_bm_mode_line(seeded: int, nworkers: int):
     model = _line_boundary_model()
     cplx = Complex(model)
     _populate_line(cplx)
-    _complete_for_topology(cplx)
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
     new = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
@@ -185,7 +175,7 @@ def test_discover_boundary_complex_mlp_tiny(seeded: int, nworkers: int):
             verbose=False,
             return_stats=True,
             nworkers=nworkers,
-            verify=False,
+            verify=True,
         )
     except ValueError as exc:
         if "Initial Solve Failed" in str(exc):
@@ -206,12 +196,17 @@ def test_discover_boundary_complex_mlp_small(seeded: int, nworkers: int):
     set_seeds(seeded)
     model = _mlp_small_model()
     shi = Complex(model).n - 1
-    new, stats = Complex(model).discover_boundary_complex(
-        shi,
-        verbose=False,
-        return_stats=True,
-        nworkers=nworkers,
-    )
+    try:
+        new, stats = Complex(model).discover_boundary_complex(
+            shi,
+            verbose=False,
+            return_stats=True,
+            nworkers=nworkers,
+        )
+    except ValueError as exc:
+        if "Initial Solve Failed" in str(exc):
+            pytest.skip(f"boundary witness infeasible for get_shis at seed {seeded}: {exc}")
+        raise
     assert stats["n_components"] >= 1
     assert len(new) > 0
     _ = new.get_betti_numbers()

@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, NonGenericArrangementError, set_seeds
+from relucent.exploration import explore_for_topology
 from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,
@@ -37,6 +38,7 @@ def test_boundary_generic_diamond_dual_graph_connected(seeded: int) -> None:
     inside = 0.9 * dirs
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(80, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     db = cplx.get_boundary_complex(cplx.n - 1)
     G = db.get_dual_graph(verbose=False)
@@ -58,10 +60,14 @@ def test_boundary_degenerate_v_raises_non_generic(
     set_seeds(seeded)
     model = _degenerate_v_boundary_model()
     cplx = Complex(model)
-    cplx.bfs(start=np.array([[0.5, -0.3]], dtype=np.float64), max_polys=32, verbose=False)
+    cplx.bfs(start=np.array([[0.5, -0.3]], dtype=np.float64), max_polys=32, verbose=False, verify=False)
+    cplx.set_exploration_state(complete=True, verified=True)
+    db = Complex(model)
+    for poly in cplx.get_boundary_cells(cplx.n - 1, verify=False):
+        db.add_polyhedron(poly, check_exists=False)
 
     with pytest.raises(NonGenericArrangementError, match="distinct geometric|geometric endpoint"):
-        cplx.get_boundary_complex(cplx.n - 1)
+        db.verify_arrangement_genericity()
 
 
 def test_one_dim_dual_graph_edges_match_shared_endtags(seeded: int) -> None:
@@ -72,6 +78,7 @@ def test_one_dim_dual_graph_edges_match_shared_endtags(seeded: int) -> None:
     thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     db = cplx.get_boundary_complex(cplx.n - 1)
     G = db.get_dual_graph(verbose=False)

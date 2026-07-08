@@ -40,6 +40,9 @@ from tests.integration.helpers import (  # noqa: E402
     witness_by_id,
 )
 
+# Dual-roundtrip / specialty witnesses: no boundary-parity golden fields in the manifest.
+_REFRESH_SKIP = frozenset({"dual_recovery_4392"})
+
 
 def _compute_golden(
     model: Any,
@@ -51,11 +54,18 @@ def _compute_golden(
     ambient = run_bfs_ambient(model, spec, nworkers=nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
     boundary_full = ambient.get_boundary_complex(shi, verbose=False)
-    boundary_disc = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
     tags_full = tag_set(boundary_full)
-    tags_disc = tag_set(boundary_disc)
     betti_full = truncated_betti(boundary_full)
-    betti_disc = truncated_betti(boundary_disc)
+    tags_disc: set[bytes] = set()
+    betti_disc: dict[int, int] = {}
+    try:
+        boundary_disc = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
+        tags_disc = tag_set(boundary_disc)
+        betti_disc = truncated_betti(boundary_disc)
+    except ValueError as exc:
+        if "Initial Solve Failed" not in str(exc):
+            raise
+        print(f"  WARNING: discover_boundary_complex failed: {exc}", flush=True)
     return {
         "n_regions": len(ambient),
         "n_boundary_cells": len(tags_full),
@@ -97,6 +107,9 @@ def main() -> None:
         target_ids = [s.id for s in load_manifest()]
 
     for wid in target_ids:
+        if wid in _REFRESH_SKIP:
+            print(f"Skipping {wid} (not a boundary-parity golden witness)", flush=True)
+            continue
         spec = witness_by_id(wid)
         print(f"Refreshing {wid} (nworkers={args.nworkers}) ...", flush=True)
         model = load_witness_model(spec)

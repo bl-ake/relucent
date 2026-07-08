@@ -18,6 +18,7 @@ from relucent.boundary_mip import (
     price_boundary_witness,
 )
 from relucent.config import update_settings
+from relucent.exploration import explore_for_topology
 from relucent.utils import encode_ss
 
 update_settings(VERBOSE=0)
@@ -46,6 +47,12 @@ def _populate_line(cplx: Complex) -> None:
         cplx.add_point(x.reshape(1, -1), check_exists=True)
 
 
+def _complete_line_topology(cplx: Complex) -> int:
+    _populate_line(cplx)
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
+    return cplx.n - 1
+
+
 def test_nogood_flip_terms_empty_for_single_relu_boundary():
     """Single-ReLU networks have no free indicators to flip at the boundary pin."""
     tag = b"\x00"
@@ -65,8 +72,7 @@ def test_tags_requiring_cuts_marks_excluded_pattern(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     assert len(ref) >= 1
     known = next(iter(ref))
@@ -86,8 +92,7 @@ def test_tags_requiring_cuts_empty_when_already_rejected(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     known = next(iter(ref))
     ss = np.asarray(known.ss_np, dtype=np.int8).reshape(1, -1)
@@ -107,8 +112,7 @@ def test_price_boundary_witness_finds_unvisited_cell(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     assert len(tags) >= 1
@@ -122,8 +126,7 @@ def test_price_boundary_witness_proven_none_when_all_visited(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     witness = price_boundary_witness(cplx._net, shi, tags)
@@ -171,6 +174,7 @@ def test_diamond_discover_finds_all_components(seeded: int):
             continue
         cplx.add_point(x.reshape(1, -1), check_exists=True)
 
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
     ref_components = nx.number_connected_components(ref.get_dual_graph(verbose=False, require_complete=False))
@@ -244,8 +248,7 @@ def test_cut_ordering_preserves_witness_tag(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     target = next(iter(tags))
@@ -271,8 +274,7 @@ def test_price_boundary_witness_static_exclusions_match_lazy(seeded: int):
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     assert len(tags) >= 1
@@ -303,8 +305,7 @@ def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch
     set_seeds(seeded)
     model = _line_boundary_model()
     cplx = Complex(model)
-    _populate_line(cplx)
-    shi = cplx.n - 1
+    shi = _complete_line_topology(cplx)
     ref = cplx.get_boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     assert len(tags) >= 1

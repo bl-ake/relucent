@@ -19,7 +19,7 @@ import torch.nn as nn
 import relucent.topology as topology
 from relucent import Complex, set_seeds
 from relucent.exploration import explore_for_topology
-from relucent.topology import C_BACKEND_AVAILABLE, ConnectedComponentsMismatch, get_betti_numbers
+from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
 
 
 def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
@@ -125,6 +125,7 @@ def _populate_diamond_boundary(seed: int) -> Complex:
     thetas = np.linspace(0.0, 2.0 * np.pi, 40, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, rng.standard_normal((80, 2))]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -142,6 +143,7 @@ def _populate_line_boundary(seed: int) -> Complex:
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, rng.standard_normal((80, 2))]))
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
@@ -308,22 +310,19 @@ def test_get_betti_numbers_kmin0_unaffected() -> None:
 
 
 def test_beta0_truncated_two_components() -> None:
-    """Truncated unbounded complex: β₀ equals graph component count (not rank formula)."""
+    """Truncated unbounded complex: rank-formula β₀ equals graph component count."""
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
     betti = get_betti_numbers(meta)
     assert betti.get(0) == 2, f"expected β₀=2 after truncation, got {betti}"
 
 
-def test_verify_connected_components_raises() -> None:
-    """verify_connected_components surfaces rank-formula vs graph mismatch."""
+def test_verify_connected_components_passes_truncated_meta() -> None:
+    """After truncation closure, rank β₀ matches path components."""
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
-    with pytest.raises(ConnectedComponentsMismatch) as exc_info:
-        get_betti_numbers(meta, verify_connected_components=True)
-    err = exc_info.value
-    assert err.rank_beta0 == 0
-    assert err.graph_beta0 == 2
+    betti = get_betti_numbers(meta, verify_connected_components=True)
+    assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"
 
 
 def test_verify_connected_components_passes_for_proper_complex() -> None:

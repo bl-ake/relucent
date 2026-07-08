@@ -33,6 +33,7 @@ __version__ = _read_version()
 if TYPE_CHECKING:
     from .complex import Complex
     from .convert_model import convert
+    from .exploration import explore_for_topology, generic_topology_start
     from .meta_graph import NonGenericArrangementError
     from .poly import Polyhedron
     from .ss import SSManager
@@ -51,6 +52,8 @@ __all__ = [
     "get_colors",
     "get_env",
     "add_output_relu",
+    "explore_for_topology",
+    "generic_topology_start",
     "mlp",
     "plot_complex",
     "plot_polyhedron",
@@ -67,6 +70,8 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "get_colors": ("relucent.vis", "get_colors"),
     "get_env": ("relucent.utils", "get_env"),
     "add_output_relu": ("relucent.utils", "add_output_relu"),
+    "explore_for_topology": ("relucent.exploration", "explore_for_topology"),
+    "generic_topology_start": ("relucent.exploration", "generic_topology_start"),
     "mlp": ("relucent.utils", "mlp"),
     "plot_complex": ("relucent.vis", "plot_complex"),
     "plot_polyhedron": ("relucent.vis", "plot_polyhedron"),

@@ -41,6 +41,7 @@ def test_dual_edges_match_flip_neighbors_on_diamond_boundary(seeded: int) -> Non
     thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     db = cplx.get_boundary_complex(cplx.n - 1)
     G = db.get_dual_graph(verbose=False)
@@ -57,6 +58,7 @@ def test_cubical_dual_graph_on_boundary_has_edges(seeded: int, monkeypatch: pyte
     thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     monkeypatch.setattr(cfg, "CUBICAL_DUAL_GRAPH", True)
     db = cplx.get_boundary_complex(cplx.n - 1)

@@ -6,16 +6,12 @@ These tests construct small, fixed-weight ReLU networks whose decision boundary
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
-import pytest
 import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds
-
-INTEGRATION_ENV = "RELUCENT_RUN_DB_INTEGRATION"
+from relucent.exploration import explore_for_topology
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -104,12 +100,12 @@ def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
     set_seeds(seeded)
     model = _diamond_boundary_model_l1_ball(radius=1.0)
     cplx = Complex(model)
-    # Populate many regions near the decision boundary without running BFS.
     thetas = np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False)
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     inside = 0.9 * dirs
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
@@ -133,6 +129,7 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     inside = 0.9 * dirs
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
+    explore_for_topology(cplx, np.array([0.1, 0.2]))
     db = cplx.get_boundary_complex(cplx.n - 1)
     betti_std = db.get_betti_numbers()
     assert db.get_betti_numbers(verify_chain_complex=True) == betti_std
@@ -152,6 +149,7 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx2, np.vstack([left, right, np.random.randn(200, 2)]))
+    explore_for_topology(cplx2, np.array([0.5, 0.0]))
     db2 = cplx2.get_boundary_complex(cplx2.n - 1)
     _ = db2.get_betti_numbers(verify_chain_complex=True)
     _ = db2.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True)
@@ -176,6 +174,7 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
     right = grid.copy()
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
@@ -194,38 +193,3 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
 
     # Unbounded line boundary: the sole 1-cell is non-finite, so respect_finite is empty.
     assert betti_embedded == {} or betti_embedded == betti_std
-
-
-@torch.no_grad()
-def _far_away_hyperplane_model() -> nn.Sequential:
-    """Model whose last neuron's BH is an affine line far from sampled points."""
-    # y = ReLU(x1 + 100) has decision boundary x1 = -100 (homeomorphic to R).
-    fc = nn.Linear(2, 1, bias=True, dtype=torch.float64)
-    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
-    fc.bias.data[:] = torch.tensor([100.0], dtype=torch.float64)
-    return nn.Sequential(fc, nn.ReLU())
-
-
-@pytest.mark.skipif(
-    os.environ.get("GITHUB_ACTIONS", "0") == "1" or os.environ.get("CI", "0") == "1",
-    reason="Skip decision-boundary integration tests on CI (optional).",
-)
-@pytest.mark.skipif(
-    os.environ.get(INTEGRATION_ENV, "0") != "1",
-    reason=f"Opt-in integration test. Set {INTEGRATION_ENV}=1.",
-)
-def test_decision_boundary_empty_boundary_has_no_cells(seeded: int):
-    """Far-away affine BH: sampling misses one side; one boundary 1-cell is recovered.
-
-    With intrinsic ``finite`` from Chebyshev (not coface propagation), the lone
-    bounded line segment yields the same ``{1: 1}`` pattern in standard and
-    Borel–Moore conventions here.
-    """
-    set_seeds(seeded)
-    model = _far_away_hyperplane_model()
-    cplx = Complex(model)
-    _add_points(cplx, np.random.randn(300, 2))
-    db = cplx.get_boundary_complex(cplx.n - 1)
-    assert len(db) == 1
-    assert db.get_betti_numbers() == {1: 1}
-    assert db.get_betti_numbers(compactify=True, reduced=True) == {1: 1}

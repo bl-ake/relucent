@@ -2,13 +2,13 @@
 
 Face **edges** in :meth:`~relucent.complex.Complex.get_meta_graph` must use every
 nonzero sign-sequence entry (:func:`~relucent.meta_graph.ss_nonzero_indices`),
-not propagated ``_shis`` lists that coface intersection can shrink.
+not propagated ``_shis`` lists that can be a strict subset of SS crossings.
 
-Face **construction** in :meth:`~relucent.complex.Complex.contract` keeps
-coface-intersected ``shis`` in kwargs plus flip-neighbor assignment
-(:func:`~relucent.meta_graph.assign_contracted_shis`): assigning
-full SS flip-neighbor membership to ``_shis`` before further contractions would
-add spurious dual-graph edges and break ``∂² = 0``.
+Face **construction** in :meth:`~relucent.complex.Complex.contract` seeds SHI
+candidates from SS crossings and finalizes with
+:func:`~relucent.meta_graph.assign_contracted_shis` (
+:func:`~relucent.meta_graph.cubical_cell_shis`). Using propagated ``_shis`` for
+meta-graph face-edge discovery would omit valid faces and break ``∂² = 0``.
 
 Deep uniform MLPs with seeds 2 and 51 exhibited the latter failure under the
 incorrect WIP.

@@ -24,7 +24,7 @@ flowchart TD
     search["BFS discovers top-dimensional cells"]
     chain["get_chain_complex: contract down to 0-cells"]
     meta["get_meta_graph: face edges + bounded/unbounded labels"]
-    trunc["truncate_meta_graph"]
+    trunc["truncate_meta_graph + close 1-cell boundaries"]
     rank["topology.get_betti_numbers: rank boundary matrices"]
 
     search --> chain --> meta --> trunc --> rank
@@ -152,6 +152,22 @@ Unbounded cells (`finite is False`) get a duplicate node "at infinity":
 The idea is to model the link at infinity so homology of the truncated complex
 reflects the topology of unbounded regions.
 
+### Step 3b: Close 1-cell boundaries
+
+**Entry point:** [`complete_truncated_one_cell_boundaries()`](../src/relucent/meta_graph.py)
+(called automatically at the end of [`truncate_meta_graph()`](../src/relucent/meta_graph.py)).
+
+Truncation can leave 1-cells with only one 0-cell endpoint (the cut duplicate).
+Closure materializes the missing endpoint so each 1-cell has two 0-faces in ∂₁,
+as if the complex were restricted to a large bounding box:
+
+1. Link to an existing interior 0-cell when its face tag is already in the graph.
+2. Otherwise add a per-1-cell materialized 0-face node.
+
+This makes the truncated 1-skeleton a valid CW complex; β₀ from the rank formula
+then matches the path-component count. Pass `verify_connected_components=True` to
+`get_betti_numbers()` as a sanity check.
+
 ---
 
 ## Step 4: Rank boundary matrices
@@ -169,13 +185,6 @@ From the (possibly truncated) meta-graph:
 4. Apply the cellular formula:
 
    `β_k = (number of k-cells) − rank(∂_k) − rank(∂_{k+1})`
-
-### β₀ is special
-
-When 0-cells are present (`kmin == 0`), β₀ is set from the number of connected
-components of the meta-graph (edges treated as undirected), not from the rank
-formula alone. This stays correct after truncation, where half-edges at infinity
-would confuse a pure rank count.
 
 When there are no 0-cells (e.g. a boundary complex with only 1- and 2-cells), the
 lowest key in the returned dictionary is `1`, not `0`.

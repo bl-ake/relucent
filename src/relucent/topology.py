@@ -89,8 +89,8 @@ class ChainComplexInconsistent(RuntimeError):
 class ConnectedComponentsMismatch(RuntimeError):
     """Rank-formula β₀ disagrees with the graph component count.
 
-    This typically indicates half-edges in a truncated complex, where ``rank(∂₁)``
-    is inflated and the algebraic formula no longer counts path-connected components.
+    Indicates the truncated meta-graph 1-skeleton is not a closed CW complex
+    (e.g. missing materialized 0-faces after truncation).
     """
 
     def __init__(self, rank_beta0: int, graph_beta0: int) -> None:
@@ -98,7 +98,7 @@ class ConnectedComponentsMismatch(RuntimeError):
         self.graph_beta0 = graph_beta0
         super().__init__(
             f"β₀ from rank formula ({rank_beta0}) != graph components ({graph_beta0}). "
-            + "The chain complex has half-edges; use verify_connected_components=True to surface this."
+            + "Truncation closure may be incomplete; use verify_connected_components=True to surface this."
         )
 
 
@@ -472,8 +472,7 @@ def get_betti_numbers(
             where both maps exist; otherwise raise :class:`ChainComplexInconsistent`.
         verify_connected_components: If True, require rank-formula β₀ to agree with the
             number of path-connected components when ``kmin == 0``; otherwise raise
-            :class:`ConnectedComponentsMismatch`. When False (default), β₀ is always set
-            from graph connectivity for ``kmin == 0``.
+            :class:`ConnectedComponentsMismatch`.
         verbose: If True, print short progress lines to stderr.
         nworkers: Number of threads to use for ranking independent boundary maps concurrently.
             ``None`` (default): automatically use one thread per non-trivial map when the C
@@ -491,9 +490,9 @@ def get_betti_numbers(
         boundary complex consisting only of 1- and 2-cells returns ``{1: n}``
         where ``n`` is the number of connected components of the 1-skeleton.
 
-        When ``kmin == 0``, β₀ is the number of path-connected components of the
-        meta-graph (not necessarily the rank formula), which remains correct for
-        truncated complexes with half-edges.
+        When ``kmin == 0``, β₀ is computed from the cellular rank formula on the
+        (possibly truncated and closed) meta-graph. Use ``verify_connected_components=True``
+        to assert it equals the path-component count.
     """
     if meta.number_of_nodes() == 0:
         return {}
@@ -629,15 +628,11 @@ def get_betti_numbers(
         r_dk1 = boundary_rank.get(k + 1, 0) if k < kmax else 0
         beta[k] = int(n_k - r_dk - r_dk1)
 
-    if kmin == 0:
+    if kmin == 0 and verify_connected_components:
         n_cc = _count_weakly_connected_components(meta)
         rank_beta0 = beta.get(0, 0)
-        if verify_connected_components and rank_beta0 != n_cc:
+        if rank_beta0 != n_cc:
             raise ConnectedComponentsMismatch(rank_beta0, n_cc)
-        if n_cc > 0:
-            beta[0] = n_cc
-        elif 0 in beta and beta[0] == 0:
-            beta.pop(0)
 
     if reduced and int(beta.get(0, 0)) > 0:
         # Reduced homology: β̃0 = β0 - 1 (when β0 is represented explicitly).

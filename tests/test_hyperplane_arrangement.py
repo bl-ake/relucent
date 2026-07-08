@@ -25,10 +25,10 @@ def _generic_hyperplane_arrangement_num_d_cells(*, ambient_dim: int, num_hyperpl
 @pytest.mark.parametrize(
     ("ambient_dim", "num_hidden"),
     [
-        pytest.param(2, 4, marks=pytest.mark.xfail(reason="BFS misses regions when get_shis omits facets")),
+        (2, 4),
         (2, 6),
         (3, 5),
-        pytest.param(3, 7, marks=pytest.mark.xfail(reason="BFS misses regions when get_shis omits facets")),
+        (3, 7),
         (4, 6),
     ],
 )

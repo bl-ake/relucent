@@ -18,6 +18,7 @@ __all__ = [
     "explore_for_topology",
     "finalize_ambient_search",
     "finalize_boundary_complex",
+    "generic_topology_start",
     "search_stats_dict",
 ]
 
@@ -134,16 +135,32 @@ def search_stats_dict(
     return out
 
 
+def generic_topology_start(cplx: Complex, *, seed: int = 0) -> np.ndarray:
+    """Return an interior start point that does not lie on any hyperplane."""
+    rng = np.random.default_rng(seed)
+    for _ in range(32):
+        start = rng.normal(size=(1, cplx.dim))
+        if not (cplx.point2ss(start) == 0).any():
+            return np.asarray(start, dtype=np.float64).reshape(-1)
+    raise RuntimeError("could not find generic start for topology exploration")
+
+
 def explore_for_topology(
     cplx: Complex,
-    start: np.ndarray,
+    start: np.ndarray | None = None,
     *,
+    seed: int = 0,
     max_polys: float = float("inf"),
     nworkers: int | None = None,
 ) -> None:
-    """BFS from ``start`` and require a complete, verified ambient complex."""
+    """BFS from ``start`` and require a complete, verified ambient complex.
+
+    When ``start`` is None, :func:`generic_topology_start` picks an interior point.
+    """
     from relucent.complex import IncompleteDualGraphError
 
+    if start is None:
+        start = generic_topology_start(cplx, seed=seed)
     kwargs: dict[str, object] = {
         "start": np.asarray(start, dtype=np.float64).reshape(1, -1),
         "max_polys": max_polys,
