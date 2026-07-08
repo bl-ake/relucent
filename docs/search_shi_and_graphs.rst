@@ -126,18 +126,22 @@ Role 1 — Contraction and contracted slices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When building lower-dimensional cells via :meth:`~relucent.complex.Complex.contract`,
-each codimension-one face inherits SHI candidates from its cofaces::
+each codimension-one face seeds SHI candidates from its sign sequence::
 
-   SHI(face) = ∩ { SHI(coface) \ {crossing_shi} : coface ⊃ face }
+   SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
 
+The crossing hyperplane is already zeroed, so it is not included.
 :meth:`~relucent.complex.Complex._codim_one_face_kwargs` applies this at face
-creation. After the full slice is known,
-:func:`~relucent.meta_graph.assign_contracted_shis` filters candidates with
-:func:`~relucent.meta_graph.filter_shi_candidates`: keep only SHIs whose
-flip-neighbor exists in the slice.
+creation (via :func:`~relucent.meta_graph.ss_nonzero_indices`). Infeasible
+1-cells are dropped with
+:meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`. After the full slice is
+known, :func:`~relucent.meta_graph.assign_contracted_shis` sets authoritative
+``_shis`` to :func:`~relucent.meta_graph.cubical_cell_shis` — the same
+flip-neighbor rule as role 3, restricted to cells in the slice.
 
-**Do not** replace this with full sign-sequence flip-neighbor closure on
-contracted 1-skeletons — that adds spurious edges and breaks ``∂² = 0``.
+**Critical:** meta-graph **face edges** still use role 2 (all SS crossings), not
+propagated ``_shis``. Using only ``_shis`` for face discovery omits valid faces
+and breaks ``∂² = 0``.
 
 Role 2 — Meta-graph face edges
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,14 +204,15 @@ and topology.
 On contracted slices (boundary, chain complex)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After :meth:`~relucent.complex.Complex.contract` creates faces, SHIs come from
-coface intersection (role 1) plus :func:`~relucent.meta_graph.assign_contracted_shis`.
-Contracted 1-skeleton dual graphs walk ``poly.shis`` lists rather than full SS
-flip closure.
+After :meth:`~relucent.complex.Complex.contract` creates faces, SHIs are seeded
+from SS crossings (role 1) and finalized by
+:func:`~relucent.meta_graph.assign_contracted_shis` to
+:func:`~relucent.meta_graph.cubical_cell_shis`. Contracted 1-skeleton dual
+graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
 
-Boundary discovery additionally runs ambient coface SHI attachment
-(``_apply_ambient_boundary_shis`` in :mod:`relucent.boundary_search`) before
-finalize.
+Boundary discovery seeds slice ``_shis`` from SS crossings
+(``_apply_ambient_boundary_shis`` in :mod:`relucent.boundary_search`), then
+runs the same ``assign_contracted_shis`` pass during finalize.
 
 Verification
 ------------
@@ -307,8 +312,8 @@ The rule depends on the complex dimension:
   flipping a single nonzero entry.
 * **1D ambient complex** — Cells sharing a combinatorial **0-face** (vertex tag).
 * **Contracted 1-skeleton** (``max_dim == 1`` but ambient ``dim > 1``) — Walk
-  each cell's propagated ``poly.shis`` and add edges only when the flip neighbor
-  exists in the complex. Full SS flip closure would add spurious edges.
+  each cell's finalized ``poly.shis`` (from :func:`~relucent.meta_graph.cubical_cell_shis`)
+  and add edges only when the flip neighbor exists in the complex.
 
 After edge construction, :func:`~relucent.meta_graph.sync_shis_from_dual_graph`
 sets each node's ``_shis`` from incident edge labels.
@@ -388,14 +393,16 @@ Dual graph vs meta-graph
 +----------------------+---------------------------+---------------------------+
 | SHI on edges         | Crossing hyperplane       | Hyperplane zeroed to face |
 +----------------------+---------------------------+---------------------------+
-| SHI on nodes         | Synced from edges (top)   | Propagated ``_shis``      |
-|                      | or coface intersection    | (role 3)                  |
+| SHI on nodes         | Synced from edges (top)   | ``cubical_cell_shis``     |
+|                      | or ``cubical_cell_shis``  | (role 3)                  |
+|                      | on contracted slices      |                           |
 +----------------------+---------------------------+---------------------------+
 | Face discovery       | Flip neighbors /          | All ``ss_i ≠ 0`` crossings|
 |                      | 0-face sharing            | (role 2)                  |
 +----------------------+---------------------------+---------------------------+
 | Primary consumers    | Search finalize,          | Topology, persistence,    |
-|                      | contraction, recovery     | Morse                     |
+|                      | contraction, dual-graph   | Morse                     |
+|                      | finalize                  |                           |
 +----------------------+---------------------------+---------------------------+
 
 **Critical invariant:** meta-graph **face edges** use
@@ -415,8 +422,8 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    each component with ``ss[boundary_shi] = 0`` fixed and SHI subsets that
    exclude the boundary hyperplane.
 3. **Finalize** — :func:`~relucent.exploration.finalize_boundary_complex`:
-   ambient coface SHIs, dual graph, genericity check,
-   ``assign_contracted_shis``, ``verify_complex``.
+   slice SHI assignment (``ss_nonzero_indices`` + ``assign_contracted_shis``),
+   dual graph, genericity check, ``verify_complex``.
 
 Alternatively, explore the full ambient complex first, then
 :meth:`~relucent.complex.Complex.get_boundary_complex` via contraction (requires

@@ -199,6 +199,10 @@ Topology and logging
      - Type
      - Default
      - Role
+   * - ``CUBICAL_DUAL_GRAPH``
+     - ``bool``
+     - ``True``
+     - Cubical dual-graph and contracted-slice SHI model (the only supported path). Setting ``False`` is deprecated, undocumented, and will be removed.
    * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
      - ``float``
      - ``2.0``

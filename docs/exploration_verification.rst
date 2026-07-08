@@ -79,9 +79,11 @@ Topology prerequisites
 
 :meth:`~relucent.complex.Complex.contract` and
 :meth:`~relucent.complex.Complex.get_boundary_complex` call
-:meth:`~relucent.complex.Complex.assert_topology_ready`, which requires a complete,
-verified ambient complex. If flags were never set (e.g. complexes built only via
-``add_point``), relucent runs :func:`~relucent.verify.verify_complex` on demand.
+:meth:`~relucent.complex.Complex.assert_topology_ready`, which requires
+``complete=True`` and ``verified=True``. Run BFS or
+:func:`~relucent.exploration.explore_for_topology` first. For trusted loads
+(deserialized complexes), call
+:meth:`~relucent.complex.Complex.set_exploration_state` explicitly.
 
 :meth:`~relucent.complex.Complex.get_betti_numbers` does **not** require
 ``assert_topology_ready`` — it can run on partial complexes, but results may be
@@ -92,12 +94,13 @@ Boundary discovery
 
 Two paths build a decision-boundary complex:
 
-* **Full ambient complex first** — explore the input space, then
+* **Full ambient complex first** — explore the input space (BFS or
+  :func:`~relucent.exploration.explore_for_topology`), then
   :meth:`~relucent.complex.Complex.get_boundary_complex(i)` contracts faces on
-  neuron ``i``. Requires ``assert_topology_ready``.
+  neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
 * **Direct boundary discovery** — :meth:`~relucent.complex.Complex.discover_boundary_complex(i)`
   uses MIP pricing plus slice-restricted BFS per connected component, then
-  :func:`~relucent.exploration.finalize_boundary_complex` for ambient coface SHIs,
+  :func:`~relucent.exploration.finalize_boundary_complex` for slice SHI assignment,
   dual graph, and verification. Does not require a full ambient BFS first.
 
 Dual-graph SHI model
@@ -108,10 +111,9 @@ At finalize on a **complete** ambient search, top-cell ``_shis`` are **re-derive
 from combinatorial dual-graph edges.
 
 On **contracted** slices (boundary complexes, chain-complex steps),
-:func:`~relucent.meta_graph.assign_contracted_shis` assigns SHIs from coface
-intersection. Contracted 1-skeleton dual graphs still walk propagated ``poly.shis``
-lists — full flip-neighbor closure there would add spurious edges and break
-``∂² = 0``.
+:func:`~relucent.meta_graph.assign_contracted_shis` sets ``_shis`` to
+:func:`~relucent.meta_graph.cubical_cell_shis` (flip neighbors in the slice).
+Contracted 1-skeleton dual graphs walk each cell's finalized ``poly.shis`` lists.
 
 See also :doc:`topology` for Betti-number prerequisites. For the full search →
 SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`. The markdown

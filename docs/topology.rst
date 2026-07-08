@@ -23,6 +23,8 @@ After BFS, check :attr:`~relucent.complex.Complex.complete` and
 :meth:`~relucent.complex.Complex.contract` and
 :meth:`~relucent.complex.Complex.get_boundary_complex` require a complete, verified
 ambient complex via :meth:`~relucent.complex.Complex.assert_topology_ready`.
+For boundary components not covered by ambient exploration, use
+:meth:`~relucent.complex.Complex.discover_boundary_complex`.
 
 **Geometry for filtrations.** Built-in filtrations such as
 :class:`~relucent.filtration.AffineOutputFiltration` and

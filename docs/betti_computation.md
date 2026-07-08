@@ -52,12 +52,14 @@ calling [`contract()`](../src/relucent/complex.py).
 2. For each dual edge `(cell_a, cell_b, shi)`, zero `shi` in the sign sequence to
    get the tag of their shared `(k−1)`-face.
 3. Create that lower-dimensional cell via `add_ss`, passing SHI metadata from
-   [`_codim_one_face_kwargs()`](../src/relucent/complex.py).
+   [`_codim_one_face_kwargs()`](../src/relucent/complex.py) (SS crossings via
+   [`ss_nonzero_indices()`](../src/relucent/meta_graph.py); infeasible 1-cells
+   dropped with `is_shi_face_feasible`).
 4. Run [`assign_contracted_shis()`](../src/relucent/meta_graph.py)
-   on the **contracted slice** to assign SHIs from coface intersection once all
-   cells are present. Top-dimensional ambient cells do not use this step; their
-   `_shis` come from the dual graph at search finalize. Infeasible 1-cell faces
-   are dropped earlier in [`_codim_one_face_kwargs()`](../src/relucent/complex.py).
+   on the **contracted slice** to set authoritative `_shis` via
+   [`cubical_cell_shis()`](../src/relucent/meta_graph.py) once all cells are
+   present. Top-dimensional ambient cells do not use this step; their `_shis`
+   come from the dual graph at search finalize.
 
 The loop stops when contraction produces 0-cells or an empty complex.
 
@@ -73,10 +75,9 @@ The loop stops when contraction produces 0-cells or an empty complex.
 With default config, top-dimensional cells at ``max_dim >= 2`` (and top-level
 ``max_dim == 1`` slices) build edges combinatorially via
 [`dual_edges_top_dim()`](../src/relucent/meta_graph.py) and sync ``_shis`` from
-those edges.  **Contracted** 1-skeleton slices (``max_dim == 1`` but ambient
-``self.dim > 1``) still iterate propagated ``poly.shis`` lists from coface
-intersection — full SS flip-neighbor closure there would add spurious edges and
-break ``∂² = 0``.  The ``cubical`` parameter is retained for API compatibility.
+those edges. **Contracted** 1-skeleton slices (``max_dim == 1`` but ambient
+``self.dim > 1``) walk each cell's finalized ``poly.shis`` from
+[`cubical_cell_shis()`](../src/relucent/meta_graph.py).
 
 ---
 
