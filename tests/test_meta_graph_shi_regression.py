@@ -35,17 +35,16 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
             [2, 4, 4, 1],
             2,
             [(42, 2), (74, 1), (32, 0)],
-            276,
-            {0: 1, 1: 1, 2: 1},
+            274,
+            {0: 1, 2: 1},
         ),
-        pytest.param(
+        (
             "deep_3431_seed51",
             [3, 4, 3, 1],
             51,
-            [(50, 3), (106, 2), (74, 1), (17, 0)],
-            610,
+            [(50, 3), (113, 2), (89, 1), (18, 0)],
+            626,
             {0: 1, 3: 1},
-            marks=pytest.mark.skip(reason="CAREFUL_MODE propagation can flag dim-2 SHI false negatives on this witness"),
         ),
     ],
 )

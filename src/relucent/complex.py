@@ -5,7 +5,6 @@ import os
 import pickle
 import random
 import warnings
-from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, Literal, Self, overload
@@ -1396,18 +1395,13 @@ class Complex:
 
         **SHI rules (see module comment above the meta-graph helpers):**
 
-        - Face **edges**: :func:`mg.ss_nonzero_indices` — try every
-          ``ss_i != 0`` (role 2).  Do not use propagated ``_shis`` here; coface
-          intersection can omit valid incidences and break ``∂² = 0``.
-        - Node **metadata** (``shis`` attr, 1-cell boundedness): propagated
-          ``poly._shis`` from :meth:`contract` plus :func:`mg.compute_contracted_shis_top_down`
-          (role 3).  This metadata can be a strict subset of SS crossings.
+        - Face **edges**: :func:`mg.ss_nonzero_indices` + lookup (homology-critical).
+        - Node **metadata** (``shis``, ``crossings``): :func:`mg.cubical_cell_shis` on each
+          dimension slice — derived at node creation, not propagated from ``contract``.
+        - **Boundedness**: combinatorial classification from face edges only.
 
-        If ``verify=True``, a second pass re-derives boundedness/SHI information
-        from the assembled meta-graph (coface intersections and flip-neighbor
-        filtering), in the same spirit as :meth:`contract`. This is intended for
-        consistency checks and debugging; the default ``verify=False`` uses the
-        combinatorial SHI/boundedness values already computed on chain cells.
+        If ``verify=True``, :func:`mg.verify_meta_graph_incidence` checks that assembled
+        edges, node SHIs, and finite labels match the incidence engine.
 
         For combinatorial truncation (link-at-infinity homology), build the graph with
         this method and call :meth:`truncate_meta_graph` on a copy before
@@ -1470,36 +1464,12 @@ class Complex:
             lookup.update(c_k.tag2poly)
 
         top_dim = max(by_dim.keys())
-        top_dim_cells = list(by_dim[top_dim])
 
-        # Top-dim cells already have _shis set by the searcher during BFS; no
-        # recomputation is needed.  Log a warning for any that are missing so
-        # failures are visible (their contracted faces will have incomplete SHIs).
-        n_top_missing = sum(1 for c in top_dim_cells if c._shis is None)
-        if n_top_missing:
-            logger.warning(
-                "get_meta_graph: %d/%d top-dim cells are missing _shis; "
-                + "the searcher should have populated these during enumeration",
-                n_top_missing,
-                len(top_dim_cells),
-            )
-        else:
-            logger.info(
-                "get_meta_graph: %d top-dim cells have SHIs from BFS (no LP needed)",
-                len(top_dim_cells),
-            )
+        dim_neighbor_tags: dict[int, set[bytes]] = {
+            int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()
+        }
 
-        # Contracted (lower-dim) cells: propagate SHIs top-down through the face
-        # lattice using:  SHI(face) = ∩(SHI(coface) \ {crossing_shi}).
-        # This works for both full complexes and sub-complexes (boundary complexes,
-        # etc.) since the dual of any ReLU complex is cubical.  No LP needed.
-        logger.info(
-            "get_meta_graph: computing SHIs for %d contracted cells via top-down propagation (no LP)",
-            len(all_chain_polys) - len(top_dim_cells),
-        )
-        mg.compute_contracted_shis_top_down(by_dim)
-
-        # Role 2: face edges from SS crossings, not propagated _shis (see module comment).
+        # Role 2: face edges from SS crossings (see module comment).
         edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
         for k, c_k in sorted(by_dim.items(), reverse=True):
             if int(k) <= 0:
@@ -1605,12 +1575,13 @@ class Complex:
             )
 
         excluded_tags: set[bytes] = set()
-        for _k, c_k in sorted(by_dim.items(), reverse=True):
+        for k, c_k in sorted(by_dim.items(), reverse=True):
+            neighbor_tags = dim_neighbor_tags[int(k)]
             for p in c_k:
                 if p.dim > 0 and p._finite_computed and p._finite is None:
                     excluded_tags.add(p.tag)
                     continue
-                meta.add_node(p.tag, **mg.meta_node_attrs(p))
+                meta.add_node(p.tag, **mg.meta_node_attrs(p, neighbor_tags=neighbor_tags))
 
         # Add cached face edges k -> k-1.
         for k in sorted(by_dim.keys(), reverse=True):
@@ -1622,8 +1593,13 @@ class Complex:
             new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
             if new_face_tags:
                 mg.propagate_finite_from_coface_edges(lookup, edges)
-            for face_tag in new_face_tags:
-                meta.add_node(face_tag, **mg.meta_node_attrs(lookup[face_tag]))
+            face_dim = int(k) - 1
+            face_neighbors = dim_neighbor_tags.get(face_dim, set())
+            for face_tag_key in new_face_tags:
+                meta.add_node(
+                    face_tag_key,
+                    **mg.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors),
+                )
             known_nodes.update(new_face_tags)
 
             meta.add_edges_from(
@@ -1631,76 +1607,8 @@ class Complex:
             )
 
         if verify:
-            logger.info("get_meta_graph: verify pass (re-derive SHIs/boundedness from meta-graph)")
-            # Optional second pass: re-derive boundedness/SHI from the assembled face poset.
-            # Traverse high->low so coface attrs are already available.
-            cofaces_by_face_by_dim: dict[int, dict[Any, list[tuple[Any, dict[str, Any]]]]] = defaultdict(
-                lambda: defaultdict(list)
-            )
-            for u, v, data in meta.in_edges(data=True):
-                cofaces_by_face_by_dim[int(meta.nodes[u]["dim"])][v].append((u, data))
-
-            for k in sorted(by_dim.keys(), reverse=True):
-                if int(k) <= 0:
-                    continue
-                for face_tag, in_edges in cofaces_by_face_by_dim.get(int(k), {}).items():
-                    # Keep cofaces aligned with `in_edges`: dropping Nones from cofaces alone would
-                    # pair the wrong SHI data with the wrong poly under zip().
-                    in_edges = [(u, data) for u, data in in_edges if meta.nodes[u].get("poly") is not None]
-                    if not in_edges:
-                        continue
-
-                    cofaces = [meta.nodes[u]["poly"] for u, _ in in_edges]
-
-                    # A face of a bounded cell is always bounded, so we can upgrade
-                    # None/False → True when any coface is known bounded.
-                    # We cannot safely infer False: two unbounded cofaces can share
-                    # a bounded face (the crossed hyperplane may cut off all rays).
-                    # Use meta-node ``finite`` (set by mg.meta_node_attrs) — not ``poly.finite``.
-                    if any(meta.nodes[u].get("finite") is True for u, _ in in_edges):
-                        meta.nodes[face_tag]["finite"] = True
-                        face_poly = meta.nodes[face_tag].get("poly")
-                        if face_poly is not None:
-                            face_poly._finite = True
-                            face_poly._finite_computed = True
-
-                    # contract()-style SHI inference: intersect coface SHIs after removing crossed facet.
-                    # Coface SHIs are read from the meta node (not ``poly.shis``) so each
-                    # dimension uses SHIs already propagated from higher-dimensional cofaces.
-                    shis_sets: list[set[int]] = []
-                    for (u, data), _coface in zip(in_edges, cofaces, strict=True):
-                        shi = data.get("shi")
-                        coface_shis = meta.nodes[u].get("shis")
-                        if isinstance(coface_shis, list):
-                            s = set(int(x) for x in coface_shis)
-                        else:
-                            s = set(int(x) for x in getattr(_coface, "shis", []))
-                        if shi is not None:
-                            s.discard(int(shi))
-                        shis_sets.append(s)
-                    inferred_shis = sorted(set.intersection(*shis_sets)) if shis_sets else []
-                    face_dim = int(meta.nodes[face_tag].get("dim", -1))
-                    dim_tags = {
-                        n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == face_dim and isinstance(n, bytes)
-                    }
-                    face_poly = meta.nodes[face_tag].get("poly")
-                    if face_poly is not None:
-                        filtered_shis = mg.filter_shi_candidates(
-                            face_poly.ss_np,
-                            inferred_shis,
-                            neighbor_tags=dim_tags,
-                        )
-                        face_poly._shis = list(filtered_shis)
-                        inferred_shis = filtered_shis
-                    elif dim_tags:
-                        ss_node = meta.nodes[face_tag].get("ss")
-                        if ss_node is not None:
-                            inferred_shis = mg.filter_shi_candidates(
-                                np.asarray(ss_node),
-                                inferred_shis,
-                                neighbor_tags=dim_tags,
-                            )
-                    meta.nodes[face_tag]["shis"] = inferred_shis
+            logger.info("get_meta_graph: verify pass (incidence engine consistency)")
+            mg.verify_meta_graph_incidence(meta, by_dim, lookup, edges_by_dim)
 
         logger.info(
             "get_meta_graph: done (%d nodes, %d edges, verify=%s)",

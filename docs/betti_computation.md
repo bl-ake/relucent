@@ -122,19 +122,12 @@ Classification is **combinatorial** on the default path — no linear programs.
 | 1-cells | Bounded if at least two distinct combinatorial 0-faces appear in meta face edges ([`classify_one_cells_finite_from_face_edges()`](../src/relucent/meta_graph.py)). One 0-face → ray (unbounded). No 0-faces → geometric check: empty phantoms (`finite is None`) are excluded; feasible full lines are unbounded |
 | k ≥ 2 | Unbounded if **any** `(k−1)`-face is unbounded; bounded if **all** `(k−1)`-faces are bounded ([`classify_finite_ascending()`](../src/relucent/meta_graph.py)) |
 
-Before boundedness is checked, [`compute_contracted_shis_top_down()`](../src/relucent/meta_graph.py)
-fills in `_shis` on contracted cells by propagating from cofaces (metadata only).
-Top-dimensional cells already have `_shis` from BFS.
+### Node `shis` vs face edges
 
-### A note on `_shis` vs the sign sequence
-
-Cells carry a `_shis` list (supporting hyperplane indices where the cell actually
-meets a bounding hyperplane). That list can be **smaller** than the set of nonzero
-entries in the sign sequence.
-
-That's fine. Face edges always scan the full sign sequence (`ss_nonzero_indices`).
-The `_shis` list is stored as node metadata — not used for boundedness labels or
-for deciding which face incidences exist.
+Face edges always scan the full sign sequence ([`ss_nonzero_indices()`](../src/relucent/meta_graph.py)).
+Meta-graph node ``shis`` are flip-neighbor crossings derived by
+[`cubical_cell_shis()`](../src/relucent/meta_graph.py) at node creation — metadata
+only, not used for boundedness or incidence.
 
 ---
 
@@ -237,7 +230,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 |------|----------------|
 | Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph` |
 | Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `assign_contracted_shis` |
-| Meta-graph | `get_meta_graph`, `compute_contracted_shis_top_down`, `ss_nonzero_indices`, `face_tag`, `collect_meta_face_edges`, `classify_finite_ascending`, `meta_node_attrs` |
+| Meta-graph | `get_meta_graph`, `cubical_cell_shis`, `ss_nonzero_indices`, `face_tag`, `collect_meta_face_edges`, `classify_finite_ascending`, `meta_node_attrs`, `verify_meta_graph_incidence` |
 | Truncation | `truncate_meta_graph` |
 | Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_packed_boundary_matrix`, `gf2_rank_boundary` |
 

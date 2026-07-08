@@ -151,14 +151,15 @@ This rule is **complete** for cubical incidence: propagated ``_shis`` can be a
 strict subset of SS crossings, so using only ``_shis`` here would omit valid
 faces.
 
-Role 3 — Node metadata (boundedness, labels)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Role 3 — Meta-graph node metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``Polyhedron._shis`` on chain-complex cells is **metadata**: coface-intersection
-SHIs for graph node attributes. 1-cell boundedness uses 0-face incidence in meta
-face edges (:func:`~relucent.meta_graph.classify_one_cells_finite_from_face_edges`),
-not ``len(_shis)``. :func:`~relucent.meta_graph.compute_contracted_shis_top_down`
-fills missing ``_shis`` on contracted cells after the chain complex is built.
+:func:`~relucent.meta_graph.meta_node_attrs` derives ``shis`` (flip-neighbor
+crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
+sequence and same-dimension slice.
+1-cell boundedness uses 0-face incidence in meta face edges
+(:func:`~relucent.meta_graph.classify_one_cells_finite_from_face_edges`), not
+``len(shis)``.
 
 SHI assignment over the pipeline
 --------------------------------
@@ -337,7 +338,7 @@ input to Betti numbers and persistent homology.
 +------------------+----------------------------------------------------------+
 | Nodes            | All cells ``k = 0 … d`` from the chain complex           |
 +------------------+----------------------------------------------------------+
-| Node attrs       | ``poly``, ``dim``, ``ss``, ``finite``, ``shis``          |
+| Node attrs       | ``poly``, ``dim``, ``ss``, ``finite``, ``crossings``, ``shis`` |
 +------------------+----------------------------------------------------------+
 | Edges            | Directed ``k-cell → (k−1)-face``                         |
 +------------------+----------------------------------------------------------+
@@ -349,20 +350,21 @@ Construction pipeline
 
 1. :meth:`~relucent.complex.Complex.get_chain_complex` — Repeated contraction
    from the ambient complex down to 0-cells.
-2. **SHI propagation** — Top cells use search/finalize ``_shis``; contracted cells
-   get :func:`~relucent.meta_graph.compute_contracted_shis_top_down`.
-3. **Face edges (role 2)** — :func:`~relucent.meta_graph.collect_meta_face_edges`
-   per dimension; parallelized when cell count ≥
+2. **Face edges** — :func:`~relucent.meta_graph.collect_meta_face_edges` per
+   dimension (``ss_nonzero_indices`` + lookup); parallelized when cell count ≥
    ``META_FACE_PARALLEL_MIN_CELLS``.
-4. **Boundedness** — 0-face incidence on 1-cells and ascending sweep
+3. **Boundedness** — 0-face incidence on 1-cells and ascending sweep
    (:func:`~relucent.meta_graph.classify_one_cells_finite_from_face_edges`,
    :func:`~relucent.meta_graph.classify_finite_ascending`).
+4. **Node assembly** — :func:`~relucent.meta_graph.meta_node_attrs` derives
+   ``crossings`` and flip-neighbor ``shis`` per dimension slice.
 5. **Optional truncation** — :func:`~relucent.meta_graph.truncate_meta_graph` or
    :func:`~relucent.meta_graph.one_point_compactify_meta_graph` for homology at
    infinity.
 
-Pass ``verify=True`` to ``get_meta_graph`` only for debugging: a second pass
-re-derives boundedness/SHI from the assembled graph.
+Pass ``verify=True`` to ``get_meta_graph`` only for debugging:
+:func:`~relucent.meta_graph.verify_meta_graph_incidence` checks edges, SHIs, and
+finite labels match the incidence engine.
 
 Dual graph vs meta-graph
 ~~~~~~~~~~~~~~~~~~~~~~~~

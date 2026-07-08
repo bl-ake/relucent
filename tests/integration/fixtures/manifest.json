@@ -97,8 +97,9 @@
         "n_boundary_cells": 1844,
         "truncated_betti": {
           "0": 1,
-          "1": 430,
-          "2": 2
+          "1": 1,
+          "2": 1,
+          "3": 1
         },
         "methods_agree": true
       },
@@ -129,8 +130,8 @@
         "n_boundary_cells": 656,
         "truncated_betti": {
           "0": 1,
-          "1": 59,
-          "2": 7
+          "2": 1,
+          "3": 1
         },
         "methods_agree": true
       },

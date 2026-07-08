@@ -47,7 +47,7 @@ __all__ = [
     "classify_finite_ascending",
     "assign_contracted_shis",
     "collect_meta_face_edges",
-    "compute_contracted_shis_top_down",
+    "cubical_cell_shis",
     "dual_edges_top_dim",
     "face_tag",
     "filter_shi_candidates",
@@ -63,6 +63,7 @@ __all__ = [
     "truncate_meta_graph",
     "verify_arrangement_genericity",
     "verify_dual_graph_cubical",
+    "verify_meta_graph_incidence",
 ]
 
 META_FACE_PARALLEL_MIN_CELLS = 64
@@ -78,20 +79,19 @@ META_FACE_PARALLEL_MIN_CELLS = 64
 # - **Dual graph** (:func:`dual_edges_top_dim`): group top cells by shared face tag.
 # - **Meta-graph face edges** (:func:`collect_meta_face_edges`):
 #   zero each ``ss_i != 0``; keep edge iff face tag exists in lookup.
-# - **Node metadata** (:func:`meta_node_attrs`): propagated ``_shis``.
+# - **Node metadata** (:func:`meta_node_attrs`): derived flip-neighbor SHIs.
 #
-# The historical "three roles" tension is expressed as filter stacks on the same
-# cubical primitives, not unrelated SHI lists.
+# **Contract path** (``contract`` / ``get_boundary_complex`` only):
+# :meth:`~relucent.complex.Complex._codim_one_face_kwargs` seeds coface-intersection
+# SHIs; :func:`assign_contracted_shis` flip-filters for the contracted dual graph.
+# Do not reuse that propagation in :meth:`~relucent.complex.Complex.get_meta_graph`.
 #
-# 1. **Contraction face kwargs** (:meth:`Complex._codim_one_face_kwargs`)
-#    - Rule: coface SHI intersection minus crossing; 1-cell feasibility at construction.
-#    - :func:`assign_contracted_shis` applies flip-neighbor filter on the full slice.
+# **Meta-graph path** (stateless):
 #
-# 2. **Meta-graph face edges** (:meth:`Complex.get_meta_graph`)
-#    - Rule: :func:`ss_nonzero_indices` + lookup existence (complete for ``∂² = 0``).
-#
-# 3. **Meta-graph node metadata** (:func:`meta_node_attrs`)
-#    - Propagated ``_shis`` for boundedness heuristics; strict subset of crossings.
+# 1. **Face edges** — :func:`ss_nonzero_indices` + lookup (complete for ``∂² = 0``).
+# 2. **Node ``shis``** — :func:`cubical_cell_shis` (flip neighbors in the dim slice).
+# 3. **Boundedness** — :func:`classify_one_cells_finite_from_face_edges` and
+#    :func:`classify_finite_ascending` from face edges only.
 #
 # See ``tests/test_meta_graph_shi_regression.py`` and ``negative-betti-meta-graph-bug.md``.
 
@@ -338,25 +338,38 @@ def verify_arrangement_genericity(polys: Iterable[Polyhedron]) -> None:
                 )
 
 
-def meta_node_attrs(poly: Polyhedron) -> dict[str, Any]:
+def cubical_cell_shis(
+    ss: np.ndarray,
+    *,
+    neighbor_tags: set[bytes],
+) -> list[int]:
+    """Flip-neighbor SHIs: ``ss_nonzero_indices`` with same-dimension slice filter."""
+    return filter_shi_candidates(ss, ss_nonzero_indices(ss), neighbor_tags=neighbor_tags)
+
+
+def meta_node_attrs(
+    poly: Polyhedron,
+    *,
+    neighbor_tags: set[bytes],
+) -> dict[str, Any]:
     if poly.dim == 0:
         finite: bool | None = True
     elif poly._finite_computed:
         finite = poly._finite
     else:
         finite = poly.finite
-    # Node SHIs: propagated _shis when set; else all nonzero ss indices (not edge rule).
-    shis = poly._shis
-    if shis is not None:
-        node_shis: list[int] = sorted(int(s) for s in shis)
-    else:
-        node_shis = list(ss_nonzero_indices(np.asarray(poly.ss_np)))
+    ss_arr = np.asarray(poly.ss_np)
+    crossings = list(ss_nonzero_indices(ss_arr))
+    flip_shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
+    if int(poly.dim) == 1 and poly.halfspaces is not None:
+        flip_shis = [s for s in flip_shis if poly.is_shi_face_feasible(int(s))]
     return {
         "poly": poly,
         "dim": int(poly.dim),
-        "ss": np.asarray(poly.ss_np),
+        "ss": ss_arr,
         "finite": finite,
-        "shis": node_shis,
+        "crossings": crossings,
+        "shis": flip_shis,
     }
 
 
@@ -611,12 +624,13 @@ def filter_shi_candidates(
 
 
 def assign_contracted_shis(cplx: Complex) -> int:
-    """Finalize ``_shis`` on a contracted slice (role 1).
+    """Finalize ``_shis`` on a contracted slice after :meth:`~relucent.complex.Complex.contract`.
 
-    Coface-intersected candidates are set at face construction time via
-    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`; this pass applies
-    the flip-neighbor filter once the full slice is known.  Do not replace with
-    full SS flip-neighbor membership; see the module comment above role 1.
+    Used only on the **contract path** (``contract``, ``get_boundary_complex``).
+    Coface-intersected candidates come from
+    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`; this pass applies the
+    flip-neighbor filter once the full slice is known.  Meta-graph node labels use
+    :func:`cubical_cell_shis` instead — do not call this from :meth:`~relucent.complex.Complex.get_meta_graph`.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -634,94 +648,70 @@ def assign_contracted_shis(cplx: Complex) -> int:
     return n_changed
 
 
-def compute_contracted_shis_top_down(by_dim: Mapping[int, Iterable[Polyhedron]]) -> None:
-    """Fill missing ``_shis`` on chain cells (role 3).
+def verify_meta_graph_incidence(
+    meta: nx.MultiDiGraph[Any],
+    by_dim: Mapping[int, Iterable[Polyhedron]],
+    lookup: dict[bytes, Polyhedron],
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
+) -> None:
+    """Check assembled meta-graph matches the stateless incidence engine.
 
-    The chain complex from :meth:`Complex.contract` already sets ``_shis`` via
-    coface intersection and :func:`assign_contracted_shis` (role 1).  This pass is a
-    safety net for contracted cells that still lack ``_shis``.  It does **not**
-    drive meta-graph face-edge discovery; that uses
-    :func:`ss_nonzero_indices` (role 2).  Boundedness is classified
-    separately via :func:`classify_one_cells_finite_from_face_edges` and
-    :func:`classify_finite_ascending`.
-
-    For each face still missing ``_shis``:
-
-        SHI(face) = filter_flip( ∩{ SHI(coface) \\ {crossing_shi} : coface ⊃ face } )
-
-    In :data:`~relucent.config.CAREFUL_MODE`, an :exc:`AssertionError` is raised
-    if any k-dim cell (k > 1) ends up with fewer than k SHIs after propagation,
-    which indicates false negatives in the original maximal-cell SHI computation.
-
-    Args:
-        by_dim: Mapping from dimension to cells at that dimension.  Top-dim cells
-            must have ``_shis`` already set by the searcher.
+  - Face edges equal ``ss_nonzero_indices`` zeroings kept by lookup.
+  - Node ``shis`` equal :func:`cubical_cell_shis` on each dimension slice.
+  - ``finite`` on chain cells matches combinatorial classification from face edges.
     """
-    for k in sorted(by_dim.keys(), reverse=True):
-        if k <= 0:
+    valid_face_tags = set(lookup.keys())
+    for k, c_k in by_dim.items():
+        if int(k) <= 0:
             continue
-        if k - 1 not in by_dim:
-            continue
-
-        # For each (k-1)-dim face: accumulate the SHI intersection over all cofaces.
-        face_shis: dict[bytes, set[int]] = {}
-
-        for coface in by_dim[k]:
-            if coface._shis is None:
-                logger.warning(
-                    "get_meta_graph: dim-%d cell is missing _shis (tag=%r); "
-                    + "its contracted faces will have incomplete SHI information",
-                    k,
-                    coface.tag[:8],
-                )
+        expected_edges: set[tuple[bytes, bytes, int]] = set()
+        meta_nodes = set(meta.nodes)
+        for poly in c_k:
+            if poly.tag not in meta_nodes:
                 continue
-
-            ss_coface = np.asarray(coface.ss_np, dtype=np.int8).ravel()
-
-            for shi in coface._shis:
-                ss_face = ss_coface.copy()
-                ss_face[shi] = 0
-                ft = face_tag(coface.ss_np, int(shi))
-
-                contrib = set(coface._shis) - {shi}
-                if ft not in face_shis:
-                    face_shis[ft] = contrib.copy()
-                else:
-                    face_shis[ft] &= contrib
-
-        # Apply the computed SHIs to the (k-1)-dim cells.
-        face_lookup = {p.tag: p for p in by_dim[k - 1]}
-        neighbor_tags = set(face_lookup.keys())
-        n_set = 0
-        for face_tag_key, shis in face_shis.items():
-            face = face_lookup.get(face_tag_key)
-            if face is None:
+            ss_arr = np.asarray(poly.ss_np)
+            for shi in ss_nonzero_indices(ss_arr):
+                shi_i = int(shi)
+                ft = face_tag(ss_arr, shi_i)
+                if ft in valid_face_tags and ft in meta_nodes:
+                    expected_edges.add((poly.tag, ft, shi_i))
+        actual_edges: set[tuple[bytes, bytes, int]] = set()
+        for u, v, data in meta.edges(data=True):
+            if int(meta.nodes[u].get("dim", -1)) != int(k):
                 continue
-            if not face._shis:
-                face._shis = filter_shi_candidates(face.ss_np, shis, neighbor_tags=neighbor_tags)
-                n_set += 1
-
-        if n_set:
-            logger.info(
-                "get_meta_graph: top-down pass set SHIs for %d dim-%d cells (no LP)",
-                n_set,
-                k - 1,
+            actual_edges.add((u, v, int(data["shi"])))
+        if expected_edges != actual_edges:
+            missing = len(expected_edges - actual_edges)
+            extra = len(actual_edges - expected_edges)
+            raise AssertionError(
+                f"get_meta_graph verify: dim-{int(k)} face edges mismatch "
+                + f"(missing={missing}, extra={extra})"
             )
 
-        if cfg.CAREFUL_MODE:
-            for face in by_dim[k - 1]:
-                if face._shis is None:
-                    continue
-                n_shis = len(face._shis)
-                # A k-dim cell needs ≥ k SHIs to be geometrically consistent.
-                # 1-dim cells can legitimately have 0 or 1 SHIs (full lines or
-                # rays), so the assertion only applies to k > 1.
-                if (k - 1) > 1 and n_shis < (k - 1):
-                    raise AssertionError(
-                        f"get_meta_graph: dim-{k - 1} cell has only {n_shis} SHIs "
-                        + f"(expected ≥ {k - 1}). This indicates false negatives in the "
-                        + f"maximal-cell SHI computation. Tag: {face.tag!r}"
-                    )
+    for c_k in by_dim.values():
+        neighbor_tags = {p.tag for p in c_k}
+        for poly in c_k:
+            if poly.tag not in meta.nodes:
+                continue
+            expected_shis = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+            if int(poly.dim) == 1 and poly.halfspaces is not None:
+                expected_shis = [s for s in expected_shis if poly.is_shi_face_feasible(int(s))]
+            actual_shis = sorted(int(s) for s in meta.nodes[poly.tag].get("shis", []))
+            if actual_shis != expected_shis:
+                raise AssertionError(
+                    f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}"
+                )
+
+    for c_k in by_dim.values():
+        for poly in c_k:
+            if poly.tag not in meta.nodes or not poly._finite_computed:
+                continue
+            node_finite = meta.nodes[poly.tag].get("finite")
+            if node_finite != poly._finite:
+                raise AssertionError(
+                    f"get_meta_graph verify: finite mismatch tag={poly.tag!r} "
+                    + f"expected={poly._finite!r} got={node_finite!r}"
+                )
 
 
 def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
