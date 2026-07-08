@@ -652,13 +652,12 @@ def verify_meta_graph_incidence(
     meta: nx.MultiDiGraph[Any],
     by_dim: Mapping[int, Iterable[Polyhedron]],
     lookup: dict[bytes, Polyhedron],
-    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
 ) -> None:
     """Check assembled meta-graph matches the stateless incidence engine.
 
-  - Face edges equal ``ss_nonzero_indices`` zeroings kept by lookup.
-  - Node ``shis`` equal :func:`cubical_cell_shis` on each dimension slice.
-  - ``finite`` on chain cells matches combinatorial classification from face edges.
+    - Face edges equal ``ss_nonzero_indices`` zeroings kept by lookup.
+    - Node ``shis`` equal :func:`cubical_cell_shis` on each dimension slice.
+    - ``finite`` on chain cells matches combinatorial classification from face edges.
     """
     valid_face_tags = set(lookup.keys())
     for k, c_k in by_dim.items():
@@ -684,8 +683,7 @@ def verify_meta_graph_incidence(
             missing = len(expected_edges - actual_edges)
             extra = len(actual_edges - expected_edges)
             raise AssertionError(
-                f"get_meta_graph verify: dim-{int(k)} face edges mismatch "
-                + f"(missing={missing}, extra={extra})"
+                f"get_meta_graph verify: dim-{int(k)} face edges mismatch " + f"(missing={missing}, extra={extra})"
             )
 
     for c_k in by_dim.values():
@@ -698,9 +696,7 @@ def verify_meta_graph_incidence(
                 expected_shis = [s for s in expected_shis if poly.is_shi_face_feasible(int(s))]
             actual_shis = sorted(int(s) for s in meta.nodes[poly.tag].get("shis", []))
             if actual_shis != expected_shis:
-                raise AssertionError(
-                    f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}"
-                )
+                raise AssertionError(f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}")
 
     for c_k in by_dim.values():
         for poly in c_k:

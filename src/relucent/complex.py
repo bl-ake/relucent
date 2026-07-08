@@ -1465,9 +1465,7 @@ class Complex:
 
         top_dim = max(by_dim.keys())
 
-        dim_neighbor_tags: dict[int, set[bytes]] = {
-            int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()
-        }
+        dim_neighbor_tags: dict[int, set[bytes]] = {int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()}
 
         # Role 2: face edges from SS crossings (see module comment).
         edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
@@ -1608,7 +1606,7 @@ class Complex:
 
         if verify:
             logger.info("get_meta_graph: verify pass (incidence engine consistency)")
-            mg.verify_meta_graph_incidence(meta, by_dim, lookup, edges_by_dim)
+            mg.verify_meta_graph_incidence(meta, by_dim, lookup)
 
         logger.info(
             "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
