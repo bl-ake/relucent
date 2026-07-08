@@ -63,15 +63,8 @@ def _line_boundary_model() -> nn.Sequential:
     return nn.Sequential(fc, nn.ReLU())
 
 
-_MLP_BOUNDARY_ENV = "RELUCENT_RUN_MLP_BOUNDARY_DISCOVERY"
-
-
 def _mlp_tiny_model() -> nn.Sequential:
     return add_output_relu(mlp(widths=[3, 5, 5, 1]))
-
-
-def _mlp_small_model() -> nn.Sequential:
-    return add_output_relu(mlp(widths=[5, 8, 8, 8, 1]))
 
 
 def _populate_diamond(cplx: Complex) -> None:
@@ -164,7 +157,7 @@ def test_discover_boundary_complex_mlp_tiny(seeded: int, nworkers: int):
     """Discover-only smoke on a small seeded random MLP.
 
     Hand-crafted diamond/line cases above already check reference parity. Larger
-    MLP integration tests are opt-in via ``RELUCENT_RUN_MLP_BOUNDARY_DISCOVERY``.
+    MLP cases live in ``tests/integration/test_boundary_discovery_mlp.py``.
     """
     set_seeds(seeded)
     model = _mlp_tiny_model()
@@ -185,50 +178,3 @@ def test_discover_boundary_complex_mlp_tiny(seeded: int, nworkers: int):
     assert len(new) > 0
     _ = new.get_betti_numbers()
     _ = new.get_betti_numbers(compactify=True, reduced=True)
-
-
-@pytest.mark.skipif(
-    os.environ.get(_MLP_BOUNDARY_ENV) != "1",
-    reason="Opt-in MLP boundary discovery tests. Set RELUCENT_RUN_MLP_BOUNDARY_DISCOVERY=1.",
-)
-@pytest.mark.parametrize("nworkers", [1])
-def test_discover_boundary_complex_mlp_small(seeded: int, nworkers: int):
-    set_seeds(seeded)
-    model = _mlp_small_model()
-    shi = Complex(model).n - 1
-    try:
-        new, stats = Complex(model).discover_boundary_complex(
-            shi,
-            verbose=False,
-            return_stats=True,
-            nworkers=nworkers,
-        )
-    except ValueError as exc:
-        if "Initial Solve Failed" in str(exc):
-            pytest.skip(f"boundary witness infeasible for get_shis at seed {seeded}: {exc}")
-        raise
-    assert stats["n_components"] >= 1
-    assert len(new) > 0
-    _ = new.get_betti_numbers()
-
-
-@pytest.mark.skipif(
-    os.environ.get(_MLP_BOUNDARY_ENV) != "1",
-    reason="Opt-in MLP boundary discovery tests. Set RELUCENT_RUN_MLP_BOUNDARY_DISCOVERY=1.",
-)
-@pytest.mark.parametrize("nworkers", [1])
-def test_discover_boundary_complex_mlp_medium_parity(seeded: int, nworkers: int):
-    set_seeds(seeded)
-    model = add_output_relu(mlp(widths=[4, 12, 12, 12, 12, 1]))
-    cplx = Complex(model)
-    cplx.bfs(verbose=0, nworkers=nworkers)
-    shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
-    new, stats = Complex(model).discover_boundary_complex(
-        shi,
-        verbose=False,
-        return_stats=True,
-        nworkers=nworkers,
-    )
-    assert stats["n_components"] >= 1
-    _assert_boundary_parity(ref, new)
