@@ -223,7 +223,14 @@ def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
         if poly is None and isinstance(graph.nodes[node], dict):
             poly = graph.nodes[node].get("poly")
         if isinstance(poly, Polyhedron):
-            poly._shis = sorted(set(shis))
+            assigned = sorted(set(shis))
+            keep_strict = (
+                bool(getattr(poly, "_shis_strict", False))
+                and poly._shis is not None
+                and set(int(s) for s in poly._shis) == set(assigned)
+            )
+            poly._shis = assigned
+            poly._shis_strict = keep_strict
 
 
 def verify_dual_graph_cubical(
@@ -490,7 +497,16 @@ def geometric_infeasible_one_cells(
             continue
         # Use compute-only Chebyshev; ``poly.finite`` would cache ``_finite`` and
         # skip combinatorial classification in :func:`classify_one_cells_finite_from_face_edges`.
-        _center, inradius = p.get_center_inradius()
+        try:
+            _center, inradius = p.get_center_inradius()
+        except ValueError as exc:
+            # Borderline phantom 1-cells can trip the Chebyshev LP with a tiny
+            # negative radius (e.g. "Inradius -8e-07"). Treat those exactly as
+            # geometrically infeasible so meta-graph construction can continue.
+            if str(exc).startswith("Inradius "):
+                infeasible.add(p.tag)
+                continue
+            raise
         if _center is None and inradius is None:
             infeasible.add(p.tag)
     return infeasible
@@ -625,6 +641,34 @@ def filter_shi_candidates(
     return sorted(kept)
 
 
+def _symmetrize_top_cell_flip_shis(cplx: Complex) -> int:
+    """Drop SHIs that are not listed on both endpoints of a same-dimension flip edge."""
+    if len(cplx) == 0:
+        return 0
+    top_dim = max(int(p.dim) for p in cplx)
+    tag2poly = {p.tag: p for p in cplx}
+    n_changed = 0
+    for poly in cplx:
+        if int(poly.dim) != top_dim or not poly._shis:
+            continue
+        ss = np.asarray(poly.ss_np, dtype=np.int8).ravel()
+        kept: list[int] = []
+        for shi in poly._shis:
+            shi_i = int(shi)
+            if shi_i >= ss.shape[0] or int(ss[shi_i]) == 0:
+                continue
+            neighbor = tag2poly.get(encode_ss(flip_ss_at_shi(ss, shi_i)))
+            if neighbor is None or shi_i not in (neighbor._shis or []):
+                continue
+            kept.append(shi_i)
+        assigned = sorted(set(kept))
+        if assigned != list(poly._shis):
+            poly._shis = assigned
+            poly._shis_strict = False
+            n_changed += 1
+    return n_changed
+
+
 def assign_contracted_shis(cplx: Complex) -> int:
     """Finalize ``_shis`` on a contracted slice after :meth:`~relucent.complex.Complex.contract`.
 
@@ -653,7 +697,12 @@ def assign_contracted_shis(cplx: Complex) -> int:
             assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
         if assigned != poly._shis:
             poly._shis = assigned
+            poly._shis_strict = False
             n_changed += 1
+    if any(int(p.dim) == 1 for p in cplx):
+        # ``is_shi_face_feasible`` is evaluated per 1-cell with coface halfspaces;
+        # adjacent cells can disagree, so enforce mutual flip-SHI listing.
+        n_changed += _symmetrize_top_cell_flip_shis(cplx)
     return n_changed
 
 

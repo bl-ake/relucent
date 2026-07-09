@@ -292,6 +292,34 @@ def test_classify_one_cells_finite_from_face_edges_infeasible_left_none() -> Non
     assert seg._finite is None
 
 
+def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Near-zero negative Chebyshev radii classify phantom 1-cells as infeasible."""
+    halfspaces = np.array(
+        [
+            [-1.0, 0.0, 0.0],
+            [1.0, 0.0, -1.0],
+            [0.0, -1.0, 0.0],
+            [0.0, 1.0, -1.0],
+        ],
+        dtype=np.float64,
+    )
+    ss_seg = np.array([[1, 0, 0, 0]], dtype=np.int8)
+    seg = Polyhedron(None, ss_seg, halfspaces=halfspaces, finite=None)
+    seg._shis = []
+    seg._finite_computed = False
+
+    def _raise_inradius() -> tuple[None, None]:
+        raise ValueError("Inradius -8.7393e-07")
+
+    monkeypatch.setattr(seg, "get_center_inradius", _raise_inradius)
+
+    by_dim = {1: [seg]}
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}
+
+    infeasible = mg.geometric_infeasible_one_cells(by_dim, edges_by_dim)
+    assert infeasible == {seg.tag}
+
+
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
 def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
     """Meta-graph node ``shis`` match :func:`~relucent.meta_graph.cubical_cell_shis` per slice."""

@@ -162,7 +162,7 @@ Complex search and parallel add
    * - ``MIN_SEARCH_INRADIUS``
      - ``float``
      - ``TOL_SHI_OBJECTIVE / 2``
-     - During BFS/A* search, raise if a discovered cell's Chebyshev inradius is below this floor.
+     - During BFS/A* search, thin cells below this floor trigger an interior witness-point check; search continues if a witness is found and raises only if witness search fails.
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
@@ -187,6 +187,10 @@ Complex search and parallel add
      - ``float``
      - ``10000``
      - Default bound for :meth:`~relucent.complex.Complex.plot_cells` when ``bound`` is omitted.
+   * - ``BOUNDARY_MIP_BOUND_MARGIN``
+     - ``float``
+     - ``5.0``
+     - Multiplier applied to layerwise bound propagation when estimating network scale for boundary MIPs and automatic tolerance selection.
 
 Topology and logging
 ~~~~~~~~~~~~~~~~~~~~

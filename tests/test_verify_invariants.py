@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
+from relucent.complex import IncompleteDualGraphError
+from relucent.exploration import finalize_ambient_search
 from relucent.verify import ComplexNotCompleteError
 
 os_environ = __import__("os").environ
@@ -96,3 +98,134 @@ def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
         verify_shi_flip_symmetry(cplx)
     cplx.get_dual_graph(verbose=False, require_complete=False, verify=False, cubical=False)
     verify_shi_flip_symmetry(cplx)
+
+
+def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
+
+    orig_get_dual_graph = cplx.get_dual_graph
+    calls = {"count": 0}
+
+    def _counting_get_dual_graph(*args, **kwargs):
+        calls["count"] += 1
+        return orig_get_dual_graph(*args, **kwargs)
+
+    monkeypatch.setattr(cplx, "get_dual_graph", _counting_get_dual_graph)
+
+    finalize_ambient_search(cplx, complete=True, verify=True)
+
+    assert calls["count"] == 1
+    assert cplx.verified is True
+
+
+def test_complete_verify_fails_closed_on_shi_recompute_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    import relucent.calculations as calc
+    from relucent.verify import verify_lp_flip_neighbors_in_complex
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
+    cplx.set_exploration_state(complete=True, verified=False)
+    orig_get_shis = calc.get_shis
+
+    def _boom(poly, *args, **kwargs):
+        if getattr(poly, "_shis_strict", False):
+            return orig_get_shis(poly, *args, **kwargs)
+        raise ValueError("synthetic SHI failure")
+
+    monkeypatch.setattr(calc, "get_shis", _boom)
+
+    with pytest.raises(IncompleteDualGraphError, match="failed to recompute SHIs"):
+        verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
+
+
+def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
+    import relucent.calculations as calc
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("strict SHIs should be reused instead of recomputed")
+
+    monkeypatch.setattr(calc, "get_shis", _boom)
+
+    boundary = cplx.get_boundary_complex(cplx.n - 1)
+    assert boundary.verified is True
+
+
+def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    import relucent.calculations as calc
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
+    graph = cplx.get_dual_graph(relabel=True, verbose=False)
+    initial_ss = cplx.index2poly[0].ss_np
+
+    reloaded = Complex(model)
+    reloaded.recover_from_dual_graph(graph, initial_ss=initial_ss, source=0)
+    assert reloaded.verified is True
+    top = next(p for p in reloaded if p.dim == reloaded.dim)
+    assert top._shis_strict is True
+
+    reloaded.get_poly_attrs(["finite"])
+    top = next(p for p in reloaded if p.dim == reloaded.dim)
+    assert top._shis_strict is True
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("strict SHIs should be reused instead of recomputed")
+
+    monkeypatch.setattr(calc, "get_shis", _boom)
+
+    boundary = reloaded.get_boundary_complex(reloaded.n - 1)
+    assert boundary.verified is True
+
+
+def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
+    import relucent.calculations as calc
+    from relucent.verify import verify_lp_flip_neighbors_in_complex
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
+    cplx.set_exploration_state(complete=True, verified=False)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("strict SHIs should be reused instead of recomputed")
+
+    monkeypatch.setattr(calc, "get_shis", _boom)
+
+    verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
+
+
+def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
+    from relucent.verify import verify_lp_flip_neighbors_in_complex
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
+    cplx.set_exploration_state(complete=True, verified=False)
+
+    verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
+    verify_lp_flip_neighbors_in_complex(cplx, nworkers=2)
+
+
+def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
+    from relucent.verify import verify_lp_flip_neighbors_in_complex
+
+    model = mlp(widths=[2, 8, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3, verify=False)
+    cplx.set_exploration_state(complete=True, verified=False)
+
+    with pytest.raises(IncompleteDualGraphError) as serial_err:
+        verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
+    with pytest.raises(IncompleteDualGraphError) as parallel_err:
+        verify_lp_flip_neighbors_in_complex(cplx, nworkers=2)
+
+    assert "Dual graph is incomplete relative to LP facets" in str(serial_err.value)
+    assert str(serial_err.value) == str(parallel_err.value)

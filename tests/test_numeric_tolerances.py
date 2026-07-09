@@ -96,7 +96,9 @@ def test_import_bootstrap_runs_by_default() -> None:
         "import relucent; "
         "import relucent.config as cfg; "
         "from relucent.numeric_tolerances import compute_tolerances; "
-        "assert cfg.TOL_HALFSPACE_CONTAINMENT == compute_tolerances()['TOL_HALFSPACE_CONTAINMENT']"
+        "tol = compute_tolerances(); "
+        "assert cfg.TOL_HALFSPACE_CONTAINMENT == tol['TOL_HALFSPACE_CONTAINMENT']; "
+        "assert cfg.MIN_SEARCH_INRADIUS == tol['MIN_SEARCH_INRADIUS']"
     )
     env = os.environ.copy()
     env.pop("RELUCENT_SKIP_NUMERIC_BOOTSTRAP", None)
@@ -125,3 +127,7 @@ def test_complex_auto_tolerances_false_skips_network_tune(monkeypatch: pytest.Mo
     assert calls == []
     Complex(convert(mlp([2, 3, 1])), auto_tolerances=True)
     assert len(calls) == 1
+
+
+def test_boundary_mip_bound_margin_default() -> None:
+    assert cfg.BOUNDARY_MIP_BOUND_MARGIN == 5.0

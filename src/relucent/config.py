@@ -158,9 +158,10 @@ GUROBI_SHI_BEST_BD_STOP: float = _env_float("GUROBI_SHI_BEST_BD_STOP", -1e-6)
 TOL_SHI_OBJECTIVE: float = _env_float("TOL_SHI_OBJECTIVE", 1e-8)
 
 # During complex search (BFS/A*), raise if a discovered cell's Chebyshev inradius is
-# below this floor.  Defaults to half of :data:`TOL_SHI_OBJECTIVE` so that when a thin
-# cell is sandwiched between similarly thin neighbors, SHI LPs are not operating in a
-# regime where opposing halfspaces can sit within tolerance of the relaxed boundary.
+# below this floor.  The literal fallback here is legacy-only: normal imports call
+# ``numeric_tolerances.apply_tolerances()`` and ``Complex(..., auto_tolerances=True)``
+# reapplies a network-scaled value, again keeping this at half of the effective
+# ``TOL_SHI_OBJECTIVE`` used at runtime.
 MIN_SEARCH_INRADIUS: float = _env_float("MIN_SEARCH_INRADIUS", TOL_SHI_OBJECTIVE / 2)
 
 # In 2D cell plotting (``Polyhedron.plot_cells`` when ``ambient_dim == 2``), halfspace normal
@@ -208,7 +209,7 @@ BOUNDARY_MIP_TIME_LIMIT: float = _env_float("BOUNDARY_MIP_TIME_LIMIT", 0.0)
 BOUNDARY_MIP_GUROBI_LOG: bool = _env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
 
 # Multiplier applied to the layerwise propagated preactivation bound for pricing MIP ``big-M``.
-BOUNDARY_MIP_BOUND_MARGIN: float = _env_float("BOUNDARY_MIP_BOUND_MARGIN", 10.0)
+BOUNDARY_MIP_BOUND_MARGIN: float = _env_float("BOUNDARY_MIP_BOUND_MARGIN", 5.0)
 
 # Compile ``exclude_tags`` into compressed trie no-goods when at least this many tags
 # are present; set to ``0`` to always compile, or a large value to disable.

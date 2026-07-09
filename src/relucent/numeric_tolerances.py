@@ -151,9 +151,11 @@ def compute_tolerances(
     tol_dead_relu = _safe(dead_floor, safety_factor=safety_factor)
     tol_verify_ab = _safe(dot_floor, safety_factor=safety_factor)
 
-    shi_obj_floor = max(gurobi_tol, dot_floor * push_size, _MIN_SHI_OBJECTIVE)
+    shi_obj_floor = max(dot_floor * push_size, _MIN_SHI_OBJECTIVE)
     tol_shi_objective = _safe(shi_obj_floor, safety_factor=safety_factor)
-    tol_gurobi_obj_stop = _safe(tol_shi_objective, safety_factor=safety_factor)
+    # BestObjStop should not be below solver feasibility tolerance, but the
+    # acceptance threshold (TOL_SHI_OBJECTIVE) can be smaller.
+    tol_gurobi_obj_stop = _safe(max(tol_shi_objective, gurobi_tol), safety_factor=safety_factor)
 
     k_viol = min(max_constraints, _SHI_PROOF_MAX_VIOLATIONS)
     tol_shi_hyperplane = _safe(float(k_viol) * dot_floor, safety_factor=safety_factor)
@@ -170,6 +172,8 @@ def compute_tolerances(
         "TOL_SHI_OBJECTIVE": tol_shi_objective,
         "GUROBI_SHI_BEST_OBJ_STOP": tol_gurobi_obj_stop,
         "GUROBI_SHI_BEST_BD_STOP": -tol_gurobi_obj_stop,
+        # Search uses the same SHI-scale threshold, with a half-step margin, so
+        # thin cells are rejected before relaxed-face LPs drift into tolerance noise.
         "MIN_SEARCH_INRADIUS": tol_shi_objective / 2.0,
         "TOL_SHI_HYPERPLANE": tol_shi_hyperplane,
         "TOL_NEARLY_VERTICAL": tol_nearly_vertical,

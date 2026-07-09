@@ -89,7 +89,7 @@ def _cancel_pending_neighbor(
 
 
 def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
-    """Fail fast when a search-discovered cell is thinner than ``MIN_SEARCH_INRADIUS``.
+    """Require either sufficient inradius or a valid interior witness point.
 
     Skips 0-cells (vertices), infeasible regions, and unbounded cells.
     """
@@ -104,12 +104,18 @@ def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
         return
     min_r = cfg.MIN_SEARCH_INRADIUS
     if inradius < min_r:
-        raise ValueError(
+        msg = (
             f"Polyhedron inradius {inradius:.4e} is below MIN_SEARCH_INRADIUS ({min_r:.4e}). "
             + "A cell this thin (often with neighbors equally thin across a shared face) "
             + "can leave opposing halfspaces within the SHI objective tolerance after "
             + "relaxation; tighten scaling or lower RELUCENT_TOL_SHI_OBJECTIVE."
         )
+        try:
+            witness = poly.get_interior_point(env=env)
+        except ValueError as error:
+            raise ValueError(msg + f" Witness point search failed: {error}") from error
+        poly._interior_point = np.asarray(witness).reshape(-1)
+        poly.warnings.append(RuntimeWarning(msg + " Witness point found; continuing search."))
 
 
 def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
@@ -158,6 +164,7 @@ def _worker_prepare_poly(
             if p._shis is None:
                 result = get_shis(p, env=env, **shis_kwargs)
                 p._shis = result[0] if isinstance(result, tuple) else result
+                p._shis_strict = bool(shis_kwargs.get("strict", False))
         except Exception as error:
             return error
     retain_geometry_caches(p, props)
@@ -207,8 +214,12 @@ def geometric_calculations(
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
     ctx = get_worker_context()
-    ss, shis, poly_index, *rest = task
-    p = Polyhedron(ctx.net, ss, shis=shis, bound=bound)
+    if len(task) >= 4:
+        ss, shis, shis_strict, poly_index, *rest = task
+    else:
+        ss, shis, poly_index, *rest = task
+        shis_strict = False
+    p = Polyhedron(ctx.net, ss, shis=shis, bound=bound, _shis_strict=bool(shis_strict))
     if err := _worker_prepare_poly(p, tuple(geometry_properties), env=ctx.env):
         return err, poly_index, *rest
     return (p, poly_index, *rest)
@@ -242,7 +253,7 @@ def parallel_compute_geometric_properties(
     if verbose:
         logger.info("Computing geometric properties on %d workers", nworkers)
 
-    tasks = [(poly.ss_np, poly._shis, i) for i, poly in enumerate(cx)]
+    tasks = [(poly.ss_np, poly._shis, bool(getattr(poly, "_shis_strict", False)), i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
     computed = 0
     with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
@@ -504,6 +515,7 @@ def searcher(
     result = get_shis(start, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
     start._shis = result
+    start._shis_strict = bool(shis_kwargs.get("strict", False))
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
     # Seed the frontier: each task is (neighbor ss, shi crossed, depth, parent index).
@@ -635,7 +647,9 @@ def searcher(
         pbar.close()
 
     hit_cap = max_polys != float("inf") and len(cx) >= max_polys
-    complete = unprocessed == 0 and not hit_cap and not depth_limited
+    # Failed neighbor discoveries mean the frontier was pruned, so queue exhaustion
+    # alone is not enough to certify that the ambient complex is complete.
+    complete = unprocessed == 0 and not hit_cap and not depth_limited and not bad_shi_computations
     # Skip verify when max_polys hit — frontier may still have neighbors (LP false-fail).
     do_verify = verify and complete and not hit_cap
     finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional verify_complex
@@ -774,6 +788,7 @@ def hamming_astar(
 
         start_poly._interior_point = start_poly.get_interior_point()
         start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))
+        start_poly._shis_strict = False
         return {
             "path": [start_poly],
             "succeeded": True,
@@ -817,6 +832,7 @@ def hamming_astar(
     result = get_shis(start_poly, bound=bound, **kwargs)
     assert isinstance(result, list)
     start_poly._shis = result
+    start_poly._shis_strict = bool(kwargs.get("strict", False))
 
     openSet.push((start_poly,), fScore[start_poly])
 

@@ -52,6 +52,7 @@ def test_recover_from_dual_graph(seed: int):
     G1 = cplx1.get_dual_graph(relabel=True)
     cplx2 = Complex(model)
     cplx2.recover_from_dual_graph(G1, initial_ss=cplx1.point2ss(start1), source=0)
+    assert cplx2.complete is True and cplx2.verified is True
     cplx2.bfs(start=start1, max_polys=5000)
     G2 = cplx2.get_dual_graph(relabel=True, require_complete=True)
     assert all(p.feasible for p in cplx2)

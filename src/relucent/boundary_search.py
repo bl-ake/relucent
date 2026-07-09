@@ -161,6 +161,7 @@ def _apply_ambient_boundary_shis(
                 **shis_kwargs,
             )
             poly._shis = shis
+            poly._shis_strict = bool(shis_kwargs.get("strict", False))
             poly._halfspaces = halfspaces
         return
 
@@ -181,6 +182,7 @@ def _apply_ambient_boundary_shis(
         )
     for tag, shis, halfspaces in results:
         tag_to_poly[tag]._shis = shis
+        tag_to_poly[tag]._shis_strict = bool(shis_kwargs.get("strict", False))
         tag_to_poly[tag]._halfspaces = halfspaces
     if verbose:
         _phase_log(
@@ -286,6 +288,7 @@ def boundary_searcher(
         result = _ambient_coface_shis_for_boundary_cell(start, boundary_shi, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
     start._shis = [s for s in result if int(s) != boundary_shi]  # boundary hyperplane is not a facet
+    start._shis_strict = bool(shis_kwargs.get("strict", False))
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
     failed_flips: set[tuple[bytes, int]] = set()
@@ -410,7 +413,9 @@ def boundary_searcher(
         pbar.close()
 
     hit_cap = max_polys != float("inf") and len(cx) >= max_polys
-    complete = unprocessed == 0 and not hit_cap and not depth_limited
+    # As in ambient search, a failed neighbor task means we pruned the frontier and
+    # cannot treat an empty queue as proof that the boundary complex is complete.
+    complete = unprocessed == 0 and not hit_cap and not depth_limited and not bad_shi_computations
     if not complete:
         # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
         cx.set_exploration_state(complete=False, verified=False)

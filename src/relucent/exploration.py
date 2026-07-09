@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from relucent._logging import logger
 from relucent._network_scale import default_polyhedron_bound
 from relucent.utils import process_aware_cpu_count
 
@@ -37,12 +38,21 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
             )
         return
     # Rebuild dual-graph edges and sync top-cell _shis from them.
-    cx.get_dual_graph(verbose=False, require_complete=False, verify=False, cubical=False)
+    graph = cx.get_dual_graph(verbose=False, require_complete=False, verify=False, cubical=False)
+    if verify:
+        top_dim = max(int(p.dim) for p in cx)
+        if top_dim == int(cx.dim):
+            for poly in cx:
+                if int(poly.dim) == top_dim and poly._shis is not None:
+                    poly._shis_strict = True
     cx.set_exploration_state(complete=True, verified=False)
     if verify:
         from relucent.verify import verify_complex
 
-        verify_complex(cx, level="fast", record_state=True)
+        logger.info("ambient finalize: certifying %d polyhedra ...", len(cx))
+        t_verify = time.perf_counter()
+        verify_complex(cx, level="fast", graph=graph, record_state=True)
+        logger.info("ambient finalize: certification finished in %.1fs", time.perf_counter() - t_verify)
     else:
         cx.set_exploration_state(complete=True, verified=False)
 

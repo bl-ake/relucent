@@ -115,7 +115,9 @@ class Complex:
                 is to be built and queried.
             auto_tolerances: When True (default), set :mod:`relucent.config`
                 tolerance values from this network's weight scale via
-                :func:`~relucent.numeric_tolerances.apply_tolerances`.
+                :func:`~relucent.numeric_tolerances.apply_tolerances`. This is
+                the usual runtime source for values such as
+                ``cfg.MIN_SEARCH_INRADIUS`` after import bootstrap.
         """
         original_net = net
         if not isinstance(net, ReLUNetwork):
@@ -2238,9 +2240,9 @@ class Complex:
             copy: If True, operate on a copy of G; otherwise modify G in place.
                 Defaults to False.
 
-        Returns:
-            networkx.Graph: The graph with polyhedron objects stored in node
-                attributes under the "poly" key.
+        Notes:
+            Sets exploration state to ``complete=True, verified=True``. Only
+            recover graphs that were built from a complete, verified ambient search.
         """
         if copy:
             graph = graph.copy()
@@ -2269,6 +2271,10 @@ class Complex:
             shis_per_node[v].append(shi)
         for node, shis in shis_per_node.items():
             graph.nodes[node]["poly"]._shis = shis
+            # Caches are written only for complete+verified complexes; trust SHIs on reload.
+            graph.nodes[node]["poly"]._shis_strict = True
+        # Dual-graph recovery is a trusted reconstruct of a previously explored complex.
+        self.set_exploration_state(complete=True, verified=True)
 
     def plot(
         self,

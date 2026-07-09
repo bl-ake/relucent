@@ -154,7 +154,15 @@
         ],
         "max_polys": 0
       },
-      "expected": {}
+      "expected": {
+        "n_regions": 640,
+        "n_boundary_cells": 254,
+        "truncated_betti": {
+          "0": 1
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 10
     },
     {
       "id": "parity_5490",
@@ -175,7 +183,15 @@
         ],
         "max_polys": 0
       },
-      "expected": {}
+      "expected": {
+        "n_regions": 26541,
+        "n_boundary_cells": 668,
+        "truncated_betti": {
+          "0": 2
+        },
+        "methods_agree": false
+      },
+      "boundary_shi": 30
     },
     {
       "id": "meta_graph_large",
@@ -197,7 +213,15 @@
         ],
         "max_polys": 0
       },
-      "expected": {}
+      "expected": {
+        "n_regions": 58714,
+        "n_boundary_cells": 346,
+        "truncated_betti": {
+          "0": 1
+        },
+        "methods_agree": false
+      },
+      "boundary_shi": 40
     },
     {
       "id": "parity_6013",
@@ -216,7 +240,15 @@
         ],
         "max_polys": 0
       },
-      "expected": {}
+      "expected": {
+        "n_regions": 1237,
+        "n_boundary_cells": 443,
+        "truncated_betti": {
+          "0": 1
+        },
+        "methods_agree": true
+      },
+      "boundary_shi": 12
     }
   ]
 }

@@ -72,6 +72,7 @@ class Polyhedron:
         self.bound = bound
 
         self._shis: list[int] | None = shis
+        self._shis_strict: bool = False
         self._hs: HalfspaceIntersection | None = None
         self._ch: ConvexHull | None = None
         self._finite: bool | None = finite
@@ -1103,6 +1104,7 @@ class Polyhedron:
             "_interior_point_norm": self._interior_point_norm,
             "_inradius": self._inradius,
             "_shis": self._shis,
+            "_shis_strict": self._shis_strict,
             "_Wl2": self._Wl2,
             "_volume": self._volume,
             "_num_dead_relus": self._num_dead_relus,

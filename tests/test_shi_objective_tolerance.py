@@ -85,6 +85,24 @@ def _thin_rectangle_halfspaces(*, width: float = 1.0, height: float) -> np.ndarr
     )
 
 
+def test_min_search_inradius_accepts_thin_cell_with_witness(monkeypatch: pytest.MonkeyPatch) -> None:
+    hs = _thin_rectangle_halfspaces(height=1e-9)
+    poly = _poly_from_halfspaces(halfspaces=hs)
+    poly._finite = True
+    poly._finite_computed = True
+    poly._center = np.array([[0.5], [5e-10]], dtype=np.float64)
+    poly._inradius = 5e-10
+
+    monkeypatch.setattr(cfg, "MIN_SEARCH_INRADIUS", 1e-6)
+
+    _enforce_min_search_inradius(poly, env=None)
+
+    assert poly._interior_point is not None
+    assert np.allclose(poly._interior_point, np.array([0.5, 5e-10], dtype=np.float64))
+    assert poly.warnings
+    assert "Witness point found; continuing search." in str(poly.warnings[-1])
+
+
 def _shi_objective_for_face(
     poly: Polyhedron,
     face_i: int,
@@ -299,7 +317,7 @@ class TestChebyshevVsShiIndependence:
 class TestMinSearchInradiusGuard:
     """Search-time guard when Chebyshev inradius falls below ``MIN_SEARCH_INRADIUS``."""
 
-    def test_enforce_raises_below_half_shi_tolerance(self, env):
+    def test_enforce_accepts_thin_cell_with_witness(self, env):
         height = 1e-10
         hs = _thin_rectangle_halfspaces(height=height)
         poly = _poly_from_halfspaces(halfspaces=hs)
@@ -310,8 +328,10 @@ class TestMinSearchInradiusGuard:
         poly._finite_computed = True
         poly._center = _center
         poly._inradius = inradius
-        with pytest.raises(ValueError, match="MIN_SEARCH_INRADIUS"):
-            _enforce_min_search_inradius(poly, env=env)
+        _enforce_min_search_inradius(poly, env=env)
+        assert poly._interior_point is not None
+        assert poly.warnings
+        assert "Witness point found; continuing search." in str(poly.warnings[-1])
 
     def test_enforce_passes_at_tolerance_scale(self, env):
         height = 1e-7
@@ -334,7 +354,7 @@ class TestMinSearchInradiusGuard:
         poly._inradius = 0.0
         _enforce_min_search_inradius(poly, env=env)
 
-    def test_1d_relu_strip_triggers_search_worker_guard(self, env):
+    def test_1d_relu_strip_search_worker_keeps_thin_cell_with_witness(self, env):
         """Two parallel ReLU thresholds spaced by eps give a strip with inradius eps/2."""
         from relucent import Complex
         from relucent.worker_context import worker_context_scope
@@ -350,8 +370,10 @@ class TestMinSearchInradiusGuard:
             assert thin.inradius < cfg.MIN_SEARCH_INRADIUS
 
             result = search_calculations((thin.ss_np, 0, 0))
-            assert not isinstance(result[0], Polyhedron)
-            assert "MIN_SEARCH_INRADIUS" in str(result[0])
+            assert isinstance(result[0], Polyhedron)
+            assert result[0]._interior_point is not None
+            assert result[0].warnings
+            assert "Witness point found; continuing search." in str(result[0].warnings[-1])
 
 
 class TestStripNetworkBfs:
@@ -366,7 +388,7 @@ class TestStripNetworkBfs:
         # vars; CI sets RELUCENT_CAREFUL_MODE=1, so patch the env as well as cfg.
         monkeypatch.setenv("RELUCENT_CAREFUL_MODE", "0")
 
-    def test_bfs_rejects_thin_strip_neighbor_and_completes(self):
+    def test_bfs_keeps_thin_strip_neighbor_when_witness_exists(self):
         from collections import deque
 
         from relucent import Complex
@@ -396,8 +418,8 @@ class TestStripNetworkBfs:
         )
 
         assert info["Complete"] is True
-        assert len(info["Bad SHI Computations"]) >= 1
-        assert any("MIN_SEARCH_INRADIUS" in str(entry[-1]) for entry in info["Bad SHI Computations"])
+        assert not any("MIN_SEARCH_INRADIUS" in str(entry[-1]) for entry in info["Bad SHI Computations"])
+        assert len(cplx) >= 1
 
     def test_bfs_completes_after_strip_widening_perturbation(self):
         from relucent import Complex
