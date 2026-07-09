@@ -271,11 +271,6 @@ PLOT_MARGIN_FACTOR: float = _env_float("PLOT_MARGIN_FACTOR", 1.1)
 # Topology / Betti computation
 # -----------------------------------------------------------------------------
 
-# When True, :meth:`~relucent.complex.Complex.get_dual_graph` builds adjacency by
-# grouping top-dimensional cells on shared codimension-one face tags (cubical rule).
-# When False, use the legacy flip-on-``_shis`` walk (search / contraction SHI lists).
-CUBICAL_DUAL_GRAPH: bool = _env_bool("CUBICAL_DUAL_GRAPH", True)
-
 # When True, run geometric genericity / transversality checks (e.g. degenerate
 # 1-cell endpoints). Expensive on large complexes; enabled automatically in
 # :meth:`~relucent.complex.Complex.get_boundary_complex`.

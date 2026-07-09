@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import os
 import pickle
 import random
@@ -56,7 +55,6 @@ from relucent.utils import (
     BlockingQueue,
     encode_ss,
     flip_ss_at_shi,
-    flip_ss_at_shi_inplace,
     process_aware_cpu_count,
 )
 from relucent.verify import (
@@ -1021,7 +1019,9 @@ class Complex:
         if len(out) > 0:
             from relucent import meta_graph as mg
 
-            mg.assign_contracted_shis(out)
+            mg.set_contracted_shis(out)
+            if cfg.CAREFUL_MODE:
+                mg.verify_contracted_shis(out)
         return out
 
     def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
@@ -1041,12 +1041,10 @@ class Complex:
     def _codim_one_face_kwargs(self, p1: Polyhedron, p2: Polyhedron, shi: int) -> dict[str, Any]:
         """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces.
 
-        When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, candidate SHIs are
-        all nonzero sign-sequence crossings on the face (role 2), then
-        :func:`mg.assign_contracted_shis` keeps flip neighbors in the slice.
-        Otherwise candidates are the legacy coface SHI intersection minus the
-        crossing index.  Infeasible 1-cell faces are dropped at construction time
-        via :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`.
+        Candidate SHIs are all nonzero sign-sequence crossings on the face (role 2);
+        :func:`mg.set_contracted_shis` keeps flip neighbors in the slice.
+        Infeasible 1-cell faces are dropped at construction time via
+        :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`.
 
         Meta-graph **face edges** always use :func:`mg.ss_nonzero_indices`; see
         ``negative-betti-meta-graph-bug.md``.
@@ -1055,12 +1053,9 @@ class Complex:
         codim = p1.codim + 1
         face_dim = ambient - codim
         shi_i = int(shi)
-        if cfg.CUBICAL_DUAL_GRAPH:
-            face_ss = p1.ss_np.copy()
-            face_ss[0, shi_i] = 0
-            candidate_shis = list(mg.ss_nonzero_indices(face_ss))
-        else:
-            candidate_shis = sorted(set(p1.shis) & set(p2.shis) - {shi_i})
+        face_ss = p1.ss_np.copy()
+        face_ss[0, shi_i] = 0
+        candidate_shis = list(mg.ss_nonzero_indices(face_ss))
         if face_dim == 1 and p1.halfspaces is not None:
             new_ss = p1.ss_np.copy()
             new_ss[0, shi_i] = 0
@@ -1125,7 +1120,9 @@ class Complex:
             disable=not verbose,
         ):
             cplx.add_polyhedron(poly, check_exists=False)
-        mg.assign_contracted_shis(cplx)
+        mg.set_contracted_shis(cplx)
+        if cfg.CAREFUL_MODE:
+            mg.verify_contracted_shis(cplx)
         cplx.verify_arrangement_genericity()
         from relucent.verify import verify_complex
 
@@ -1196,9 +1193,7 @@ class Complex:
 
         Each codimension-one face is keyed by zeroing one dual-graph SHI in the
         sign sequence.  Face ``shis`` kwargs come from
-        :meth:`_codim_one_face_kwargs`, then :func:`mg.assign_contracted_shis`.
-        The next :meth:`get_dual_graph` call on the result iterates those ``_shis``
-        lists when :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is False.
+        :meth:`_codim_one_face_kwargs`, then :func:`mg.set_contracted_shis`.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
@@ -1216,7 +1211,7 @@ class Complex:
                 **self._codim_one_face_kwargs(p1, p2, int(shi)),
             )
 
-        mg.assign_contracted_shis(new_complex)
+        mg.set_contracted_shis(new_complex)
         if len(new_complex) > 0:
             from relucent.verify import verify_complex
 
@@ -1234,7 +1229,7 @@ class Complex:
         Phantom vertices (geometrically infeasible 0-cells that would otherwise arise
         from combinatorial contraction) are prevented upstream:
         :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible` at 1-cell construction
-        and :func:`~relucent.meta_graph.assign_contracted_shis` on each slice.
+        and :func:`~relucent.meta_graph.set_contracted_shis` on each slice.
 
         Raises:
             IncompleteDualGraphError: If dual adjacency is incomplete at some dimension;
@@ -1583,7 +1578,7 @@ class Complex:
             known_nodes = set(meta.nodes)
             new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
             if new_face_tags:
-                mg.propagate_finite_from_coface_edges(lookup, edges)
+                mg.classify_lazy_face_polys(new_face_tags, lookup, edges_by_dim)
             face_dim = int(k) - 1
             face_neighbors = dim_neighbor_tags.get(face_dim, set())
             for face_tag_key in new_face_tags:
@@ -2087,10 +2082,8 @@ class Complex:
         where nodes are polyhedra and edges connect adjacent polyhedra (those
         sharing a supporting hyperplane).
 
-        Edges use cubical 0-face sharing when ``cubical`` is True and ``max_dim == 1``
-        (default: :data:`~relucent.config.CUBICAL_DUAL_GRAPH` for 1D complexes only).
-        Otherwise edges follow flip-on-``poly.shis`` (legacy).  Contraction passes
-        ``cubical=False`` to preserve conservative SHI propagation.
+        Edges use combinatorial cubical adjacency via :func:`~relucent.meta_graph.dual_edges_top_dim`
+        (0-face sharing when ``max_dim == 1``, flip neighbors when ``max_dim >= 2``).
 
         Args:
             relabel: If True, nodes are indexed by integers matching self.index2poly
@@ -2136,35 +2129,21 @@ class Complex:
                 top_cells.append(poly)
 
         neighbor_tags = {p.tag for p in top_cells}
-        use_cubical_1d = (cfg.CUBICAL_DUAL_GRAPH if cubical is None else cubical) and max_dim == 1
-        if max_dim >= 2 or int(max_dim) == int(self.dim):
-            # Ambient top dimension: combinatorial flip-neighbor edges, always sync _shis.
-            edges, _ = mg.dual_edges_top_dim(top_cells, neighbor_tags, top_dim=max_dim)
-            for u, v, shi in edges:
-                graph.add_edge(u, v, shi=shi)
-            if top_cells:
-                mg.sync_shis_from_dual_graph(graph)
-        elif use_cubical_1d:
-            # 1D complex with cubical 0-face sharing; sync _shis only if search left them empty.
-            edges, _ = mg.dual_edges_top_dim(top_cells, neighbor_tags, top_dim=max_dim)
-            for u, v, shi in edges:
-                graph.add_edge(u, v, shi=shi)
-            if all(not poly.shis for poly in top_cells):
-                mg.sync_shis_from_dual_graph(graph)
-        else:
-            # Contracted 1-skeleton: walk propagated poly.shis; skip missing flip neighbors.
-            for poly in tqdm(top_cells, desc="Creating Dual Graph", leave=False, disable=not verbose):
-                ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
-                for shi in poly.shis:
-                    if cfg.CAREFUL_MODE:
-                        assert ss.ravel()[shi] != 0
-                    flip_ss_at_shi_inplace(ss, shi)
-                    with contextlib.suppress(KeyError):
-                        graph.add_edge(poly, self[ss], shi=shi)
-                    flip_ss_at_shi_inplace(ss, shi)
+        edge_top_dim = mg.dual_graph_edge_top_dim(cell_top_dim=max_dim, ambient_dim=int(self.dim))
+        prefer_cell_shis = max_dim < int(self.dim)
+        edges, _ = mg.dual_edges_top_dim(
+            top_cells,
+            neighbor_tags,
+            top_dim=edge_top_dim,
+            prefer_cell_shis=prefer_cell_shis,
+        )
+        for u, v, shi in edges:
+            graph.add_edge(u, v, shi=shi)
+        if top_cells:
+            mg.set_shis_from_dual_graph(graph)
 
         if verify and top_cells:
-            mg.verify_dual_graph_cubical(top_cells, graph, top_dim=max_dim)
+            mg.verify_dual_graph_cubical(top_cells, graph, top_dim=edge_top_dim)
         if plot:
             from relucent.vis import get_colors
 

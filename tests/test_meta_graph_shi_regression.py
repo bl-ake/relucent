@@ -6,7 +6,7 @@ not propagated ``_shis`` lists that can be a strict subset of SS crossings.
 
 Face **construction** in :meth:`~relucent.complex.Complex.contract` seeds SHI
 candidates from SS crossings and finalizes with
-:func:`~relucent.meta_graph.assign_contracted_shis` (
+:func:`~relucent.meta_graph.set_contracted_shis` (
 :func:`~relucent.meta_graph.cubical_cell_shis`). Using propagated ``_shis`` for
 meta-graph face-edge discovery would omit valid faces and break ``∂² = 0``.
 
@@ -22,6 +22,7 @@ import pytest
 import torch
 
 from relucent import Complex, mlp, set_seeds
+from relucent import meta_graph as mg
 from relucent.exploration import explore_for_topology
 
 os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
@@ -68,6 +69,7 @@ def test_meta_graph_chain_complex_regression(
     assert sizes == chain_sizes, f"{name}: unexpected chain sizes {sizes!r}"
 
     meta = cplx.get_meta_graph(verbose=False)
+    mg.verify_meta_graph_one_cells(meta)
     assert meta.number_of_edges() == meta_edges, f"{name}: edge count"
 
     got = cplx.get_betti_numbers(

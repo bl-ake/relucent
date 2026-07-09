@@ -18,6 +18,7 @@ from relucent import Complex, set_seeds
 from relucent.exploration import explore_for_topology
 from relucent.filtration import ConstantFiltration
 from relucent.persistence import betti_at_filtration_end, compute_persistent_homology
+from relucent.topology import get_betti_numbers
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -151,6 +152,17 @@ def test_line_boundary_beta0_matches_components(seeded: int) -> None:
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
     betti = db.get_betti_numbers(verify_connected_components=True)
     assert betti.get(0, 0) >= 1
+
+
+def test_line_boundary_truncated_chain_complex_is_consistent(seeded: int) -> None:
+    """Truncated line boundary meta-graph satisfies ∂²=0."""
+    set_seeds(seeded)
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
+    meta = db.get_meta_graph(verbose=False)
+    Complex.truncate_meta_graph(meta)
+    get_betti_numbers(meta, verify_chain_complex=True)
 
 
 def test_constant_filtration_matches_betti_on_small_relu_complex(seeded: int):

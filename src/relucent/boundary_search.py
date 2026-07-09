@@ -86,34 +86,14 @@ def _ambient_coface_shis_for_boundary_cell(
 ) -> list[int]:
     """``_shis`` for a boundary top cell, matching :meth:`Complex.get_boundary_cells`.
 
-    When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, returns all nonzero
-    sign-sequence crossings on the slice (finalized by
-    :func:`~relucent.meta_graph.assign_contracted_shis`).  Otherwise lifts
-    ``poly`` off the bent hyperplane and intersects ambient coface SHI sets.
+    Returns all nonzero sign-sequence crossings on the slice (finalized by
+    :func:`~relucent.meta_graph.set_contracted_shis`).
     """
     ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
     bshi = int(boundary_shi)
     if int(ss.ravel()[bshi]) != 0:
         raise ValueError(f"Expected ss[{bshi}]=0 on boundary cell, got {ss!r}")
-    if cfg.CUBICAL_DUAL_GRAPH:
-        return sorted(int(s) for s in mg.ss_nonzero_indices(ss))
-    net = poly._net
-    if net is None:
-        raise ValueError("boundary cell missing network reference for ambient lift")
-    if bound is None:
-        bound = default_polyhedron_bound(net)
-    p_pos, p_neg = _ambient_lift_polyhedra(poly, bshi)
-    try:
-        shis_pos = get_shis(p_pos, bound=bound, **shis_kwargs)
-        shis_neg = get_shis(p_neg, bound=bound, **shis_kwargs)
-    except Exception:
-        saved = poly._shis
-        poly._shis = None
-        try:
-            return [int(s) for s in get_shis(poly, bound=bound, **shis_kwargs) if int(s) != bshi]
-        finally:
-            poly._shis = saved
-    return sorted(int(s) for s in (set(shis_pos) & set(shis_neg) - {bshi}))
+    return sorted(int(s) for s in mg.ss_nonzero_indices(ss))
 
 
 def _ambient_boundary_metadata_for_cell(

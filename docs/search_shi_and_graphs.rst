@@ -135,7 +135,7 @@ The crossing hyperplane is already zeroed, so it is not included.
 creation (via :func:`~relucent.meta_graph.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
 :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`. After the full slice is
-known, :func:`~relucent.meta_graph.assign_contracted_shis` sets authoritative
+known, :func:`~relucent.meta_graph.set_contracted_shis` sets authoritative
 ``_shis`` to :func:`~relucent.meta_graph.cubical_cell_shis` — the same
 flip-neighbor rule as role 3, restricted to cells in the slice.
 
@@ -195,7 +195,7 @@ After complete ambient search (authoritative top cells)
    :func:`~relucent.meta_graph.dual_edges_top_dim` (flip neighbors for
    ``max_dim ≥ 2``; shared 0-face tags for 1D ambient complexes).
 2. Syncs ``poly._shis`` from incident edge labels via
-   :func:`~relucent.meta_graph.sync_shis_from_dual_graph`.
+   :func:`~relucent.meta_graph.set_shis_from_dual_graph`.
 
 Top-cell ``_shis`` are therefore **re-derived from dual-graph edges**, not left
 as raw LP output. This is the combinatorial cubical model used by contraction
@@ -206,13 +206,13 @@ On contracted slices (boundary, chain complex)
 
 After :meth:`~relucent.complex.Complex.contract` creates faces, SHIs are seeded
 from SS crossings (role 1) and finalized by
-:func:`~relucent.meta_graph.assign_contracted_shis` to
+:func:`~relucent.meta_graph.set_contracted_shis` to
 :func:`~relucent.meta_graph.cubical_cell_shis`. Contracted 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
 
 Boundary discovery seeds slice ``_shis`` from SS crossings
 (``_apply_ambient_boundary_shis`` in :mod:`relucent.boundary_search`), then
-runs the same ``assign_contracted_shis`` pass during finalize.
+runs the same ``set_contracted_shis`` pass during finalize.
 
 Verification
 ------------
@@ -267,7 +267,7 @@ Boundary-specific checks
   (:func:`~relucent.verify.verify_boundary_cell`)
 * Builds the dual graph with ``require_complete=verify``
 * Runs :func:`~relucent.meta_graph.verify_arrangement_genericity`
-* Calls :func:`~relucent.meta_graph.assign_contracted_shis` before ``verify_complex``
+* Calls :func:`~relucent.meta_graph.set_contracted_shis` before ``verify_complex``
 
 Exploration flags
 ~~~~~~~~~~~~~~~~~
@@ -315,7 +315,7 @@ The rule depends on the complex dimension:
   each cell's finalized ``poly.shis`` (from :func:`~relucent.meta_graph.cubical_cell_shis`)
   and add edges only when the flip neighbor exists in the complex.
 
-After edge construction, :func:`~relucent.meta_graph.sync_shis_from_dual_graph`
+After edge construction, :func:`~relucent.meta_graph.set_shis_from_dual_graph`
 sets each node's ``_shis`` from incident edge labels.
 
 Uses
@@ -422,7 +422,7 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    each component with ``ss[boundary_shi] = 0`` fixed and SHI subsets that
    exclude the boundary hyperplane.
 3. **Finalize** — :func:`~relucent.exploration.finalize_boundary_complex`:
-   slice SHI assignment (``ss_nonzero_indices`` + ``assign_contracted_shis``),
+   slice SHI assignment (``ss_nonzero_indices`` + ``set_contracted_shis``),
    dual graph, genericity check, ``verify_complex``.
 
 Alternatively, explore the full ambient complex first, then

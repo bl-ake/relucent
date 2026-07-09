@@ -116,8 +116,9 @@ def finalize_boundary_complex(
         "discover finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
         verbose=verbose,
     )
-    mg.assign_contracted_shis(cx)  # boundary top cells need contracted SHIs before verify
+    mg.set_contracted_shis(cx)  # boundary top cells need contracted SHIs before verify
     if verify:
+        mg.verify_contracted_shis(cx)
         verify_complex(cx, level="fast", graph=cx._dual_graph, record_state=True)
     else:
         cx.set_exploration_state(complete=True, verified=False)  # discoverer defers certification when verify=False

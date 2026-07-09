@@ -11,6 +11,7 @@ from relucent import meta_graph as mg
 from relucent.calculations import get_shis
 from relucent.complex import TRUNCATION_META_SHI
 from relucent.exploration import explore_for_topology
+from relucent.topology import get_betti_numbers
 from relucent.utils import get_env
 
 
@@ -54,6 +55,7 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     assert len(chain) >= 1
 
     meta = db.get_meta_graph(verbose=False)
+    mg.verify_meta_graph_one_cells(meta)
 
     # Meta-graph should contain every feasible cell across the contraction chain.
     expected_nodes = {p.tag for cc in chain for p in cc if not (p.dim > 0 and p.finite is None)}
@@ -146,6 +148,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     explore_for_topology(cplx, np.array([0.5, 0.0]))
 
     meta_plain = cplx.get_meta_graph(verbose=False)
+    mg.verify_meta_graph_one_cells(meta_plain)
     meta_tr = meta_plain.copy()
     Complex.truncate_meta_graph(meta_tr)
 
@@ -182,6 +185,8 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
             assert meta_tr.has_edge(tu, tv)
             shis_dup = [ed.get("shi") for _u, _v, _k, ed in meta_tr.out_edges(tu, keys=True, data=True) if _v == tv]
             assert d.get("shi") in shis_dup
+
+    get_betti_numbers(meta_tr, verify_chain_complex=True)
 
 
 def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:
@@ -223,7 +228,15 @@ def _finite_from_dual_graph_propagation(
                 zero_faces = {
                     dst for src, dst, _ in face_edges if src == tag and cells.get(dst) is not None and cells[dst].dim == 0
                 }
-                finite[tag] = len(zero_faces) >= 2
+                n_zero = len(zero_faces)
+                n_shis = len(poly._shis or [])
+                assert 0 <= n_shis <= 2, f"1-cell {tag!r}: expected 0–2 flip SHIs, got {n_shis}"
+                assert 0 <= n_zero <= 2, f"1-cell {tag!r}: expected 0–2 combinatorial 0-faces, got {n_zero}"
+                finite[tag] = n_zero >= 2
+                if finite[tag]:
+                    assert n_shis >= 2, f"bounded 1-cell {tag!r} must list two flip SHIs"
+                elif n_shis >= 2:
+                    assert n_zero < 2, f"unbounded 1-cell {tag!r} cannot have two 0-faces and two flip SHIs"
                 continue
             faces = [dst for src, dst, _ in face_edges if src == tag and dst in finite]
             if not faces:
@@ -334,6 +347,7 @@ def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
     dim_neighbor_tags = {k: {p.tag for p in cc} for k, cc in by_dim.items()}
 
     meta = cplx.get_meta_graph(verbose=False)
+    mg.verify_meta_graph_one_cells(meta)
     mismatches: list[str] = []
 
     for tag, attrs in meta.nodes(data=True):
@@ -397,6 +411,7 @@ def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
     meta = cplx.get_meta_graph(verbose=False)
+    mg.verify_meta_graph_one_cells(meta)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
     face_edges = [(u, v, int(d["shi"])) for u, v, d in meta.edges(data=True)]

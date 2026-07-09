@@ -111,7 +111,7 @@ At finalize on a **complete** ambient search, top-cell ``_shis`` are **re-derive
 from combinatorial dual-graph edges.
 
 On **contracted** slices (boundary complexes, chain-complex steps),
-:func:`~relucent.meta_graph.assign_contracted_shis` sets ``_shis`` to
+:func:`~relucent.meta_graph.set_contracted_shis` sets ``_shis`` to
 :func:`~relucent.meta_graph.cubical_cell_shis` (flip neighbors in the slice).
 Contracted 1-skeleton dual graphs walk each cell's finalized ``poly.shis`` lists.
 

@@ -45,26 +45,30 @@ __all__ = [
     "NonGenericArrangementError",
     "classify_finite",
     "classify_finite_ascending",
-    "assign_contracted_shis",
+    "classify_lazy_face_polys",
     "collect_meta_face_edges",
     "cubical_cell_shis",
     "dual_edges_top_dim",
+    "dual_graph_edge_top_dim",
     "face_tag",
-    "filter_shi_candidates",
     "finite_cells_subgraph",
-    "complete_truncated_one_cell_boundaries",
     "flip_tag",
     "META_FACE_PARALLEL_MIN_CELLS",
     "meta_node_attrs",
     "one_point_compactify_meta_graph",
     "parallel_collect_meta_face_edges",
-    "propagate_finite_from_coface_edges",
+    "set_contracted_shis",
+    "set_shis_from_dual_graph",
     "ss_nonzero_indices",
-    "sync_shis_from_dual_graph",
     "truncate_meta_graph",
     "verify_arrangement_genericity",
+    "verify_contracted_shis",
     "verify_dual_graph_cubical",
     "verify_meta_graph_incidence",
+    "verify_meta_graph_one_cells",
+    "verify_shi_flip_neighbors",
+    "verify_shis_from_dual_graph",
+    "verify_top_cell_flip_shi_symmetry",
 ]
 
 META_FACE_PARALLEL_MIN_CELLS = 64
@@ -83,10 +87,8 @@ META_FACE_PARALLEL_MIN_CELLS = 64
 # - **Node metadata** (:func:`meta_node_attrs`): derived flip-neighbor SHIs.
 #
 # **Contract path** (``contract`` / ``get_boundary_complex`` only):
-# With :data:`~relucent.config.CUBICAL_DUAL_GRAPH`, :func:`assign_contracted_shis`
-# assigns :func:`cubical_cell_shis`.  Legacy mode seeds coface-intersection SHIs
-# in :meth:`~relucent.complex.Complex._codim_one_face_kwargs`, then flip-filters.
-# Do not reuse that propagation in :meth:`~relucent.complex.Complex.get_meta_graph`.
+# :func:`set_contracted_shis` assigns :func:`cubical_cell_shis`; :func:`verify_contracted_shis`
+# checks flip neighbors and symmetry.  Do not reuse that in :meth:`~relucent.complex.Complex.get_meta_graph`.
 #
 # **Meta-graph path** (stateless):
 #
@@ -128,11 +130,21 @@ def flip_tag(ss: np.ndarray, shi: int) -> bytes:
     return encode_ss(flip_ss_at_shi(row, int(shi)).reshape(np.asarray(ss).shape))
 
 
+def dual_graph_edge_top_dim(*, cell_top_dim: int, ambient_dim: int) -> int:
+    """``top_dim`` argument for :func:`dual_edges_top_dim` / :func:`verify_dual_graph_cubical`.
+
+    1-cells always use flip-neighbor adjacency so ``_shis`` match flip-SHI verification.
+    """
+    _ = ambient_dim
+    return cell_top_dim if cell_top_dim >= 2 else 2
+
+
 def dual_edges_top_dim(
     cells: Iterable[Polyhedron],
     neighbor_tags: set[bytes],
     *,
     top_dim: int | None = None,
+    prefer_cell_shis: bool = False,
 ) -> tuple[list[tuple[Polyhedron, Polyhedron, int]], list[tuple[Polyhedron, int]]]:
     """Cubical dual edges for top-dimensional cells.
 
@@ -147,25 +159,34 @@ def dual_edges_top_dim(
         top_dim = int(cell_list[0].dim)
     if int(top_dim) == 1:
         return _dual_edges_one_dim(cell_list), []
-    return _dual_edges_flip_neighbors(cell_list, neighbor_tags), []
+    return _dual_edges_flip_neighbors(cell_list, neighbor_tags, prefer_cell_shis=prefer_cell_shis), []
 
 
 def _dual_edges_flip_neighbors(
     cell_list: list[Polyhedron],
     neighbor_tags: set[bytes],
+    *,
+    prefer_cell_shis: bool = False,
 ) -> list[tuple[Polyhedron, Polyhedron, int]]:
     tag_to_poly = {p.tag: p for p in cell_list}
     edges: list[tuple[Polyhedron, Polyhedron, int]] = []
     seen: set[tuple[bytes, bytes]] = set()
     for u in cell_list:
         ss = np.asarray(u.ss_np)
-        for shi in ss_nonzero_indices(ss):
+        candidates = list(u._shis) if prefer_cell_shis and u._shis is not None else list(ss_nonzero_indices(ss))
+        for shi in candidates:
             shi_i = int(shi)
+            if shi_i >= ss.shape[-1] or int(ss.ravel()[shi_i]) == 0:
+                raise ValueError(f"SHI {shi_i} is out of bounds for sign sequence {ss}.")
+            if int(u.dim) == 1 and u.halfspaces is not None and not u.is_shi_face_feasible(shi_i):
+                continue
             vt = flip_tag(ss, shi_i)
             if vt not in neighbor_tags:
                 continue
             v = tag_to_poly.get(vt)
             if v is None or u.tag == v.tag:
+                continue
+            if int(v.dim) == 1 and v.halfspaces is not None and not v.is_shi_face_feasible(shi_i):
                 continue
             lo, hi = (u.tag, v.tag) if u.tag < v.tag else (v.tag, u.tag)
             if (lo, hi) in seen:
@@ -209,7 +230,7 @@ def _dual_edges_one_dim(
     return edges
 
 
-def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
+def set_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
     """Populate ``poly._shis`` on nodes from dual-graph edge ``shi`` attributes."""
     shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
     for u, v, data in graph.edges(data=True):
@@ -231,6 +252,28 @@ def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
             )
             poly._shis = assigned
             poly._shis_strict = keep_strict
+
+
+def verify_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
+    """Require each polyhedron's ``_shis`` to match incident dual-graph edge labels."""
+    shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
+    for u, v, data in graph.edges(data=True):
+        shi = data.get("shi")
+        if shi is None:
+            raise CubicalConsistencyError("Dual-graph edge is missing 'shi' attribute.")
+        shis_per_node[u].append(int(shi))
+        shis_per_node[v].append(int(shi))
+    for node, expected in shis_per_node.items():
+        poly = node if isinstance(node, Polyhedron) else None
+        if poly is None and isinstance(graph.nodes[node], dict):
+            poly = graph.nodes[node].get("poly")
+        if not isinstance(poly, Polyhedron):
+            continue
+        actual = sorted(int(s) for s in (poly._shis or []))
+        if actual != sorted(set(expected)):
+            raise CubicalConsistencyError(
+                f"Dual-graph SHI sync mismatch on {poly!r}: cached {actual!r} != edges {sorted(set(expected))!r}."
+            )
 
 
 def verify_dual_graph_cubical(
@@ -352,8 +395,29 @@ def cubical_cell_shis(
     *,
     neighbor_tags: set[bytes],
 ) -> list[int]:
-    """Flip-neighbor SHIs: ``ss_nonzero_indices`` with same-dimension slice filter."""
-    return filter_shi_candidates(ss, ss_nonzero_indices(ss), neighbor_tags=neighbor_tags)
+    """Flip-neighbor SHIs: nonzero sign-sequence crossings with a same-dimension neighbor."""
+    row = np.asarray(ss, dtype=np.int8).ravel()
+    kept: list[int] = []
+    for shi in ss_nonzero_indices(np.asarray(ss)):
+        shi_i = int(shi)
+        if shi_i >= row.shape[0] or row[shi_i] == 0:
+            continue
+        if encode_ss(flip_ss_at_shi(row, shi_i)) in neighbor_tags:
+            kept.append(shi_i)
+    return sorted(kept)
+
+
+def verify_shi_flip_neighbors(
+    ss: np.ndarray,
+    shis: Iterable[int],
+    *,
+    neighbor_tags: set[bytes],
+) -> None:
+    """Raise if ``shis`` is not the cubical flip-neighbor list for ``ss`` in the slice."""
+    expected = cubical_cell_shis(ss, neighbor_tags=neighbor_tags)
+    actual = sorted(int(s) for s in shis)
+    if actual != expected:
+        raise CubicalConsistencyError(f"SHI flip-neighbor mismatch: expected {expected!r}, got {actual!r}.")
 
 
 def meta_node_attrs(
@@ -369,16 +433,17 @@ def meta_node_attrs(
         finite = poly.finite
     ss_arr = np.asarray(poly.ss_np)
     crossings = list(ss_nonzero_indices(ss_arr))
-    flip_shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
-    if int(poly.dim) == 1 and poly.halfspaces is not None:
-        flip_shis = [s for s in flip_shis if poly.is_shi_face_feasible(int(s))]
+    if poly._shis is not None:
+        node_shis = sorted(int(s) for s in poly._shis)
+    else:
+        node_shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
     return {
         "poly": poly,
         "dim": int(poly.dim),
         "ss": ss_arr,
         "finite": finite,
         "crossings": crossings,
-        "shis": flip_shis,
+        "shis": node_shis,
     }
 
 
@@ -583,19 +648,27 @@ def classify_finite_ascending(
     return total
 
 
-def propagate_finite_from_coface_edges(
+def classify_lazy_face_polys(
+    face_tags: Iterable[bytes],
     lookup: dict[bytes, Polyhedron],
-    edges: Iterable[tuple[bytes, bytes, int]],
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
 ) -> None:
-    """Mark faces as bounded when any codimension-1 coface is already known bounded."""
-    for u, v, _ in edges:
-        face = lookup.get(v)
-        if face is None or face._finite_computed:
+    """Classify boundedness on lazily discovered face polys before meta nodes are added."""
+    pending: dict[int, list[Polyhedron]] = defaultdict(list)
+    for tag in face_tags:
+        poly = lookup.get(tag)
+        if poly is None or poly._finite_computed:
             continue
-        coface = lookup.get(u)
-        if coface is not None and (coface.dim == 0 or (coface._finite_computed and coface._finite is True)):
-            face._finite = True
-            face._finite_computed = True
+        if int(poly.dim) == 0:
+            poly._finite = True
+            poly._finite_computed = True
+            continue
+        pending[int(poly.dim)].append(poly)
+    if not pending:
+        return
+    if 1 in pending:
+        classify_one_cells_finite_from_face_edges(pending, edges_by_dim)
+    classify_finite_ascending(pending, lookup, edges_by_dim)
 
 
 def classify_finite(poly: Polyhedron, env: Any) -> None:
@@ -619,66 +692,42 @@ def classify_finite(poly: Polyhedron, env: Any) -> None:
     poly._finite_computed = True
 
 
-def filter_shi_candidates(
-    ss: np.ndarray,
-    candidates: Iterable[int],
-    *,
-    neighbor_tags: set[bytes],
-) -> list[int]:
-    """Keep SHIs whose sign-flip neighbor exists among ``neighbor_tags``.
-
-    A candidate ``shi`` is retained only when flipping ``ss[shi]`` yields the tag
-    of another cell at the same dimension in the contracted complex.
-    """
-    row = np.asarray(ss, dtype=np.int8).ravel()
-    kept: list[int] = []
-    for shi in candidates:
-        shi_i = int(shi)
-        if shi_i >= row.shape[0] or row[shi_i] == 0:
-            continue
-        if encode_ss(flip_ss_at_shi(row, shi_i)) in neighbor_tags:
-            kept.append(shi_i)
-    return sorted(kept)
+def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> list[int]:
+    assigned = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+    if int(poly.dim) == 1 and poly.halfspaces is not None:
+        assigned = [s for s in assigned if poly.is_shi_face_feasible(int(s))]
+    return assigned
 
 
-def _symmetrize_top_cell_flip_shis(cplx: Complex) -> int:
-    """Drop SHIs that are not listed on both endpoints of a same-dimension flip edge."""
+def verify_top_cell_flip_shi_symmetry(cplx: Complex) -> None:
+    """Require mutual flip-SHI listing on every top-dimensional cell in ``cplx``."""
     if len(cplx) == 0:
-        return 0
+        return
     top_dim = max(int(p.dim) for p in cplx)
     tag2poly = {p.tag: p for p in cplx}
-    n_changed = 0
     for poly in cplx:
         if int(poly.dim) != top_dim or not poly._shis:
             continue
         ss = np.asarray(poly.ss_np, dtype=np.int8).ravel()
-        kept: list[int] = []
         for shi in poly._shis:
             shi_i = int(shi)
             if shi_i >= ss.shape[0] or int(ss[shi_i]) == 0:
-                continue
+                raise CubicalConsistencyError(f"Active SHI {shi_i} on {poly!r} has ss[{shi_i}]=0.")
             neighbor = tag2poly.get(encode_ss(flip_ss_at_shi(ss, shi_i)))
-            if neighbor is None or shi_i not in (neighbor._shis or []):
-                continue
-            kept.append(shi_i)
-        assigned = sorted(set(kept))
-        if assigned != list(poly._shis):
-            poly._shis = assigned
-            poly._shis_strict = False
-            n_changed += 1
-    return n_changed
+            if neighbor is None:
+                raise CubicalConsistencyError(f"SHI {shi_i} on {poly!r} has no flip neighbor in the slice.")
+            if shi_i not in (neighbor._shis or []):
+                raise CubicalConsistencyError(
+                    f"Asymmetric SHI {shi_i}: listed on {poly!r} but not on flip neighbor {neighbor!r}."
+                )
 
 
-def assign_contracted_shis(cplx: Complex) -> int:
-    """Finalize ``_shis`` on a contracted slice after :meth:`~relucent.complex.Complex.contract`.
+def set_contracted_shis(cplx: Complex) -> int:
+    """Set authoritative ``_shis`` on a contracted slice after :meth:`~relucent.complex.Complex.contract`.
 
     Used only on the **contract path** (``contract``, ``get_boundary_complex``).
-    When :data:`~relucent.config.CUBICAL_DUAL_GRAPH` is True, assigns
-    :func:`cubical_cell_shis` (SS crossings filtered to same-dimension flip
-    neighbors).  Otherwise filters coface-intersected candidates from
-    :meth:`~relucent.complex.Complex._codim_one_face_kwargs`.  Meta-graph node
-    labels use :func:`cubical_cell_shis` as well — do not call this from
-    :meth:`~relucent.complex.Complex.get_meta_graph`.
+    Assigns :func:`cubical_cell_shis` once the full dimension slice is known.
+    Call :func:`verify_contracted_shis` to assert flip-neighbor and symmetry invariants.
 
     Returns the number of cells whose ``_shis`` list was changed.
     """
@@ -687,23 +736,65 @@ def assign_contracted_shis(cplx: Complex) -> int:
     neighbor_tags = {p.tag for p in cplx}
     n_changed = 0
     for poly in cplx:
-        if cfg.CUBICAL_DUAL_GRAPH:
-            assigned = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
-            if int(poly.dim) == 1 and poly.halfspaces is not None:
-                assigned = [s for s in assigned if poly.is_shi_face_feasible(int(s))]
-        elif poly._shis is None:
-            continue
-        else:
-            assigned = filter_shi_candidates(poly.ss_np, poly._shis, neighbor_tags=neighbor_tags)
+        assigned = _contracted_shis_for_poly(poly, neighbor_tags=neighbor_tags)
         if assigned != poly._shis:
             poly._shis = assigned
             poly._shis_strict = False
             n_changed += 1
-    if any(int(p.dim) == 1 for p in cplx):
-        # ``is_shi_face_feasible`` is evaluated per 1-cell with coface halfspaces;
-        # adjacent cells can disagree, so enforce mutual flip-SHI listing.
-        n_changed += _symmetrize_top_cell_flip_shis(cplx)
     return n_changed
+
+
+def verify_contracted_shis(cplx: Complex) -> None:
+    """Check contracted-slice ``_shis`` match cubical flip neighbors and mutual listing."""
+    if len(cplx) == 0:
+        return
+    neighbor_tags = {p.tag for p in cplx}
+    for poly in cplx:
+        expected = _contracted_shis_for_poly(poly, neighbor_tags=neighbor_tags)
+        actual = sorted(int(s) for s in (poly._shis or []))
+        if actual != expected:
+            raise CubicalConsistencyError(f"Contracted SHI mismatch on {poly!r}: expected {expected!r}, got {actual!r}.")
+    if any(int(p.dim) == 1 for p in cplx):
+        verify_top_cell_flip_shi_symmetry(cplx)
+
+
+def _meta_one_cell_zero_face_count(meta: nx.MultiDiGraph[Any], node: Any) -> int:
+    return sum(1 for _u, v, _ in meta.out_edges(node, data=True) if int(meta.nodes[v].get("dim", -1)) == 0)
+
+
+def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any]) -> None:
+    """Require sound 1-cell flip-SHI counts and boundedness labels.
+
+      Each 1-cell has **0–2** flip-SHI neighbors and **0–2** combinatorial 0-face endpoints.
+      Bounded segments (``finite is True``) close at both ends; fewer than two flip SHIs
+    implies ``finite is False``.
+    """
+    for node, attrs in meta.nodes(data=True):
+        if int(attrs.get("dim", -1)) != 1:
+            continue
+        shis = [int(s) for s in attrs.get("shis", ())]
+        n_shis = len(shis)
+        if n_shis > 2:
+            raise CubicalConsistencyError(f"1-cell {node!r} has {n_shis} flip SHIs {shis!r}; expected at most 2.")
+        n_zero = _meta_one_cell_zero_face_count(meta, node)
+        if n_zero > 2:
+            raise CubicalConsistencyError(f"1-cell {node!r} has {n_zero} combinatorial 0-faces; expected at most 2.")
+        finite = attrs.get("finite")
+        if finite is None:
+            continue
+        if finite is True:
+            if n_shis < 2 or n_zero < 2:
+                raise CubicalConsistencyError(
+                    f"Bounded 1-cell {node!r} must have two flip SHIs and two 0-faces; "
+                    + f"got shis={shis!r}, n_zero={n_zero}."
+                )
+            continue
+        if n_shis < 2:
+            continue
+        if n_zero >= 2:
+            raise CubicalConsistencyError(
+                f"1-cell {node!r} is marked unbounded but has {n_shis} flip SHIs and {n_zero} 0-faces."
+            )
 
 
 def verify_meta_graph_incidence(
@@ -749,9 +840,10 @@ def verify_meta_graph_incidence(
         for poly in c_k:
             if poly.tag not in meta.nodes:
                 continue
-            expected_shis = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
-            if int(poly.dim) == 1 and poly.halfspaces is not None:
-                expected_shis = [s for s in expected_shis if poly.is_shi_face_feasible(int(s))]
+            if poly._shis is not None:
+                expected_shis = sorted(int(s) for s in poly._shis)
+            else:
+                expected_shis = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
             actual_shis = sorted(int(s) for s in meta.nodes[poly.tag].get("shis", []))
             if actual_shis != expected_shis:
                 raise AssertionError(f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}")
@@ -766,6 +858,8 @@ def verify_meta_graph_incidence(
                     f"get_meta_graph verify: finite mismatch tag={poly.tag!r} "
                     + f"expected={poly._finite!r} got={node_finite!r}"
                 )
+
+    verify_meta_graph_one_cells(meta)
 
 
 def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
@@ -783,6 +877,8 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     ``("trunc", tag)``. Face edges among duplicates mirror the induced subgraph; each
     original unbounded node ``n`` gains an edge ``n → ("trunc", n)`` with ``shi`` equal to
     :data:`TRUNCATION_META_SHI`. Duplicates are not created for 0-cells.
+
+    TODO: Handle non-maximal cells intersecting the boundary at multiple separate faces.
     """
     if meta.number_of_nodes() == 0:
         return
@@ -825,87 +921,6 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
         tu, tv = ("trunc", u), ("trunc", v)
         if tu in dup_keys and tv in dup_keys:
             meta.add_edge(tu, tv, **dict(ed))
-
-    complete_truncated_one_cell_boundaries(meta)
-
-
-def complete_truncated_one_cell_boundaries(meta: nx.MultiDiGraph[Any]) -> tuple[int, int]:
-    """Materialize missing 0-faces so every 1-cell has two 0-cell endpoints in ``meta``.
-
-    After :func:`truncate_meta_graph`, unbounded 1-cells often have only the truncation
-    duplicate as a boundary vertex.  Combinatorially close each open end by linking to an
-    existing 0-face from sign-sequence zeroing when present, otherwise a per-cell endpoint.
-    """
-    nodes_added = 0
-    edges_added = 0
-
-    def _zero_neighbors(one_cell: object) -> set[object]:
-        return {v for _u, v, _ in meta.out_edges(one_cell, data=True) if int(meta.nodes[v].get("dim", -1)) == 0}
-
-    def _trunc_partner(one_cell: object) -> object | None:
-        key = ("trunc", one_cell)
-        return key if key in meta else None
-
-    for one_cell, attrs in list(meta.nodes(data=True)):
-        if int(attrs.get("dim", -1)) != 1:
-            continue
-        ss_in = attrs.get("ss")
-        if ss_in is None:
-            continue
-        ss_arr = np.asarray(ss_in, dtype=np.int8)
-        zero_faces = _zero_neighbors(one_cell)
-
-        # Link to interior 0-cells already present in the meta-graph.
-        for shi in ss_nonzero_indices(ss_arr):
-            if len(zero_faces) >= 2:
-                break
-            ft = face_tag(ss_arr, int(shi))
-            if ft not in meta or int(meta.nodes[ft].get("dim", -1)) != 0:
-                continue
-            if ft in zero_faces:
-                continue
-            meta.add_edge(one_cell, ft, shi=int(shi))
-            zero_faces.add(ft)
-            edges_added += 1
-
-        # Match a face zeroing to the truncation duplicate on the cut (tuple node key).
-        trunc = _trunc_partner(one_cell)
-        if trunc is not None and trunc not in zero_faces:
-            for shi in ss_nonzero_indices(ss_arr):
-                row = ss_arr.reshape(-1).copy()
-                row[int(shi)] = 0
-                trunc_ss = np.asarray(meta.nodes[trunc].get("ss"), dtype=np.int8)
-                if trunc_ss.shape == row.reshape(ss_arr.shape).shape and np.array_equal(trunc_ss, row.reshape(ss_arr.shape)):
-                    meta.add_edge(one_cell, trunc, shi=int(shi))
-                    zero_faces.add(trunc)
-                    edges_added += 1
-                    break
-
-        # One materialized endpoint per still-open end (unique per 1-cell).
-        while len(zero_faces) < 2:
-            mat_key: tuple[str, object, int] = ("mat", one_cell, len(zero_faces))
-            shi = ss_nonzero_indices(ss_arr)[0] if ss_nonzero_indices(ss_arr) else 0
-            row = ss_arr.reshape(-1).copy()
-            row[int(shi)] = 0
-            if mat_key not in meta:
-                meta.add_node(
-                    mat_key,
-                    poly=None,
-                    dim=0,
-                    ss=row.reshape(ss_arr.shape),
-                    finite=True,
-                    shis=[],
-                    materialized_face=True,
-                )
-                nodes_added += 1
-            if mat_key not in zero_faces:
-                meta.add_edge(one_cell, mat_key, shi=int(shi))
-                zero_faces.add(mat_key)
-                edges_added += 1
-            else:
-                break
-
-    return nodes_added, edges_added
 
 
 def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:

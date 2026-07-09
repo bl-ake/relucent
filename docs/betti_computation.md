@@ -47,7 +47,7 @@ calling [`contract()`](../src/relucent/complex.py).
 1. Build the **dual graph** — combinatorial adjacency among cells at the current top
    dimension ([`get_dual_graph()`](../src/relucent/complex.py) →
    [`dual_edges_top_dim()`](../src/relucent/meta_graph.py)), then
-   [`sync_shis_from_dual_graph()`](../src/relucent/meta_graph.py) so each cell's
+   [`set_shis_from_dual_graph()`](../src/relucent/meta_graph.py) so each cell's
    `_shis` list matches incident edge labels.
 2. For each dual edge `(cell_a, cell_b, shi)`, zero `shi` in the sign sequence to
    get the tag of their shared `(k−1)`-face.
@@ -55,10 +55,11 @@ calling [`contract()`](../src/relucent/complex.py).
    [`_codim_one_face_kwargs()`](../src/relucent/complex.py) (SS crossings via
    [`ss_nonzero_indices()`](../src/relucent/meta_graph.py); infeasible 1-cells
    dropped with `is_shi_face_feasible`).
-4. Run [`assign_contracted_shis()`](../src/relucent/meta_graph.py)
+4. Run [`set_contracted_shis()`](../src/relucent/meta_graph.py)
    on the **contracted slice** to set authoritative `_shis` via
    [`cubical_cell_shis()`](../src/relucent/meta_graph.py) once all cells are
-   present. Top-dimensional ambient cells do not use this step; their `_shis`
+   present, then [`verify_contracted_shis()`](../src/relucent/meta_graph.py)
+   when verifying. Top-dimensional ambient cells do not use this step; their `_shis`
    come from the dual graph at search finalize.
 
 The loop stops when contraction produces 0-cells or an empty complex.
@@ -152,21 +153,8 @@ Unbounded cells (`finite is False`) get a duplicate node "at infinity":
 The idea is to model the link at infinity so homology of the truncated complex
 reflects the topology of unbounded regions.
 
-### Step 3b: Close 1-cell boundaries
-
-**Entry point:** [`complete_truncated_one_cell_boundaries()`](../src/relucent/meta_graph.py)
-(called automatically at the end of [`truncate_meta_graph()`](../src/relucent/meta_graph.py)).
-
-Truncation can leave 1-cells with only one 0-cell endpoint (the cut duplicate).
-Closure materializes the missing endpoint so each 1-cell has two 0-faces in ∂₁,
-as if the complex were restricted to a large bounding box:
-
-1. Link to an existing interior 0-cell when its face tag is already in the graph.
-2. Otherwise add a per-1-cell materialized 0-face node.
-
-This makes the truncated 1-skeleton a valid CW complex; β₀ from the rank formula
-then matches the path-component count. Pass `verify_connected_components=True` to
-`get_betti_numbers()` as a sanity check.
+Truncated 1-cells may have fewer than two combinatorial 0-endpoints until a
+proper truncation model lands (shared point at infinity or face subdivision).
 
 ---
 
@@ -239,7 +227,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Step | Main functions |
 |------|----------------|
 | Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph` |
-| Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `assign_contracted_shis` |
+| Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `set_contracted_shis` |
 | Meta-graph | `get_meta_graph`, `cubical_cell_shis`, `ss_nonzero_indices`, `face_tag`, `collect_meta_face_edges`, `classify_finite_ascending`, `meta_node_attrs`, `verify_meta_graph_incidence` |
 | Truncation | `truncate_meta_graph` |
 | Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_packed_boundary_matrix`, `gf2_rank_boundary` |

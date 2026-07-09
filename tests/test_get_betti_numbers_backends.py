@@ -313,12 +313,12 @@ def test_beta0_truncated_two_components() -> None:
     """Truncated unbounded complex: rank-formula β₀ equals graph component count."""
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
-    betti = get_betti_numbers(meta)
+    betti = get_betti_numbers(meta, verify_chain_complex=True)
     assert betti.get(0) == 2, f"expected β₀=2 after truncation, got {betti}"
 
 
 def test_verify_connected_components_passes_truncated_meta() -> None:
-    """After truncation closure, rank β₀ matches path components."""
+    """After truncation, rank β₀ matches path components on a valid CW complex."""
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
     betti = get_betti_numbers(meta, verify_connected_components=True)

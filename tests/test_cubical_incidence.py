@@ -7,11 +7,9 @@ import time
 
 import networkx as nx
 import numpy as np
-import pytest
 import torch
 
 from relucent import Complex, mlp, set_seeds
-from relucent import config as cfg
 from relucent import meta_graph as mg
 from relucent.exploration import explore_for_topology
 from relucent.utils import encode_ss
@@ -50,7 +48,7 @@ def test_dual_edges_match_flip_neighbors_on_diamond_boundary(seeded: int) -> Non
     assert nx.number_connected_components(G) == 1
 
 
-def test_cubical_dual_graph_on_boundary_has_edges(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cubical_dual_graph_on_boundary_has_edges(seeded: int) -> None:
     """Cubical 1D dual graph connects subdivided diamond boundary cells."""
     set_seeds(seeded)
     model = _diamond_boundary_model_l1_ball(radius=1.0)
@@ -60,7 +58,6 @@ def test_cubical_dual_graph_on_boundary_has_edges(seeded: int, monkeypatch: pyte
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
 
-    monkeypatch.setattr(cfg, "CUBICAL_DUAL_GRAPH", True)
     db = cplx.get_boundary_complex(cplx.n - 1)
     G = db.get_dual_graph(verbose=False)
     assert G.number_of_edges() >= 1

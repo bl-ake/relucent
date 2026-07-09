@@ -159,6 +159,7 @@ def verify_dual_graph_edges(
         return
     if top_dim is None:
         top_dim = max(int(p.dim) for p in cplx)
+    cubical_top_dim = mg.dual_graph_edge_top_dim(cell_top_dim=top_dim, ambient_dim=int(cplx.dim))
     top_cells = [p for p in cplx if int(p.dim) == top_dim]
     for u, v, data in graph.edges(data=True):
         shi = data.get("shi")
@@ -169,7 +170,8 @@ def verify_dual_graph_edges(
             raise DualGraphAsymmetricEdgeError(f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in u.shis.")
         if shi_i not in v.shis:
             raise DualGraphAsymmetricEdgeError(f"Dual edge shi={shi_i} on ({u!r}, {v!r}) is not in v.shis.")
-    mg.verify_dual_graph_cubical(top_cells, graph, top_dim=top_dim)
+    mg.verify_dual_graph_cubical(top_cells, graph, top_dim=cubical_top_dim)
+    mg.verify_shis_from_dual_graph(graph)
 
 
 def verify_boundary_cell(poly: Polyhedron, boundary_shi: int) -> None:
@@ -342,6 +344,12 @@ def verify_complex(
     t_stage = time.perf_counter()
     verify_dual_graph_edges(g, cplx)
     logger.info("verify_complex: dual-graph edge certification finished in %.1fs", time.perf_counter() - t_stage)
+    top_dim = max(int(p.dim) for p in cplx)
+    if top_dim != int(cplx.dim):
+        logger.info("verify_complex: contracted-slice SHI checks ...")
+        t_stage = time.perf_counter()
+        mg.verify_contracted_shis(cplx)
+        logger.info("verify_complex: contracted-slice SHI checks finished in %.1fs", time.perf_counter() - t_stage)
     if level == "fast" and cplx.complete is True:
         logger.info("verify_complex: LP facet completeness certification ...")
         t_stage = time.perf_counter()
