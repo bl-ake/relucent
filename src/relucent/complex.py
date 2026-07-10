@@ -1561,9 +1561,18 @@ class Complex:
         excluded_tags: set[bytes] = set()
         infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
         if infeasible_tags:
-            excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
+            excluded_tags = set(infeasible_tags)
+            # Propagate exclusion only when the complex has genuinely unbounded cells.
+            # On closed bounded surfaces (e.g. torus DB), phantom 1-cells are spurious
+            # combinatorial faces; dropping only those cells (not their cofaces) keeps
+            # correct homology [1, 2, 1] while still filtering bad edges.
+            has_unbounded_chain = any(
+                p._finite_computed and p._finite is False for p in all_chain_polys
+            )
+            if has_unbounded_chain:
+                excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
             logger.info(
-                "get_meta_graph: excluding %d infeasible cells (%d with propagated cofaces)",
+                "get_meta_graph: excluding %d infeasible cells (%d total excluded)",
                 len(infeasible_tags),
                 len(excluded_tags),
             )
