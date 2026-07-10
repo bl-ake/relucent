@@ -217,9 +217,8 @@ def boundary_searcher(
         nworkers: Worker process count.
         verbose: Progress verbosity.
         geometry_properties: Optional geometry caches (default topology-only).
-        verify: When True (default), require complete exploration and pass
-            ``strict=True`` to SHI LPs. Certification runs later in
-            :func:`~relucent.exploration.finalize_boundary_complex`.
+        verify: When True (default), require complete exploration. Certification runs
+            later in :func:`~relucent.exploration.finalize_boundary_complex`.
         **kwargs: Forwarded to :func:`~relucent.calculations.get_shis`.
 
     Returns:
@@ -235,8 +234,6 @@ def boundary_searcher(
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
     shis_kwargs = dict(kwargs)
-    if verify:
-        shis_kwargs["strict"] = True
     if not _is_top_boundary_ss(start.ss_np, boundary_shi):
         raise ValueError(f"Start sign sequence must have ss[{boundary_shi}]=0 as its only zero entry; got {start.ss_np!r}")
 
@@ -251,7 +248,12 @@ def boundary_searcher(
     pending_neighbors: dict[bytes, list[tuple[int, int]]] = {}
     nworkers = nworkers or process_aware_cpu_count()
     if verbose:
-        logger.info("boundary_searcher running on %d workers (boundary_shi=%d)", nworkers, boundary_shi)
+        logger.info(
+            "boundary_searcher running on %d workers (boundary_shi=%d, verify=%s)",
+            nworkers,
+            boundary_shi,
+            verify,
+        )
 
     queue = BlockingQueue(
         queue_class=deque,

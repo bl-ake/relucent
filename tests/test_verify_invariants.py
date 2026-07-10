@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pytest
 
@@ -225,3 +227,84 @@ def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
 
     assert "Dual graph is incomplete relative to LP facets" in str(serial_err.value)
     assert str(serial_err.value) == str(parallel_err.value)
+
+
+def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
+    from relucent.errors import ShiProofError
+    from relucent.poly import Polyhedron
+    from relucent.search import _start_shis_for_search
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    start = cplx.add_point(np.zeros((1, 2), dtype=np.float64))
+    strict_flags: list[bool | None] = []
+
+    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+        _ = poly, bound
+        strict_flags.append(cast(bool | None, kwargs.get("strict")))
+        if kwargs.get("strict") is not False:
+            raise ShiProofError("invalid proof")
+        return [0]
+
+    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+    shis = _start_shis_for_search(start, bound=1.0, shis_kwargs={"strict": True})
+    assert shis == [0]
+    assert strict_flags == [True, False]
+
+
+def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
+    import warnings
+
+    from relucent.poly import Polyhedron
+    from relucent.search import searcher
+    from relucent.utils import BlockingQueue
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+
+    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+        _ = bound, kwargs
+        poly.warnings.append(RuntimeWarning("Invalid Proof for SHI 0! Violation Sizes: ..."))
+        return [0]
+
+    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        searcher(
+            cplx,
+            start=np.zeros((1, 2), dtype=np.float64),
+            queue=BlockingQueue(),
+            verify=False,
+            verbose=0,
+            max_polys=5,
+        )
+
+    invalid_proof_warns = [w for w in caught if "Invalid Proof for SHI" in str(w.message)]
+    assert not invalid_proof_warns
+
+
+def test_searcher_verify_keeps_frontier_shis_non_strict(monkeypatch) -> None:
+    from relucent.poly import Polyhedron
+    from relucent.search import searcher
+    from relucent.utils import BlockingQueue
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    strict_flags: list[bool | None] = []
+
+    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+        _ = poly, bound
+        strict_flags.append(cast(bool | None, kwargs.get("strict")))
+        return []
+
+    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+    searcher(
+        cplx,
+        start=np.zeros((1, 2), dtype=np.float64),
+        queue=BlockingQueue(),
+        verify=True,
+        verbose=0,
+    )
+    assert strict_flags
+    assert all(flag is not True for flag in strict_flags)

@@ -111,9 +111,11 @@ Search uses a process pool with initializer
 ``(net, env, dim)`` from module-level state — do not call ``set_worker_context``
 from the main process.
 
-When ``verify=True`` (the default for ``bfs``), search passes ``strict=True``
-into ``get_shis()`` so facet proofs raise
-:class:`~relucent.errors.ShiProofError` on failure.
+When ``verify=True`` (the default for ``bfs``), frontier search keeps SHI LPs
+non-strict (heuristic neighbor discovery). After a complete search,
+:func:`~relucent.exploration.finalize_ambient_search` syncs top-cell SHIs from the
+dual graph and runs :func:`~relucent.certify.certify_complex`, which applies strict
+facet checks.
 
 SHI assignment: three roles
 ---------------------------
@@ -180,7 +182,9 @@ The LP algorithm (:func:`~relucent.calculations.get_shis`):
 2. Work in intrinsic coordinates (null-space of zero-sign equalities).
 3. For each candidate index ``i``: relax halfspace ``i``, maximize along its normal.
 4. If the objective exceeds ``TOL_SHI_OBJECTIVE``, ``i`` is a facet SHI.
-5. With ``strict=True``, invalid proofs raise :class:`~relucent.errors.ShiProofError`.
+5. With ``strict=True`` (opt-in via ``get_shis`` kwargs), invalid proofs raise
+   :class:`~relucent.errors.ShiProofError`; during default ambient search they
+   emit warnings instead.
 
 This is a **heuristic for exploration**: it must be good enough to find neighbors,
 but it is not the final authority on top-cell SHIs after a complete search.

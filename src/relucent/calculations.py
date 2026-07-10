@@ -891,9 +891,7 @@ def get_shis(
                             from relucent.errors import ShiProofError
 
                             raise ShiProofError(msg)
-                        w = RuntimeWarning(msg)
-                        poly.warnings.append(w)
-                        warnings.warn(w, stacklevel=2)
+                        poly.warnings.append(RuntimeWarning(msg))
                     else:
                         shis.append(i)
                 elif np.isfinite(attempt_bound) and x_norm >= 0.99 * attempt_bound:

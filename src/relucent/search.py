@@ -17,6 +17,7 @@ from relucent._logging import logger
 from relucent._network_scale import default_polyhedron_bound
 from relucent._torch_compat import torch
 from relucent.calculations import get_shis
+from relucent.errors import ShiProofError
 from relucent.exploration import (
     finalize_ambient_search,
     search_stats_dict,
@@ -171,6 +172,23 @@ def _worker_prepare_poly(
     if shuffle_shis and isinstance(p._shis, list):
         random.shuffle(p._shis)  # spreads load when many workers race on the same parent
     return None
+
+
+def _start_shis_for_search(
+    start: Polyhedron,
+    *,
+    bound: float,
+    shis_kwargs: dict[str, Any],
+) -> list[int]:
+    """SHIs for the search seed cell; relax strict proofs once on failure."""
+    try:
+        result = get_shis(start, bound=bound, **shis_kwargs)
+    except ShiProofError:
+        relaxed = dict(shis_kwargs)
+        relaxed["strict"] = False
+        result = get_shis(start, bound=bound, **relaxed)
+    assert isinstance(result, list)
+    return result
 
 
 def _apply_cube_filter(p: Polyhedron, cube_mode: str, cube_radius: float) -> bool:
@@ -449,8 +467,8 @@ def searcher(
             :func:`~relucent.certify.certify_complex` at the end. Skipped when
             exploration hits ``max_polys`` before the frontier is exhausted. A
             finite ``max_depth`` cap can leave ``complete=False``; with
-            ``verify=True`` that raises unless the cap was hit. Sets ``strict=True``
-            on SHI LPs when verifying.
+            ``verify=True`` that raises unless the cap was hit. Frontier SHI LPs
+            stay non-strict; certification applies strict checks after dual-graph sync.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
     Returns:
@@ -474,8 +492,6 @@ def searcher(
         bound = default_polyhedron_bound(cx._net)
 
     shis_kwargs = dict(kwargs)
-    if verify:
-        shis_kwargs["strict"] = True  # proof-grade SHIs for post-search LP completeness
 
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
@@ -526,9 +542,7 @@ def searcher(
         )
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
-    result = get_shis(start, bound=bound, **shis_kwargs)
-    assert isinstance(result, list)
-    start._shis = result
+    start._shis = _start_shis_for_search(start, bound=bound, shis_kwargs=shis_kwargs)
     start._shis_strict = bool(shis_kwargs.get("strict", False))
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
@@ -543,6 +557,7 @@ def searcher(
 
     rolling_average = len(start.shis)
     bad_shi_computations: list[Any] = []
+    invalid_proof_suppressed = 0
     pbar = tqdm(
         desc="Search Progress",
         mininterval=5,
@@ -599,12 +614,9 @@ def searcher(
                     p = cx.add_polyhedron(p)
                     pending_neighbors.pop(encode_ss(p.ss_np), None)  # this tag is no longer "in flight"
 
-                    if getattr(p, "warnings", None):
-                        for warning in p.warnings:
-                            try:
-                                warnings.warn(warning, stacklevel=2)
-                            except Exception as e:
-                                logger.warning("%s %s %s", warning, type(warning), e)
+                    for warning in getattr(p, "warnings", ()) or ():
+                        if "Invalid Proof for SHI" in str(warning):
+                            invalid_proof_suppressed += 1
 
                     if depth < max_depth:
                         poly_index = cx.ssm[p.ss_np]
@@ -667,6 +679,12 @@ def searcher(
     # Skip verify when max_polys hit — frontier may still have neighbors (LP false-fail).
     do_verify = verify and complete and not hit_cap
     finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
+
+    if verbose and invalid_proof_suppressed:
+        logger.info(
+            "searcher: suppressed %d invalid SHI proof(s) during frontier exploration",
+            invalid_proof_suppressed,
+        )
 
     return search_stats_dict(
         depth=depth,

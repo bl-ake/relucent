@@ -435,6 +435,22 @@ class TestStripNetworkBfs:
         assert not any("MIN_SEARCH_INRADIUS" in str(entry[-1]) for entry in info["Bad SHI Computations"])
         assert len(cplx) >= 2
 
+    def test_bfs_strip_completes_and_verifies_with_verify_true(self):
+        from relucent import Complex
+
+        eps = 1e-7
+        assert eps / 2 >= cfg.MIN_SEARCH_INRADIUS
+
+        net = _make_1d_strip_net(eps)
+        cplx = Complex(net)
+        info = cplx.bfs(start=np.array([-1.0], dtype=np.float64), max_polys=20, nworkers=1, verbose=0, verify=True)
+
+        assert info["Complete"] is True
+        assert info["Verified"] is True
+        assert cplx.complete is True
+        assert cplx.verified is True
+        assert not info["Bad SHI Computations"]
+
 
 def test_shi_objective_diagnostic_table(env):
     """Print per-face objectives for a thin slab (visible with ``pytest -s``)."""

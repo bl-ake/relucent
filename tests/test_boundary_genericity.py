@@ -46,6 +46,7 @@ def test_boundary_generic_diamond_dual_graph_connected(seeded: int) -> None:
     assert G.number_of_edges() >= 1
     assert nx.number_connected_components(G) == 1
     from relucent.incidence import certify_dual_graph
+
     certify_dual_graph(G, db)
 
 
@@ -86,4 +87,5 @@ def test_one_dim_dual_graph_edges_match_shared_endtags(seeded: int) -> None:
     if G.number_of_edges() == 0:
         pytest.skip("boundary exploration produced no dual edges")
     from relucent.incidence import certify_dual_graph
+
     certify_dual_graph(G, db)

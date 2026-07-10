@@ -689,7 +689,8 @@ class Complex:
                 is skipped when exploration hits ``max_polys`` before the frontier is
                 exhausted. A finite ``max_depth`` cap can leave ``complete=False``; with
                 ``verify=True`` that raises :class:`~relucent.complex.IncompleteDualGraphError`
-                unless the cap was hit. Sets ``strict=True`` on SHI LPs when verifying.
+                unless the cap was hit. Frontier SHI LPs stay non-strict; certification
+                applies strict checks after dual-graph sync.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -1566,9 +1567,7 @@ class Complex:
             # On closed bounded surfaces (e.g. torus DB), phantom 1-cells are spurious
             # combinatorial faces; dropping only those cells (not their cofaces) keeps
             # correct homology [1, 2, 1] while still filtering bad edges.
-            has_unbounded_chain = any(
-                p._finite_computed and p._finite is False for p in all_chain_polys
-            )
+            has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
             if has_unbounded_chain:
                 excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
             logger.info(
