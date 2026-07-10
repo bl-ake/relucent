@@ -310,7 +310,11 @@ def test_get_betti_numbers_kmin0_unaffected() -> None:
 
 
 def test_beta0_truncated_two_components() -> None:
-    """Truncated unbounded complex: rank-formula β₀ equals graph component count."""
+    """Truncated unbounded complex: bilateral truncation gives β₀ = number of components.
+
+    Cells with no original boundary get two truncation faces (bilateral), so every 1-cell
+    becomes a proper closed interval and the rank formula gives the correct β₀.
+    """
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
     betti = get_betti_numbers(meta, verify_chain_complex=True)
@@ -318,7 +322,7 @@ def test_beta0_truncated_two_components() -> None:
 
 
 def test_verify_connected_components_passes_truncated_meta() -> None:
-    """After truncation, rank β₀ matches path components on a valid CW complex."""
+    """After truncation, rank β₀ matches path components."""
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)
     betti = get_betti_numbers(meta, verify_connected_components=True)

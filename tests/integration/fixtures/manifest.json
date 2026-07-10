@@ -126,7 +126,7 @@
         "max_polys": 0
       },
       "expected": {
-        "n_regions": 12343,
+        "n_regions": 12350,
         "n_boundary_cells": 656,
         "truncated_betti": {
           "0": 1,
@@ -184,12 +184,12 @@
         "max_polys": 0
       },
       "expected": {
-        "n_regions": 26541,
-        "n_boundary_cells": 668,
+        "n_regions": 27420,
+        "n_boundary_cells": 1072,
         "truncated_betti": {
           "0": 2
         },
-        "methods_agree": false
+        "methods_agree": true
       },
       "boundary_shi": 30
     },

@@ -81,8 +81,8 @@ def _ambient_coface_shis_for_boundary_cell(
     poly: Polyhedron,
     boundary_shi: int,
     *,
-    bound: float | None = None,
-    **shis_kwargs: Any,
+    _bound: float | None = None,
+    **_shis_kwargs: Any,
 ) -> list[int]:
     """``_shis`` for a boundary top cell, matching :meth:`Complex.get_boundary_cells`.
 
@@ -217,9 +217,9 @@ def boundary_searcher(
         nworkers: Worker process count.
         verbose: Progress verbosity.
         geometry_properties: Optional geometry caches (default topology-only).
-        verify: When True (default), require complete exploration and run invariant
-            checks at the end. Skipped when exploration hits ``max_polys`` before the
-            frontier is exhausted. Sets ``strict=True`` on SHI LPs.
+        verify: When True (default), require complete exploration and pass
+            ``strict=True`` to SHI LPs. Certification runs later in
+            :func:`~relucent.exploration.finalize_boundary_complex`.
         **kwargs: Forwarded to :func:`~relucent.calculations.get_shis`.
 
     Returns:
@@ -431,7 +431,27 @@ def discover_boundary_complex(
     verify: bool = True,
     **kwargs: Any,
 ) -> tuple[Complex, BoundaryDiscoveryStats]:
-    """Discover the full boundary complex via MIP pricing + slice BFS per component."""
+    """Discover the full boundary complex via MIP pricing + slice BFS per component.
+
+    Repeatedly calls :func:`~relucent.boundary_mip.price_boundary_witness` to find
+    a new connected component on the slice ``ss[boundary_shi] = 0``, explores it
+    with :func:`boundary_searcher`, and merges cells into one complex. Finalizes
+    with :func:`~relucent.exploration.finalize_boundary_complex` (ambient coface
+    SHIs, dual graph, genericity, and :func:`~relucent.certify.certify_complex`).
+
+    Args:
+        net: Canonical :class:`~relucent.model.ReLUNetwork`.
+        boundary_shi: Global supporting-hyperplane index for the decision boundary.
+        bound: Gurobi box bound for SHI LPs; defaults to
+            :func:`~relucent._network_scale.default_polyhedron_bound`.
+        nworkers: Worker process count for slice BFS.
+        verbose: If True, log pricing and search progress.
+        verify: When True (default), run full certification during finalize.
+        **kwargs: Forwarded to slice BFS / SHI routines.
+
+    Returns:
+        ``(complex, stats)`` where ``stats`` records component counts and timings.
+    """
     from relucent.complex import Complex
 
     merged = Complex(net)

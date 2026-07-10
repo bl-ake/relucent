@@ -208,16 +208,29 @@ def search_calculations(
 
 
 def geometric_calculations(
-    task: tuple[np.ndarray, list[int] | None, int] | tuple[Any, ...],
+    task: tuple[np.ndarray, list[int] | None, int, *tuple[Any, ...]]
+    | tuple[np.ndarray, list[int] | None, bool, int, *tuple[Any, ...]],
     geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
     bound: float | None = None,
 ) -> tuple[Any, ...]:
     """Worker function for geometric-property computation on known polyhedra."""
     ctx = get_worker_context()
+    ss: np.ndarray
+    shis: list[int] | None
+    poly_index: int
+    shis_strict: bool
+    rest: tuple[Any, ...]
     if len(task) >= 4:
-        ss, shis, shis_strict, poly_index, *rest = task
+        ss = cast(np.ndarray, task[0])
+        shis = cast(list[int] | None, task[1])
+        shis_strict = bool(task[2])
+        poly_index = int(task[3])
+        rest = task[4:]
     else:
-        ss, shis, poly_index, *rest = task
+        ss = cast(np.ndarray, task[0])
+        shis = cast(list[int] | None, task[1])
+        poly_index = int(task[2])
+        rest = task[3:]
         shis_strict = False
     p = Polyhedron(ctx.net, ss, shis=shis, bound=bound, _shis_strict=bool(shis_strict))
     if err := _worker_prepare_poly(p, tuple(geometry_properties), env=ctx.env):
@@ -432,10 +445,11 @@ def searcher(
             performs topology-only search. Pass
             :data:`ALL_GEOMETRY_PROPERTIES` or a subset to retain optional caches.
             ``finite``, ``center``, and ``inradius`` are always computed.
-        verify: When True (default), require complete exploration and run invariant
-            checks at the end. Skipped when exploration hits ``max_polys`` before the
-            frontier is exhausted. A finite ``max_depth`` cap can leave ``complete=False``;
-            with ``verify=True`` that raises unless the cap was hit. Sets ``strict=True``
+        verify: When True (default), require complete exploration and run
+            :func:`~relucent.certify.certify_complex` at the end. Skipped when
+            exploration hits ``max_polys`` before the frontier is exhausted. A
+            finite ``max_depth`` cap can leave ``complete=False``; with
+            ``verify=True`` that raises unless the cap was hit. Sets ``strict=True``
             on SHI LPs when verifying.
         **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
@@ -446,7 +460,7 @@ def searcher(
             - "Search Time": Elapsed time in seconds
             - "Bad SHI Computations": List of failed computations
             - "Complete": Whether search completed (no unprocessed items)
-            - "Verified": Whether invariant checks passed (``None`` if not run)
+            - "Verified": Whether certification passed (``None`` if not run)
 
     Raises:
         ValueError: If the start point lies on a hyperplane (has zero in SS).
@@ -652,7 +666,7 @@ def searcher(
     complete = unprocessed == 0 and not hit_cap and not depth_limited and not bad_shi_computations
     # Skip verify when max_polys hit — frontier may still have neighbors (LP false-fail).
     do_verify = verify and complete and not hit_cap
-    finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional verify_complex
+    finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
 
     return search_stats_dict(
         depth=depth,

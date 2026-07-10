@@ -40,7 +40,8 @@ Core capabilities include:
    complex
    polyhedron
    exploration
-   verify
+   certify
+   incidence
    filtration
    persistence
    topology_api

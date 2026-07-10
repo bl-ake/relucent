@@ -704,6 +704,7 @@ def get_shis(
     shi_pbar: bool = False,
     push_size: float = 1.0,
     strict: bool = False,
+    escalate_bound: bool = True,
 ) -> list[int]: ...
 
 
@@ -719,6 +720,7 @@ def get_shis(
     shi_pbar: bool = False,
     push_size: float = 1.0,
     strict: bool = False,
+    escalate_bound: bool = True,
 ) -> tuple[list[int], list[dict[str, object]]]: ...
 
 
@@ -733,6 +735,7 @@ def get_shis(
     shi_pbar: bool = False,
     push_size: float = 1.0,
     strict: bool = False,
+    escalate_bound: bool = True,
 ) -> list[int] | tuple[list[int], list[dict[str, object]]]:
     """Supporting halfspace indices (SHIs) for ``poly``.
 
@@ -752,13 +755,16 @@ def get_shis(
         env: Gurobi environment; default uses :func:`~relucent.utils.get_env`.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
-        strict: If True, raise :class:`~relucent.verify.ShiProofError` on invalid proofs.
+        strict: If True, raise :class:`~relucent.errors.ShiProofError` on invalid proofs.
+        escalate_bound: If False, use only the requested ``bound`` (no automatic box-radius
+            escalation when clipping is suspected).
 
     Returns:
         List of SHI indices, or ``(shis, info)`` if ``collect_info`` is truthy.
 
     Raises:
         ValueError: If the initial Gurobi solve fails.
+        :class:`~relucent.errors.ShiProofError`: If ``strict`` is True and a candidate facet proof fails.
     """
     if tol is None:
         tol = cfg.TOL_SHI_HYPERPLANE
@@ -822,6 +828,8 @@ def get_shis(
     shis: list[int] = []
     poly_info: list[dict[str, object]] | None = [] if collect_info else None
     bounds_to_try = _shi_variable_bounds_to_try(bound)
+    if not escalate_bound:
+        bounds_to_try = bounds_to_try[:1]
     last_status: int | None = None
     model: Model | None = None
 
@@ -880,7 +888,7 @@ def get_shis(
                             f"{np.argwhere(dists.ravel() > 0), dists[np.argwhere(dists.ravel() > 0)]}"
                         )
                         if strict:
-                            from relucent.verify import ShiProofError
+                            from relucent.errors import ShiProofError
 
                             raise ShiProofError(msg)
                         w = RuntimeWarning(msg)

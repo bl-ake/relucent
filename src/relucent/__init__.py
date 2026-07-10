@@ -33,8 +33,8 @@ __version__ = _read_version()
 if TYPE_CHECKING:
     from .complex import Complex
     from .convert_model import convert
+    from .errors import NonGenericArrangementError
     from .exploration import explore_for_topology, generic_topology_start
-    from .meta_graph import NonGenericArrangementError
     from .poly import Polyhedron
     from .ss import SSManager
     from .utils import add_output_relu, get_env, mlp, set_seeds, split_sequential
@@ -63,7 +63,7 @@ __all__ = [
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Complex": ("relucent.complex", "Complex"),
-    "NonGenericArrangementError": ("relucent.meta_graph", "NonGenericArrangementError"),
+    "NonGenericArrangementError": ("relucent.errors", "NonGenericArrangementError"),
     "Polyhedron": ("relucent.poly", "Polyhedron"),
     "SSManager": ("relucent.ss", "SSManager"),
     "convert": ("relucent.convert_model", "convert"),

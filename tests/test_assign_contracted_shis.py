@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp
+from relucent.errors import CubicalConsistencyError, ShiFlipInvariantError
 from relucent.meta_graph import (
-    CubicalConsistencyError,
     set_contracted_shis,
     set_shis_from_dual_graph,
     verify_contracted_shis,
@@ -51,7 +51,7 @@ def _asymmetric_one_cell_fixture() -> tuple[Complex, Polyhedron, Polyhedron]:
 
 def test_verify_top_cell_flip_shi_symmetry_raises_on_one_sided_listing() -> None:
     cplx, _a, _b = _asymmetric_one_cell_fixture()
-    with pytest.raises(CubicalConsistencyError, match="Asymmetric SHI"):
+    with pytest.raises(ShiFlipInvariantError, match="Asymmetric SHI"):
         verify_top_cell_flip_shi_symmetry(cplx)
 
 

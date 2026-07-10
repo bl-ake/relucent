@@ -36,8 +36,16 @@ def test_network_bound_detects_output_shi_on_unbounded_cofaces(integration_nwork
         ss_pos = ss.copy()
         ss_pos.ravel()[shi] = 1
         ppos = ambient[ss_pos]
-        sh_large = get_shis(Polyhedron(model, ppos.ss_np, bound=_LARGE_BOUND), bound=_LARGE_BOUND)
-        sh_net = get_shis(Polyhedron(model, ppos.ss_np, bound=net_bound), bound=net_bound)
+        sh_large = get_shis(
+            Polyhedron(model, ppos.ss_np, bound=_LARGE_BOUND),
+            bound=_LARGE_BOUND,
+            escalate_bound=False,
+        )
+        sh_net = get_shis(
+            Polyhedron(model, ppos.ss_np, bound=net_bound),
+            bound=net_bound,
+            escalate_bound=False,
+        )
         if shi not in sh_large and shi in sh_net:
             hits += 1
 

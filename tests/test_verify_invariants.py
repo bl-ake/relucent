@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
-from relucent.complex import IncompleteDualGraphError
+from relucent.certify import verify_lp_flip_neighbors_in_complex
+from relucent.errors import ComplexNotCompleteError, IncompleteDualGraphError
 from relucent.exploration import finalize_ambient_search
-from relucent.verify import ComplexNotCompleteError
+from relucent.incidence import verify_flip_shi_symmetry
 
 os_environ = __import__("os").environ
 os_environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
@@ -43,7 +44,7 @@ def test_incomplete_search_raises_with_verify() -> None:
 
 
 def test_empty_boundary_complex_verifies() -> None:
-    """Output ReLU constant on all regions → empty boundary, not a verify crash."""
+    """Output ReLU constant on all regions → empty boundary, not a certify crash."""
     set_seeds(3)
     model = mlp(widths=[2, 4, 1], add_last_relu=True, init="uniform")
     cplx = Complex(model)
@@ -53,7 +54,7 @@ def test_empty_boundary_complex_verifies() -> None:
     assert len(boundary) == 0
     assert boundary.complete is True
     assert boundary.verified is True
-    assert boundary.get_dual_graph(verbose=False, verify=False).number_of_nodes() == 0
+    assert boundary.get_dual_graph(verbose=False).number_of_nodes() == 0
 
 
 def test_assert_topology_ready_blocks_unverified() -> None:
@@ -82,8 +83,8 @@ def test_assert_topology_ready_blocks_add_point_only() -> None:
 
 def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     """Top-cell ``_shis`` are re-derived from the dual graph, repairing asymmetric LP cache."""
+    from relucent.errors import ShiFlipInvariantError
     from relucent.utils import flip_ss_at_shi
-    from relucent.verify import ShiFlipInvariantError, verify_shi_flip_symmetry
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -95,9 +96,10 @@ def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     neighbor = cplx[flip_ss_at_shi(np.asarray(top.ss_np, dtype=np.int8), shi)]
     neighbor._shis = [s for s in neighbor.shis if int(s) != shi]
     with pytest.raises(ShiFlipInvariantError):
-        verify_shi_flip_symmetry(cplx)
-    cplx.get_dual_graph(verbose=False, require_complete=False, verify=False, cubical=False)
-    verify_shi_flip_symmetry(cplx)
+        verify_flip_shi_symmetry(cplx)
+    # Rebuilding the dual graph with repair=True resyncs _shis
+    cplx.get_dual_graph(verbose=False, require_complete=False)
+    verify_flip_shi_symmetry(cplx)
 
 
 def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,9 +122,8 @@ def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPat
     assert cplx.verified is True
 
 
-def test_complete_verify_fails_closed_on_shi_recompute_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.calculations as calc
-    from relucent.verify import verify_lp_flip_neighbors_in_complex
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -148,7 +149,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
 
-    def _boom(*args, **kwargs):
+    def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
     monkeypatch.setattr(calc, "get_shis", _boom)
@@ -176,7 +177,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
     top = next(p for p in reloaded if p.dim == reloaded.dim)
     assert top._shis_strict is True
 
-    def _boom(*args, **kwargs):
+    def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
     monkeypatch.setattr(calc, "get_shis", _boom)
@@ -187,14 +188,13 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
 
 def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.calculations as calc
-    from relucent.verify import verify_lp_flip_neighbors_in_complex
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
     cplx.set_exploration_state(complete=True, verified=False)
 
-    def _boom(*args, **kwargs):
+    def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
     monkeypatch.setattr(calc, "get_shis", _boom)
@@ -203,8 +203,6 @@ def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pyte
 
 
 def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
-    from relucent.verify import verify_lp_flip_neighbors_in_complex
-
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
@@ -215,8 +213,6 @@ def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
 
 
 def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
-    from relucent.verify import verify_lp_flip_neighbors_in_complex
-
     model = mlp(widths=[2, 8, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3, verify=False)

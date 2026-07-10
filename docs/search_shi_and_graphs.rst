@@ -113,13 +113,13 @@ from the main process.
 
 When ``verify=True`` (the default for ``bfs``), search passes ``strict=True``
 into ``get_shis()`` so facet proofs raise
-:class:`~relucent.verify.ShiProofError` on failure.
+:class:`~relucent.errors.ShiProofError` on failure.
 
 SHI assignment: three roles
 ---------------------------
 
 Relucent uses SHI information in three related but distinct ways. The helpers in
-:mod:`relucent.meta_graph` document these as **roles 1–3**. Using the wrong rule
+:mod:`relucent.incidence` document these as **roles 1–3**. Using the wrong rule
 in the wrong place breaks adjacency or homology (``∂² = 0``).
 
 Role 1 — Contraction and contracted slices
@@ -132,11 +132,11 @@ each codimension-one face seeds SHI candidates from its sign sequence::
 
 The crossing hyperplane is already zeroed, so it is not included.
 :meth:`~relucent.complex.Complex._codim_one_face_kwargs` applies this at face
-creation (via :func:`~relucent.meta_graph.ss_nonzero_indices`). Infeasible
+creation (via :func:`~relucent.incidence.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
 :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`. After the full slice is
-known, :func:`~relucent.meta_graph.set_contracted_shis` sets authoritative
-``_shis`` to :func:`~relucent.meta_graph.cubical_cell_shis` — the same
+known, :func:`~relucent.incidence.set_contracted_shis` sets authoritative
+``_shis`` to :func:`~relucent.incidence.cubical_cell_shis` — the same
 flip-neighbor rule as role 3, restricted to cells in the slice.
 
 **Critical:** meta-graph **face edges** still use role 2 (all SS crossings), not
@@ -146,9 +146,9 @@ and breaks ``∂² = 0``.
 Role 2 — Meta-graph face edges
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:func:`~relucent.meta_graph.collect_meta_face_edges` builds directed
+:func:`~relucent.incidence.collect_meta_face_edges` builds directed
 ``k-cell → (k−1)-face`` incidences by zeroing **every** index where
-``ss_i ≠ 0`` (via :func:`~relucent.meta_graph.ss_nonzero_indices`), then keeping
+``ss_i ≠ 0`` (via :func:`~relucent.incidence.ss_nonzero_indices`), then keeping
 an edge only if the resulting face tag exists in the complex.
 
 This rule is **complete** for cubical incidence: propagated ``_shis`` can be a
@@ -158,11 +158,11 @@ faces.
 Role 3 — Meta-graph node metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-:func:`~relucent.meta_graph.meta_node_attrs` derives ``shis`` (flip-neighbor
+:func:`~relucent.incidence.meta_node_attrs` derives ``shis`` (flip-neighbor
 crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
 sequence and same-dimension slice.
 1-cell boundedness uses 0-face incidence in meta face edges
-(:func:`~relucent.meta_graph.classify_one_cells_finite_from_face_edges`), not
+(:func:`~relucent.incidence.classify_one_cells_finite_from_face_edges`), not
 ``len(shis)``.
 
 SHI assignment over the pipeline
@@ -180,7 +180,7 @@ The LP algorithm (:func:`~relucent.calculations.get_shis`):
 2. Work in intrinsic coordinates (null-space of zero-sign equalities).
 3. For each candidate index ``i``: relax halfspace ``i``, maximize along its normal.
 4. If the objective exceeds ``TOL_SHI_OBJECTIVE``, ``i`` is a facet SHI.
-5. With ``strict=True``, invalid proofs raise :class:`~relucent.verify.ShiProofError`.
+5. With ``strict=True``, invalid proofs raise :class:`~relucent.errors.ShiProofError`.
 
 This is a **heuristic for exploration**: it must be good enough to find neighbors,
 but it is not the final authority on top-cell SHIs after a complete search.
@@ -189,13 +189,14 @@ After complete ambient search (authoritative top cells)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.exploration.finalize_ambient_search` calls
-:meth:`~relucent.complex.Complex.get_dual_graph` with ``cubical=False``, which:
+:meth:`~relucent.complex.Complex.get_dual_graph`, which:
 
 1. Builds combinatorial edges with
-   :func:`~relucent.meta_graph.dual_edges_top_dim` (flip neighbors for
+   :func:`~relucent.incidence.dual_edges_top_dim` (flip neighbors for
    ``max_dim ≥ 2``; shared 0-face tags for 1D ambient complexes).
 2. Syncs ``poly._shis`` from incident edge labels via
-   :func:`~relucent.meta_graph.set_shis_from_dual_graph`.
+   :func:`~relucent.incidence.sync_shis_from_dual_graph` when ``repair=True``
+   (the default).
 
 Top-cell ``_shis`` are therefore **re-derived from dual-graph edges**, not left
 as raw LP output. This is the combinatorial cubical model used by contraction
@@ -206,31 +207,46 @@ On contracted slices (boundary, chain complex)
 
 After :meth:`~relucent.complex.Complex.contract` creates faces, SHIs are seeded
 from SS crossings (role 1) and finalized by
-:func:`~relucent.meta_graph.set_contracted_shis` to
-:func:`~relucent.meta_graph.cubical_cell_shis`. Contracted 1-skeleton dual
+:func:`~relucent.incidence.set_contracted_shis` to
+:func:`~relucent.incidence.cubical_cell_shis`. Contracted 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
 
 Boundary discovery seeds slice ``_shis`` from SS crossings
 (``_apply_ambient_boundary_shis`` in :mod:`relucent.boundary_search`), then
 runs the same ``set_contracted_shis`` pass during finalize.
 
-Verification
-------------
+Certification
+-------------
 
-Verification is orchestrated by :func:`~relucent.verify.verify_complex`.
+Certification is orchestrated by :func:`~relucent.certify.certify_complex`.
 :meth:`~relucent.complex.Complex.bfs` with ``verify=True`` runs it automatically
-after a **complete** search via ``finalize_ambient_search``.
+after a **complete** search via ``finalize_ambient_search`` at
+:class:`~relucent.certify.CertifyLevel.COMPLETE`. Call
+:meth:`~relucent.complex.Complex.certify` to re-run certification manually.
 
-When verification runs
-~~~~~~~~~~~~~~~~~~~~~~
+:class:`~relucent.certify.CertifyLevel` is cumulative:
+
+* ``COMBINATORIAL`` — flip-SHI symmetry
+  (:func:`~relucent.incidence.verify_flip_shi_symmetry`), dual-graph certification
+  (:func:`~relucent.incidence.certify_dual_graph`), and contracted-slice SHI checks
+  (:func:`~relucent.incidence.verify_contracted_shis`) when applicable.
+* ``COMPLETE`` — additionally requires every LP facet on a top cell to flip to a
+  same-dimension neighbor in the complex
+  (:func:`~relucent.certify.verify_lp_flip_neighbors_in_complex`).
+* ``GEOMETRIC`` — additionally recompute SHIs with ``strict=True`` on every cached
+  cell and require an exact match
+  (:func:`~relucent.certify.verify_shi_geometry`).
+
+When certification runs
+~~~~~~~~~~~~~~~~~~~~~~~
 
 +-------------------------------+------------------------------------------------+
 | Situation                     | Behavior                                       |
 +===============================+================================================+
 | Complete search,              | Dual-graph sync +                              |
-| ``verify=True``               | ``verify_complex(level="fast")``               |
+| ``verify=True``               | ``certify_complex(level=COMPLETE)``            |
 +-------------------------------+------------------------------------------------+
-| ``max_polys`` cap hit         | Verification skipped                           |
+| ``max_polys`` cap hit         | Certification skipped                          |
 |                               | (``complete=False``, ``verified=False``)       |
 +-------------------------------+------------------------------------------------+
 | ``max_depth`` cap with        | ``complete=False``; with ``verify=True``       |
@@ -240,39 +256,21 @@ When verification runs
 | exploration                   |                                                |
 +-------------------------------+------------------------------------------------+
 
-Fast tier (``level="fast"``, default)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-1. :func:`~relucent.verify.verify_shi_flip_symmetry` — Every top-cell SHI flips
-   to a same-dimension neighbor that also lists that SHI.
-2. :func:`~relucent.verify.verify_dual_graph_edges` — Each dual edge's ``shi``
-   appears in both endpoint ``_shis``; cubical face-tag consistency via
-   :func:`~relucent.meta_graph.verify_dual_graph_cubical`.
-3. :func:`~relucent.verify.verify_lp_flip_neighbors_in_complex` — On complete
-   ambient complexes only: recompute SHIs by LP and check every facet has a
-   same-dimension flip neighbor in the complex (completeness).
-
-Full tier (``level="full"``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Additionally runs :func:`~relucent.verify.verify_shi_geometry` on every cell with
-cached ``_shis``: recompute with ``strict=True`` and require an exact match.
-
 Boundary-specific checks
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.exploration.finalize_boundary_complex` also:
 
 * Verifies ambient coface feasibility per cell
-  (:func:`~relucent.verify.verify_boundary_cell`)
+  (:func:`~relucent.certify.verify_boundary_cell`)
 * Builds the dual graph with ``require_complete=verify``
-* Runs :func:`~relucent.meta_graph.verify_arrangement_genericity`
-* Calls :func:`~relucent.meta_graph.set_contracted_shis` before ``verify_complex``
+* Runs :func:`~relucent.certify.verify_arrangement_genericity`
+* Calls :func:`~relucent.incidence.set_contracted_shis` before ``certify_complex``
 
 Exploration flags
 ~~~~~~~~~~~~~~~~~
 
-After search or verify, :class:`~relucent.complex.Complex` records:
+After search or certification, :class:`~relucent.complex.Complex` records:
 
 * ``complete`` — frontier exhausted without caps/depth limits
 * ``verified`` — last invariant check passed
@@ -312,11 +310,11 @@ The rule depends on the complex dimension:
   flipping a single nonzero entry.
 * **1D ambient complex** — Cells sharing a combinatorial **0-face** (vertex tag).
 * **Contracted 1-skeleton** (``max_dim == 1`` but ambient ``dim > 1``) — Walk
-  each cell's finalized ``poly.shis`` (from :func:`~relucent.meta_graph.cubical_cell_shis`)
+  each cell's finalized ``poly.shis`` (from :func:`~relucent.incidence.cubical_cell_shis`)
   and add edges only when the flip neighbor exists in the complex.
 
-After edge construction, :func:`~relucent.meta_graph.set_shis_from_dual_graph`
-sets each node's ``_shis`` from incident edge labels.
+After edge construction, :func:`~relucent.incidence.sync_shis_from_dual_graph`
+sets each node's ``_shis`` from incident edge labels when ``repair=True``.
 
 Uses
 ~~~~
@@ -355,13 +353,13 @@ Construction pipeline
 
 1. :meth:`~relucent.complex.Complex.get_chain_complex` — Repeated contraction
    from the ambient complex down to 0-cells.
-2. **Face edges** — :func:`~relucent.meta_graph.collect_meta_face_edges` per
+2. **Face edges** — :func:`~relucent.incidence.collect_meta_face_edges` per
    dimension (``ss_nonzero_indices`` + lookup); parallelized when cell count ≥
    ``META_FACE_PARALLEL_MIN_CELLS``.
 3. **Boundedness** — 0-face incidence on 1-cells and ascending sweep
-   (:func:`~relucent.meta_graph.classify_one_cells_finite_from_face_edges`,
-   :func:`~relucent.meta_graph.classify_finite_ascending`).
-4. **Node assembly** — :func:`~relucent.meta_graph.meta_node_attrs` derives
+   (:func:`~relucent.incidence.classify_one_cells_finite_from_face_edges`,
+   :func:`~relucent.incidence.classify_finite_ascending`).
+4. **Node assembly** — :func:`~relucent.incidence.meta_node_attrs` derives
    ``crossings`` and flip-neighbor ``shis`` per dimension slice.
 5. **Optional truncation** — :func:`~relucent.meta_graph.truncate_meta_graph` or
    :func:`~relucent.meta_graph.one_point_compactify_meta_graph` for homology at
@@ -406,7 +404,7 @@ Dual graph vs meta-graph
 +----------------------+---------------------------+---------------------------+
 
 **Critical invariant:** meta-graph **face edges** use
-:func:`~relucent.meta_graph.ss_nonzero_indices` (role 2), not propagated
+:func:`~relucent.incidence.ss_nonzero_indices` (role 2), not propagated
 ``_shis`` (role 3). Node ``_shis`` can be a strict subset of SS crossings;
 conflating the two breaks ``∂² = 0`` for GF(2) boundary maps.
 
@@ -423,7 +421,7 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    exclude the boundary hyperplane.
 3. **Finalize** — :func:`~relucent.exploration.finalize_boundary_complex`:
    slice SHI assignment (``ss_nonzero_indices`` + ``set_contracted_shis``),
-   dual graph, genericity check, ``verify_complex``.
+   dual graph, genericity check, ``certify_complex``.
 
 Alternatively, explore the full ambient complex first, then
 :meth:`~relucent.complex.Complex.get_boundary_complex` via contraction (requires

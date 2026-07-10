@@ -224,7 +224,7 @@ class TestComplexPointAndSS:
 
 class TestComplexDualGraph:
     def test_contract_raises_on_incomplete_dual(self, small_mlp):
-        from relucent.verify import ComplexNotCompleteError
+        from relucent.errors import ComplexNotCompleteError
 
         cplx = Complex(small_mlp)
         cplx.bfs(start=_rand_batch(4), max_polys=30)

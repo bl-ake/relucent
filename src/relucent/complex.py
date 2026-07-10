@@ -1,3 +1,5 @@
+"""Polyhedral complex container: search, graphs, topology, and certification."""
+
 from __future__ import annotations
 
 import os
@@ -6,7 +8,7 @@ import random
 import warnings
 from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
-from typing import TYPE_CHECKING, Any, Literal, Self, overload
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import networkx as nx
 import numpy as np
@@ -14,20 +16,28 @@ import plotly.graph_objects as go
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent import certify, incidence
 from relucent import meta_graph as mg
 from relucent._logging import logger
 from relucent._torch_compat import TORCH_AVAILABLE, torch
+from relucent.certify import CertifyLevel
 from relucent.complex_graph import (
     contract_dual_graph_for_shi,
     delete_ss_columns,
     net_without_last_ss_layer_neuron,
 )
 from relucent.convert_model import convert
+from relucent.errors import (
+    ComplexNotCompleteError,
+    ComplexNotVerifiedError,
+    DualGraphAsymmetricEdgeError,
+    IncompleteDualGraphError,
+    NonGenericArrangementError,
+)
 from relucent.meta_graph import (
     INFINITY_POINT_META_NODE,
     INFINITY_POINT_META_SHI,
     TRUNCATION_META_SHI,
-    NonGenericArrangementError,
 )
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.poly import Polyhedron
@@ -57,17 +67,13 @@ from relucent.utils import (
     flip_ss_at_shi,
     process_aware_cpu_count,
 )
-from relucent.verify import (
-    ComplexNotCompleteError,
-    ComplexNotVerifiedError,
-    DualGraphAsymmetricEdgeError,
-)
 
 if TYPE_CHECKING:
     from relucent.morse import CriticalPoint
 
 __all__ = [
     "Complex",
+    "CertifyLevel",
     "INFINITY_POINT_META_NODE",
     "INFINITY_POINT_META_SHI",
     "IncompleteDualGraphError",
@@ -77,17 +83,6 @@ __all__ = [
     "ComplexNotVerifiedError",
     "DualGraphAsymmetricEdgeError",
 ]
-
-
-class IncompleteDualGraphError(ValueError):
-    """The dual graph has missing boundary neighbors (partially explored complex).
-
-    :meth:`Complex.contract`, :meth:`Complex.get_chain_complex`, and
-    :meth:`Complex.get_meta_graph` require a complete adjacency structure among
-    top-dimensional cells. Explore the complex further (e.g. BFS/DFS) before building
-    the chain complex or running topology routines.
-    """
-
 
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
@@ -161,11 +156,11 @@ class Complex:
 
     @property
     def verified(self) -> bool | None:
-        """Whether the complex passed the last invariant verification (``None`` if unknown)."""
+        """Whether the complex passed the last certification (``None`` if unknown)."""
         return self._verified
 
     def set_exploration_state(self, *, complete: bool, verified: bool) -> None:
-        """Record exploration / verification status after search or verify."""
+        """Record exploration / certification status after search or certify."""
         self._complete = complete
         self._verified = verified
 
@@ -174,25 +169,33 @@ class Complex:
         if self._complete is True and self._verified is True:
             return
         if self._complete is False:
-            from relucent.verify import ComplexNotCompleteError
-
             raise ComplexNotCompleteError(
                 "Complex is not complete or failed invariant verification. Explore further "
                 + "(e.g. BFS) or pass an explicit exploration cap (max_polys) to opt into "
                 + "a partial complex."
             )
         if self._complete is True and self._verified is not True:
-            from relucent.verify import ComplexNotVerifiedError
-
             raise ComplexNotVerifiedError(
-                "Complex is complete but not verified. Re-run BFS with verify=True or call " + "verify_complex."
+                "Complex is complete but not verified. Re-run BFS with verify=True or call " + "certify()."
             )
-        from relucent.verify import ComplexNotCompleteError
-
         raise ComplexNotCompleteError(
             "Complex exploration state is unknown. Run BFS or explore_for_topology first, "
             + "or set_exploration_state(complete=True, verified=True) for trusted loads."
         )
+
+    def certify(
+        self,
+        *,
+        level: CertifyLevel = CertifyLevel.COMPLETE,
+        repair: bool = True,
+        graph: nx.Graph[Polyhedron] | None = None,
+    ) -> None:
+        """Certify this complex and record the result via :meth:`set_exploration_state`.
+
+        See :func:`relucent.certify.certify_complex` for the certification levels
+        and the (conservative, ``_shis``-only) repair this performs.
+        """
+        certify.certify_complex(self, level=level, repair=repair, graph=graph, record_state=True)
 
     def __repr__(self) -> str:
         net_name = type(self._net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -681,12 +684,12 @@ class Complex:
                 :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a subset for
                 optional caches. ``finite``, ``center``, and ``inradius`` are always
                 computed.
-            verify: When True (default), require complete exploration and run invariant
-                checks at the end. Verification is skipped when exploration hits
-                ``max_polys`` before the frontier is exhausted. A finite ``max_depth``
-                cap can leave ``complete=False``; with ``verify=True`` that raises
-                :class:`~relucent.complex.IncompleteDualGraphError` unless the cap
-                was hit. Sets ``strict=True`` on SHI LPs when verifying.
+            verify: When True (default), require complete exploration and run
+                :func:`~relucent.certify.certify_complex` at the end. Certification
+                is skipped when exploration hits ``max_polys`` before the frontier is
+                exhausted. A finite ``max_depth`` cap can leave ``complete=False``; with
+                ``verify=True`` that raises :class:`~relucent.complex.IncompleteDualGraphError`
+                unless the cap was hit. Sets ``strict=True`` on SHI LPs when verifying.
             **kwargs: Additional arguments passed to :func:`~relucent.poly.get_shis`.
 
         Returns:
@@ -696,7 +699,7 @@ class Complex:
                 - "Search Time": Elapsed time in seconds
                 - "Bad SHI Computations": List of failed computations
                 - "Complete": Whether search completed (no unprocessed items)
-                - "Verified": Whether invariant checks passed (``None`` if not run)
+                - "Verified": Whether certification passed (``None`` if not run)
 
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
@@ -1017,11 +1020,9 @@ class Complex:
                     check_exists=False,
                 )
         if len(out) > 0:
-            from relucent import meta_graph as mg
-
-            mg.set_contracted_shis(out)
+            incidence.set_contracted_shis(out)
             if cfg.CAREFUL_MODE:
-                mg.verify_contracted_shis(out)
+                incidence.verify_contracted_shis(out)
         return out
 
     def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
@@ -1038,16 +1039,15 @@ class Complex:
         edges = list(self.get_boundary_edges(i, verbose=verbose))
         return self.G.subgraph([p for edge in edges for p in edge])
 
-    def _codim_one_face_kwargs(self, p1: Polyhedron, p2: Polyhedron, shi: int) -> dict[str, Any]:
+    def _codim_one_face_kwargs(self, p1: Polyhedron, _p2: Polyhedron, shi: int) -> dict[str, Any]:
         """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces.
 
         Candidate SHIs are all nonzero sign-sequence crossings on the face (role 2);
-        :func:`mg.set_contracted_shis` keeps flip neighbors in the slice.
+        :func:`~relucent.incidence.set_contracted_shis` keeps flip neighbors in the slice.
         Infeasible 1-cell faces are dropped at construction time via
         :meth:`~relucent.poly.Polyhedron.is_shi_face_feasible`.
 
-        Meta-graph **face edges** always use :func:`mg.ss_nonzero_indices`; see
-        ``negative-betti-meta-graph-bug.md``.
+        Meta-graph **face edges** always use :func:`~relucent.incidence.ss_nonzero_indices`.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1055,7 +1055,7 @@ class Complex:
         shi_i = int(shi)
         face_ss = p1.ss_np.copy()
         face_ss[0, shi_i] = 0
-        candidate_shis = list(mg.ss_nonzero_indices(face_ss))
+        candidate_shis = list(incidence.ss_nonzero_indices(face_ss))
         if face_dim == 1 and p1.halfspaces is not None:
             new_ss = p1.ss_np.copy()
             new_ss[0, shi_i] = 0
@@ -1111,7 +1111,7 @@ class Complex:
             ComplexNotVerifiedError: If the input complex is not verified.
         """
         self.assert_topology_ready()
-        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True, verify=True, cubical=False)
+        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True)
         cplx = Complex(self.net)
         for poly in tqdm(
             self.get_boundary_cells(i, verbose=verbose, verify=True),
@@ -1120,17 +1120,16 @@ class Complex:
             disable=not verbose,
         ):
             cplx.add_polyhedron(poly, check_exists=False)
-        mg.set_contracted_shis(cplx)
+        incidence.set_contracted_shis(cplx)
         if cfg.CAREFUL_MODE:
-            mg.verify_contracted_shis(cplx)
+            incidence.verify_contracted_shis(cplx)
         cplx.verify_arrangement_genericity()
-        from relucent.verify import verify_complex
 
         if len(cplx) == 0:
             cplx.set_exploration_state(complete=True, verified=True)
             return cplx
         cplx.set_exploration_state(complete=True, verified=False)
-        verify_complex(cplx, level="fast", record_state=True)
+        certify.certify_complex(cplx, level=CertifyLevel.COMPLETE, record_state=True)
         return cplx
 
     @overload
@@ -1193,7 +1192,7 @@ class Complex:
 
         Each codimension-one face is keyed by zeroing one dual-graph SHI in the
         sign sequence.  Face ``shis`` kwargs come from
-        :meth:`_codim_one_face_kwargs`, then :func:`mg.set_contracted_shis`.
+        :meth:`_codim_one_face_kwargs`, then :func:`~relucent.incidence.set_contracted_shis`.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
@@ -1201,7 +1200,7 @@ class Complex:
             ComplexNotVerifiedError: If this complex is not verified.
         """
         self.assert_topology_ready()
-        G = self.get_dual_graph(verbose=verbose, require_complete=True, verify=True, cubical=False)
+        G = self.get_dual_graph(verbose=verbose, require_complete=True)
         new_complex = Complex(self.net)
         for p1, p2, shi in G.edges(data="shi"):
             new_ss = p1.ss_np.copy()
@@ -1211,12 +1210,10 @@ class Complex:
                 **self._codim_one_face_kwargs(p1, p2, int(shi)),
             )
 
-        mg.set_contracted_shis(new_complex)
+        incidence.set_contracted_shis(new_complex)
         if len(new_complex) > 0:
-            from relucent.verify import verify_complex
-
             new_complex.set_exploration_state(complete=True, verified=False)
-            verify_complex(new_complex, level="fast", record_state=True)
+            certify.certify_complex(new_complex, level=CertifyLevel.COMPLETE, record_state=True)
         return new_complex
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
@@ -1381,15 +1378,15 @@ class Complex:
         codimension-1 face of the former under the SHI-zeroing rule. Each edge
         stores ``shi``, the supporting hyperplane index that was zeroed.
 
-        **SHI rules (see module comment above the meta-graph helpers):**
+        **SHI rules (see** :mod:`relucent.incidence` **module docstring):**
 
-        - Face **edges**: :func:`mg.ss_nonzero_indices` + lookup (homology-critical).
-        - Node **metadata** (``shis``, ``crossings``): :func:`mg.cubical_cell_shis` on each
-          dimension slice — derived at node creation, not propagated from ``contract``.
+        - Face **edges**: :func:`~relucent.incidence.ss_nonzero_indices` + lookup (homology-critical).
+        - Node **metadata** (``shis``, ``crossings``): :func:`~relucent.incidence.cubical_cell_shis` on
+          each dimension slice — derived at node creation, not propagated from ``contract``.
         - **Boundedness**: combinatorial classification from face edges only.
 
-        If ``verify=True``, :func:`mg.verify_meta_graph_incidence` checks that assembled
-        edges, node SHIs, and finite labels match the incidence engine.
+        If ``verify=True``, :func:`~relucent.meta_graph.verify_meta_graph_incidence` checks that
+        assembled edges, node SHIs, and finite labels match the incidence engine.
 
         For combinatorial truncation (link-at-infinity homology), build the graph with
         this method and call :meth:`truncate_meta_graph` on a copy before
@@ -1461,8 +1458,8 @@ class Complex:
             if int(k) <= 0:
                 continue
             valid_face_tags = set(lookup.keys())
-            cells = [(p.tag, np.asarray(p.ss_np), mg.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
-            use_parallel = len(cells) >= mg.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
+            cells = [(p.tag, np.asarray(p.ss_np), incidence.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
+            use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
                 logger.info(
                     "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
@@ -1470,14 +1467,14 @@ class Complex:
                     nworkers,
                     len(cells),
                 )
-                edges, extra_tags = mg.parallel_collect_meta_face_edges(
+                edges, extra_tags = incidence.parallel_collect_meta_face_edges(
                     cells,
                     valid_face_tags,
                     nworkers=nworkers,
                 )
             else:
-                if len(cells) < mg.META_FACE_PARALLEL_MIN_CELLS:
-                    face_mode = f"sequential (cells < {mg.META_FACE_PARALLEL_MIN_CELLS})"
+                if len(cells) < incidence.META_FACE_PARALLEL_MIN_CELLS:
+                    face_mode = f"sequential (cells < {incidence.META_FACE_PARALLEL_MIN_CELLS})"
                 elif nworkers <= 1:
                     face_mode = "sequential (nworkers <= 1)"
                 else:
@@ -1489,7 +1486,7 @@ class Complex:
                     len(cells),
                 )
                 if verbose:
-                    edges, extra_tags = mg.collect_meta_face_edges(
+                    edges, extra_tags = incidence.collect_meta_face_edges(
                         list(
                             tqdm(
                                 cells,
@@ -1500,7 +1497,7 @@ class Complex:
                         valid_face_tags,
                     )
                 else:
-                    edges, extra_tags = mg.collect_meta_face_edges(cells, valid_face_tags)
+                    edges, extra_tags = incidence.collect_meta_face_edges(cells, valid_face_tags)
             edges_by_dim[int(k)] = (edges, extra_tags)
             for face_tag in set(extra_tags):
                 if face_tag not in lookup and face_tag in self.tag2poly:
@@ -1516,7 +1513,7 @@ class Complex:
                 p._finite = None
 
         # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
-        n_from_faces, infeasible_one_cells = mg.classify_one_cells_finite_from_face_edges(
+        n_from_faces, infeasible_one_cells = incidence.classify_one_cells_finite_from_face_edges(
             by_dim,
             edges_by_dim,
         )
@@ -1531,25 +1528,26 @@ class Complex:
                 n_from_faces,
             )
 
-        # Step 2: ascending sweep — classify k-dim contracted cells (k ≥ 2) using
-        # their already-classified (k-1)-dim faces.  Because every 0-dim cell is
-        # trivially bounded (a point) and every 1-dim cell was classified above,
-        # induction guarantees this sweep fully classifies all contracted cells:
-        #   • unbounded if ANY (k-1)-face is unbounded
-        #   • bounded   if ALL (k-1)-faces are bounded
-        n_ascending = mg.classify_finite_ascending(by_dim, lookup, edges_by_dim)
+        # Step 2: ascending sweep to fixed point, then LP fallback for stragglers.
+        n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
         if n_ascending:
             logger.info(
                 "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
                 n_ascending,
             )
 
+        n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
+        if n_lp:
+            logger.info("get_meta_graph: LP fallback classified %d chain cells", n_lp)
+
         pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
         if pending_finite:
+            detail = incidence.format_pending_finite_polys(all_chain_polys)
             msg = (
                 f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
-                "still unclassified after combinatorial passes. This may indicate an "
-                "incomplete BFS, missing edges, or a non-generic network."
+                + "still unclassified after combinatorial passes and LP fallback. "
+                + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
+                + detail
             )
             if cfg.CAREFUL_MODE:
                 raise AssertionError(msg)
@@ -1561,13 +1559,21 @@ class Complex:
             )
 
         excluded_tags: set[bytes] = set()
+        infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
+        if infeasible_tags:
+            excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
+            logger.info(
+                "get_meta_graph: excluding %d infeasible cells (%d with propagated cofaces)",
+                len(infeasible_tags),
+                len(excluded_tags),
+            )
+
         for k, c_k in sorted(by_dim.items(), reverse=True):
             neighbor_tags = dim_neighbor_tags[int(k)]
             for p in c_k:
-                if p.dim > 0 and p._finite_computed and p._finite is None:
-                    excluded_tags.add(p.tag)
+                if p.tag in excluded_tags:
                     continue
-                meta.add_node(p.tag, **mg.meta_node_attrs(p, neighbor_tags=neighbor_tags))
+                meta.add_node(p.tag, **incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags))
 
         # Add cached face edges k -> k-1.
         for k in sorted(by_dim.keys(), reverse=True):
@@ -1578,13 +1584,13 @@ class Complex:
             known_nodes = set(meta.nodes)
             new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
             if new_face_tags:
-                mg.classify_lazy_face_polys(new_face_tags, lookup, edges_by_dim)
+                incidence.classify_lazy_face_polys(new_face_tags, lookup, edges_by_dim)
             face_dim = int(k) - 1
             face_neighbors = dim_neighbor_tags.get(face_dim, set())
             for face_tag_key in new_face_tags:
                 meta.add_node(
                     face_tag_key,
-                    **mg.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors),
+                    **incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors),
                 )
             known_nodes.update(new_face_tags)
 
@@ -1858,22 +1864,7 @@ class Complex:
             return
         top_dim = max(int(p.dim) for p in self)
         if top_dim == 1:
-            mg.verify_arrangement_genericity(self)
-
-    def verify_dual_graph_consistency(self, graph: nx.Graph[Polyhedron] | None = None) -> None:
-        """Verify cubical consistency of dual-graph edges (Layer 1)."""
-        if len(self) == 0:
-            return
-        try:
-            top_dim = max(int(p.dim) for p in self)
-        except ValueError:
-            return
-        if top_dim <= 0:
-            return
-
-        g = graph if graph is not None else self.get_dual_graph(verbose=False)
-        top_cells = [p for p in self if int(p.dim) == top_dim]
-        mg.verify_dual_graph_cubical(top_cells, g, top_dim=top_dim)
+            certify.verify_arrangement_genericity(self)
 
     def intrinsic_vertex_coords(
         self,
@@ -2038,8 +2029,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = False,
         require_complete: bool = False,
-        verify: bool = True,
-        cubical: bool | None = None,
+        repair: bool = True,
     ) -> nx.Graph[Polyhedron]: ...
 
     @overload
@@ -2056,8 +2046,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = False,
         require_complete: bool = False,
-        verify: bool = True,
-        cubical: bool | None = None,
+        repair: bool = True,
     ) -> nx.Graph[int]: ...
 
     def get_dual_graph(
@@ -2073,8 +2062,7 @@ class Complex:
         show_edge_labels: bool = False,
         verbose: bool = True,
         require_complete: bool = False,
-        verify: bool = True,
-        cubical: bool | None = None,
+        repair: bool = True,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
         """Construct the dual graph of the complex.
 
@@ -2082,7 +2070,7 @@ class Complex:
         where nodes are polyhedra and edges connect adjacent polyhedra (those
         sharing a supporting hyperplane).
 
-        Edges use combinatorial cubical adjacency via :func:`~relucent.meta_graph.dual_edges_top_dim`
+        Edges use combinatorial cubical adjacency via :func:`~relucent.incidence.dual_edges_top_dim`
         (0-face sharing when ``max_dim == 1``, flip neighbors when ``max_dim >= 2``).
 
         Args:
@@ -2102,10 +2090,12 @@ class Complex:
             show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
             verbose: If True, print progress messages. Defaults to True.
             require_complete: If True, raise :class:`IncompleteDualGraphError` when
-                boundary neighbors are missing. Defaults to False (emit a warning).
-                Used by :meth:`contract`.
-            verify: If True, require bidirectional ``_shis`` on each edge and run
-                cubical consistency checks. Defaults to True.
+                boundary neighbors are missing (checked via an LP facet recompute on
+                full ambient top cells). Defaults to False. Used by :meth:`contract`.
+            repair: If True (default), overwrite each top cell's ``_shis`` from the
+                freshly built combinatorial dual graph (see
+                :func:`~relucent.incidence.sync_shis_from_dual_graph`). This is the
+                one repair relucent performs automatically.
 
         Returns:
             networkx.Graph: The dual graph of the complex. Nodes are polyhedra
@@ -2120,80 +2110,62 @@ class Complex:
         """
         if len(self) == 0:
             return nx.Graph()
+        _ = verbose
         max_dim = max(poly.dim for poly in self)
-        graph = nx.Graph()
-        top_cells: list[Polyhedron] = []
-        for poly in self:
-            if poly.dim == max_dim:
-                graph.add_node(poly, label=str(poly))
-                top_cells.append(poly)
+        top_cells = [poly for poly in self if poly.dim == max_dim]
+        graph = incidence.build_dual_graph(top_cells, top_dim=max_dim, ambient_dim=int(self.dim), repair=repair)
+        for poly in top_cells:
+            graph.nodes[poly]["label"] = str(poly)
 
-        neighbor_tags = {p.tag for p in top_cells}
-        edge_top_dim = mg.dual_graph_edge_top_dim(cell_top_dim=max_dim, ambient_dim=int(self.dim))
-        prefer_cell_shis = max_dim < int(self.dim)
-        edges, _ = mg.dual_edges_top_dim(
-            top_cells,
-            neighbor_tags,
-            top_dim=edge_top_dim,
-            prefer_cell_shis=prefer_cell_shis,
-        )
-        for u, v, shi in edges:
-            graph.add_edge(u, v, shi=shi)
-        if top_cells:
-            mg.set_shis_from_dual_graph(graph)
-
-        if verify and top_cells:
-            mg.verify_dual_graph_cubical(top_cells, graph, top_dim=edge_top_dim)
         if plot:
             from relucent.vis import get_colors
 
+            plot_graph = cast(Any, graph)
             if match_locations:
                 if self.dim != 2:
                     raise ValueError("Polyhedra must be 2D to match locations")
 
-                nx.set_node_attributes(graph, {node: False for node in graph.nodes}, "physics")
+                nx.set_node_attributes(plot_graph, {node: False for node in plot_graph.nodes}, "physics")
                 nx.set_node_attributes(
-                    graph,
-                    {poly: poly.interior_point[0].item() * 10 for poly in graph.nodes},
+                    plot_graph,
+                    {poly: pt[0].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
                     "x",
                 )
                 nx.set_node_attributes(
-                    graph,
-                    {poly: poly.interior_point[1].item() * 10 for poly in graph.nodes},
+                    plot_graph,
+                    {poly: pt[1].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
                     "y",
                 )
 
             if node_color == "Wl2":
-                colors = get_colors([poly.Wl2 for poly in graph.nodes], cmap=cmap)
-                for c, poly in zip(colors, graph.nodes, strict=True):
-                    graph.nodes[poly]["color"] = c
+                colors = get_colors([poly.Wl2 for poly in plot_graph.nodes], cmap=cmap)
+                for c, poly in zip(colors, plot_graph.nodes, strict=True):
+                    plot_graph.nodes[poly]["color"] = c
             elif node_color == "volume":
-                colors = get_colors([poly.ch.volume for poly in graph.nodes], cmap=cmap)
-                for c, poly in zip(colors, graph.nodes, strict=True):
-                    graph.nodes[poly]["color"] = c
+                colors = get_colors([poly.volume for poly in plot_graph.nodes], cmap=cmap)
+                for c, poly in zip(colors, plot_graph.nodes, strict=True):
+                    plot_graph.nodes[poly]["color"] = c
 
             if node_size == "volume":
-                sizes = [poly.ch.volume for poly in graph.nodes]
+                sizes = [poly.volume for poly in plot_graph.nodes]
                 maxsize = max(sizes)
-                for size, poly in zip(sizes, graph.nodes, strict=True):
-                    graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
+                for size, poly in zip(sizes, plot_graph.nodes, strict=True):
+                    plot_graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
             else:
-                nx.set_node_attributes(graph, {node: 4 for node in graph.nodes}, "size")
+                nx.set_node_attributes(plot_graph, {node: 4 for node in plot_graph.nodes}, "size")
 
-            for node in graph.nodes:
-                graph.nodes[node]["label"] = str(node) if show_node_labels else ""
-                graph.nodes[node]["title"] = str(node)
-            for edge in graph.edges:
-                graph.edges[edge]["label"] = str(graph.edges[edge]["shi"]) if show_edge_labels else ""
-                graph.edges[edge]["title"] = str(graph.edges[edge]["shi"])
+            for node in plot_graph.nodes:
+                plot_graph.nodes[node]["label"] = str(node) if show_node_labels else ""
+                plot_graph.nodes[node]["title"] = str(node)
+            for edge in plot_graph.edges:
+                plot_graph.edges[edge]["label"] = str(plot_graph.edges[edge]["shi"]) if show_edge_labels else ""
+                plot_graph.edges[edge]["title"] = str(plot_graph.edges[edge]["shi"])
         if plot or relabel:
             graph = nx.relabel_nodes(graph, {poly: i for i, poly in enumerate(self)})
         if require_complete and int(max_dim) == int(self.dim) and top_cells:
             # LP completeness check for full ambient top cells only.
-            from relucent.verify import verify_lp_flip_neighbors_in_complex
-
-            verify_lp_flip_neighbors_in_complex(self)
-        return graph
+            certify.verify_lp_flip_neighbors_in_complex(self)
+        return cast(Any, graph)
 
     def recover_from_dual_graph(
         self,
@@ -2220,7 +2192,8 @@ class Complex:
                 Defaults to False.
 
         Notes:
-            Sets exploration state to ``complete=True, verified=True``. Only
+            Runs combinatorial certification (:class:`~relucent.certify.CertifyLevel.COMBINATORIAL`)
+            on the reconstructed complex and sets exploration state accordingly. Only
             recover graphs that were built from a complete, verified ambient search.
         """
         if copy:
@@ -2252,8 +2225,11 @@ class Complex:
             graph.nodes[node]["poly"]._shis = shis
             # Caches are written only for complete+verified complexes; trust SHIs on reload.
             graph.nodes[node]["poly"]._shis_strict = True
-        # Dual-graph recovery is a trusted reconstruct of a previously explored complex.
-        self.set_exploration_state(complete=True, verified=True)
+        # Dual-graph recovery reconstructs a previously explored complex, but still
+        # certifies combinatorially (rebuilding + repairing the dual graph) rather
+        # than blindly trusting the reconstruction.
+        self.set_exploration_state(complete=True, verified=False)
+        certify.certify_complex(self, level=CertifyLevel.COMBINATORIAL, repair=True, record_state=True)
 
     def plot(
         self,

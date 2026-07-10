@@ -10,6 +10,9 @@ import numpy as np
 
 from relucent._logging import logger
 from relucent._network_scale import default_polyhedron_bound
+from relucent.certify import CertifyLevel, certify_complex, verify_boundary_cell
+from relucent.errors import IncompleteDualGraphError
+from relucent.incidence import set_contracted_shis, verify_contracted_shis
 from relucent.utils import process_aware_cpu_count
 
 if TYPE_CHECKING:
@@ -25,9 +28,7 @@ __all__ = [
 
 
 def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> None:
-    """Certify a fully explored ambient complex (dual-graph SHI sync + optional verify)."""
-    from relucent.complex import IncompleteDualGraphError  # lazy: breaks complex ↔ exploration cycle
-
+    """Certify a fully explored ambient complex (dual-graph SHI sync + optional certify)."""
     if not complete:
         cx.set_exploration_state(complete=False, verified=False)
         if verify:
@@ -37,8 +38,8 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
                 + "max_polys to opt into a partial complex."
             )
         return
-    # Rebuild dual-graph edges and sync top-cell _shis from them.
-    graph = cx.get_dual_graph(verbose=False, require_complete=False, verify=False, cubical=False)
+    # Build dual graph and resync top-cell _shis from it (repair=True, the default).
+    graph = cx.get_dual_graph(verbose=False, require_complete=False)
     if verify:
         top_dim = max(int(p.dim) for p in cx)
         if top_dim == int(cx.dim):
@@ -47,11 +48,9 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
                     poly._shis_strict = True
     cx.set_exploration_state(complete=True, verified=False)
     if verify:
-        from relucent.verify import verify_complex
-
         logger.info("ambient finalize: certifying %d polyhedra ...", len(cx))
         t_verify = time.perf_counter()
-        verify_complex(cx, level="fast", graph=graph, record_state=True)
+        certify_complex(cx, level=CertifyLevel.COMPLETE, graph=graph, record_state=True)
         logger.info("ambient finalize: certification finished in %.1fs", time.perf_counter() - t_verify)
     else:
         cx.set_exploration_state(complete=True, verified=False)
@@ -67,10 +66,8 @@ def finalize_boundary_complex(
     verify: bool = True,
     **shis_kwargs: Any,
 ) -> None:
-    """Ambient coface SHIs, dual graph, genericity, and invariant verification."""
-    from relucent import meta_graph as mg
+    """Ambient coface SHIs, dual graph, genericity, and invariant certification."""
     from relucent.boundary_search import _apply_ambient_boundary_shis, _phase_log
-    from relucent.verify import verify_boundary_cell, verify_complex
 
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
@@ -103,7 +100,7 @@ def finalize_boundary_complex(
         poly._finite_computed = False
     t2 = time.perf_counter()
     _phase_log("discover finalize: building dual graph ...", verbose=verbose)
-    cx._dual_graph = cx.get_dual_graph(verbose=verbose, require_complete=verify, verify=verify, cubical=False)
+    cx._dual_graph = cx.get_dual_graph(verbose=verbose, require_complete=verify)
     _phase_log(
         "discover finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
         verbose=verbose,
@@ -116,12 +113,12 @@ def finalize_boundary_complex(
         "discover finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
         verbose=verbose,
     )
-    mg.set_contracted_shis(cx)  # boundary top cells need contracted SHIs before verify
+    set_contracted_shis(cx)  # boundary top cells need contracted SHIs before certify
     if verify:
-        mg.verify_contracted_shis(cx)
-        verify_complex(cx, level="fast", graph=cx._dual_graph, record_state=True)
+        verify_contracted_shis(cx)
+        certify_complex(cx, level=CertifyLevel.COMPLETE, graph=cx._dual_graph, record_state=True)
     else:
-        cx.set_exploration_state(complete=True, verified=False)  # discoverer defers certification when verify=False
+        cx.set_exploration_state(complete=True, verified=False)  # defers certification when verify=False
 
 
 def search_stats_dict(
@@ -168,8 +165,6 @@ def explore_for_topology(
 
     When ``start`` is None, :func:`generic_topology_start` picks an interior point.
     """
-    from relucent.complex import IncompleteDualGraphError
-
     if start is None:
         start = generic_topology_start(cplx, seed=seed)
     kwargs: dict[str, object] = {

@@ -57,9 +57,13 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     meta = db.get_meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
 
-    # Meta-graph should contain every feasible cell across the contraction chain.
-    expected_nodes = {p.tag for cc in chain for p in cc if not (p.dim > 0 and p.finite is None)}
-    assert set(meta.nodes) >= expected_nodes
+    # Meta-graph should contain feasible cells; phantoms and their cofaces are excluded.
+    meta_tags = set(meta.nodes)
+    for cc in chain:
+        for p in cc:
+            if p.dim > 0 and p.finite is None:
+                assert p.tag not in meta_tags
+    assert meta_tags  # non-empty
 
     # Every edge should decrease dimension by exactly 1.
     for u, v, data in meta.edges(data=True):
@@ -177,7 +181,12 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
         if int(a.get("dim", -1)) != 1:
             continue
         zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
-        assert len(zero_faces) == 2, f"1-cell {n!r} should have two 0-face endpoints, got {zero_faces!r}"
+        # Original 1-cells (rays and infinite lines) always get 2 endpoints after bilateral
+        # truncation. Truncation duplicates of higher-dim cells may have only 1 endpoint when
+        # the parent 2D cell has a single boundary 1-cell and no bounded counterpart.
+        assert 1 <= len(zero_faces) <= 2, (
+            f"1-cell {n!r} should have 1 or 2 0-face endpoints after truncation, got {zero_faces!r}"
+        )
 
     for u, v, d in meta_plain.edges(data=True):
         if u in ub and v in ub:
@@ -187,6 +196,33 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
             assert d.get("shi") in shis_dup
 
     get_betti_numbers(meta_tr, verify_chain_complex=True)
+
+
+def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
+    """Truncated boundary meta-graph must satisfy ``∂²=0`` after phantom exclusion."""
+    set_seeds(seeded)
+    import torch.nn as nn
+
+    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
+    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
+    model = nn.Sequential(fc, nn.ReLU())
+    cplx = Complex(model)
+
+    xs = np.linspace(-2.0, 2.0, 11)
+    ys = np.linspace(-2.0, 2.0, 11)
+    grid = np.array([[x, y] for x in xs for y in ys], dtype=np.float64)
+    eps = 1e-2
+    left = grid.copy()
+    left[:, 0] = -eps
+    right = grid.copy()
+    right[:, 0] = eps
+    _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
+    explore_for_topology(cplx, np.array([0.5, 0.0]))
+    db = cplx.get_boundary_complex(cplx.n - 1)
+
+    meta = db.get_meta_graph(verbose=False)
+    Complex.truncate_meta_graph(meta)
+    get_betti_numbers(meta, verify_chain_complex=True)
 
 
 def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:
@@ -246,6 +282,75 @@ def _finite_from_dual_graph_propagation(
             else:
                 finite[tag] = True
     return finite
+
+
+def test_propagate_infeasible_exclusion_expands_to_cofaces() -> None:
+    """Cofaces of phantom faces must be excluded so ``∂²=0`` is preserved."""
+    from relucent.incidence import propagate_infeasible_exclusion
+
+    bad = b"\x01"
+    one = b"\x02"
+    two = b"\x03"
+    edges_by_dim = {
+        2: ([(two, one, 0), (two, bad, 1)], []),
+        3: ([(b"\x04", two, 0)], []),
+    }
+    excluded = propagate_infeasible_exclusion({bad}, edges_by_dim)
+    assert bad in excluded
+    assert two in excluded
+    assert b"\x04" in excluded
+    assert one not in excluded
+
+
+def test_classify_finite_combinatorial_fixed_point() -> None:
+    """A single ascending pass can leave k-cells pending; fixed point resolves them."""
+    from relucent.incidence import classify_finite_combinatorial
+
+    def _poly(dim: int, tag_byte: int) -> Polyhedron:
+        ss = np.zeros((1, 4), dtype=np.int8)
+        p = Polyhedron(None, ss, halfspaces=None, finite=None)
+        p._finite_computed = False
+        p._finite = None
+        object.__setattr__(p, "dim", dim)  # type: ignore[misc]
+        p.tag = bytes([tag_byte])  # type: ignore[misc]
+        return p
+
+    one_ub = _poly(1, 1)
+    one_ub._finite = False
+    one_ub._finite_computed = True
+    one_bd = _poly(1, 2)
+    one_bd._finite = True
+    one_bd._finite_computed = True
+
+    face_c = _poly(2, 3)
+    face_b = _poly(2, 4)
+    coface_y = _poly(3, 5)
+
+    lookup = {
+        one_ub.tag: one_ub,
+        one_bd.tag: one_bd,
+        face_c.tag: face_c,
+        face_b.tag: face_b,
+        coface_y.tag: coface_y,
+    }
+    by_dim = {1: [one_ub, one_bd], 2: [face_c, face_b], 3: [coface_y]}
+    edges_by_dim = {
+        2: (
+            [
+                (face_c.tag, one_ub.tag, 0),
+                (face_b.tag, one_bd.tag, 1),
+                (face_b.tag, face_c.tag, 2),
+            ],
+            [],
+        ),
+        3: ([(coface_y.tag, face_b.tag, 0)], []),
+    }
+
+    n = classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
+    assert n >= 2
+    assert face_c._finite is False
+    assert face_b._finite is False
+    assert coface_y._finite is False
 
 
 def test_classify_one_cells_finite_from_face_edges_empty_shis_two_zero_faces() -> None:

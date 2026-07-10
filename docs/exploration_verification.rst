@@ -17,7 +17,7 @@ Exploration flags
   ``False`` when verification was skipped or failed. ``None`` if unknown.
 
 Use :meth:`~relucent.complex.Complex.set_exploration_state` only from library
-internals; user code should rely on search and verify routines to set these flags.
+internals; user code should rely on search and certification routines to set these flags.
 
 Default verify behavior
 -----------------------
@@ -28,7 +28,8 @@ accept ``verify=True`` by default. After a **complete** search, relucent:
 1. Rebuilds combinatorial dual-graph edges and syncs top-cell ``_shis`` from them
    (:func:`~relucent.exploration.finalize_ambient_search` via
    :meth:`~relucent.complex.Complex.get_dual_graph`).
-2. Runs fast invariant checks (:func:`~relucent.verify.verify_complex`).
+2. Runs certification (:func:`~relucent.certify.certify_complex` at
+   :class:`~relucent.certify.CertifyLevel.COMPLETE`).
 
 Verification is **skipped** when exploration hits ``max_polys`` before the
 frontier empties — the complex may still have undiscovered neighbors and an LP
@@ -111,9 +112,11 @@ At finalize on a **complete** ambient search, top-cell ``_shis`` are **re-derive
 from combinatorial dual-graph edges.
 
 On **contracted** slices (boundary complexes, chain-complex steps),
-:func:`~relucent.meta_graph.set_contracted_shis` sets ``_shis`` to
-:func:`~relucent.meta_graph.cubical_cell_shis` (flip neighbors in the slice).
+:func:`~relucent.incidence.set_contracted_shis` sets ``_shis`` to
+:func:`~relucent.incidence.cubical_cell_shis` (flip neighbors in the slice).
 Contracted 1-skeleton dual graphs walk each cell's finalized ``poly.shis`` lists.
+
+You can re-run certification manually with :meth:`~relucent.complex.Complex.certify`.
 
 See also :doc:`topology` for Betti-number prerequisites. For the full search →
 SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`. The markdown

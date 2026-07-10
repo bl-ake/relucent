@@ -145,12 +145,16 @@ def test_constant_filtration_matches_betti_on_line_boundary(seeded: int, compact
 
 
 def test_line_boundary_beta0_matches_components(seeded: int) -> None:
-    """Rank β₀ on truncated line boundary agrees with path-component count."""
+    """Truncated line boundary: bilateral truncation closes the infinite line into a segment.
+
+    truncate_meta_graph with bilateral truncation gives the infinite 1-cell two 0-face
+    endpoints, making the rank formula give β₀ = number of path components.
+    """
     set_seeds(seeded)
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
-    betti = db.get_betti_numbers(verify_connected_components=True)
+    betti = db.get_betti_numbers(compactify=False, verify_connected_components=True)
     assert betti.get(0, 0) >= 1
 
 

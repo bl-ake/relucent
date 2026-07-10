@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import networkx as nx
 import numpy as np
 import pytest
@@ -18,9 +20,9 @@ def _segment_meta(
     shis: list[int],
     finite: bool,
     zero_face_nodes: list[object],
-) -> nx.MultiDiGraph:
+) -> nx.MultiDiGraph[Any]:
     """Minimal meta-graph with one 1-cell and optional 0-face endpoints."""
-    meta: nx.MultiDiGraph = nx.MultiDiGraph()
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     one = b"seg"
     meta.add_node(one, dim=1, shis=list(shis), finite=finite, ss=np.array([[1, 0, 0]], dtype=np.int8))
     for i, z in enumerate(zero_face_nodes):

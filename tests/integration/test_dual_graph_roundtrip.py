@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from relucent.exploration import finalize_ambient_search
-from relucent.verify import verify_shi_flip_symmetry
+from relucent.incidence import verify_flip_shi_symmetry
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     export_dual_graph_payload,
@@ -35,7 +35,7 @@ def test_dual_graph_recovery_matches_direct_bfs(
     payload = export_dual_graph_payload(direct)
     recovered = recover_from_dual_payload(model, payload)
     finalize_ambient_search(recovered, complete=True, verify=True)
-    verify_shi_flip_symmetry(recovered)
+    verify_flip_shi_symmetry(recovered)
 
     recovered_boundary = recovered.get_boundary_complex(shi, verbose=False)
     recovered_betti = truncated_betti(recovered_boundary)
