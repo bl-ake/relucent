@@ -45,6 +45,7 @@ def test_dual_edges_match_flip_neighbors_on_diamond_boundary(seeded: int) -> Non
     G = db.get_dual_graph(verbose=False)
     assert G.number_of_edges() >= 1
     from relucent.incidence import certify_dual_graph
+
     certify_dual_graph(G, db)
     assert nx.number_connected_components(G) == 1
 

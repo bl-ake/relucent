@@ -22,6 +22,7 @@ from relucent.poly import Polyhedron
 from relucent.search import (
     SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
     _cancel_pending_neighbor,
+    blocking_bad_shi_computations,
     retain_geometry_caches,
     search_calculations,
 )
@@ -395,9 +396,15 @@ def boundary_searcher(
         pbar.close()
 
     hit_cap = max_polys != float("inf") and len(cx) >= max_polys
+    blocking_mistakes = blocking_bad_shi_computations(bad_shi_computations)
     # As in ambient search, a failed neighbor task means we pruned the frontier and
-    # cannot treat an empty queue as proof that the boundary complex is complete.
-    complete = unprocessed == 0 and not hit_cap and not depth_limited and not bad_shi_computations
+    # cannot treat an empty queue as proof that the boundary complex is complete —
+    # except for true phantoms (empty flip-neighbor sign patterns).
+    complete = unprocessed == 0 and not hit_cap and not depth_limited and not blocking_mistakes
+    if verbose:
+        n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
+        if n_phantom:
+            logger.info("boundary search: ignored %d true phantom flip-neighbor(s)", n_phantom)
     if not complete:
         # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
         cx.set_exploration_state(complete=False, verified=False)

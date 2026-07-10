@@ -41,6 +41,7 @@ __all__ = [
     "ALL_GEOMETRY_PROPERTIES",
     "SEARCH_REQUIRED_GEOMETRY_PROPERTIES",
     "astar_calculations",
+    "blocking_bad_shi_computations",
     "get_ip",
     "greedy_path",
     "hamming_astar",
@@ -49,6 +50,7 @@ __all__ = [
     "retain_geometry_caches",
     "search_calculations",
     "searcher",
+    "true_phantom_neighbor_error",
 ]
 
 # Chebyshev center/inradius (and boundedness) are always computed during search
@@ -72,6 +74,36 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "ch",
     "volume",
 )
+
+
+def true_phantom_neighbor_error(error: object) -> bool:
+    """Return True when a queued flip-neighbor is geometrically empty.
+
+    These are combinatorial flip labels with no nonempty activation region (or a
+    Chebyshev inradius in the empty band matched by :func:`~relucent.calculations.solve_radius`).
+    They are not worker faults and should not block search completeness.
+    """
+    msg = str(error)
+    if msg == "Polyhedron is infeasible (empty).":
+        return True
+    if not msg.startswith("Inradius "):
+        return False
+    try:
+        inradius = float(msg.removeprefix("Inradius ").strip())
+    except ValueError:
+        return False
+    verify_tol = float(cfg.TOL_INTERIOR_VERIFY)
+    return inradius <= 0.0 and inradius > -verify_tol
+
+
+def blocking_bad_shi_computations(bad_shi_computations: list[Any]) -> list[Any]:
+    """Failed neighbor tasks that still prevent certifying exploration complete."""
+    blocking: list[Any] = []
+    for item in bad_shi_computations:
+        err = item[3] if isinstance(item, tuple) and len(item) > 3 else item
+        if not true_phantom_neighbor_error(err):
+            blocking.append(item)
+    return blocking
 
 
 def _cancel_pending_neighbor(
@@ -673,12 +705,19 @@ def searcher(
         pbar.close()
 
     hit_cap = max_polys != float("inf") and len(cx) >= max_polys
+    blocking_mistakes = blocking_bad_shi_computations(bad_shi_computations)
     # Failed neighbor discoveries mean the frontier was pruned, so queue exhaustion
-    # alone is not enough to certify that the ambient complex is complete.
-    complete = unprocessed == 0 and not hit_cap and not depth_limited and not bad_shi_computations
+    # alone is not enough to certify that the ambient complex is complete — except
+    # for true phantoms (empty flip-neighbor sign patterns).
+    complete = unprocessed == 0 and not hit_cap and not depth_limited and not blocking_mistakes
     # Skip verify when max_polys hit — frontier may still have neighbors (LP false-fail).
     do_verify = verify and complete and not hit_cap
     finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
+
+    if verbose:
+        n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
+        if n_phantom:
+            logger.info("searcher: ignored %d true phantom flip-neighbor(s)", n_phantom)
 
     if verbose and invalid_proof_suppressed:
         logger.info(
