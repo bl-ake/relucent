@@ -100,7 +100,7 @@ def blocking_bad_shi_computations(bad_shi_computations: list[Any]) -> list[Any]:
     """Failed neighbor tasks that still prevent certifying exploration complete."""
     blocking: list[Any] = []
     for item in bad_shi_computations:
-        err = item[3] if isinstance(item, tuple) and len(item) > 3 else item
+        err = str(item[3]) if isinstance(item, tuple) and len(item) > 3 else str(item)
         if not true_phantom_neighbor_error(err):
             blocking.append(item)
     return blocking

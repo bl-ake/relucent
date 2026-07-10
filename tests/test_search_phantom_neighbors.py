@@ -31,6 +31,36 @@ def test_blocking_bad_shi_computations_filters_phantoms() -> None:
     assert blocking_bad_shi_computations([phantom, real]) == [real]
 
 
+class _SyncPool:
+    """In-process Pool stand-in so monkeypatches survive on macOS (spawn workers)."""
+
+    def __init__(self, _nworkers: int, *, initializer=None, initargs=()) -> None:
+        if initializer is not None:
+            initializer(*initargs)
+
+    def imap_unordered(self, func, iterable, chunksize=1):
+        _ = chunksize
+        for item in iterable:
+            yield func(item)
+
+    def terminate(self) -> None:
+        pass
+
+    def join(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        pass
+
+
+class _SyncMpContext:
+    def Pool(self, nworkers: int, initializer=None, initargs=()):
+        return _SyncPool(nworkers, initializer=initializer, initargs=initargs)
+
+
 def test_bfs_complete_when_only_phantom_mistakes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Phantom-only failures must not leave BFS incomplete."""
     model = mlp(widths=[2, 6, 1], add_last_relu=True)
@@ -55,6 +85,7 @@ def test_bfs_complete_when_only_phantom_mistakes(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr(search_mod, "_worker_prepare_poly", _fake_worker)
+    monkeypatch.setattr(search_mod, "get_mp_context", lambda: _SyncMpContext())
 
     stats = cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1)
     assert len(stats["Bad SHI Computations"]) >= 1
