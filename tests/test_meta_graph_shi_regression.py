@@ -83,8 +83,8 @@ def test_meta_graph_chain_complex_regression(
 @pytest.mark.parametrize(
     ("name", "architecture", "seed", "betti"),
     [
-        ("deep_2441_seed2", [2, 4, 4, 1], 2, {1: 1}),
-        ("deep_3431_seed51", [3, 4, 3, 1], 51, {1: 1}),
+        ("deep_2441_seed2", [2, 4, 4, 1], 2, {0: 1}),
+        ("deep_3431_seed51", [3, 4, 3, 1], 51, {0: 1, 1: 1}),
     ],
 )
 def test_truncated_homology_chain_complex_regression(

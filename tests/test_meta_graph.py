@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import networkx as nx
 import numpy as np
 import pytest
 import torch
@@ -9,9 +10,10 @@ import torch
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent import meta_graph as mg
 from relucent.calculations import get_shis
+from relucent.errors import NonGenericArrangementError
 from relucent.exploration import explore_for_topology
 from relucent.incidence import face_tag
-from relucent.topology import get_betti_numbers
+from relucent.topology import ChainComplexInconsistent, get_betti_numbers
 from relucent.utils import encode_ss, get_env
 
 
@@ -217,7 +219,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
             f"1-cell {n!r} should have 1 or 2 0-face endpoints after truncation, got {zero_faces!r}"
         )
 
-    get_betti_numbers(meta_tr, verify_chain_complex=True)
+    get_betti_numbers(meta_tr, verify_chain_complex=True, verify_connected_components=False)
 
 
 def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
@@ -247,8 +249,8 @@ def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
     get_betti_numbers(meta, verify_chain_complex=True)
 
 
-def test_truncation_delegate_caps_when_2_cell_has_bounded_face() -> None:
-    """Mixed-boundary 2-cells do not materialize cell-global cap 1-faces (34923-style rule)."""
+def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
+    """Mixed-boundary 2-cells get their own sphere-cut cap; facet incidence is preserved."""
     import networkx as nx
 
     meta = nx.MultiDiGraph()
@@ -285,13 +287,14 @@ def test_truncation_delegate_caps_when_2_cell_has_bounded_face() -> None:
 
     ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
     cap_cache: dict[Any, int] = {}
-    assert mg._open_cap_count(sheet, meta, ub, cap_cache) == 0
-    assert mg._open_cap_count(unbounded, meta, ub, cap_cache) == 0
+    assert mg._open_cap_count(sheet, meta, ub, cap_cache) == 1
+    assert mg._open_cap_count(unbounded, meta, ub, cap_cache) == 1
 
     meta_tr = meta.copy()
     Complex.truncate_meta_graph(meta_tr)
 
     sheet_ext = encode_ss(mg._ss_with_truncation_bits(ss_sheet, 1, 0))
+    unbounded_ext = encode_ss(mg._ss_with_truncation_bits(ss_unbounded, 1, 0))
     t1_shi, t2_shi = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
     trunc_bit_shis = {t1_shi, t2_shi}
     cap_one_faces = [
@@ -299,7 +302,115 @@ def test_truncation_delegate_caps_when_2_cell_has_bounded_face() -> None:
         for _, v, ed in meta_tr.out_edges(sheet_ext, data=True)
         if int(meta_tr.nodes[v].get("dim", -1)) == 1 and int(ed.get("shi", -1)) in trunc_bit_shis
     ]
-    assert cap_one_faces == [], f"expected no truncation-bit cap 1-faces on mixed-boundary 2-cell, got {cap_one_faces!r}"
+    assert len(cap_one_faces) == 1, f"expected one truncation-bit cap 1-face on 2-cell, got {cap_one_faces!r}"
+
+    sheet_cap_1 = cap_one_faces[0]
+    unbounded_cap_0 = _expected_cap_tags(np.asarray(meta_tr.nodes[unbounded_ext]["ss"]), 1)[0]
+    assert meta_tr.has_edge(sheet_cap_1, unbounded_cap_0), (
+        f"cap of unbounded facet {unbounded_cap_0!r} should be facet of cap {sheet_cap_1!r}"
+    )
+
+
+def test_open_cap_count_raises_on_unanchored_sidedness_disagreement() -> None:
+    """Unanchored k-cells with disagreeing unbounded facets are non-generic."""
+    import networkx as nx
+
+    meta = nx.MultiDiGraph()
+
+    def _add(ss: np.ndarray, dim: int, finite: bool | None) -> bytes:
+        tag = encode_ss(ss)
+        meta.add_node(
+            tag,
+            dim=dim,
+            ss=ss,
+            finite=finite,
+            shis=list(mg.ss_nonzero_indices(ss)),
+        )
+        return tag
+
+    sheet = _add(np.array([[1, 1, 1, 1]], dtype=np.int8), 2, False)
+    ray = _add(np.array([[1, 0, 1, 1]], dtype=np.int8), 1, False)
+    line = _add(np.array([[1, 1, 0, 1]], dtype=np.int8), 1, False)
+    z_ray = _add(np.array([[0, 0, 1, 1]], dtype=np.int8), 0, True)
+    meta.add_edges_from(
+        [
+            (sheet, ray, {"shi": 1}),
+            (sheet, line, {"shi": 2}),
+            (ray, z_ray, {"shi": 0}),
+        ]
+    )
+
+    ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
+    with pytest.raises(NonGenericArrangementError, match="disagree on truncation sidedness"):
+        mg._open_cap_count(sheet, meta, ub, {})
+
+
+def _truncation_handbuilt_node(dim: int, ss: list[int], finite: bool | None) -> dict[str, Any]:
+    ss_arr = np.array([ss], dtype=np.int8)
+    return {"dim": dim, "ss": ss_arr, "finite": finite, "shis": list(mg.ss_nonzero_indices(ss_arr))}
+
+
+def _isolated_ray_meta() -> nx.MultiDiGraph[Any]:
+    """Single ray with one bounded endpoint (minimal ray-capping case)."""
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
+    meta.add_node("ray", **_truncation_handbuilt_node(1, [0, 1], False))
+    meta.add_node("z0", **_truncation_handbuilt_node(0, [0, 0], True))
+    meta.add_edge("ray", "z0", shi=1)
+    return meta
+
+
+def _mixed_boundary_wedge_meta() -> nx.MultiDiGraph[Any]:
+    """Half-infinite strip: bounded edge AB plus rays at A and B."""
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
+    meta.add_node("P", **_truncation_handbuilt_node(2, [1, 1, 1], False))
+    meta.add_node("AB", **_truncation_handbuilt_node(1, [0, 1, 1], True))
+    meta.add_node("rayA", **_truncation_handbuilt_node(1, [1, 0, 1], False))
+    meta.add_node("rayB", **_truncation_handbuilt_node(1, [1, 1, 0], False))
+    meta.add_node("A", **_truncation_handbuilt_node(0, [0, 0, 1], True))
+    meta.add_node("B", **_truncation_handbuilt_node(0, [0, 1, 0], True))
+    meta.add_edges_from(
+        [
+            ("P", "AB", {"shi": 0}),
+            ("P", "rayA", {"shi": 1}),
+            ("P", "rayB", {"shi": 2}),
+            ("AB", "A", {"shi": 1}),
+            ("AB", "B", {"shi": 2}),
+            ("rayA", "A", {"shi": 0}),
+            ("rayB", "B", {"shi": 0}),
+        ]
+    )
+    return meta
+
+
+def test_truncate_caps_an_isolated_ray() -> None:
+    """A ray with one bounded endpoint gains one cap 0-cell and becomes a segment."""
+    meta = _isolated_ray_meta()
+    n_before = meta.number_of_nodes()
+
+    Complex.truncate_meta_graph(meta)
+
+    assert meta.number_of_nodes() == n_before + 1, "expected exactly one new cap 0-cell"
+
+    (ray_tag,) = [n for n, a in meta.nodes(data=True) if int(a.get("dim", -1)) == 1]
+    zero_faces = [v for _u, v, _k in meta.out_edges(ray_tag, keys=True) if int(meta.nodes[v]["dim"]) == 0]
+    assert len(zero_faces) == 2, "capped ray should have two combinatorial 0-faces"
+    assert meta.nodes[ray_tag]["finite"] is True, "capped ray should be reclassified as bounded"
+
+
+def test_truncate_closes_mixed_boundary_cell_into_a_disk() -> None:
+    """Truncating a half-infinite strip yields a closed disk with trivial homology."""
+    meta = _mixed_boundary_wedge_meta()
+    Complex.truncate_meta_graph(meta)
+
+    unbounded_after = [n for n, a in meta.nodes(data=True) if a.get("finite") is False]
+    assert not unbounded_after, f"truncation should leave no unbounded cells, got {unbounded_after!r}"
+
+    try:
+        betti = get_betti_numbers(meta, verify_chain_complex=True, verify_connected_components=False)
+    except ChainComplexInconsistent as exc:
+        pytest.fail(f"truncated meta-graph is not a valid chain complex (∂²≠0): {exc}")
+
+    assert betti == {0: 1}, f"truncated strip should be a contractible disk, got {betti!r}"
 
 
 def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:

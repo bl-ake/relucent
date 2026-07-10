@@ -149,11 +149,12 @@ bits. Bounded cells and rays use `[..., 1, 0]`; cells with two open ends use
 
 | Situation | Caps on this cell |
 |-----------|-------------------|
-| Has any bounded `(k−1)`-face | None (delegate to unbounded lower faces) |
-| All `(k−1)`-faces unbounded, 1-skeleton has 2 bounded 0-endpoints | None (bounded segment) |
-| All `(k−1)`-faces unbounded, 1 bounded 0-endpoint | 1 cap (ray) |
-| All `(k−1)`-faces unbounded, 0 bounded 0-endpoints | 2 caps (line) |
-| `k≥2`, all `(k−1)`-faces unbounded, no bounded lower | inherit max openness from unbounded lower faces |
+| `k≥2`, has bounded `(k−1)`-face and unbounded facets | 1 cap (single sphere-cut patch) |
+| `k≥2`, has bounded `(k−1)`-face, no unbounded facets | None |
+| `k=1`, 2 bounded 0-endpoints | None (bounded segment) |
+| `k=1`, 1 bounded 0-endpoint | 1 cap (ray) |
+| `k=1`, 0 bounded 0-endpoints | 2 caps (line) |
+| `k≥2`, all `(k−1)`-faces unbounded | inherit max openness from unbounded lower faces |
 
 **Phase C — cap cells:** for each needed cap, `cap_tag = face_tag(parent_ss, truncation_bit_index)`.
 If absent, add an ordinary byte-tagged node at dimension `k−1` with the appropriate
@@ -167,8 +168,9 @@ zeroed truncation bit. No `("trunc", …)` tuple nodes.
 **0-cells are never duplicated**, even if marked unbounded.
 
 The idea is to model caps at infinity so homology of the truncated complex reflects the
-topology of unbounded regions. Mixed-boundary `k`-cells (some bounded facets) do not get
-their own cell-global caps; infinity is handled on unbounded lower faces only.
+topology of unbounded regions. Each unbounded `k`-cell gets its own sphere-cut
+`(k−1)`-cell; if it has a bounded facet the cut is a single connected patch (one cap),
+built from the caps of its unbounded facets.
 
 ---
 

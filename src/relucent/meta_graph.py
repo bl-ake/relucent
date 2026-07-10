@@ -135,8 +135,8 @@ def _open_cap_count(
 ) -> int:
     """How many truncation caps this unbounded cell needs (0, 1, or 2).
 
-    Cells with any bounded codimension-one face get no caps; infinity is delegated
-    to caps on unbounded lower faces.
+    Cap is a functor on unbounded cells: each unbounded k-cell maps to a (k-1)-cell
+      sphere-cut, and face incidence is preserved (a cap of a facet is a facet of the cap).
     """
     if orig in cache:
         return cache[orig]
@@ -145,30 +145,38 @@ def _open_cap_count(
         cache[orig] = 0
         return 0
     km1_dim = k - 1
+
+    if k == 1:
+        zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
+        bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
+        n = 0 if bounded_zeros >= 2 else (1 if bounded_zeros == 1 else 2)
+        cache[orig] = n
+        return n
+
     bounded_lower = sum(
         1
         for _, v, _ in meta.out_edges(orig, data=True)
         if int(meta.nodes[v].get("dim", -1)) == km1_dim and meta.nodes[v].get("finite") is True
     )
+    unbounded_facets = [
+        v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == km1_dim and v in unbounded
+    ]
     if bounded_lower > 0:
-        cache[orig] = 0
-        return 0
-    if k == 1:
-        zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
-        bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
-        if bounded_zeros >= 2:
-            n = 0
-        elif bounded_zeros == 1:
-            n = 1
-        else:
-            n = 2
-    else:
-        lower_open = [
-            _open_cap_count(v, meta, unbounded, cache)
-            for _, v, _ in meta.out_edges(orig, data=True)
-            if int(meta.nodes[v].get("dim", -1)) == km1_dim and v in unbounded
-        ]
-        n = max(lower_open) if lower_open else 1
+        # Bounded facet anchors the sphere-cut to one connected patch.
+        n = 1 if unbounded_facets else 0
+        cache[orig] = n
+        return n
+
+    # Unanchored (k>=2)-cell: propagate sidedness from unbounded facets.
+    lower_open = [_open_cap_count(v, meta, unbounded, cache) for v in unbounded_facets]
+    if lower_open and min(lower_open) != max(lower_open):
+        raise NonGenericArrangementError(
+            f"unbounded {k}-cell {orig!r} has no bounded (k-1)-facet, but its unbounded "
+            + f"facets disagree on truncation sidedness ({lower_open}); the recession cone "
+            + "is likely a degenerate linear subspace (e.g. parallel bent hyperplanes with "
+            + "no anchor). Generic networks should not hit this branch."
+        )
+    n = max(lower_open) if lower_open else 1
     cache[orig] = n
     return n
 
@@ -189,7 +197,7 @@ def _cap_sign_sequence(parent_ss: np.ndarray, *, cap_index: int, n_caps: int) ->
     return ss
 
 
-def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any]) -> None:
+def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any], *, exclude_truncation_bits: bool = False) -> None:
     """Refresh ``crossings`` / ``shis`` on every node from cubical flip-neighbor rules."""
     nodes_by_dim = _meta_nodes_by_dim(meta)
     for dim, nodes in nodes_by_dim.items():
@@ -206,21 +214,31 @@ def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any]) -> None:
                 continue
             ss_arr = np.asarray(ss, dtype=np.int8)
             attrs["crossings"] = list(ss_nonzero_indices(ss_arr))
-            shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
+            trunc_shis: frozenset[int] = frozenset()
+            if exclude_truncation_bits:
+                t1, t2 = _truncation_bit_indices(ss_arr)
+                trunc_shis = frozenset({t1, t2})
+            shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags, exclude_shis=trunc_shis)
             poly = attrs.get("poly")
             if int(dim) == 1 and poly is not None and poly.halfspaces is not None:
                 shis = [s for s in shis if poly.is_shi_face_feasible(int(s))]
-            if int(dim) == 1 and attrs.get("finite") is True and len(shis) < 2:
+            edge_shis: list[int] = []
+            if int(dim) == 1:
                 edge_shis = sorted(
                     {
                         int(shi)
                         for _u, v, _k, ed in meta.out_edges(n, keys=True, data=True)
                         if int(meta.nodes[v].get("dim", -1)) == 0
                         if (shi := ed.get("shi")) is not None
+                        if int(shi) not in trunc_shis
                     }
                 )
-                if len(edge_shis) >= 2:
+            if int(dim) == 1 and attrs.get("finite") is True and len(shis) < 2:
+                if len(edge_shis) >= 2 or (exclude_truncation_bits and edge_shis):
                     shis = edge_shis
+            elif exclude_truncation_bits and int(dim) == 1 and len(shis) > 2:
+                # Prefer combinatorial 0-face incidences over excess cubical flips.
+                shis = edge_shis if 1 <= len(edge_shis) <= 2 else shis[:2]
             attrs["shis"] = shis
 
 
@@ -362,8 +380,8 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
 
     rebuild_meta_graph_face_edges(meta)
     _reclassify_meta_finite(meta)
-    _sync_meta_node_shis(meta)
-    verify_meta_graph_one_cells(meta)
+    _sync_meta_node_shis(meta, exclude_truncation_bits=True)
+    verify_meta_graph_one_cells(meta, truncated=True)
 
 
 def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
@@ -408,13 +426,15 @@ def _meta_one_cell_zero_face_count(meta: nx.MultiDiGraph[Any], node: Any) -> int
     return sum(1 for _u, v, _ in meta.out_edges(node, data=True) if int(meta.nodes[v].get("dim", -1)) == 0)
 
 
-def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any]) -> None:
+def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any], *, truncated: bool = False) -> None:
     """Require sound 1-cell flip-SHI counts and boundedness labels.
 
       Each 1-cell has **0–2** flip-SHI neighbors and **0–2** combinatorial 0-face endpoints.
       Bounded segments (``finite is True``) close at both ends; fewer than two flip SHIs
-    implies ``finite is False``.
+    implies ``finite is False``. After truncation, a capped segment may have no network
+    flip SHIs when its only crossings are truncation bits.
     """
+    min_bounded_shis = 0 if truncated else 2
     for node, attrs in meta.nodes(data=True):
         if int(attrs.get("dim", -1)) != 1:
             continue
@@ -429,9 +449,9 @@ def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any]) -> None:
         if finite is None:
             continue
         if finite is True:
-            if n_shis < 2 or n_zero < 2:
+            if n_shis < min_bounded_shis or n_zero < 2:
                 raise CubicalConsistencyError(
-                    f"Bounded 1-cell {node!r} must have two flip SHIs and two 0-faces; "
+                    f"Bounded 1-cell {node!r} must have at least {min_bounded_shis} flip SHI(s) and two 0-faces; "
                     + f"got shis={shis!r}, n_zero={n_zero}."
                 )
             continue

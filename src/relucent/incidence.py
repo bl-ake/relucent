@@ -117,12 +117,20 @@ def dual_graph_edge_top_dim(*, cell_top_dim: int, ambient_dim: int) -> int:
     return cell_top_dim if cell_top_dim >= 2 else 2
 
 
-def cubical_cell_shis(ss: np.ndarray, *, neighbor_tags: set[bytes]) -> list[int]:
+def cubical_cell_shis(
+    ss: np.ndarray,
+    *,
+    neighbor_tags: set[bytes],
+    exclude_shis: frozenset[int] | set[int] | None = None,
+) -> list[int]:
     """Flip-neighbor SHIs: nonzero sign-sequence crossings with a same-dimension neighbor."""
     row = np.asarray(ss, dtype=np.int8).ravel()
+    skip = exclude_shis or frozenset()
     kept: list[int] = []
     for shi in ss_nonzero_indices(np.asarray(ss)):
         shi_i = int(shi)
+        if shi_i in skip:
+            continue
         if shi_i >= row.shape[0] or row[shi_i] == 0:
             continue
         if encode_ss(flip_ss_at_shi(row, shi_i)) in neighbor_tags:
