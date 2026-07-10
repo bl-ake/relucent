@@ -137,24 +137,38 @@ only, not used for boundedness or incidence.
 
 **Entry point:** [`truncate_meta_graph()`](../src/relucent/meta_graph.py)
 
-This runs automatically when `compactify=False` (the default).
+This runs automatically when `compactify=False` (the default). Truncation is a single
+incidence pipeline: extend sign sequences, materialize cap cells, then rebuild all face
+edges with the same rule as [`get_meta_graph()`](complex.py).
 
-Unbounded cells (`finite is False`) get a duplicate node "at infinity":
+**Phase A — extend SS:** every node’s sign sequence gains **two** trailing truncation
+bits. Bounded cells and rays use `[..., 1, 0]`; cells with two open ends use
+`[..., 1, 1]`. Node keys are relabeled to `encode_ss(extended_ss)`.
 
-- Every node's sign sequence gains an extra trailing bit set to `1` (inside the
-  truncation region).
-- Each unbounded cell `n` with `k > 0` gets a duplicate `("trunc", n)` at dimension
-  `k−1`, with the trailing bit set to `0` (on the cut).
-- An edge `n → ("trunc", n)` is added with `shi = TRUNCATION_META_SHI` (−1).
-- Face edges among unbounded cells are mirrored on their duplicates.
+**Phase B — openness:** bottom-up from codimension-one face structure:
+
+| Situation | Caps on this cell |
+|-----------|-------------------|
+| Has any bounded `(k−1)`-face | None (delegate to unbounded lower faces) |
+| All `(k−1)`-faces unbounded, 1-skeleton has 2 bounded 0-endpoints | None (bounded segment) |
+| All `(k−1)`-faces unbounded, 1 bounded 0-endpoint | 1 cap (ray) |
+| All `(k−1)`-faces unbounded, 0 bounded 0-endpoints | 2 caps (line) |
+| `k≥2`, all `(k−1)`-faces unbounded, no bounded lower | inherit max openness from unbounded lower faces |
+
+**Phase C — cap cells:** for each needed cap, `cap_tag = face_tag(parent_ss, truncation_bit_index)`.
+If absent, add an ordinary byte-tagged node at dimension `k−1` with the appropriate
+zeroed truncation bit. No `("trunc", …)` tuple nodes.
+
+**Phase D — incidence:** clear face edges and rebuild via
+[`collect_meta_face_edges()`](../src/relucent/incidence.py) /
+[`assemble_face_edges_by_dim()`](../src/relucent/incidence.py), reclassify `finite`, refresh
+`crossings` / `shis`, and run [`verify_meta_graph_one_cells()`](../src/relucent/meta_graph.py).
 
 **0-cells are never duplicated**, even if marked unbounded.
 
-The idea is to model the link at infinity so homology of the truncated complex
-reflects the topology of unbounded regions.
-
-Truncated 1-cells may have fewer than two combinatorial 0-endpoints until a
-proper truncation model lands (shared point at infinity or face subdivision).
+The idea is to model caps at infinity so homology of the truncated complex reflects the
+topology of unbounded regions. Mixed-boundary `k`-cells (some bounded facets) do not get
+their own cell-global caps; infinity is handled on unbounded lower faces only.
 
 ---
 
@@ -241,7 +255,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Face edges | None outgoing | Zero each `ss[i] ≠ 0` → connect to 0-faces |
 | Boundedness | Always bounded | Two or more distinct 0-faces in face edges → bounded segment; one → ray |
 | Dual graph (when top dim = 1) | N/A | Pair by shared 0-face tag |
-| Truncation | Not duplicated | Duplicated at infinity if unbounded |
+| Truncation | Not duplicated | Caps at infinity on unbounded cells (byte tags) |
 | One-point compactify | Synthetic `("infty",)` node added | Open ends get edge to ∞ |
 
 ---

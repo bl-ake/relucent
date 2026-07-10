@@ -29,6 +29,7 @@ from relucent.errors import NonGenericArrangementError as NonGenericArrangementE
 
 # Re-export incidence primitives (previously defined here)
 from relucent.incidence import META_FACE_PARALLEL_MIN_CELLS as META_FACE_PARALLEL_MIN_CELLS
+from relucent.incidence import assemble_face_edges_by_dim as assemble_face_edges_by_dim
 from relucent.incidence import classify_finite_ascending as classify_finite_ascending
 from relucent.incidence import classify_finite_combinatorial as classify_finite_combinatorial
 from relucent.incidence import classify_finite_lp_fallback as classify_finite_lp_fallback
@@ -53,6 +54,7 @@ from relucent.incidence import verify_flip_shi_symmetry as verify_top_cell_flip_
 from relucent.incidence import verify_shi_flip_neighbors as verify_shi_flip_neighbors
 from relucent.incidence import verify_shis_from_dual_graph as verify_shis_from_dual_graph
 from relucent.poly import Polyhedron
+from relucent.utils import encode_ss
 
 # ``shi`` edge attribute for truncation incidences (not a network SHI).
 TRUNCATION_META_SHI: int = -1
@@ -71,6 +73,7 @@ __all__ = [
     "classify_finite_ascending",
     "classify_lazy_face_polys",
     "classify_one_cells_finite_from_face_edges",
+    "assemble_face_edges_by_dim",
     "collect_meta_face_edges",
     "cubical_cell_shis",
     "dual_edges_top_dim",
@@ -86,6 +89,7 @@ __all__ = [
     "ss_nonzero_indices",
     "sync_shis_from_dual_graph",
     "truncate_meta_graph",
+    "rebuild_meta_graph_face_edges",
     "verify_contracted_shis",
     "verify_dual_graph_cubical",
     "verify_meta_graph_incidence",
@@ -103,89 +107,233 @@ def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
     return meta.subgraph(finite).copy()
 
 
-def _truncate_n_copies(orig: Any, meta: nx.MultiDiGraph[Any], unbounded: set[Any], _cache: dict[Any, int]) -> int:
-    """Number of bilateral truncation copies needed for an unbounded cell.
+def _meta_nodes_by_dim(meta: nx.MultiDiGraph[Any]) -> dict[int, list[Any]]:
+    nodes_by_dim: dict[int, list[Any]] = {}
+    for n, attrs in meta.nodes(data=True):
+        nodes_by_dim.setdefault(int(attrs.get("dim", -1)), []).append(n)
+    return nodes_by_dim
 
-    A cell needs 2 copies when it has no existing (dim-1)-face out-edges within the
-    unbounded subgraph -- meaning both ends of the cell exit the complex. This is
-    determined bottom-up (1-cells first, then 2-cells, etc.) so that higher-dimensional
-    cells can inherit from their boundaries.
+
+def _truncation_bit_indices(ss: np.ndarray) -> tuple[int, int]:
+    """Flattened indices of the two trailing truncation coordinates."""
+    flat = np.asarray(ss, dtype=np.int8).reshape(-1)
+    return int(flat.size - 2), int(flat.size - 1)
+
+
+def _ss_with_truncation_bits(ss: np.ndarray, t1: int, t2: int) -> np.ndarray:
+    """Append two truncation halfspace bits to a sign sequence."""
+    a = np.asarray(ss)
+    dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
+    return np.hstack([a, np.full((a.shape[0], 2), [t1, t2], dtype=dt)])
+
+
+def _open_cap_count(
+    orig: Any,
+    meta: nx.MultiDiGraph[Any],
+    unbounded: set[Any],
+    cache: dict[Any, int],
+) -> int:
+    """How many truncation caps this unbounded cell needs (0, 1, or 2).
+
+    Cells with any bounded codimension-one face get no caps; infinity is delegated
+    to caps on unbounded lower faces.
     """
-    if orig in _cache:
-        return _cache[orig]
+    if orig in cache:
+        return cache[orig]
     k = int(meta.nodes[orig].get("dim", -1))
     if k <= 0:
-        _cache[orig] = 1
-        return 1
+        cache[orig] = 0
+        return 0
     km1_dim = k - 1
-    # Count existing (k-1)-face out-edges to BOUNDED cells (not in unbounded set).
     bounded_lower = sum(
-        1 for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == km1_dim and v not in unbounded
+        1
+        for _, v, _ in meta.out_edges(orig, data=True)
+        if int(meta.nodes[v].get("dim", -1)) == km1_dim and meta.nodes[v].get("finite") is True
     )
+    if bounded_lower > 0:
+        cache[orig] = 0
+        return 0
     if k == 1:
-        # For 1-cells, count all existing 0-face out-edges (bounded + unbounded).
-        all_lower = sum(1 for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0)
-        # Need 2 truncation copies iff the 1-cell has no original 0-face endpoints at all
-        # (i.e., it's an infinite line rather than a ray or segment).
-        n = 2 if all_lower == 0 else 1
+        zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
+        bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
+        if bounded_zeros >= 2:
+            n = 0
+        elif bounded_zeros == 1:
+            n = 1
+        else:
+            n = 2
     else:
-        # Inherit from the maximum across unbounded (k-1)-face boundaries.
-        ub_lower_copies = [
-            _truncate_n_copies(v, meta, unbounded, _cache)
+        lower_open = [
+            _open_cap_count(v, meta, unbounded, cache)
             for _, v, _ in meta.out_edges(orig, data=True)
             if int(meta.nodes[v].get("dim", -1)) == km1_dim and v in unbounded
         ]
-        n = max(ub_lower_copies) if ub_lower_copies else 1
-        if bounded_lower > 0:
-            # Has at least one bounded face -- only one open end from the truncation side.
-            n = min(n, 1)
-    _cache[orig] = n
+        n = max(lower_open) if lower_open else 1
+    cache[orig] = n
     return n
+
+
+def _cap_sign_sequence(parent_ss: np.ndarray, *, cap_index: int, n_caps: int) -> np.ndarray:
+    """Sign sequence of a truncation cap (zeroing the appropriate truncation bit)."""
+    ss = np.asarray(parent_ss, dtype=np.int8).copy()
+    if n_caps >= 2:
+        if cap_index == 0:
+            ss[..., -2] = 0
+            ss[..., -1] = 1
+        else:
+            ss[..., -2] = 1
+            ss[..., -1] = 0
+    else:
+        ss[..., -2] = 0
+        ss[..., -1] = 0
+    return ss
+
+
+def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any]) -> None:
+    """Refresh ``crossings`` / ``shis`` on every node from cubical flip-neighbor rules."""
+    nodes_by_dim = _meta_nodes_by_dim(meta)
+    for dim, nodes in nodes_by_dim.items():
+        neighbor_tags: set[bytes] = set()
+        for n in nodes:
+            ss = meta.nodes[n].get("ss")
+            if ss is not None:
+                neighbor_tags.add(encode_ss(np.asarray(ss, dtype=np.int8)))
+
+        for n in nodes:
+            attrs = meta.nodes[n]
+            ss = attrs.get("ss")
+            if ss is None:
+                continue
+            ss_arr = np.asarray(ss, dtype=np.int8)
+            attrs["crossings"] = list(ss_nonzero_indices(ss_arr))
+            shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
+            poly = attrs.get("poly")
+            if int(dim) == 1 and poly is not None and poly.halfspaces is not None:
+                shis = [s for s in shis if poly.is_shi_face_feasible(int(s))]
+            if int(dim) == 1 and attrs.get("finite") is True and len(shis) < 2:
+                edge_shis = sorted(
+                    {
+                        int(shi)
+                        for _u, v, _k, ed in meta.out_edges(n, keys=True, data=True)
+                        if int(meta.nodes[v].get("dim", -1)) == 0
+                        if (shi := ed.get("shi")) is not None
+                    }
+                )
+                if len(edge_shis) >= 2:
+                    shis = edge_shis
+            attrs["shis"] = shis
+
+
+def _reclassify_meta_finite(meta: nx.MultiDiGraph[Any]) -> None:
+    """Refresh ``finite`` on meta nodes from combinatorial face-edge incidence."""
+    nodes_by_dim = _meta_nodes_by_dim(meta)
+
+    for n, attrs in meta.nodes(data=True):
+        if int(attrs.get("dim", -1)) != 1:
+            continue
+        n_zero = _meta_one_cell_zero_face_count(meta, n)
+        if n_zero == 0:
+            attrs["finite"] = None
+        elif n_zero >= 2:
+            attrs["finite"] = True
+        else:
+            attrs["finite"] = False
+
+    max_dim = max(nodes_by_dim.keys(), default=0)
+    for k in range(2, max_dim + 1):
+        for n in nodes_by_dim.get(k, []):
+            face_tags = {v for _, v, _ in meta.out_edges(n, data=True) if int(meta.nodes[v].get("dim", -1)) == k - 1}
+            if not face_tags:
+                continue
+            n_bounded = 0
+            n_unbounded = 0
+            n_infeasible = 0
+            unknown = False
+            for ft in face_tags:
+                fv = meta.nodes[ft].get("finite")
+                if fv is None:
+                    n_infeasible += 1
+                elif fv is False:
+                    n_unbounded += 1
+                elif fv is True:
+                    n_bounded += 1
+                else:
+                    unknown = True
+            if n_unbounded > 0:
+                meta.nodes[n]["finite"] = False
+            elif n_bounded > 0 and not unknown:
+                meta.nodes[n]["finite"] = True
+            elif n_infeasible > 0 and n_bounded == 0 and n_unbounded == 0 and not unknown:
+                meta.nodes[n]["finite"] = None
+
+
+def rebuild_meta_graph_face_edges(meta: nx.MultiDiGraph[Any]) -> None:
+    """Replace all face edges using :func:`~relucent.incidence.collect_meta_face_edges`."""
+    nodes_by_dim = _meta_nodes_by_dim(meta)
+    valid_tags = set(meta.nodes)
+    cells_by_dim: dict[int, list[tuple[Any, np.ndarray, tuple[int, ...]]]] = {}
+    for dim, nodes in nodes_by_dim.items():
+        if dim <= 0:
+            continue
+        cells: list[tuple[Any, np.ndarray, tuple[int, ...]]] = []
+        for n in nodes:
+            ss = meta.nodes[n].get("ss")
+            if ss is None:
+                continue
+            ss_arr = np.asarray(ss, dtype=np.int8)
+            cells.append((n, ss_arr, ss_nonzero_indices(ss_arr)))
+        if cells:
+            cells_by_dim[int(dim)] = cells
+
+    edges_by_dim = assemble_face_edges_by_dim(cells_by_dim, valid_tags)
+    meta.remove_edges_from(list(meta.edges()))
+    for edges in edges_by_dim.values():
+        meta.add_edges_from((u, v, {"shi": int(shi)}) for u, v, shi in edges)
+
+
+def _retag_meta_nodes_from_ss(meta: nx.MultiDiGraph[Any]) -> dict[Any, Any]:
+    """Relabel nodes so keys match :func:`~relucent.utils.encode_ss` of their ``ss``."""
+    tag_remap: dict[Any, Any] = {}
+    for n, attrs in meta.nodes(data=True):
+        ss = attrs.get("ss")
+        if ss is None:
+            continue
+        new_tag = encode_ss(np.asarray(ss, dtype=np.int8))
+        if new_tag != n:
+            tag_remap[n] = new_tag
+    if tag_remap:
+        nx.relabel_nodes(meta, tag_remap, copy=False)
+    return tag_remap
 
 
 def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     """Augment ``meta`` in place with combinatorial truncation at infinity.
 
-    Equivalent to intersecting the complex with a large enough bounding box: bounded
-    cells are unaffected, each unbounded cell gains one or two (dim-1)-dimensional
-    truncation faces.
-
-    Every node's ``ss`` gains a trailing ``1`` (strictly inside the truncation halfspace).
-    For each unbounded cell ``n``, one or two truncation duplicates are created:
-
-    - **One copy** (``("trunc", n)``): when ``n`` has at least one existing (dim-1)-face
-      boundary -- the cell is a *ray* with one open end.
-    - **Two copies** (``("trunc", n)`` and ``("trunc2", n)``): when ``n`` has no existing
-      (dim-1)-face boundary -- the cell is an *infinite line/plane* with two open ends.
-      The second copy closes the other end, giving the cell exactly two boundary faces.
-
-    Each duplicate has trailing ``0`` on ``ss``, dimension decremented by one, and is
-    marked ``finite=True``. Face edges among duplicates mirror the induced subgraph on
-    unbounded cells independently for each truncation layer.
+    Extends every sign sequence with two truncation bits, materializes cap cells as
+    ordinary byte-tagged nodes via :func:`~relucent.incidence.face_tag`, then rebuilds
+    all face edges through :func:`collect_meta_face_edges`.
     """
     if meta.number_of_nodes() == 0:
         return
 
     unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
-    ub_faces = meta.subgraph(unbounded).copy()
 
-    def _ss_with_extra_bit(ss: np.ndarray, bit: int) -> np.ndarray:
-        a = np.asarray(ss)
-        dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
-        return np.hstack([a, np.full((a.shape[0], 1), bit, dtype=dt)])
-
-    for attrs in meta.nodes.values():
-        if (ss0 := attrs.get("ss")) is not None:
-            attrs["ss"] = _ss_with_extra_bit(np.asarray(ss0), 1)
-
-    # Compute number of truncation copies bottom-up (1-cells first, then higher dims).
-    n_copies_cache: dict[Any, int] = {}
+    cap_count_cache: dict[Any, int] = {}
     for orig in sorted(unbounded, key=lambda n: int(meta.nodes[n].get("dim", -1))):
-        _truncate_n_copies(orig, meta, unbounded, n_copies_cache)
+        _open_cap_count(orig, meta, unbounded, cap_count_cache)
 
-    # Create truncation duplicates (one or two per unbounded cell).
-    layer0: set[Any] = set()
-    layer1: set[Any] = set()
+    for n, attrs in meta.nodes(data=True):
+        ss0 = attrs.get("ss")
+        if ss0 is None:
+            continue
+        n_caps = cap_count_cache.get(n, 0) if n in unbounded else 0
+        t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
+        attrs["ss"] = _ss_with_truncation_bits(np.asarray(ss0), t1, t2)
+
+    tag_remap = _retag_meta_nodes_from_ss(meta)
+    if tag_remap:
+        cap_count_cache = {tag_remap.get(k, k): v for k, v in cap_count_cache.items()}
+        unbounded = {tag_remap.get(n, n) for n in unbounded}
 
     for orig in unbounded:
         oa = meta.nodes[orig]
@@ -193,34 +341,29 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
         ss_in = oa.get("ss")
         if k <= 0 or ss_in is None:
             continue
-        ss_on_cut = np.asarray(ss_in).copy()
-        ss_on_cut[..., -1] = 0
-        node_attrs = {
-            "poly": oa.get("poly"),
-            "dim": k - 1,
-            "ss": ss_on_cut,
-            "finite": True,
-            "shis": list(oa.get("shis", [])),
-            "truncation_duplicate": True,
-        }
-        dup0 = ("trunc", orig)
-        layer0.add(dup0)
-        meta.add_node(dup0, **node_attrs)
-        meta.add_edge(orig, dup0, shi=TRUNCATION_META_SHI)
-        if n_copies_cache.get(orig, 1) >= 2:
-            dup1 = ("trunc2", orig)
-            layer1.add(dup1)
-            meta.add_node(dup1, **node_attrs)
-            meta.add_edge(orig, dup1, shi=TRUNCATION_META_SHI)
+        n_caps = cap_count_cache.get(orig, 0)
+        if n_caps <= 0:
+            continue
+        t1_shi, t2_shi = _truncation_bit_indices(np.asarray(ss_in))
+        cap_bits = [t1_shi] if n_caps == 1 else [t1_shi, t2_shi]
+        for cap_index, bit_shi in enumerate(cap_bits):
+            cap_ss = _cap_sign_sequence(np.asarray(ss_in), cap_index=cap_index, n_caps=n_caps)
+            cap_tag = face_tag(np.asarray(ss_in), int(bit_shi))
+            if cap_tag in meta.nodes:
+                continue
+            meta.add_node(
+                cap_tag,
+                poly=oa.get("poly"),
+                dim=k - 1,
+                ss=cap_ss,
+                finite=True,
+                shis=[],
+            )
 
-    # Mirror ub_faces edges into each truncation layer independently.
-    for u, v, ed in ub_faces.edges(data=True):
-        tu0, tv0 = ("trunc", u), ("trunc", v)
-        if tu0 in layer0 and tv0 in layer0:
-            meta.add_edge(tu0, tv0, **dict(ed))
-        tu1, tv1 = ("trunc2", u), ("trunc2", v)
-        if tu1 in layer1 and tv1 in layer1:
-            meta.add_edge(tu1, tv1, **dict(ed))
+    rebuild_meta_graph_face_edges(meta)
+    _reclassify_meta_finite(meta)
+    _sync_meta_node_shis(meta)
+    verify_meta_graph_one_cells(meta)
 
 
 def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:

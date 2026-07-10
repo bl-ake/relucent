@@ -9,10 +9,10 @@ import torch
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent import meta_graph as mg
 from relucent.calculations import get_shis
-from relucent.complex import TRUNCATION_META_SHI
 from relucent.exploration import explore_for_topology
+from relucent.incidence import face_tag
 from relucent.topology import get_betti_numbers
-from relucent.utils import get_env
+from relucent.utils import encode_ss, get_env
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -77,15 +77,18 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
         assert isinstance(attrs["shis"], list)
 
 
-def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
-    """Boundary complex of a 1-neuron network: ``truncate`` augments ss and duplicates unbounded cells.
+def _expected_cap_tags(ss_ext: np.ndarray, n_caps: int) -> list[bytes]:
+    """Byte tags of truncation cap cells for an extended sign sequence."""
+    t1_shi, t2_shi = mg._truncation_bit_indices(ss_ext)
+    cap_bits = [t1_shi] if n_caps == 1 else [t1_shi, t2_shi]
+    return [face_tag(ss_ext, int(bit_shi)) for bit_shi in cap_bits[:n_caps]]
 
-    The boundary cell (the ReLU hyperplane x1=0 in R^2) is a 1-D line, which is
-    geometrically unbounded.  ``truncate=True`` therefore adds a ``("trunc", tag)``
-    duplicate for it, exactly as it does for unbounded cells in the full complex.
-    We check that:
-    - every non-truncation node has its sign sequence extended with a trailing 1,
-    - every positive-dim unbounded cell gets a ``("trunc", tag)`` copy with trailing 0.
+
+def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
+    """Boundary complex of a 1-neuron network: truncation extends ss and materializes cap cells.
+
+    The boundary cell (the ReLU hyperplane x1=0 in R^2) is a 1-D line with no combinatorial
+    0-faces, so bilateral truncation adds two cap 0-cells as ordinary byte-tagged nodes.
     """
     set_seeds(seeded)
     import torch.nn as nn
@@ -113,25 +116,38 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
     meta_tr = meta_plain.copy()
     Complex.truncate_meta_graph(meta_tr)
 
-    # Every original (non-truncation) node has its sign sequence extended with a trailing 1.
-    for n in meta_plain.nodes():
-        assert n in meta_tr.nodes(), f"original node {n!r} missing from truncated graph"
-        ss0 = np.asarray(meta_plain.nodes[n]["ss"])
-        sst = np.asarray(meta_tr.nodes[n]["ss"])
-        assert sst.shape == (ss0.shape[0], ss0.shape[1] + 1)
-        assert int(sst.flat[-1]) == 1
+    assert not any(isinstance(n, tuple) for n in meta_tr.nodes()), "truncation uses byte tags only"
 
-    # Every positive-dim unbounded cell gets a truncation duplicate with trailing 0.
+    # Every original cell is retained under its extended tag.
+    for n, attrs in meta_plain.nodes(data=True):
+        ss0 = np.asarray(attrs["ss"])
+        n_caps = 2 if attrs.get("finite") is False and int(attrs.get("dim", -1)) == 1 else 0
+        t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
+        ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
+        ext_tag = encode_ss(np.asarray(ss_ext, dtype=np.int8))
+        assert ext_tag in meta_tr.nodes(), f"extended node for {n!r} missing from truncated graph"
+        sst = np.asarray(meta_tr.nodes[ext_tag]["ss"])
+        assert sst.shape == (ss0.shape[0], ss0.shape[1] + 2)
+        assert int(sst.flat[-2]) == 1
+
     unbounded = {n for n, a in meta_plain.nodes(data=True) if a.get("finite") is False and int(a.get("dim", -1)) > 0}
+    cache: dict[Any, int] = {}
     for n in unbounded:
-        dup = ("trunc", n)
-        assert dup in meta_tr.nodes(), f"expected truncation duplicate {dup!r} for unbounded node {n!r}"
-        ssd = np.asarray(meta_tr.nodes[dup]["ss"])
-        assert int(ssd.flat[-1]) == 0
+        _ = mg._open_cap_count(n, meta_plain, unbounded, cache)
+    for n in unbounded:
+        ss0 = np.asarray(meta_plain.nodes[n]["ss"])
+        n_caps = cache[n]
+        t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
+        ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
+        for cap_index, cap_tag in enumerate(_expected_cap_tags(ss_ext, n_caps)):
+            assert cap_tag in meta_tr.nodes(), f"expected cap {cap_tag!r} for unbounded node {n!r}"
+            assert int(meta_tr.nodes[cap_tag]["dim"]) == int(meta_plain.nodes[n]["dim"]) - 1
+            expected_ss = mg._cap_sign_sequence(ss_ext, cap_index=cap_index, n_caps=n_caps)
+            assert np.array_equal(np.asarray(meta_tr.nodes[cap_tag]["ss"]), expected_ss)
 
 
 def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
-    """Half-plane activation regions: duplicates mirror the unbounded induced subgraph."""
+    """Half-plane activation regions: caps at infinity and combinatorial face edges."""
     set_seeds(seeded)
     import torch.nn as nn
 
@@ -156,44 +172,50 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     meta_tr = meta_plain.copy()
     Complex.truncate_meta_graph(meta_tr)
 
+    assert not any(isinstance(n, tuple) for n in meta_tr.nodes()), "truncation uses byte tags only"
+
     ub = {n for n, a in meta_plain.nodes(data=True) if a.get("finite", None) is False}
     assert ub, "expected unbounded meta nodes in this construction"
 
-    for n in meta_tr.nodes():
-        if isinstance(n, tuple):
-            continue
-        sst = np.asarray(meta_tr.nodes[n]["ss"])
-        assert int(sst.flat[-1]) == 1
+    for n, attrs in meta_plain.nodes(data=True):
+        ss0 = np.asarray(attrs["ss"])
+        n_caps = mg._open_cap_count(n, meta_plain, ub, {}) if n in ub and int(attrs.get("dim", -1)) > 0 else 0
+        t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
+        ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
+        ext_tag = encode_ss(np.asarray(ss_ext, dtype=np.int8))
+        assert ext_tag in meta_tr.nodes
+        assert int(np.asarray(meta_tr.nodes[ext_tag]["ss"]).flat[-2]) == 1
 
     for n in ub:
         if int(meta_plain.nodes[n]["dim"]) <= 0:
             continue
-        dk = ("trunc", n)
-        assert dk in meta_tr.nodes
-        assert int(meta_tr.nodes[dk]["dim"]) == int(meta_plain.nodes[n]["dim"]) - 1
-        ssd = np.asarray(meta_tr.nodes[dk]["ss"])
-        assert int(ssd.flat[-1]) == 0
-        assert meta_tr.has_edge(n, dk)
-        trunc_shis = [ed.get("shi") for _u, _v, _k, ed in meta_tr.out_edges(n, keys=True, data=True) if _v == dk]
-        assert TRUNCATION_META_SHI in trunc_shis
+        cache: dict[Any, int] = {}
+        n_caps = mg._open_cap_count(n, meta_plain, ub, cache)
+        if n_caps <= 0:
+            continue
+        ss0 = np.asarray(meta_plain.nodes[n]["ss"])
+        t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
+        ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
+        ext_tag = encode_ss(np.asarray(ss_ext, dtype=np.int8))
+        for cap_tag in _expected_cap_tags(ss_ext, n_caps):
+            assert cap_tag in meta_tr.nodes
+            assert meta_tr.has_edge(ext_tag, cap_tag)
+            trunc_shis = [
+                shi
+                for _u, v, _k, ed in meta_tr.out_edges(ext_tag, keys=True, data=True)
+                if v == cap_tag
+                if (shi := ed.get("shi")) is not None
+            ]
+            assert trunc_shis, f"expected truncation incidence from {ext_tag!r} to {cap_tag!r}"
+            assert all(int(s) >= 0 for s in trunc_shis)
 
     for n, a in meta_tr.nodes(data=True):
         if int(a.get("dim", -1)) != 1:
             continue
         zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
-        # Original 1-cells (rays and infinite lines) always get 2 endpoints after bilateral
-        # truncation. Truncation duplicates of higher-dim cells may have only 1 endpoint when
-        # the parent 2D cell has a single boundary 1-cell and no bounded counterpart.
         assert 1 <= len(zero_faces) <= 2, (
             f"1-cell {n!r} should have 1 or 2 0-face endpoints after truncation, got {zero_faces!r}"
         )
-
-    for u, v, d in meta_plain.edges(data=True):
-        if u in ub and v in ub:
-            tu, tv = ("trunc", u), ("trunc", v)
-            assert meta_tr.has_edge(tu, tv)
-            shis_dup = [ed.get("shi") for _u, _v, _k, ed in meta_tr.out_edges(tu, keys=True, data=True) if _v == tv]
-            assert d.get("shi") in shis_dup
 
     get_betti_numbers(meta_tr, verify_chain_complex=True)
 
@@ -223,6 +245,61 @@ def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
     meta = db.get_meta_graph(verbose=False)
     Complex.truncate_meta_graph(meta)
     get_betti_numbers(meta, verify_chain_complex=True)
+
+
+def test_truncation_delegate_caps_when_2_cell_has_bounded_face() -> None:
+    """Mixed-boundary 2-cells do not materialize cell-global cap 1-faces (34923-style rule)."""
+    import networkx as nx
+
+    meta = nx.MultiDiGraph()
+
+    def _add(ss: np.ndarray, dim: int, finite: bool | None) -> bytes:
+        tag = encode_ss(ss)
+        meta.add_node(
+            tag,
+            dim=dim,
+            ss=ss,
+            finite=finite,
+            shis=list(mg.ss_nonzero_indices(ss)),
+        )
+        return tag
+
+    ss_sheet = np.array([[1, 1, 1]], dtype=np.int8)
+    ss_bounded = np.array([[0, 1, 1]], dtype=np.int8)
+    ss_unbounded = np.array([[1, 0, 1]], dtype=np.int8)
+    sheet = _add(ss_sheet, 2, False)
+    bounded = _add(ss_bounded, 1, True)
+    unbounded = _add(ss_unbounded, 1, False)
+    z_a = _add(np.array([[0, 0, 1]], dtype=np.int8), 0, True)
+    z_b = _add(np.array([[0, 1, 0]], dtype=np.int8), 0, True)
+    z_c = _add(np.array([[0, 0, 0]], dtype=np.int8), 0, True)
+    meta.add_edges_from(
+        [
+            (sheet, bounded, {"shi": 0}),
+            (sheet, unbounded, {"shi": 1}),
+            (bounded, z_a, {"shi": 1}),
+            (bounded, z_b, {"shi": 2}),
+            (unbounded, z_c, {"shi": 0}),
+        ]
+    )
+
+    ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
+    cap_cache: dict[Any, int] = {}
+    assert mg._open_cap_count(sheet, meta, ub, cap_cache) == 0
+    assert mg._open_cap_count(unbounded, meta, ub, cap_cache) == 0
+
+    meta_tr = meta.copy()
+    Complex.truncate_meta_graph(meta_tr)
+
+    sheet_ext = encode_ss(mg._ss_with_truncation_bits(ss_sheet, 1, 0))
+    t1_shi, t2_shi = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
+    trunc_bit_shis = {t1_shi, t2_shi}
+    cap_one_faces = [
+        v
+        for _, v, ed in meta_tr.out_edges(sheet_ext, data=True)
+        if int(meta_tr.nodes[v].get("dim", -1)) == 1 and int(ed.get("shi", -1)) in trunc_bit_shis
+    ]
+    assert cap_one_faces == [], f"expected no truncation-bit cap 1-faces on mixed-boundary 2-cell, got {cap_one_faces!r}"
 
 
 def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:

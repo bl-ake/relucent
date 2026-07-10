@@ -16,10 +16,12 @@ import pytest
 import torch
 import torch.nn as nn
 
+import relucent.incidence as incidence
 import relucent.topology as topology
 from relucent import Complex, set_seeds
 from relucent.exploration import explore_for_topology
 from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
+from relucent.utils import encode_ss
 
 
 def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
@@ -50,19 +52,34 @@ def _isolated_meta(dim: int, n: int) -> nx.MultiDiGraph[Any]:
 
 
 def _make_unbounded_two_component_meta() -> nx.MultiDiGraph[Any]:
-    """kmin=1 meta-graph with two disconnected groups, all cells unbounded (for truncation)."""
+    """Meta-graph with two disconnected unbounded 2-component pieces (byte-tagged ss)."""
     meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
-    for dim, idx in [(1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1)]:
+
+    def _add(ss: np.ndarray, dim: int) -> bytes:
+        tag = encode_ss(ss)
         meta.add_node(
-            (dim, idx),
+            tag,
             dim=dim,
             finite=False,
-            ss=np.array([[1]], dtype=np.int8),
+            ss=ss,
+            shis=list(incidence.ss_nonzero_indices(ss)),
         )
-    meta.add_edge((2, 0), (1, 0), shi=0)
-    meta.add_edge((2, 0), (1, 1), shi=1)
-    meta.add_edge((2, 1), (1, 2), shi=0)
-    meta.add_edge((2, 1), (1, 3), shi=1)
+        return tag
+
+    sheet_a = _add(np.array([[1, 1, 1]], dtype=np.int8), 2)
+    ray_a0 = _add(np.array([[0, 1, 1]], dtype=np.int8), 1)
+    ray_a1 = _add(np.array([[1, 0, 1]], dtype=np.int8), 1)
+    sheet_b = _add(np.array([[1, 1, -1]], dtype=np.int8), 2)
+    ray_b0 = _add(np.array([[0, 1, -1]], dtype=np.int8), 1)
+    ray_b1 = _add(np.array([[1, 0, -1]], dtype=np.int8), 1)
+    meta.add_edges_from(
+        [
+            (sheet_a, ray_a0, {"shi": 0}),
+            (sheet_a, ray_a1, {"shi": 1}),
+            (sheet_b, ray_b0, {"shi": 0}),
+            (sheet_b, ray_b1, {"shi": 1}),
+        ]
+    )
     return meta
 
 

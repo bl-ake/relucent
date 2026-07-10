@@ -78,3 +78,32 @@ def test_meta_graph_chain_complex_regression(
         verify_chain_complex=True,
     )
     assert got == betti, f"{name}: Betti mismatch"
+
+
+@pytest.mark.parametrize(
+    ("name", "architecture", "seed", "betti"),
+    [
+        ("deep_2441_seed2", [2, 4, 4, 1], 2, {1: 1}),
+        ("deep_3431_seed51", [3, 4, 3, 1], 51, {1: 1}),
+    ],
+)
+def test_truncated_homology_chain_complex_regression(
+    name: str,
+    architecture: list[int],
+    seed: int,
+    betti: dict[int, int],
+) -> None:
+    """Truncated boundary homology (``compactify=False``) satisfies ``∂² = 0``."""
+    set_seeds(seed)
+    net = mlp(widths=architecture, add_last_relu=True, init="uniform")
+    cplx = Complex(net)
+    start = torch.randn(architecture[0], dtype=torch.float64)
+    explore_for_topology(cplx, start.numpy(), max_polys=10000, nworkers=1)
+    boundary = cplx.get_boundary_complex(cplx.n - 1)
+
+    got = boundary.get_betti_numbers(
+        compactify=False,
+        reduced=False,
+        verify_chain_complex=True,
+    )
+    assert got == betti, f"{name}: truncated Betti mismatch"

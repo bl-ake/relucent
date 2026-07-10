@@ -1203,7 +1203,7 @@ class Complex:
         self.assert_topology_ready()
         G = self.get_dual_graph(verbose=verbose, require_complete=True)
         new_complex = Complex(self.net)
-        for p1, p2, shi in G.edges(data="shi"):
+        for p1, p2, shi in tqdm(G.edges(data="shi"), desc="Contracting Complex", delay=1, disable=not verbose):
             new_ss = p1.ss_np.copy()
             new_ss[0, shi] = 0
             new_complex.add_ss(
@@ -1454,12 +1454,16 @@ class Complex:
         dim_neighbor_tags: dict[int, set[bytes]] = {int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()}
 
         # Role 2: face edges from SS crossings (see module comment).
-        edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
+        cells_by_dim: dict[int, list[tuple[bytes, np.ndarray, tuple[int, ...]]]] = {}
         for k, c_k in sorted(by_dim.items(), reverse=True):
             if int(k) <= 0:
                 continue
-            valid_face_tags = set(lookup.keys())
             cells = [(p.tag, np.asarray(p.ss_np), incidence.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
+            cells_by_dim[int(k)] = cells
+
+        edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
+        for k, cells in cells_by_dim.items():
+            valid_face_tags = set(lookup.keys())
             use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
                 logger.info(
@@ -1500,9 +1504,9 @@ class Complex:
                 else:
                     edges, extra_tags = incidence.collect_meta_face_edges(cells, valid_face_tags)
             edges_by_dim[int(k)] = (edges, extra_tags)
-            for face_tag in set(extra_tags):
-                if face_tag not in lookup and face_tag in self.tag2poly:
-                    lookup[face_tag] = self.tag2poly[face_tag]
+            for face_tag_key in set(extra_tags):
+                if face_tag_key not in lookup and face_tag_key in self.tag2poly:
+                    lookup[face_tag_key] = self.tag2poly[face_tag_key]
 
         # Drop any stale finite hints on contracted cells before combinatorial
         # classification.  Boundedness is not monotone downward (a bounded coface

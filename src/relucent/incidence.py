@@ -49,6 +49,7 @@ __all__ = [
     "propagate_infeasible_exclusion",
     "classify_lazy_face_polys",
     "classify_one_cells_finite_from_face_edges",
+    "assemble_face_edges_by_dim",
     "collect_meta_face_edges",
     "cubical_cell_shis",
     "dual_edges_top_dim",
@@ -449,6 +450,20 @@ def verify_contracted_shis(cplx: Complex) -> None:
 # ---------------------------------------------------------------------------
 # Meta-graph face-edge collection and node metadata
 # ---------------------------------------------------------------------------
+
+
+def assemble_face_edges_by_dim(
+    cells_by_dim: Mapping[int, list[tuple[Any, np.ndarray, tuple[int, ...]]]],
+    valid_face_tags: set[Any],
+) -> dict[int, list[tuple[Any, Any, int]]]:
+    """Collect codimension-one face edges per dimension via :func:`collect_meta_face_edges`."""
+    edges_by_dim: dict[int, list[tuple[Any, Any, int]]] = {}
+    for k in sorted(cells_by_dim.keys(), reverse=True):
+        if int(k) <= 0:
+            continue
+        edges, _ = collect_meta_face_edges(cells_by_dim[int(k)], valid_face_tags)
+        edges_by_dim[int(k)] = edges
+    return edges_by_dim
 
 
 def collect_meta_face_edges(

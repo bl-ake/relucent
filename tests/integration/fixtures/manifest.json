@@ -219,7 +219,7 @@
         "truncated_betti": {
           "0": 1
         },
-        "methods_agree": false
+        "methods_agree": true
       },
       "boundary_shi": 40
     },
