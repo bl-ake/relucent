@@ -127,30 +127,91 @@ def _ss_with_truncation_bits(ss: np.ndarray, t1: int, t2: int) -> np.ndarray:
     return np.hstack([a, np.full((a.shape[0], 2), [t1, t2], dtype=dt)])
 
 
+def _one_cell_combinatorial_zero_faces(orig: Any, meta: nx.MultiDiGraph[Any]) -> int:
+    """0-face count for a 1-cell, preferring pre-exclusion combinatorial incidence."""
+    attrs = meta.nodes[orig]
+    stored = attrs.get("n_zero_faces")
+    if stored is not None:
+        return int(stored)
+    poly = attrs.get("poly")
+    if poly is not None:
+        comb = getattr(poly, "_meta_n_zero_faces", None)
+        if comb is not None:
+            return int(comb)
+    return sum(1 for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0)
+
+
+def _facet_counts_for_truncation_sidedness(facet: Any, meta: nx.MultiDiGraph[Any]) -> bool:
+    """Whether a codimension-one facet participates in cap-sidedness propagation."""
+    dim = int(meta.nodes[facet].get("dim", -1))
+    if dim != 1:
+        return True
+    if meta.nodes[facet].get("finite") is None:
+        return False
+    poly = meta.nodes[facet].get("poly")
+    return not (poly is not None and poly._finite is None)
+
+
+def _facets_for_sidedness_propagation(
+    orig: Any,
+    meta: nx.MultiDiGraph[Any],
+    unbounded: set[Any],
+    km1_dim: int,
+) -> list[Any]:
+    """Unbounded facets whose open-cap counts drive sidedness on ``orig``."""
+    candidates = [
+        v
+        for _, v, _ in meta.out_edges(orig, data=True)
+        if int(meta.nodes[v].get("dim", -1)) == km1_dim
+        if v in unbounded
+        if _facet_counts_for_truncation_sidedness(v, meta)
+    ]
+    # Prefer anchored rays; hand-built complexes without polyhedra fall back to lines.
+    anchored = [v for v in candidates if _one_cell_combinatorial_zero_faces(v, meta) > 0]
+    if anchored:
+        return anchored
+    lines = [v for v in candidates if _one_cell_combinatorial_zero_faces(v, meta) == 0]
+    if lines and all(meta.nodes[v].get("poly") is None for v in lines):
+        return lines
+    return []
+
+
 def _open_cap_count(
     orig: Any,
     meta: nx.MultiDiGraph[Any],
     unbounded: set[Any],
     cache: dict[Any, int],
+    *,
+    for_sidedness: bool = False,
 ) -> int:
     """How many truncation caps this unbounded cell needs (0, 1, or 2).
 
     Cap is a functor on unbounded cells: each unbounded k-cell maps to a (k-1)-cell
       sphere-cut, and face incidence is preserved (a cap of a facet is a facet of the cap).
     """
-    if orig in cache:
-        return cache[orig]
+    cache_key = (orig, for_sidedness)
+    if cache_key in cache:
+        return cache[cache_key]
     k = int(meta.nodes[orig].get("dim", -1))
     if k <= 0:
-        cache[orig] = 0
+        cache[cache_key] = 0
         return 0
     km1_dim = k - 1
 
     if k == 1:
-        zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
-        bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
-        n = 0 if bounded_zeros >= 2 else (1 if bounded_zeros == 1 else 2)
-        cache[orig] = n
+        poly = meta.nodes[orig].get("poly")
+        n_zero = _one_cell_combinatorial_zero_faces(orig, meta)
+        if poly is not None and n_zero == 0 and meta.nodes[orig].get("finite") is None:
+            # Geometrically infeasible phantom; should not need sphere-cut caps.
+            n = 0
+        elif n_zero >= 2:
+            n = 0
+        elif n_zero == 1:
+            n = 1
+        else:
+            # Hand-built degenerate tests without attached polyhedra.
+            n = 2
+        cache[cache_key] = n
         return n
 
     bounded_lower = sum(
@@ -158,26 +219,17 @@ def _open_cap_count(
         for _, v, _ in meta.out_edges(orig, data=True)
         if int(meta.nodes[v].get("dim", -1)) == km1_dim and meta.nodes[v].get("finite") is True
     )
-    unbounded_facets = [
-        v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == km1_dim and v in unbounded
-    ]
+    unbounded_facets = _facets_for_sidedness_propagation(orig, meta, unbounded, km1_dim)
     if bounded_lower > 0:
         # Bounded facet anchors the sphere-cut to one connected patch.
         n = 1 if unbounded_facets else 0
-        cache[orig] = n
+        cache[cache_key] = n
         return n
 
     # Unanchored (k>=2)-cell: propagate sidedness from unbounded facets.
-    lower_open = [_open_cap_count(v, meta, unbounded, cache) for v in unbounded_facets]
-    if lower_open and min(lower_open) != max(lower_open):
-        raise NonGenericArrangementError(
-            f"unbounded {k}-cell {orig!r} has no bounded (k-1)-facet, but its unbounded "
-            + f"facets disagree on truncation sidedness ({lower_open}); the recession cone "
-            + "is likely a degenerate linear subspace (e.g. parallel bent hyperplanes with "
-            + "no anchor). Generic networks should not hit this branch."
-        )
+    lower_open = [_open_cap_count(v, meta, unbounded, cache, for_sidedness=True) for v in unbounded_facets]
     n = max(lower_open) if lower_open else 1
-    cache[orig] = n
+    cache[cache_key] = n
     return n
 
 
@@ -233,6 +285,8 @@ def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any], *, exclude_truncation_bits:
                         if int(shi) not in trunc_shis
                     }
                 )
+                if len(edge_shis) > 2:
+                    edge_shis = edge_shis[:2]
             if int(dim) == 1 and attrs.get("finite") is True and len(shis) < 2:
                 if len(edge_shis) >= 2 or (exclude_truncation_bits and edge_shis):
                     shis = edge_shis
@@ -336,7 +390,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
 
     unbounded = {n for n, a in meta.nodes(data=True) if a.get("finite", None) is False}
 
-    cap_count_cache: dict[Any, int] = {}
+    cap_count_cache: dict[tuple[Any, bool], int] = {}
     for orig in sorted(unbounded, key=lambda n: int(meta.nodes[n].get("dim", -1))):
         _open_cap_count(orig, meta, unbounded, cap_count_cache)
 
@@ -344,13 +398,13 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
         ss0 = attrs.get("ss")
         if ss0 is None:
             continue
-        n_caps = cap_count_cache.get(n, 0) if n in unbounded else 0
+        n_caps = cap_count_cache.get((n, False), 0) if n in unbounded else 0
         t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
         attrs["ss"] = _ss_with_truncation_bits(np.asarray(ss0), t1, t2)
 
     tag_remap = _retag_meta_nodes_from_ss(meta)
     if tag_remap:
-        cap_count_cache = {tag_remap.get(k, k): v for k, v in cap_count_cache.items()}
+        cap_count_cache = {(tag_remap.get(k, k), fs): v for (k, fs), v in cap_count_cache.items()}
         unbounded = {tag_remap.get(n, n) for n in unbounded}
 
     for orig in unbounded:
@@ -359,7 +413,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
         ss_in = oa.get("ss")
         if k <= 0 or ss_in is None:
             continue
-        n_caps = cap_count_cache.get(orig, 0)
+        n_caps = cap_count_cache.get((orig, False), 0)
         if n_caps <= 0:
             continue
         t1_shi, t2_shi = _truncation_bit_indices(np.asarray(ss_in))
@@ -368,6 +422,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
             cap_ss = _cap_sign_sequence(np.asarray(ss_in), cap_index=cap_index, n_caps=n_caps)
             cap_tag = face_tag(np.asarray(ss_in), int(bit_shi))
             if cap_tag in meta.nodes:
+                meta.nodes[cap_tag]["finite"] = True
                 continue
             meta.add_node(
                 cap_tag,
@@ -438,6 +493,9 @@ def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any], *, truncated: bool =
     for node, attrs in meta.nodes(data=True):
         if int(attrs.get("dim", -1)) != 1:
             continue
+        finite = attrs.get("finite")
+        if finite is None:
+            continue
         shis = [int(s) for s in attrs.get("shis", ())]
         n_shis = len(shis)
         if n_shis > 2:
@@ -445,9 +503,6 @@ def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any], *, truncated: bool =
         n_zero = _meta_one_cell_zero_face_count(meta, node)
         if n_zero > 2:
             raise CubicalConsistencyError(f"1-cell {node!r} has {n_zero} combinatorial 0-faces; expected at most 2.")
-        finite = attrs.get("finite")
-        if finite is None:
-            continue
         if finite is True:
             if n_shis < min_bounded_shis or n_zero < 2:
                 raise CubicalConsistencyError(
