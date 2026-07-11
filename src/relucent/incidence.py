@@ -539,7 +539,7 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
     # 1-cells: filter out crossings whose 0-face endpoint is geometrically infeasible.
     if int(poly.dim) == 1 and poly.halfspaces is not None:
         node_shis = [s for s in node_shis if poly.is_shi_face_feasible(int(s))]
-    attrs: dict[str, Any] = {
+    return {
         "poly": poly,
         "dim": int(poly.dim),
         "ss": ss_arr,
@@ -547,11 +547,6 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
         "crossings": crossings,
         "shis": node_shis,
     }
-    if int(poly.dim) == 1:
-        comb = getattr(poly, "_meta_n_zero_faces", None)
-        if comb is not None:
-            attrs["n_zero_faces"] = int(comb)
-    return attrs
 
 
 # ---------------------------------------------------------------------------
@@ -632,13 +627,11 @@ def classify_one_cells_finite_from_face_edges(
             continue
         if p.tag in infeasible:
             p._finite = None
-            p._meta_n_zero_faces = 0
             p._finite_computed = True
             n_classified += 1
             continue
         n_zero = len(zero_faces_by_coface.get(p.tag, ()))
         p._finite = n_zero >= 2
-        p._meta_n_zero_faces = n_zero
         p._finite_computed = True
         n_classified += 1
     return n_classified, infeasible

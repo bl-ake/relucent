@@ -10,6 +10,7 @@ import torch
 from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent import meta_graph as mg
 from relucent.calculations import get_shis
+from relucent.errors import NonGenericArrangementError
 from relucent.exploration import explore_for_topology
 from relucent.incidence import face_tag
 from relucent.topology import ChainComplexInconsistent, get_betti_numbers
@@ -137,7 +138,7 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
         _ = mg._open_cap_count(n, meta_plain, unbounded, cache)
     for n in unbounded:
         ss0 = np.asarray(meta_plain.nodes[n]["ss"])
-        n_caps = cache[(n, False)]
+        n_caps = cache[n]
         t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
         ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
         for cap_index, cap_tag in enumerate(_expected_cap_tags(ss_ext, n_caps)):
@@ -212,8 +213,6 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
 
     for n, a in meta_tr.nodes(data=True):
         if int(a.get("dim", -1)) != 1:
-            continue
-        if a.get("finite") is None:
             continue
         zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
         assert 1 <= len(zero_faces) <= 2, (
@@ -312,8 +311,8 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
     )
 
 
-def test_open_cap_count_unanchored_mixed_facets_ray_propagation_only() -> None:
-    """Unanchored k-cells propagate sidedness from anchored ray facets; lines cap locally."""
+def test_open_cap_count_raises_on_unanchored_sidedness_disagreement() -> None:
+    """Unanchored k-cells with disagreeing unbounded facets are non-generic."""
     import networkx as nx
 
     meta = nx.MultiDiGraph()
@@ -342,45 +341,8 @@ def test_open_cap_count_unanchored_mixed_facets_ray_propagation_only() -> None:
     )
 
     ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
-    assert mg._open_cap_count(sheet, meta, ub, {}) == 1
-
-
-def test_open_cap_count_phantom_vs_infinite_line() -> None:
-    """Phantom (finite=None) gets 0 caps; valid infinite line (finite=False) gets 2."""
-    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
-    phantom_ss = np.array([[1, 0, 0]], dtype=np.int8)
-    line_ss = np.array([[1, 1, 0]], dtype=np.int8)
-
-    phantom_poly = Polyhedron(None, phantom_ss, finite=None)
-    phantom_poly._meta_n_zero_faces = 0
-    phantom_tag = encode_ss(phantom_ss)
-    meta.add_node(
-        phantom_tag,
-        dim=1,
-        ss=phantom_ss,
-        finite=None,
-        n_zero_faces=0,
-        poly=phantom_poly,
-        shis=[],
-    )
-
-    line_poly = Polyhedron(None, line_ss, finite=False)
-    line_poly._finite = False
-    line_poly._meta_n_zero_faces = 0
-    line_tag = encode_ss(line_ss)
-    meta.add_node(
-        line_tag,
-        dim=1,
-        ss=line_ss,
-        finite=False,
-        n_zero_faces=0,
-        poly=line_poly,
-        shis=[],
-    )
-
-    ub = {phantom_tag, line_tag}
-    assert mg._open_cap_count(phantom_tag, meta, ub, {}) == 0
-    assert mg._open_cap_count(line_tag, meta, ub, {}) == 2
+    with pytest.raises(NonGenericArrangementError, match="disagree on truncation sidedness"):
+        mg._open_cap_count(sheet, meta, ub, {})
 
 
 def _truncation_handbuilt_node(dim: int, ss: list[int], finite: bool | None) -> dict[str, Any]:

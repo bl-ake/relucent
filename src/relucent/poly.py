@@ -77,8 +77,6 @@ class Polyhedron:
         self._ch: ConvexHull | None = None
         self._finite: bool | None = finite
         self._finite_computed: bool = finite is not None
-        # Combinatorial 0-face count on a 1-cell (set by incidence classification).
-        self._meta_n_zero_faces: int | None = None
         self._vertices: np.ndarray | None = None
         self._volume: float | None = None
 
