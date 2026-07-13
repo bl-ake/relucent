@@ -1,7 +1,23 @@
 """Core polyhedral complex data model."""
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .complex import Complex
+    from .errors import (
+        ComplexNotCompleteError,
+        ComplexNotVerifiedError,
+        CubicalAmbiguityError,
+        CubicalConsistencyError,
+        DualGraphAsymmetricEdgeError,
+        IncompleteDualGraphError,
+        NonGenericArrangementError,
+        ShiFlipInvariantError,
+        ShiProofError,
+    )
+    from .poly import Polyhedron
+    from .ss import SSManager
 
 __all__ = [
     "Complex",
