@@ -161,8 +161,7 @@ def _facet_is_anchored_for_sidedness(facet: Any, meta: nx.MultiDiGraph[Any], km1
     bounded_lower = sum(
         1
         for _, v, _ in meta.out_edges(facet, data=True)
-        if int(meta.nodes[v].get("dim", -1)) == km1_dim - 1
-        and meta.nodes[v].get("finite") is True
+        if int(meta.nodes[v].get("dim", -1)) == km1_dim - 1 and meta.nodes[v].get("finite") is True
     )
     return bounded_lower > 0
 
@@ -185,6 +184,8 @@ def _facets_for_sidedness_propagation(
         anchored = [v for v in candidates if _facet_is_anchored_for_sidedness(v, meta, km1_dim)]
         if anchored:
             return anchored
+        # Bi-infinite lines keep bilateral caps locally; cofaces fall through to one local cut.
+        # That cut often has no cubical 0-faces onto the line's caps and becomes a phantom.
         return []
     if candidates and all(meta.nodes[v].get("poly") is None for v in candidates):
         return candidates
@@ -200,9 +201,7 @@ def _one_cell_open_cap_count(orig: Any, meta: nx.MultiDiGraph[Any]) -> int:
     if poly is not None and poly._finite is None:
         return 0
     comb_n_zero_raw = attrs.get("comb_n_zero_faces")
-    comb_n_zero = (
-        _meta_one_cell_zero_face_count(meta, orig) if comb_n_zero_raw is None else int(comb_n_zero_raw)
-    )
+    comb_n_zero = _meta_one_cell_zero_face_count(meta, orig) if comb_n_zero_raw is None else int(comb_n_zero_raw)
     zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
     bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
     if comb_n_zero >= 2 or bounded_zeros >= 2:
@@ -249,6 +248,7 @@ def _open_cap_count(
         return n
 
     # Unanchored (k>=2)-cell: propagate sidedness from unbounded facets.
+    # Empty facet list (only unanchored lines) defaults to one local cap.
     lower_open = [_open_cap_count(v, meta, unbounded, cache) for v in unbounded_facets]
     if lower_open and min(lower_open) != max(lower_open):
         raise NonGenericArrangementError(

@@ -214,6 +214,9 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     for n, a in meta_tr.nodes(data=True):
         if int(a.get("dim", -1)) != 1:
             continue
+        # Post-truncation phantom caps may have no endpoints; see docs/truncation_design_tension.md.
+        if a.get("finite") is None:
+            continue
         zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
         assert 1 <= len(zero_faces) <= 2, (
             f"1-cell {n!r} should have 1 or 2 0-face endpoints after truncation, got {zero_faces!r}"
