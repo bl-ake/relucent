@@ -3,9 +3,13 @@
 Combinatorial primitives (sign-sequence face incidence, dual-graph adjacency,
 boundedness classification) live in :mod:`relucent.graph.incidence`; certification
 of a :class:`~relucent.core.complex.Complex` lives in :mod:`relucent.verify.certify`. This
-module only holds operations on an already-assembled meta-graph: augmenting it
-for homology at infinity, and auditing that
-:meth:`~relucent.core.complex.Complex.get_meta_graph` assembled it correctly.
+module holds operations on an already-assembled meta-graph:
+
+- **Truncation / compactification** — :func:`truncate_meta_graph`, :func:`one_point_compactify_meta_graph`,
+  :func:`finite_cells_subgraph`; called from :meth:`~relucent.core.complex.Complex.get_betti_numbers`
+  and :mod:`relucent.topology.persistence`.
+- **Post-assembly audits** — :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`;
+  used when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with ``verify=True``.
 
 Re-exports of commonly used incidence primitives and error types are provided
 below for backward compatibility.
@@ -102,7 +106,11 @@ __all__ = [
 
 
 def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
-    """Return the subcomplex induced by nodes with ``finite is True``."""
+    """Return the subcomplex induced by nodes with ``finite is True``.
+
+    Used by :meth:`~relucent.core.complex.Complex.get_betti_numbers_from_meta` when
+    ``respect_finite=True`` to compute homology on bounded cells only (no truncation).
+    """
     finite = [n for n, a in meta.nodes(data=True) if a.get("finite", None) is True]
     return meta.subgraph(finite).copy()
 
@@ -127,6 +135,83 @@ def _ss_with_truncation_bits(ss: np.ndarray, t1: int, t2: int) -> np.ndarray:
     return np.hstack([a, np.full((a.shape[0], 2), [t1, t2], dtype=dt)])
 
 
+def _facet_participates_in_truncation_sidedness(facet: Any, meta: nx.MultiDiGraph[Any]) -> bool:
+    """Whether a codimension-one facet contributes to cap-sidedness on its coface."""
+    dim = int(meta.nodes[facet].get("dim", -1))
+    if dim != 1:
+        return True
+    if meta.nodes[facet].get("finite") is None:
+        return False
+    poly = meta.nodes[facet].get("poly")
+    return not (poly is not None and poly._finite is None)
+
+
+def _combinatorial_zero_faces(meta: nx.MultiDiGraph[Any], node: Any) -> int:
+    """0-face count from combinatorial incidence (pre-exclusion), when recorded on the node."""
+    stored = meta.nodes[node].get("comb_n_zero_faces")
+    if stored is not None:
+        return int(stored)
+    return _meta_one_cell_zero_face_count(meta, node)
+
+
+def _facet_is_anchored_for_sidedness(facet: Any, meta: nx.MultiDiGraph[Any], km1_dim: int) -> bool:
+    """Whether a facet has a bounded face anchoring its truncation patch."""
+    if km1_dim == 1:
+        return _combinatorial_zero_faces(meta, facet) >= 1
+    bounded_lower = sum(
+        1
+        for _, v, _ in meta.out_edges(facet, data=True)
+        if int(meta.nodes[v].get("dim", -1)) == km1_dim - 1
+        and meta.nodes[v].get("finite") is True
+    )
+    return bounded_lower > 0
+
+
+def _facets_for_sidedness_propagation(
+    orig: Any,
+    meta: nx.MultiDiGraph[Any],
+    unbounded: set[Any],
+    km1_dim: int,
+) -> list[Any]:
+    """Unbounded facets whose open-cap counts drive sidedness on an unanchored coface."""
+    candidates = [
+        v
+        for _, v, _ in meta.out_edges(orig, data=True)
+        if int(meta.nodes[v].get("dim", -1)) == km1_dim
+        if v in unbounded
+        if _facet_participates_in_truncation_sidedness(v, meta)
+    ]
+    if candidates and any(meta.nodes[v].get("poly") is not None for v in candidates):
+        anchored = [v for v in candidates if _facet_is_anchored_for_sidedness(v, meta, km1_dim)]
+        if anchored:
+            return anchored
+        return []
+    if candidates and all(meta.nodes[v].get("poly") is None for v in candidates):
+        return candidates
+    return candidates
+
+
+def _one_cell_open_cap_count(orig: Any, meta: nx.MultiDiGraph[Any]) -> int:
+    """Open-cap count for an unbounded 1-cell (0, 1, or 2 bilateral caps at infinity)."""
+    attrs = meta.nodes[orig]
+    if attrs.get("finite") is None:
+        return 0
+    poly = attrs.get("poly")
+    if poly is not None and poly._finite is None:
+        return 0
+    comb_n_zero_raw = attrs.get("comb_n_zero_faces")
+    comb_n_zero = (
+        _meta_one_cell_zero_face_count(meta, orig) if comb_n_zero_raw is None else int(comb_n_zero_raw)
+    )
+    zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
+    bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
+    if comb_n_zero >= 2 or bounded_zeros >= 2:
+        return 0
+    if comb_n_zero == 1 or bounded_zeros == 1:
+        return 1
+    return 2
+
+
 def _open_cap_count(
     orig: Any,
     meta: nx.MultiDiGraph[Any],
@@ -147,9 +232,7 @@ def _open_cap_count(
     km1_dim = k - 1
 
     if k == 1:
-        zero_faces = [v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == 0]
-        bounded_zeros = sum(1 for z in zero_faces if meta.nodes[z].get("finite") is True)
-        n = 0 if bounded_zeros >= 2 else (1 if bounded_zeros == 1 else 2)
+        n = _one_cell_open_cap_count(orig, meta)
         cache[orig] = n
         return n
 
@@ -158,9 +241,7 @@ def _open_cap_count(
         for _, v, _ in meta.out_edges(orig, data=True)
         if int(meta.nodes[v].get("dim", -1)) == km1_dim and meta.nodes[v].get("finite") is True
     )
-    unbounded_facets = [
-        v for _, v, _ in meta.out_edges(orig, data=True) if int(meta.nodes[v].get("dim", -1)) == km1_dim and v in unbounded
-    ]
+    unbounded_facets = _facets_for_sidedness_propagation(orig, meta, unbounded, km1_dim)
     if bounded_lower > 0:
         # Bounded facet anchors the sphere-cut to one connected patch.
         n = 1 if unbounded_facets else 0
@@ -286,7 +367,11 @@ def _reclassify_meta_finite(meta: nx.MultiDiGraph[Any]) -> None:
 
 
 def rebuild_meta_graph_face_edges(meta: nx.MultiDiGraph[Any]) -> None:
-    """Replace all face edges using :func:`~relucent.graph.incidence.collect_meta_face_edges`."""
+    """Replace all face edges using :func:`~relucent.graph.incidence.collect_meta_face_edges`.
+
+    Called at the end of :func:`truncate_meta_graph` after cap cells are added and sign
+    sequences are retagged.
+    """
     nodes_by_dim = _meta_nodes_by_dim(meta)
     valid_tags = set(meta.nodes)
     cells_by_dim: dict[int, list[tuple[Any, np.ndarray, tuple[int, ...]]]] = {}
@@ -330,6 +415,10 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     Extends every sign sequence with two truncation bits, materializes cap cells as
     ordinary byte-tagged nodes via :func:`~relucent.graph.incidence.face_tag`, then rebuilds
     all face edges through :func:`collect_meta_face_edges`.
+
+    Called automatically by :meth:`~relucent.core.complex.Complex.get_betti_numbers` when
+    ``compactify=False`` (the default), and by persistent-homology code in
+    :mod:`relucent.topology.persistence` for the same link-at-infinity convention.
     """
     if meta.number_of_nodes() == 0:
         return
@@ -391,6 +480,9 @@ def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
     1-cell whose boundary consists of a single 0-cell (an unbounded end) gains a
     second incidence to one new 0-cell representing infinity.  Returns whether the
     infinity node was added.
+
+    Called by :meth:`~relucent.core.complex.Complex.get_betti_numbers` when
+    ``compactify="one_point"``.
     """
     if meta.number_of_nodes() == 0:
         return False
@@ -429,10 +521,14 @@ def _meta_one_cell_zero_face_count(meta: nx.MultiDiGraph[Any], node: Any) -> int
 def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any], *, truncated: bool = False) -> None:
     """Require sound 1-cell flip-SHI counts and boundedness labels.
 
-      Each 1-cell has **0–2** flip-SHI neighbors and **0–2** combinatorial 0-face endpoints.
-      Bounded segments (``finite is True``) close at both ends; fewer than two flip SHIs
+    Each 1-cell has **0–2** flip-SHI neighbors and **0–2** combinatorial 0-face endpoints.
+    Bounded segments (``finite is True``) close at both ends; fewer than two flip SHIs
     implies ``finite is False``. After truncation, a capped segment may have no network
     flip SHIs when its only crossings are truncation bits.
+
+    Called at the end of :func:`truncate_meta_graph` (``truncated=True``) and from
+    :func:`verify_meta_graph_incidence` during :meth:`~relucent.core.complex.Complex.get_meta_graph`
+    debug verification.
     """
     min_bounded_shis = 0 if truncated else 2
     for node, attrs in meta.nodes(data=True):
@@ -474,6 +570,9 @@ def verify_meta_graph_incidence(
     - Node ``shis`` equal :func:`~relucent.graph.incidence.cubical_cell_shis` on each
       dimension slice (never the propagated ``poly._shis`` LP cache).
     - ``finite`` on chain cells matches combinatorial classification from face edges.
+
+    Invoked when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with
+    ``verify=True`` (debugging only; too expensive for routine topology).
     """
     valid_face_tags = set(lookup.keys())
     for k, c_k in by_dim.items():

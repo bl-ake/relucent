@@ -1581,12 +1581,17 @@ class Complex:
                 len(excluded_tags),
             )
 
+        comb_zero_by_tag = incidence.combinatorial_zero_faces_by_one_cell(by_dim, edges_by_dim)
+
         for k, c_k in sorted(by_dim.items(), reverse=True):
             neighbor_tags = dim_neighbor_tags[int(k)]
             for p in c_k:
                 if p.tag in excluded_tags:
                     continue
-                meta.add_node(p.tag, **incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags))
+                node_attrs = incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags)
+                if int(p.dim) == 1:
+                    node_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(p.tag, 0)
+                meta.add_node(p.tag, **node_attrs)
 
         # Add cached face edges k -> k-1.
         for k in sorted(by_dim.keys(), reverse=True):
@@ -1601,9 +1606,12 @@ class Complex:
             face_dim = int(k) - 1
             face_neighbors = dim_neighbor_tags.get(face_dim, set())
             for face_tag_key in new_face_tags:
+                face_attrs = incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors)
+                if int(lookup[face_tag_key].dim) == 1:
+                    face_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(face_tag_key, 0)
                 meta.add_node(
                     face_tag_key,
-                    **incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors),
+                    **face_attrs,
                 )
             known_nodes.update(new_face_tags)
 
