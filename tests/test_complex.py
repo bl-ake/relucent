@@ -1,4 +1,4 @@
-"""Tests for relucent.complex (Complex, BFS/DFS, dual graph, pathfinding)."""
+"""Tests for relucent.core.complex (Complex, BFS/DFS, dual graph, pathfinding)."""
 
 import warnings
 from collections import OrderedDict
@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
-from relucent.calculations import adjacent_polyhedra
+from relucent.geometry.calculations import adjacent_polyhedra
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.utils import TorchMLP
 
@@ -224,7 +224,7 @@ class TestComplexPointAndSS:
 
 class TestComplexDualGraph:
     def test_contract_raises_on_incomplete_dual(self, small_mlp):
-        from relucent.errors import ComplexNotCompleteError
+        from relucent.core.errors import ComplexNotCompleteError
 
         cplx = Complex(small_mlp)
         cplx.bfs(start=_rand_batch(4), max_polys=30)

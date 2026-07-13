@@ -14,8 +14,8 @@ import torch
 from torch import nn
 
 from relucent import Complex
-from relucent._network_scale import default_polyhedron_bound
-from relucent.exploration import finalize_ambient_search
+from relucent._internal.network_scale import default_polyhedron_bound
+from relucent.search.exploration import finalize_ambient_search
 from relucent.utils import TorchMLP
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

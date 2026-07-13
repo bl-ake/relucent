@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent.topology import _mask_trailing_bits_in_last_word, _packed_to_dense_mod2, gf2_matmul_packed_stacked_rows
+from relucent.topology.betti import _mask_trailing_bits_in_last_word, _packed_to_dense_mod2, gf2_matmul_packed_stacked_rows
 
 
 def _dense_bool_to_packed(a01: np.ndarray) -> tuple[np.ndarray, int]:

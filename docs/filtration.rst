@@ -3,7 +3,7 @@
 Filtrations
 ===========
 
-.. automodule:: relucent.filtration
+.. automodule:: relucent.topology.filtration
    :members:
    :undoc-members:
    :show-inheritance:

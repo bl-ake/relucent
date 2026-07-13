@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds
-from relucent.exploration import explore_for_topology
+from relucent.search.exploration import explore_for_topology
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:

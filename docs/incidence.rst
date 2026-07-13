@@ -3,7 +3,7 @@
 Incidence (combinatorial primitives)
 ====================================
 
-.. automodule:: relucent.incidence
+.. automodule:: relucent.graph.incidence
    :members:
    :undoc-members:
    :show-inheritance:

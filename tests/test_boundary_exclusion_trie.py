@@ -8,10 +8,10 @@ import torch.nn as nn
 from gurobipy import GRB, Model
 
 from relucent import Complex, set_seeds
-from relucent.boundary_exclusion_trie import ForbiddenPatternTrie
-from relucent.boundary_mip import price_boundary_witness
 from relucent.config import update_settings
-from relucent.exploration import explore_for_topology
+from relucent.search.boundary_exclusion_trie import ForbiddenPatternTrie
+from relucent.search.boundary_mip import price_boundary_witness
+from relucent.search.exploration import explore_for_topology
 from relucent.utils import add_output_relu, encode_ss, get_env, mlp
 
 update_settings(VERBOSE=0)

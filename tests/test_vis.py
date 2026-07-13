@@ -7,7 +7,7 @@ from types import MethodType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from relucent.poly import Polyhedron
+    from relucent.core.poly import Polyhedron
 
 import networkx as nx
 import numpy as np
@@ -16,9 +16,9 @@ import plotly.graph_objects as go
 import pytest
 
 from relucent import vis
-from relucent.complex import Complex
+from relucent.core.complex import Complex
+from relucent.core.poly import Polyhedron
 from relucent.model import LinearLayer, ReLUNetwork
-from relucent.poly import Polyhedron
 
 
 def _tiny_nn(input_dim: int) -> ReLUNetwork:

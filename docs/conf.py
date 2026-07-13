@@ -29,8 +29,8 @@ autodoc_member_order = "groupwise"
 
 autosummary_generate = True
 autosummary_filename_map = {
-    "relucent.Complex": "relucent.complex.Complex",
-    "relucent.Polyhedron": "relucent.poly.Polyhedron",
+    "relucent.Complex": "relucent.core.complex.Complex",
+    "relucent.Polyhedron": "relucent.core.poly.Polyhedron",
 }
 
 templates_path = ["_templates"]

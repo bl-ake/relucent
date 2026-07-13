@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent.calculations import get_shis
-from relucent.poly import Polyhedron
+from relucent.core.poly import Polyhedron
+from relucent.geometry.calculations import get_shis
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     default_bound,

@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
-from relucent.certify import verify_lp_flip_neighbors_in_complex
-from relucent.errors import ComplexNotCompleteError, IncompleteDualGraphError
-from relucent.exploration import finalize_ambient_search
-from relucent.incidence import verify_flip_shi_symmetry
+from relucent.core.errors import ComplexNotCompleteError, IncompleteDualGraphError
+from relucent.graph.incidence import verify_flip_shi_symmetry
+from relucent.search.exploration import finalize_ambient_search
+from relucent.verify.certify import verify_lp_flip_neighbors_in_complex
 
 os_environ = __import__("os").environ
 os_environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
@@ -85,7 +85,7 @@ def test_assert_topology_ready_blocks_add_point_only() -> None:
 
 def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     """Top-cell ``_shis`` are re-derived from the dual graph, repairing asymmetric LP cache."""
-    from relucent.errors import ShiFlipInvariantError
+    from relucent.core.errors import ShiFlipInvariantError
     from relucent.utils import flip_ss_at_shi
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
@@ -125,7 +125,7 @@ def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPat
 
 
 def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import relucent.calculations as calc
+    import relucent.geometry.calculations as calc
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -145,7 +145,7 @@ def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytes
 
 
 def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
-    import relucent.calculations as calc
+    import relucent.geometry.calculations as calc
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -161,7 +161,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
 
 
 def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
-    import relucent.calculations as calc
+    import relucent.geometry.calculations as calc
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -189,7 +189,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
 
 
 def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
-    import relucent.calculations as calc
+    import relucent.geometry.calculations as calc
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -230,9 +230,9 @@ def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
 
 
 def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
-    from relucent.errors import ShiProofError
-    from relucent.poly import Polyhedron
-    from relucent.search import _start_shis_for_search
+    from relucent.core.errors import ShiProofError
+    from relucent.core.poly import Polyhedron
+    from relucent.search.engine import _start_shis_for_search
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
@@ -246,7 +246,7 @@ def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
             raise ShiProofError("invalid proof")
         return [0]
 
-    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
     shis = _start_shis_for_search(start, bound=1.0, shis_kwargs={"strict": True})
     assert shis == [0]
     assert strict_flags == [True, False]
@@ -255,7 +255,7 @@ def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
 def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     import warnings
 
-    from relucent.poly import Polyhedron
+    from relucent.core.poly import Polyhedron
     from relucent.search import searcher
     from relucent.utils import BlockingQueue
 
@@ -267,7 +267,7 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
         poly.warnings.append(RuntimeWarning("Invalid Proof for SHI 0! Violation Sizes: ..."))
         return [0]
 
-    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -285,7 +285,7 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
 
 
 def test_searcher_verify_keeps_frontier_shis_non_strict(monkeypatch) -> None:
-    from relucent.poly import Polyhedron
+    from relucent.core.poly import Polyhedron
     from relucent.search import searcher
     from relucent.utils import BlockingQueue
 
@@ -298,7 +298,7 @@ def test_searcher_verify_keeps_frontier_shis_non_strict(monkeypatch) -> None:
         strict_flags.append(cast(bool | None, kwargs.get("strict")))
         return []
 
-    monkeypatch.setattr("relucent.search.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
     searcher(
         cplx,
         start=np.zeros((1, 2), dtype=np.float64),

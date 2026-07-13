@@ -1,9 +1,9 @@
 """Betti numbers from topology vs persistent homology must agree at filtration end.
 
-When all cells share one filtration value (:class:`~relucent.filtration.ConstantFiltration`
+When all cells share one filtration value (:class:`~relucent.topology.filtration.ConstantFiltration`
 with ``lower_star=False``), the sublevel complex at the end of the filtration is the
-full meta-graph complex. :func:`~relucent.persistence.betti_at_filtration_end` must then
-match :meth:`~relucent.complex.Complex.get_betti_numbers` with the same ``compactify`` /
+full meta-graph complex. :func:`~relucent.topology.persistence.betti_at_filtration_end` must then
+match :meth:`~relucent.core.complex.Complex.get_betti_numbers` with the same ``compactify`` /
 ``respect_finite`` flags.
 """
 
@@ -15,10 +15,10 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds
-from relucent.exploration import explore_for_topology
-from relucent.filtration import ConstantFiltration
-from relucent.persistence import betti_at_filtration_end, compute_persistent_homology
+from relucent.search.exploration import explore_for_topology
 from relucent.topology import get_betti_numbers
+from relucent.topology.filtration import ConstantFiltration
+from relucent.topology.persistence import betti_at_filtration_end, compute_persistent_homology
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -185,7 +185,7 @@ def test_betti_curve_end_matches_topology(seeded: int):
     cplx = _populate_diamond_boundary(Complex(_diamond_boundary_model()), seed=seeded)
     diagram = compute_persistent_homology(cplx, ConstantFiltration(0.0), lower_star=False)
     t_end = max(diagram.cell_filtration.values()) + 1.0
-    from relucent.persistence import betti_curve
+    from relucent.topology.persistence import betti_curve
 
     curve = betti_curve(diagram, [t_end])
     end = betti_at_filtration_end(diagram)

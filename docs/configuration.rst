@@ -14,8 +14,8 @@ Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are not overwritten.
 Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the legacy
 literals in :mod:`relucent.config`.
 
-:class:`~relucent.complex.Complex` calls
-:func:`~relucent.numeric_tolerances.apply_tolerances` for its network by default
+:class:`~relucent.core.complex.Complex` calls
+:func:`~relucent.config.numeric_tolerances.apply_tolerances` for its network by default
 (``auto_tolerances=True``). Pass ``auto_tolerances=False`` to skip that step.
 
 Changing settings
@@ -166,11 +166,11 @@ Complex search and parallel add
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
-     - Default halfspace bound for :func:`~relucent.search.parallel_add` and :meth:`~relucent.complex.Complex.parallel_add`.
+     - Default halfspace bound for :func:`~relucent.search.parallel_add` and :meth:`~relucent.core.complex.Complex.parallel_add`.
    * - ``DEFAULT_SEARCH_BOUND``
      - ``float``
      - ``1e8``
-     - Default halfspace bound for :func:`~relucent.search.searcher`, :func:`~relucent.search.hamming_astar`, and matching :class:`~relucent.complex.Complex` methods.
+     - Default halfspace bound for :func:`~relucent.search.searcher`, :func:`~relucent.search.hamming_astar`, and matching :class:`~relucent.core.complex.Complex` methods.
    * - ``ASTAR_BIAS_WEIGHT``
      - ``float``
      - ``0.9``
@@ -186,7 +186,7 @@ Complex search and parallel add
    * - ``DEFAULT_COMPLEX_PLOT_BOUND``
      - ``float``
      - ``10000``
-     - Default bound for :meth:`~relucent.complex.Complex.plot_cells` when ``bound`` is omitted.
+     - Default bound for :meth:`~relucent.core.complex.Complex.plot_cells` when ``bound`` is omitted.
    * - ``BOUNDARY_MIP_BOUND_MARGIN``
      - ``float``
      - ``5.0``

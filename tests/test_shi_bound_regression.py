@@ -7,8 +7,8 @@ import os
 import numpy as np
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
-from relucent._network_scale import default_polyhedron_bound
-from relucent.calculations import get_shis
+from relucent._internal.network_scale import default_polyhedron_bound
+from relucent.geometry.calculations import get_shis
 
 os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 

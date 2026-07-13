@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from relucent import Complex
-from relucent.poly import Polyhedron
+from relucent.core.poly import Polyhedron
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     load_witness_model,
@@ -22,7 +22,7 @@ _PHANTOM_SS = np.array([-1, -1, -1, -1, -1, -1, -1, -1, 0], dtype=np.int8).resha
 
 
 def test_phantom_ss_rejected_by_ambient_coface_gate() -> None:
-    from relucent.boundary_search import _both_ambient_cofaces_feasible
+    from relucent.search.boundary_search import _both_ambient_cofaces_feasible
 
     spec = witness_by_id("phantom_ckpt0")
     model = load_witness_model(spec)

@@ -25,7 +25,7 @@ from gurobipy import GRB, Model
 
 import relucent.config as cfg
 from relucent import Polyhedron
-from relucent.calculations import (
+from relucent.geometry.calculations import (
     DegenerateHalfspaceInfeasibility,
     _affine_null_basis,
     _drop_degenerate_halfspaces_tracked,
@@ -33,7 +33,7 @@ from relucent.calculations import (
     get_shis,
     solve_radius,
 )
-from relucent.search import _enforce_min_search_inradius, search_calculations
+from relucent.search.engine import _enforce_min_search_inradius, search_calculations
 from relucent.utils import get_env
 
 
@@ -357,7 +357,7 @@ class TestMinSearchInradiusGuard:
     def test_1d_relu_strip_search_worker_keeps_thin_cell_with_witness(self, env):
         """Two parallel ReLU thresholds spaced by eps give a strip with inradius eps/2."""
         from relucent import Complex
-        from relucent.worker_context import worker_context_scope
+        from relucent.search.worker_context import worker_context_scope
 
         eps = 1e-9
         assert eps / 2 < cfg.MIN_SEARCH_INRADIUS

@@ -8,11 +8,11 @@ import pytest
 import torch
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
-from relucent import meta_graph as mg
-from relucent.calculations import get_shis
-from relucent.errors import NonGenericArrangementError
-from relucent.exploration import explore_for_topology
-from relucent.incidence import face_tag
+from relucent.core.errors import NonGenericArrangementError
+from relucent.geometry.calculations import get_shis
+from relucent.graph import meta_graph as mg
+from relucent.graph.incidence import face_tag
+from relucent.search.exploration import explore_for_topology
 from relucent.topology import ChainComplexInconsistent, get_betti_numbers
 from relucent.utils import encode_ss, get_env
 
@@ -474,7 +474,7 @@ def _finite_from_dual_graph_propagation(
 
 def test_propagate_infeasible_exclusion_expands_to_cofaces() -> None:
     """Cofaces of phantom faces must be excluded so ``∂²=0`` is preserved."""
-    from relucent.incidence import propagate_infeasible_exclusion
+    from relucent.graph.incidence import propagate_infeasible_exclusion
 
     bad = b"\x01"
     one = b"\x02"
@@ -492,7 +492,7 @@ def test_propagate_infeasible_exclusion_expands_to_cofaces() -> None:
 
 def test_classify_finite_combinatorial_fixed_point() -> None:
     """A single ascending pass can leave k-cells pending; fixed point resolves them."""
-    from relucent.incidence import classify_finite_combinatorial
+    from relucent.graph.incidence import classify_finite_combinatorial
 
     def _poly(dim: int, tag_byte: int) -> Polyhedron:
         ss = np.zeros((1, 4), dtype=np.int8)
@@ -628,7 +628,7 @@ def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeyp
 
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
 def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
-    """Meta-graph node ``shis`` match :func:`~relucent.meta_graph.cubical_cell_shis` per slice."""
+    """Meta-graph node ``shis`` match :func:`~relucent.graph.meta_graph.cubical_cell_shis` per slice."""
     set_seeds(seeded)
     net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)

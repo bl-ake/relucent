@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp
-from relucent.errors import CubicalConsistencyError, ShiFlipInvariantError
-from relucent.meta_graph import (
+from relucent.core.errors import CubicalConsistencyError, ShiFlipInvariantError
+from relucent.core.poly import Polyhedron
+from relucent.graph.meta_graph import (
     set_contracted_shis,
     set_shis_from_dual_graph,
     verify_contracted_shis,
@@ -16,7 +17,6 @@ from relucent.meta_graph import (
     verify_shis_from_dual_graph,
     verify_top_cell_flip_shi_symmetry,
 )
-from relucent.poly import Polyhedron
 from relucent.utils import encode_ss, flip_ss_at_shi
 
 

@@ -16,10 +16,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-import relucent.incidence as incidence
+import relucent.graph.incidence as incidence
 import relucent.topology as topology
 from relucent import Complex, set_seeds
-from relucent.exploration import explore_for_topology
+from relucent.search.exploration import explore_for_topology
 from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
 from relucent.utils import encode_ss
 
@@ -216,7 +216,7 @@ def test_get_betti_numbers_c_matches_python(
 
 
 def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Public :meth:`~relucent.complex.Complex.get_betti_numbers`` matches topology module."""
+    """Public :meth:`~relucent.core.complex.Complex.get_betti_numbers`` matches topology module."""
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
     meta = db.get_meta_graph(verbose=False)

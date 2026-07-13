@@ -11,14 +11,14 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds, vis
-from relucent.exploration import explore_for_topology
-from relucent.filtration import (
+from relucent.search.exploration import explore_for_topology
+from relucent.topology.filtration import (
     LogitSublevelFiltration,
     NeuronActivationFiltration,
     TrainingDistanceFiltration,
     lower_star_extension,
 )
-from relucent.persistence import (
+from relucent.topology.persistence import (
     PersistenceDiagram,
     PersistencePair,
     _gf2_column_reduce_persistence,

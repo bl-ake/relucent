@@ -100,8 +100,8 @@ _STUB_FIG = SimpleNamespace(show=lambda *args, **kwargs: None)
 @contextmanager
 def _stub_plotting():
     with (
-        patch("relucent.complex.Complex.plot", return_value=_STUB_FIG),
-        patch("relucent.persistence.PersistenceDiagram.plot", return_value=_STUB_FIG),
+        patch("relucent.core.complex.Complex.plot", return_value=_STUB_FIG),
+        patch("relucent.topology.persistence.PersistenceDiagram.plot", return_value=_STUB_FIG),
     ):
         yield
 

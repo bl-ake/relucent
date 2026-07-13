@@ -1,4 +1,4 @@
-"""Tests for relucent.numeric_tolerances."""
+"""Tests for relucent.config.numeric_tolerances."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pytest
 import relucent.config as cfg
 from relucent import convert, mlp
 from relucent.config import update_settings
-from relucent.numeric_tolerances import apply_tolerances, compute_tolerances
+from relucent.config.numeric_tolerances import apply_tolerances, compute_tolerances
 
 
 def test_ordering_invariants() -> None:
@@ -95,7 +95,7 @@ def test_import_bootstrap_runs_by_default() -> None:
     code = (
         "import relucent; "
         "import relucent.config as cfg; "
-        "from relucent.numeric_tolerances import compute_tolerances; "
+        "from relucent.config.numeric_tolerances import compute_tolerances; "
         "tol = compute_tolerances(); "
         "assert cfg.TOL_HALFSPACE_CONTAINMENT == tol['TOL_HALFSPACE_CONTAINMENT']; "
         "assert cfg.MIN_SEARCH_INRADIUS == tol['MIN_SEARCH_INRADIUS']"
@@ -120,8 +120,8 @@ def test_complex_auto_tolerances_false_skips_network_tune(monkeypatch: pytest.Mo
     def _record(*, net=None, **_kwargs: object) -> None:
         calls.append(net)
 
-    monkeypatch.setattr("relucent.numeric_tolerances.apply_tolerances", _record)
-    from relucent.complex import Complex
+    monkeypatch.setattr("relucent.config.numeric_tolerances.apply_tolerances", _record)
+    from relucent.core.complex import Complex
 
     Complex(convert(mlp([2, 3, 1])), auto_tolerances=False)
     assert calls == []

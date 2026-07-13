@@ -1,4 +1,4 @@
-"""Tests for relucent.convert_model."""
+"""Tests for relucent.model.convert_model."""
 
 from collections import OrderedDict
 
@@ -7,8 +7,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from relucent.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
 from relucent.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
+from relucent.model.convert_model import avgpool2d_to_affine, combine_linear_layers, convert, torch_conv_layer_to_affine
 from relucent.utils import TorchMLP, mlp
 
 

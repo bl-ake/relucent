@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent.topology import (
+from relucent.topology.betti import (
     _boundary_row_sets,
     _packed_boundary_matrix,
     _row_sets_to_packed,
@@ -103,7 +103,7 @@ def test_sparse_rank_matches_packed_on_meta_like_grid() -> None:
 @pytest.mark.requires_c_gf2
 def test_c_backend_matches_dense_reference_random() -> None:
     """C backend returns same rank as brute-force GF(2) dense elimination."""
-    from relucent._gf2 import gf2_rank_packed_c
+    from relucent.topology._gf2 import gf2_rank_packed_c
 
     rng = np.random.default_rng(999)
     # Tiny matrices so _dense_rank_gf2 (pure Python) is fast.
@@ -131,7 +131,7 @@ def test_c_backend_matches_dense_reference_random() -> None:
 def test_c_backend_flip_parity_edge_case() -> None:
     """C Phase 1 must handle the flip-parity case: a row with bit_c=0 can still
     be a valid pivot when an existing pivot has bit_c set (any_pv_bit_c != 0)."""
-    from relucent._gf2 import gf2_rank_packed_c
+    from relucent.topology._gf2 import gf2_rank_packed_c
 
     # Build a 3×3 GF(2) matrix (packed into 1 uint64 per row):
     #   row 0: cols {0, 1}  → binary 011

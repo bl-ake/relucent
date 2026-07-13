@@ -3,7 +3,7 @@
 Exploration
 ===========
 
-.. automodule:: relucent.exploration
+.. automodule:: relucent.search.exploration
    :members:
    :undoc-members:
    :show-inheritance:

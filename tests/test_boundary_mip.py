@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds
-from relucent.boundary_mip import (
+from relucent.config import update_settings
+from relucent.search.boundary_mip import (
     BoundaryPricingIncompleteError,
     _batch_add_nogood_constraints,
     _nogood_flip_indices,
@@ -17,8 +18,7 @@ from relucent.boundary_mip import (
     _unique_sign_patterns,
     price_boundary_witness,
 )
-from relucent.config import update_settings
-from relucent.exploration import explore_for_topology
+from relucent.search.exploration import explore_for_topology
 from relucent.utils import encode_ss
 
 update_settings(VERBOSE=0)
@@ -288,7 +288,7 @@ def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch
     """Large exclude sets use lazy-only pricing (no trie/static precompile)."""
     import secrets
 
-    from relucent import boundary_mip
+    import relucent.search.boundary_mip as boundary_mip
 
     compile_called = False
 
@@ -324,8 +324,8 @@ def test_pricing_mip_gurobi_log_decoupled_from_verbose():
     """Gurobi console logging is controlled by BOUNDARY_MIP_GUROBI_LOG, not verbose."""
     from gurobipy import Model
 
-    from relucent.boundary_mip import _configure_pricing_mip_logging
     from relucent.config import update_settings
+    from relucent.search.boundary_mip import _configure_pricing_mip_logging
     from relucent.utils import get_env
 
     model = Model("pricing_log_test", get_env())

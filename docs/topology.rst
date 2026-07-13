@@ -7,8 +7,8 @@ routines build on the same meta-graph convention as contraction and dual-graph
 analysis: a codimension-one face of a cell is obtained by zeroing one supporting
 hyperplane index (SHI) in the cell's sign sequence.
 
-This is an experimental, research-oriented API. :meth:`~relucent.complex.Complex.get_betti_numbers`
-and :meth:`~relucent.complex.Complex.get_persistent_homology` emit a collaboration
+This is an experimental, research-oriented API. :meth:`~relucent.core.complex.Complex.get_betti_numbers`
+and :meth:`~relucent.core.complex.Complex.get_persistent_homology` emit a collaboration
 ``UserWarning`` unless you set ``DISABLE_RESEARCH_WARNING=1``.
 
 Prerequisites
@@ -18,48 +18,48 @@ Prerequisites
 topology *only if they run to completion*. Missing neighbors can leave the meta-graph
 short of a closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
 
-After BFS, check :attr:`~relucent.complex.Complex.complete` and
-:attr:`~relucent.complex.Complex.verified` (see :doc:`exploration_verification`).
-:meth:`~relucent.complex.Complex.contract` and
-:meth:`~relucent.complex.Complex.get_boundary_complex` require a complete, verified
-ambient complex via :meth:`~relucent.complex.Complex.assert_topology_ready`.
+After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
+:attr:`~relucent.core.complex.Complex.verified` (see :doc:`exploration_verification`).
+:meth:`~relucent.core.complex.Complex.contract` and
+:meth:`~relucent.core.complex.Complex.get_boundary_complex` require a complete, verified
+ambient complex via :meth:`~relucent.core.complex.Complex.assert_topology_ready`.
 For boundary components not covered by ambient exploration, use
-:meth:`~relucent.complex.Complex.discover_boundary_complex`.
+:meth:`~relucent.core.complex.Complex.discover_boundary_complex`.
 
 **Geometry for filtrations.** Built-in filtrations such as
-:class:`~relucent.filtration.AffineOutputFiltration` and
-:class:`~relucent.filtration.TrainingDistanceFiltration` need interior points on
+:class:`~relucent.topology.filtration.AffineOutputFiltration` and
+:class:`~relucent.topology.filtration.TrainingDistanceFiltration` need interior points on
 cells. Either compute geometry during search (done by default) or run
-:meth:`~relucent.complex.Complex.compute_geometric_properties` afterward with
+:meth:`~relucent.core.complex.Complex.compute_geometric_properties` afterward with
 ``properties=["interior_point", "finite"]`` (and ``"W"``, ``"b"`` when affine
 outputs are required).
 
 Graph representations
 ------------
 
-The :class:`~relucent.complex.Complex` class exposes three related graph views:
+The :class:`~relucent.core.complex.Complex` class exposes three related graph views:
 
-* **Dual graph** (:meth:`~relucent.complex.Complex.get_dual_graph`): adjacency of
+* **Dual graph** (:meth:`~relucent.core.complex.Complex.get_dual_graph`): adjacency of
   top-dimensional cells only.
-* **Chain complex** (:meth:`~relucent.complex.Complex.get_chain_complex`): iterated
+* **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): iterated
   contraction to lower-dimensional boundary complexes.
-* **Meta-graph** (:meth:`~relucent.complex.Complex.get_meta_graph`): face poset
+* **Meta-graph** (:meth:`~relucent.core.complex.Complex.get_meta_graph`): face poset
   over all cell dimensions, used by Betti and persistence code.
 
 Betti numbers
 -------------
 
-:meth:`~relucent.complex.Complex.get_betti_numbers` builds a meta-graph, applies
+:meth:`~relucent.core.complex.Complex.get_betti_numbers` builds a meta-graph, applies
 the chosen homology convention, and returns ``{dimension: β_k}``.
 
 **``compactify``** selects how unbounded cells are handled:
 
 * ``False`` (default): **combinatorial truncation** at infinity via
-  :meth:`~relucent.complex.Complex.truncate_meta_graph`.
+  :meth:`~relucent.core.complex.Complex.truncate_meta_graph`.
 * ``True``: **Borel–Moore** style boundaries (only faces with at least two
   cofaces contribute to incidence).
 * ``"one_point"``: **one-point compactification** via
-  :meth:`~relucent.complex.Complex.one_point_compactify_meta_graph`.
+  :meth:`~relucent.core.complex.Complex.one_point_compactify_meta_graph`.
 
  Note: ``compactify=True`` is deprecated and will be replaced with ``compactify="bm"`` in a future release.
 
@@ -78,8 +78,8 @@ Example:
 .. code-block:: python
 
    import relucent
-   from relucent.filtration import ConstantFiltration
-   from relucent.persistence import betti_at_filtration_end, compute_persistent_homology
+   from relucent.topology.filtration import ConstantFiltration
+   from relucent.topology.persistence import betti_at_filtration_end, compute_persistent_homology
 
    model = relucent.mlp(widths=[2, 8, 4, 1])
    # We append a final ReLU to the model so that the constructed complex includes it's decision boundary.
@@ -110,24 +110,24 @@ Example:
 Persistent homology workflow
 ----------------------------
 
-:meth:`~relucent.complex.Complex.get_persistent_homology` accepts any
-:class:`~relucent.filtration.Filtration` and returns a
-:class:`~relucent.persistence.PersistenceDiagram`.
+:meth:`~relucent.core.complex.Complex.get_persistent_homology` accepts any
+:class:`~relucent.topology.filtration.Filtration` and returns a
+:class:`~relucent.topology.persistence.PersistenceDiagram`.
 
 Built-in filtrations:
 
-* :class:`~relucent.filtration.ConstantFiltration` — all cells enter at one value.
+* :class:`~relucent.topology.filtration.ConstantFiltration` — all cells enter at one value.
   Use ``lower_star=False`` to match static Betti numbers on the same complex.
-* :class:`~relucent.filtration.LogitSublevelFiltration` — sublevel sets of a scalar
+* :class:`~relucent.topology.filtration.LogitSublevelFiltration` — sublevel sets of a scalar
   logit (last output or class difference).
-* :class:`~relucent.filtration.AffineOutputFiltration` — general affine output
+* :class:`~relucent.topology.filtration.AffineOutputFiltration` — general affine output
   functional on each cell.
-* :class:`~relucent.filtration.NeuronActivationFiltration` — combinatorial
+* :class:`~relucent.topology.filtration.NeuronActivationFiltration` — combinatorial
   filtration by ReLU sign on a chosen SHI.
-* :class:`~relucent.filtration.TrainingDistanceFiltration` — distance from a cell
+* :class:`~relucent.topology.filtration.TrainingDistanceFiltration` — distance from a cell
   representative point to training data.
 
-Lower-star extension (:func:`~relucent.filtration.lower_star_extension`) promotes
+Lower-star extension (:func:`~relucent.topology.filtration.lower_star_extension`) promotes
 vertex values to higher cells by ``f(σ) = max_{τ face of σ} f(τ)`` when
 ``lower_star=True`` (the default for most filtrations).
 
@@ -138,7 +138,7 @@ Example:
    import numpy as np
    import torch.nn as nn
    import relucent
-   from relucent.filtration import LogitSublevelFiltration
+   from relucent.topology.filtration import LogitSublevelFiltration
 
    model = nn.Sequential(nn.Linear(1, 2), nn.ReLU(), nn.Linear(2, 1), nn.ReLU())
    cplx = relucent.Complex(model)
@@ -150,15 +150,15 @@ Example:
    fig = diagram.plot()
    fig.show()
 
-Use :func:`~relucent.persistence.betti_curve` to track β_k across filtration
-thresholds, and :func:`~relucent.persistence.betti_at_filtration_end` to read
+Use :func:`~relucent.topology.persistence.betti_curve` to track β_k across filtration
+thresholds, and :func:`~relucent.topology.persistence.betti_at_filtration_end` to read
 Betti numbers after all cells have entered.
 
 Performance
 -----------
 
 Boundary-matrix rank computation can use an optional **C extension**
-(``relucent._gf2``), JIT-compiled from ``_gf2_rank.c`` when a C compiler is
+(``relucent.topology._gf2``), JIT-compiled from ``_gf2_rank.c`` when a C compiler is
 available. The public flag :data:`relucent.topology.C_BACKEND_AVAILABLE` reports
 whether the fast path is loaded; otherwise relucent falls back to pure Python.
 

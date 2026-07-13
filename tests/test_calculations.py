@@ -1,15 +1,15 @@
-"""Unit tests for relucent.calculations helpers."""
+"""Unit tests for relucent.geometry.calculations helpers."""
 
 import numpy as np
 import pytest
 
-from relucent.calculations import (
+from relucent.core.complex import Complex
+from relucent.geometry.calculations import (
     _drop_degenerate_halfspaces_tracked,
     _halfspaces_feasible,
     _remap_zero_indices,
     solve_radius,
 )
-from relucent.complex import Complex
 from relucent.utils import get_env, mlp
 
 

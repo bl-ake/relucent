@@ -10,9 +10,9 @@ import pytest
 import torch
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
-from relucent import meta_graph as mg
-from relucent.exploration import explore_for_topology
-from relucent.meta_graph import CubicalConsistencyError
+from relucent.graph import meta_graph as mg
+from relucent.graph.meta_graph import CubicalConsistencyError
+from relucent.search.exploration import explore_for_topology
 
 
 def _segment_meta(

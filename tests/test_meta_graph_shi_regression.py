@@ -1,13 +1,13 @@
 """Regression tests for meta-graph SHI / face-incidence fixes.
 
-Face **edges** in :meth:`~relucent.complex.Complex.get_meta_graph` must use every
-nonzero sign-sequence entry (:func:`~relucent.meta_graph.ss_nonzero_indices`),
+Face **edges** in :meth:`~relucent.core.complex.Complex.get_meta_graph` must use every
+nonzero sign-sequence entry (:func:`~relucent.graph.meta_graph.ss_nonzero_indices`),
 not propagated ``_shis`` lists that can be a strict subset of SS crossings.
 
-Face **construction** in :meth:`~relucent.complex.Complex.contract` seeds SHI
+Face **construction** in :meth:`~relucent.core.complex.Complex.contract` seeds SHI
 candidates from SS crossings and finalizes with
-:func:`~relucent.meta_graph.set_contracted_shis` (
-:func:`~relucent.meta_graph.cubical_cell_shis`). Using propagated ``_shis`` for
+:func:`~relucent.graph.meta_graph.set_contracted_shis` (
+:func:`~relucent.graph.meta_graph.cubical_cell_shis`). Using propagated ``_shis`` for
 meta-graph face-edge discovery would omit valid faces and break ``∂² = 0``.
 
 Deep uniform MLPs with seeds 2 and 51 exhibited the latter failure under the
@@ -22,8 +22,8 @@ import pytest
 import torch
 
 from relucent import Complex, mlp, set_seeds
-from relucent import meta_graph as mg
-from relucent.exploration import explore_for_topology
+from relucent.graph import meta_graph as mg
+from relucent.search.exploration import explore_for_topology
 
 os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 

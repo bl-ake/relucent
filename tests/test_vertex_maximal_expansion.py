@@ -1,7 +1,7 @@
 """Vertices from :meth:`Complex.contract` expand to all maximal cells (get_ssr-style).
 
 Relucent should satisfy the same combinatorics on vertices obtained from a complete dual
-graph via repeated :meth:`~relucent.complex.Complex.contract`.
+graph via repeated :meth:`~relucent.core.complex.Complex.contract`.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pytest
 
 from relucent import Complex, mlp, set_seeds
 from relucent.config import update_settings
-from relucent.exploration import explore_for_topology
+from relucent.search.exploration import explore_for_topology
 
 
 def _ss_tuple(ss: np.ndarray) -> tuple[int, ...]:

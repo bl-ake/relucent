@@ -22,14 +22,14 @@ Default behavior
 ----------------
 
 When ``geometry_properties`` is ``None`` (the default for
-:meth:`~relucent.complex.Complex.searcher`, :meth:`~relucent.complex.Complex.bfs`,
+:meth:`~relucent.core.complex.Complex.searcher`, :meth:`~relucent.core.complex.Complex.bfs`,
 and related search methods), search is **topology-only**: workers compute the Minimum
 required geometry for adjacency and feasibility, namely ``finite``, ``center``, ``inradius``, and SHIs.
 If you then run a command like ``cplx.compute_geometric_properties(properties=["volume"])``, relucent will 
 have to recompute the h-representation / affine map for each region, which can be slow.
 
 Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` to compute every property supported by
-:meth:`~relucent.poly.Polyhedron.get_geometry` (including Qhull-derived
+:meth:`~relucent.core.poly.Polyhedron.get_geometry` (including Qhull-derived
 ``vertices``, ``volume``).
 
 Any property listed in ``geometry_properties`` is retained on each polyhedron after the search is complete.
@@ -53,7 +53,7 @@ In practice:
 Certification and caps
 ----------------------
 
-:meth:`~relucent.complex.Complex.bfs` accepts ``verify=True`` by default (see
+:meth:`~relucent.core.complex.Complex.bfs` accepts ``verify=True`` by default (see
 :doc:`exploration_verification`). Examples below use ``max_polys`` as a safety cap;
 if search finishes under the cap, certification still runs. If the cap is hit first,
 ``complete`` and ``verified`` are ``False``. Pass ``verify=False`` for intentional
@@ -62,7 +62,7 @@ partial exploration.
 Common workflows
 ----------------
 
-The examples below assume a :class:`~relucent.complex.Complex` named ``cplx``:
+The examples below assume a :class:`~relucent.core.complex.Complex` named ``cplx``:
 
 .. code-block:: python
 

@@ -17,8 +17,8 @@ if str(_RELUCENT_ROOT) not in sys.path:
 
 import numpy as np  # noqa: E402
 
-from relucent.calculations import get_shis  # noqa: E402
-from relucent.poly import Polyhedron  # noqa: E402
+from relucent.core.poly import Polyhedron  # noqa: E402
+from relucent.geometry.calculations import get_shis  # noqa: E402
 from tests.integration.helpers import (  # noqa: E402
     boundary_shi_for_spec,
     default_bound,

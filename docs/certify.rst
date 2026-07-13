@@ -3,12 +3,12 @@
 Certification
 =============
 
-.. automodule:: relucent.certify
+.. automodule:: relucent.verify.certify
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: relucent.errors
+.. automodule:: relucent.core.errors
    :members:
    :undoc-members:
    :show-inheritance:

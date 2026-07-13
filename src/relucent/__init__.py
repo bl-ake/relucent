@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from . import config
 from .config import update_settings
-from .numeric_tolerances import apply_tolerances
+from .config.numeric_tolerances import apply_tolerances
 
 
 def _bootstrap_tolerances() -> None:
@@ -31,12 +31,12 @@ def _read_version() -> str:
 __version__ = _read_version()
 
 if TYPE_CHECKING:
-    from .complex import Complex
-    from .convert_model import convert
-    from .errors import NonGenericArrangementError
-    from .exploration import explore_for_topology, generic_topology_start
-    from .poly import Polyhedron
-    from .ss import SSManager
+    from .core.complex import Complex
+    from .core.errors import NonGenericArrangementError
+    from .core.poly import Polyhedron
+    from .core.ss import SSManager
+    from .model.convert_model import convert
+    from .search.exploration import explore_for_topology, generic_topology_start
     from .utils import add_output_relu, get_env, mlp, set_seeds, split_sequential
     from .vis import get_colors, plot_complex, plot_polyhedron
 
@@ -62,16 +62,16 @@ __all__ = [
 ]
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
-    "Complex": ("relucent.complex", "Complex"),
-    "NonGenericArrangementError": ("relucent.errors", "NonGenericArrangementError"),
-    "Polyhedron": ("relucent.poly", "Polyhedron"),
-    "SSManager": ("relucent.ss", "SSManager"),
-    "convert": ("relucent.convert_model", "convert"),
+    "Complex": ("relucent.core.complex", "Complex"),
+    "NonGenericArrangementError": ("relucent.core.errors", "NonGenericArrangementError"),
+    "Polyhedron": ("relucent.core.poly", "Polyhedron"),
+    "SSManager": ("relucent.core.ss", "SSManager"),
+    "convert": ("relucent.model.convert_model", "convert"),
     "get_colors": ("relucent.vis", "get_colors"),
     "get_env": ("relucent.utils", "get_env"),
     "add_output_relu": ("relucent.utils", "add_output_relu"),
-    "explore_for_topology": ("relucent.exploration", "explore_for_topology"),
-    "generic_topology_start": ("relucent.exploration", "generic_topology_start"),
+    "explore_for_topology": ("relucent.search.exploration", "explore_for_topology"),
+    "generic_topology_start": ("relucent.search.exploration", "generic_topology_start"),
     "mlp": ("relucent.utils", "mlp"),
     "plot_complex": ("relucent.vis", "plot_complex"),
     "plot_polyhedron": ("relucent.vis", "plot_polyhedron"),

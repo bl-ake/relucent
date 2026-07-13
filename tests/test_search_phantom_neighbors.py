@@ -67,7 +67,7 @@ def test_bfs_complete_when_only_phantom_mistakes(monkeypatch: pytest.MonkeyPatch
     cplx = Complex(model)
     real_calls = {"n": 0}
 
-    import relucent.search as search_mod
+    import relucent.search.engine as search_mod
 
     original = search_mod._worker_prepare_poly
 

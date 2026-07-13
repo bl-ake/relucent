@@ -1,4 +1,4 @@
-"""Tests for relucent.poly (Polyhedron, solve_radius)."""
+"""Tests for relucent.core.poly (Polyhedron, solve_radius)."""
 
 import pickle
 from collections.abc import Iterable

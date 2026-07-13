@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, NonGenericArrangementError, set_seeds
-from relucent.exploration import explore_for_topology
+from relucent.search.exploration import explore_for_topology
 from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,
@@ -45,7 +45,7 @@ def test_boundary_generic_diamond_dual_graph_connected(seeded: int) -> None:
     assert G.number_of_nodes() >= 2
     assert G.number_of_edges() >= 1
     assert nx.number_connected_components(G) == 1
-    from relucent.incidence import certify_dual_graph
+    from relucent.graph.incidence import certify_dual_graph
 
     certify_dual_graph(G, db)
 
@@ -86,6 +86,6 @@ def test_one_dim_dual_graph_edges_match_shared_endtags(seeded: int) -> None:
     G = db.get_dual_graph(verbose=False)
     if G.number_of_edges() == 0:
         pytest.skip("boundary exploration produced no dual edges")
-    from relucent.incidence import certify_dual_graph
+    from relucent.graph.incidence import certify_dual_graph
 
     certify_dual_graph(G, db)

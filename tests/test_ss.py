@@ -1,10 +1,10 @@
-"""Tests for relucent.ss (SSManager)."""
+"""Tests for relucent.core.ss (SSManager)."""
 
 import numpy as np
 import pytest
 import torch
 
-from relucent.ss import SSManager
+from relucent.core.ss import SSManager
 
 
 class TestSSManager:

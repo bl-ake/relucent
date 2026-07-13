@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from relucent.exploration import finalize_ambient_search
-from relucent.incidence import verify_flip_shi_symmetry
+from relucent.graph.incidence import verify_flip_shi_symmetry
+from relucent.search.exploration import finalize_ambient_search
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     export_dual_graph_payload,

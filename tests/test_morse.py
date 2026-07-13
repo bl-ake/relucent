@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from relucent import Complex, mlp, set_seeds
-from relucent.morse import (
+from relucent.topology.morse import (
     assert_scalar_output,
     coface_sign_sequence,
     gradient_on_cell,
