@@ -2,8 +2,21 @@
 
 Every cell is identified by its sign sequence (``ss``); a codimension-1 face is
 obtained by zeroing one nonzero entry (a supporting-hyperplane index, or SHI).
-This module is the single source of truth for that combinatorics. Consumers
-take *derived views*:
+This module is the single source of truth for that combinatorics.
+
+**Primary callers**
+
+- :meth:`~relucent.core.complex.Complex.get_dual_graph` — :func:`build_dual_graph`,
+  :func:`dual_edges_top_dim`, :func:`sync_shis_from_dual_graph`.
+- :meth:`~relucent.core.complex.Complex.get_meta_graph` — :func:`collect_meta_face_edges`,
+  :func:`meta_node_attrs`, boundedness classifiers, :func:`propagate_infeasible_exclusion`.
+- :meth:`~relucent.core.complex.Complex.contract` / chain complex — :func:`set_contracted_shis`,
+  :func:`verify_contracted_shis`.
+- :func:`~relucent.verify.certify.certify_complex` — :func:`certify_dual_graph`,
+  :func:`verify_flip_shi_symmetry`.
+- :func:`~relucent.search.exploration.finalize_boundary_complex` — contracted SHI assignment.
+
+**Derived views** (do not confuse SHI semantics):
 
 - **Dual-graph edges** (:func:`dual_edges_top_dim`): group top cells by shared
   face tag (1-cells) or flip neighbor (dim >= 2).
@@ -95,7 +108,12 @@ def ss_nonzero_indices(ss: np.ndarray) -> tuple[int, ...]:
 
 
 def face_tag(ss: np.ndarray, shi: int) -> bytes:
-    """Tag of the codimension-one face obtained by zeroing ``shi`` in ``ss``."""
+    """Tag of the codimension-one face obtained by zeroing ``shi`` in ``ss``.
+
+    Used throughout dual-graph and meta-graph assembly: dual edges for ``top_dim == 1``,
+    :func:`collect_meta_face_edges`, :func:`verify_dual_graph_cubical`, and truncation cap
+    tagging in :func:`~relucent.graph.meta_graph.truncate_meta_graph`.
+    """
     ss_arr = np.asarray(ss, dtype=np.int8)
     row = ss_arr.reshape(-1).copy()
     row[int(shi)] = 0
@@ -103,7 +121,11 @@ def face_tag(ss: np.ndarray, shi: int) -> bytes:
 
 
 def flip_tag(ss: np.ndarray, shi: int) -> bytes:
-    """Tag of the same-dimension neighbor across hyperplane ``shi``."""
+    """Tag of the same-dimension neighbor across hyperplane ``shi``.
+
+    Used by :func:`_dual_edges_flip_neighbors` and :func:`cubical_cell_shis` when deciding
+    whether a nonzero sign-sequence entry has a same-dimension flip neighbor in the slice.
+    """
     row = np.asarray(ss, dtype=np.int8).ravel()
     return encode_ss(flip_ss_at_shi(row, int(shi)).reshape(np.asarray(ss).shape))
 
@@ -112,6 +134,8 @@ def dual_graph_edge_top_dim(*, cell_top_dim: int, ambient_dim: int) -> int:
     """``top_dim`` argument for :func:`dual_edges_top_dim` / :func:`verify_dual_graph_cubical`.
 
     1-cells always use flip-neighbor adjacency so ``_shis`` match flip-SHI verification.
+    Called from :func:`build_dual_graph` and :func:`certify_dual_graph` when the complex is
+    a contracted slice (``cell_top_dim < ambient_dim``).
     """
     _ = ambient_dim
     return cell_top_dim if cell_top_dim >= 2 else 2
@@ -123,7 +147,12 @@ def cubical_cell_shis(
     neighbor_tags: set[bytes],
     exclude_shis: frozenset[int] | set[int] | None = None,
 ) -> list[int]:
-    """Flip-neighbor SHIs: nonzero sign-sequence crossings with a same-dimension neighbor."""
+    """Flip-neighbor SHIs: nonzero sign-sequence crossings with a same-dimension neighbor.
+
+    Authoritative flip-SHI list for meta-graph node metadata (:func:`meta_node_attrs`),
+    contracted slices (:func:`set_contracted_shis`), and debug checks
+    (:func:`verify_shi_flip_neighbors`, :func:`verify_meta_graph_incidence`).
+    """
     row = np.asarray(ss, dtype=np.int8).ravel()
     skip = exclude_shis or frozenset()
     kept: list[int] = []
@@ -155,6 +184,9 @@ def dual_edges_top_dim(
     For ``top_dim == 1``, pairs cells sharing a combinatorial 0-face tag.  For
     ``top_dim >= 2``, pairs cells that are flip neighbors across an existing
     ``ss_i != 0`` crossing (combinatorial cubical adjacency).
+
+    Called from :func:`build_dual_graph`, which is in turn used by
+    :meth:`~relucent.core.complex.Complex.get_dual_graph`.
     """
     cell_list = list(cells)
     if not cell_list:
@@ -247,6 +279,9 @@ def build_dual_graph(
     ``poly._shis`` is overwritten from the assembled edges via
     :func:`sync_shis_from_dual_graph` -- this is the one place relucent
     corrects an asymmetric or stale LP-derived SHI cache.
+
+    Primary entry point for :meth:`~relucent.core.complex.Complex.get_dual_graph` and
+    :func:`~relucent.verify.certify.certify_complex` (which may pass a pre-built graph).
     """
     graph: nx.Graph[Polyhedron] = nx.Graph()
     graph.add_nodes_from(top_cells)
@@ -269,6 +304,9 @@ def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
     This is relucent's one sanctioned repair: it replaces a possibly
     asymmetric or stale LP-derived SHI cache with the symmetric, combinatorially
     consistent set implied by the assembled dual-graph edges.
+
+    Called from :func:`build_dual_graph` when ``repair=True`` (the default for
+    :meth:`~relucent.core.complex.Complex.get_dual_graph`).
     """
     shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
     for u, v, data in graph.edges(data=True):
@@ -293,7 +331,10 @@ def sync_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
 
 
 def verify_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
-    """Require each polyhedron's ``_shis`` to match incident dual-graph edge labels."""
+    """Require each polyhedron's ``_shis`` to match incident dual-graph edge labels.
+
+    Final step of :func:`certify_dual_graph` after cubical face-tag consistency is checked.
+    """
     shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
     for u, v, data in graph.edges(data=True):
         shi = data.get("shi")
@@ -315,7 +356,10 @@ def verify_shis_from_dual_graph(graph: nx.Graph[Any]) -> None:
 
 
 def verify_dual_graph_cubical(cells: Iterable[Polyhedron], graph: nx.Graph[Any], *, top_dim: int) -> None:
-    """Each dual edge's ``shi`` must zero to a shared face tag on both endpoints."""
+    """Each dual edge's ``shi`` must zero to a shared face tag on both endpoints.
+
+    Called from :func:`certify_dual_graph` and integration tests that round-trip dual graphs.
+    """
     if top_dim <= 0:
         return
     endtags: dict[bytes, set[bytes]] = {}
@@ -352,6 +396,9 @@ def verify_flip_shi_symmetry(cplx: Complex) -> None:
 
     Applies to any complex whose cells share a single dimension slice: full
     ambient complexes as well as contracted chain-complex slices.
+
+    First combinatorial check in :func:`~relucent.verify.certify.certify_complex`; also
+    invoked from :func:`verify_contracted_shis` on 1-cell slices.
     """
     if len(cplx) == 0:
         return
@@ -379,7 +426,11 @@ def verify_flip_shi_symmetry(cplx: Complex) -> None:
 
 
 def certify_dual_graph(graph: nx.Graph[Polyhedron], cplx: Complex, *, top_dim: int | None = None) -> None:
-    """The one full dual-graph check: bidirectional SHI support + cubical face-tag consistency + sync."""
+    """The one full dual-graph check: bidirectional SHI support + cubical face-tag consistency + sync.
+
+    Called from :func:`~relucent.verify.certify.certify_complex` after
+    :func:`verify_flip_shi_symmetry`. Tests import this directly for round-trip checks.
+    """
     if graph.number_of_edges() == 0:
         return
     if top_dim is None:
@@ -400,7 +451,10 @@ def certify_dual_graph(graph: nx.Graph[Polyhedron], cplx: Complex, *, top_dim: i
 
 
 def verify_shi_flip_neighbors(ss: np.ndarray, shis: Iterable[int], *, neighbor_tags: set[bytes]) -> None:
-    """Raise if ``shis`` is not the cubical flip-neighbor list for ``ss`` in the slice."""
+    """Raise if ``shis`` is not the cubical flip-neighbor list for ``ss`` in the slice.
+
+    Low-level assertion helper; re-exported from :mod:`relucent.graph.meta_graph` for tests.
+    """
     expected = cubical_cell_shis(ss, neighbor_tags=neighbor_tags)
     actual = sorted(int(s) for s in shis)
     if actual != expected:
@@ -422,7 +476,9 @@ def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) ->
 def set_contracted_shis(cplx: Complex) -> int:
     """Set authoritative ``_shis`` on a contracted slice after :meth:`~relucent.core.complex.Complex.contract`.
 
-    Used only on the **contract path** (``contract``, ``get_boundary_complex``).
+    Used on the **contract path** (:meth:`~relucent.core.complex.Complex.contract`,
+    :meth:`~relucent.core.complex.Complex.get_boundary_complex`, :meth:`~relucent.core.complex.Complex.get_chain_complex`)
+    and at the end of boundary discovery in :func:`~relucent.search.exploration.finalize_boundary_complex`.
     Assigns :func:`cubical_cell_shis` once the full dimension slice is known.
     Call :func:`verify_contracted_shis` to assert flip-neighbor and symmetry invariants.
 
@@ -442,7 +498,12 @@ def set_contracted_shis(cplx: Complex) -> int:
 
 
 def verify_contracted_shis(cplx: Complex) -> None:
-    """Check contracted-slice ``_shis`` match cubical flip neighbors and mutual listing."""
+    """Check contracted-slice ``_shis`` match cubical flip neighbors and mutual listing.
+
+    Called from :func:`~relucent.verify.certify.certify_complex` on contracted slices,
+    :func:`~relucent.search.exploration.finalize_boundary_complex`, and
+    :meth:`~relucent.core.complex.Complex.get_chain_complex` when ``verify=True``.
+    """
     if len(cplx) == 0:
         return
     neighbor_tags = {p.tag for p in cplx}
@@ -464,7 +525,11 @@ def assemble_face_edges_by_dim(
     cells_by_dim: Mapping[int, list[tuple[Any, np.ndarray, tuple[int, ...]]]],
     valid_face_tags: set[Any],
 ) -> dict[int, list[tuple[Any, Any, int]]]:
-    """Collect codimension-one face edges per dimension via :func:`collect_meta_face_edges`."""
+    """Collect codimension-one face edges per dimension via :func:`collect_meta_face_edges`.
+
+    Used by :func:`~relucent.graph.meta_graph.rebuild_meta_graph_face_edges` and as a
+    convenience wrapper inside :meth:`~relucent.core.complex.Complex.get_meta_graph`.
+    """
     edges_by_dim: dict[int, list[tuple[Any, Any, int]]] = {}
     for k in sorted(cells_by_dim.keys(), reverse=True):
         if int(k) <= 0:
@@ -482,6 +547,9 @@ def collect_meta_face_edges(
 
     The ``shis`` tuple on each cell should come from :func:`ss_nonzero_indices`,
     not from propagated ``poly._shis``.
+
+    Core edge-discovery primitive for :meth:`~relucent.core.complex.Complex.get_meta_graph`
+    (serial and parallel via :func:`parallel_collect_meta_face_edges`).
     """
     edges: list[tuple[bytes, bytes, int]] = []
     extra_tags: list[bytes] = []
@@ -503,6 +571,11 @@ def parallel_collect_meta_face_edges(
     *,
     nworkers: int,
 ) -> tuple[list[tuple[bytes, bytes, int]], list[bytes]]:
+    """Parallel wrapper around :func:`collect_meta_face_edges`.
+
+    Used by :meth:`~relucent.core.complex.Complex.get_meta_graph` when the top-dimensional
+    slice is large enough to benefit from multiprocessing.
+    """
     n = len(cells)
     chunk_size = max(n // (nworkers * 4), 1)
     chunks = [cells[i : i + chunk_size] for i in range(0, n, chunk_size)]
@@ -526,6 +599,9 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
     under-report meta-graph adjacency. For contracted 1-cells, crossings where the
     corresponding 0-face endpoint is geometrically infeasible are filtered out, matching
     the behavior of :func:`_contracted_shis_for_poly`.
+
+    Called for every node added in :meth:`~relucent.core.complex.Complex.get_meta_graph`
+    (chain cells and lazily discovered face polys).
     """
     if poly.dim == 0:
         finite: bool | None = True
@@ -562,6 +638,9 @@ def geometric_infeasible_one_cells(
 
     Only 1-cells with no combinatorial 0-faces need a geometric check; segments
     and rays are decided from face incidence alone.
+
+    Called from :func:`classify_one_cells_finite_from_face_edges` during
+    :meth:`~relucent.core.complex.Complex.get_meta_graph` boundedness labeling.
     """
     if 1 not in by_dim:
         return set()
@@ -606,6 +685,9 @@ def classify_one_cells_finite_from_face_edges(
     1-cells with no combinatorial 0-faces are checked geometrically: empty
     phantoms get ``_finite is None`` so truncation does not duplicate them.
 
+    First boundedness pass in :meth:`~relucent.core.complex.Complex.get_meta_graph`;
+    also used by :func:`classify_lazy_face_polys` for lazily materialized faces.
+
     Returns ``(n_classified, infeasible_tags)``.
     """
     if 1 not in by_dim:
@@ -637,6 +719,22 @@ def classify_one_cells_finite_from_face_edges(
     return n_classified, infeasible
 
 
+def combinatorial_zero_faces_by_one_cell(
+    by_dim: Mapping[int, Iterable[Polyhedron]],
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
+) -> dict[bytes, int]:
+    """Count combinatorial 0-faces per 1-cell from face edges (before phantom exclusion)."""
+    if 1 not in by_dim:
+        return {}
+    zero_face_tags = {p.tag for p in by_dim.get(0, ())}
+    counts: dict[bytes, int] = {}
+    if 1 in edges_by_dim:
+        for coface_tag, face_tag_, _ in edges_by_dim[1][0]:
+            if face_tag_ in zero_face_tags:
+                counts[coface_tag] = counts.get(coface_tag, 0) + 1
+    return counts
+
+
 def classify_finite_ascending(
     by_dim: Mapping[int, Iterable[Polyhedron]],
     lookup: dict[bytes, Polyhedron],
@@ -656,6 +754,9 @@ def classify_finite_ascending(
     Because every (k-1)-dim cell is already classified before the k-dim pass
     (induction from the 1-dim base case), this single ascending sweep fully
     classifies all contracted cells without LP.
+
+    One pass inside :func:`classify_finite_combinatorial`, which
+    :meth:`~relucent.core.complex.Complex.get_meta_graph` calls after face edges are collected.
 
     Returns the total number of cells newly classified.
     """
@@ -717,6 +818,9 @@ def classify_finite_combinatorial(
     A single ascending pass can leave cells pending when some ``(k-1)``-faces
     were classified in the same pass (ordering dependency).  Repeat until no
     progress.
+
+    Called from :meth:`~relucent.core.complex.Complex.get_meta_graph` and
+    :func:`classify_lazy_face_polys`.
     """
     total = 0
     while True:
@@ -728,7 +832,11 @@ def classify_finite_combinatorial(
 
 
 def classify_finite_lp_fallback(polys: Iterable[Polyhedron]) -> int:
-    """Classify any remaining cells via Chebyshev LP (``poly.finite``)."""
+    """Classify any remaining cells via Chebyshev LP (``poly.finite``).
+
+    Last resort in :meth:`~relucent.core.complex.Complex.get_meta_graph` when combinatorial
+    face incidence leaves cells unclassified; also used by :func:`classify_lazy_face_polys`.
+    """
     n = 0
     for poly in polys:
         if poly._finite_computed:
@@ -739,7 +847,11 @@ def classify_finite_lp_fallback(polys: Iterable[Polyhedron]) -> int:
 
 
 def format_pending_finite_polys(polys: Iterable[Polyhedron], *, limit: int = 10) -> str:
-    """Short diagnostic string for cells still missing ``_finite``."""
+    """Short diagnostic string for cells still missing ``_finite``.
+
+    Used in :meth:`~relucent.core.complex.Complex.get_meta_graph` error messages when
+    boundedness classification fails to converge.
+    """
     pending = [p for p in polys if not p._finite_computed]
     if not pending:
         return ""
@@ -754,10 +866,13 @@ def propagate_infeasible_exclusion(
 ) -> set[bytes]:
     """Expand infeasible tags upward through face incidences.
 
-      Phantom ``(k-1)``-cells with ``_finite is None`` must not appear in the
-      meta-graph chain complex.  Any ``k``-cell that lists such a face as a
+    Phantom ``(k-1)``-cells with ``_finite is None`` must not appear in the
+    meta-graph chain complex.  Any ``k``-cell that lists such a face as a
     boundary component is also excluded; otherwise dropping only the face edge
-      leaves cofaces with open boundaries and breaks ``∂² = 0``.
+    leaves cofaces with open boundaries and breaks ``∂² = 0``.
+
+    Called from :meth:`~relucent.core.complex.Complex.get_meta_graph` before nodes for
+    infeasible cells are omitted from the assembled graph.
     """
     excluded = set(infeasible_tags)
     changed = True
@@ -776,7 +891,11 @@ def classify_lazy_face_polys(
     lookup: dict[bytes, Polyhedron],
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
 ) -> None:
-    """Classify boundedness on lazily discovered face polys before meta nodes are added."""
+    """Classify boundedness on lazily discovered face polys before meta nodes are added.
+
+    Invoked from :meth:`~relucent.core.complex.Complex.get_meta_graph` when face-edge
+    collection discovers sign patterns not yet present in the chain complex.
+    """
     pending: dict[int, list[Polyhedron]] = defaultdict(list)
     for tag in face_tags:
         poly = lookup.get(tag)

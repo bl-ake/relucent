@@ -1,4 +1,9 @@
-"""Dual-graph contraction and network surgery helpers for :class:`~relucent.core.complex.Complex`."""
+"""Dual-graph contraction and network surgery for neuron deletion.
+
+Used exclusively by :meth:`~relucent.core.complex.Complex.without_last_layer_neuron`, which
+contracts dual-graph edges on the removed supporting hyperplane, relabels sign sequences, and
+rebuilds cells via :meth:`~relucent.core.complex.Complex.recover_from_dual_graph`.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +25,12 @@ __all__ = [
 
 
 def delete_ss_columns(ss: np.ndarray | torch.Tensor, deleted_shis: Iterable[int]) -> np.ndarray | torch.Tensor:
+    """Drop sign-sequence columns for deleted supporting-hyperplane indices.
+
+    Called from :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` when seeding
+    :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` with the representative cell
+    of each contracted dual-graph component.
+    """
     axis = int(ss.ndim - 1)
     for shi in sorted(set(int(s) for s in deleted_shis), reverse=True):
         if isinstance(ss, np.ndarray):
@@ -38,8 +49,10 @@ def contract_dual_graph_for_shi(
 ) -> tuple[nx.Graph[int], dict[int, int]]:
     """Quotient a relabeled dual graph by edges with ``shi == deleted_shi``.
 
-    Returns the contracted graph (nodes ``0 .. n-1``) and a map from each new
-    node to a representative old node id.
+    Used by :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` after
+    :meth:`~relucent.core.complex.Complex.get_dual_graph` to merge top cells that shared the
+    removed neuron's facet. Returns the contracted graph (nodes ``0 .. n-1``) and a map from
+    each new node to a representative old node id.
     """
     parent = {node: node for node in graph.nodes}
 
@@ -83,7 +96,11 @@ def contract_dual_graph_for_shi(
 
 
 def net_remove_ss_layer_and_following_relu(net: ReLUNetwork, ss_layer_idx: int) -> ReLUNetwork:
-    """Remove a width-1 linear layer and the ReLU immediately after it."""
+    """Remove a width-1 linear layer and the ReLU immediately after it.
+
+    Called from :func:`net_without_last_ss_layer_neuron` when the target hidden layer has a
+    single neuron (the linear layer and its ReLU are removed entirely rather than one column).
+    """
     items = list(net.layers.items())
     relu_idx = ss_layer_idx + 1
     if relu_idx >= len(items) or not isinstance(items[relu_idx][1], ReLULayer):
@@ -117,7 +134,11 @@ def net_without_last_ss_layer_neuron(
     ss_layer_idx: int,
     neuron_idx: int,
 ) -> ReLUNetwork:
-    """Return a copy of ``net`` with one neuron removed from the given ReLU hidden layer."""
+    """Return a copy of ``net`` with one neuron removed from the given ReLU hidden layer.
+
+    Called from :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` to build the
+    smaller :class:`~relucent.core.complex.Complex` before dual-graph recovery.
+    """
     layer = list(net.layers.values())[ss_layer_idx]
     if not isinstance(layer, LinearLayer):
         raise ValueError(f"Layer index {ss_layer_idx} is not a LinearLayer.")
