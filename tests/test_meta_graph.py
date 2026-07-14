@@ -121,9 +121,14 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
     assert not any(isinstance(n, tuple) for n in meta_tr.nodes()), "truncation uses byte tags only"
 
     # Every original cell is retained under its extended tag.
+    unbounded = {n for n, a in meta_plain.nodes(data=True) if a.get("finite") is False and int(a.get("dim", -1)) > 0}
+    cache: dict[Any, int] = {}
+    for n in unbounded:
+        _ = mg._open_cap_count(n, meta_plain, unbounded, cache)
+
     for n, attrs in meta_plain.nodes(data=True):
         ss0 = np.asarray(attrs["ss"])
-        n_caps = 2 if attrs.get("finite") is False and int(attrs.get("dim", -1)) == 1 else 0
+        n_caps = cache.get(n, 0) if n in unbounded else 0
         t1, t2 = (1, 1) if n_caps >= 2 else (1, 0)
         ss_ext = mg._ss_with_truncation_bits(ss0, t1, t2)
         ext_tag = encode_ss(np.asarray(ss_ext, dtype=np.int8))
@@ -132,10 +137,6 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
         assert sst.shape == (ss0.shape[0], ss0.shape[1] + 2)
         assert int(sst.flat[-2]) == 1
 
-    unbounded = {n for n, a in meta_plain.nodes(data=True) if a.get("finite") is False and int(a.get("dim", -1)) > 0}
-    cache: dict[Any, int] = {}
-    for n in unbounded:
-        _ = mg._open_cap_count(n, meta_plain, unbounded, cache)
     for n in unbounded:
         ss0 = np.asarray(meta_plain.nodes[n]["ss"])
         n_caps = cache[n]
@@ -214,8 +215,8 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     for n, a in meta_tr.nodes(data=True):
         if int(a.get("dim", -1)) != 1:
             continue
-        # Post-truncation phantom caps may have no endpoints; see docs/truncation_design_tension.md.
         if a.get("finite") is None:
+            # Phantom 1-cells (empty geometry) are excluded from homology incidence.
             continue
         zero_faces = [v for _u, v, _ in meta_tr.out_edges(n, data=True) if int(meta_tr.nodes[v].get("dim", -1)) == 0]
         assert 1 <= len(zero_faces) <= 2, (
@@ -296,8 +297,13 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
     meta_tr = meta.copy()
     Complex.truncate_meta_graph(meta_tr)
 
-    sheet_ext = encode_ss(mg._ss_with_truncation_bits(ss_sheet, 1, 0))
-    unbounded_ext = encode_ss(mg._ss_with_truncation_bits(ss_unbounded, 1, 0))
+    # Derive expected trunc pads from open-cap counts (not hardcoded bits).
+    sheet_n = cap_cache[sheet]
+    ray_n = cap_cache[unbounded]
+    t1_s, t2_s = ((1, 1) if sheet_n >= 2 else (1, 0))
+    t1_r, t2_r = ((1, 1) if ray_n >= 2 else (1, 0))
+    sheet_ext = encode_ss(mg._ss_with_truncation_bits(ss_sheet, t1_s, t2_s))
+    unbounded_ext = encode_ss(mg._ss_with_truncation_bits(ss_unbounded, t1_r, t2_r))
     t1_shi, t2_shi = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
     trunc_bit_shis = {t1_shi, t2_shi}
     cap_one_faces = [
@@ -305,17 +311,26 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
         for _, v, ed in meta_tr.out_edges(sheet_ext, data=True)
         if int(meta_tr.nodes[v].get("dim", -1)) == 1 and int(ed.get("shi", -1)) in trunc_bit_shis
     ]
-    assert len(cap_one_faces) == 1, f"expected one truncation-bit cap 1-face on 2-cell, got {cap_one_faces!r}"
+    assert len(cap_one_faces) == sheet_n, (
+        f"expected {sheet_n} truncation-bit cap 1-face(s) on 2-cell, got {cap_one_faces!r}"
+    )
 
     sheet_cap_1 = cap_one_faces[0]
-    unbounded_cap_0 = _expected_cap_tags(np.asarray(meta_tr.nodes[unbounded_ext]["ss"]), 1)[0]
+    unbounded_cap_0 = _expected_cap_tags(np.asarray(meta_tr.nodes[unbounded_ext]["ss"]), ray_n)[0]
     assert meta_tr.has_edge(sheet_cap_1, unbounded_cap_0), (
         f"cap of unbounded facet {unbounded_cap_0!r} should be facet of cap {sheet_cap_1!r}"
     )
 
 
+class _FinitePolyStub:
+    """Minimal poly stub so sidedness filtering treats the cell as a real network facet."""
+
+    _finite: bool | None = False
+    halfspaces = None
+
+
 def test_open_cap_count_raises_on_unanchored_sidedness_disagreement() -> None:
-    """Unanchored k-cells with disagreeing unbounded facets are non-generic."""
+    """Unanchored k-cells with disagreeing unbounded facets are non-generic (poly-free)."""
     import networkx as nx
 
     meta = nx.MultiDiGraph()
@@ -346,6 +361,112 @@ def test_open_cap_count_raises_on_unanchored_sidedness_disagreement() -> None:
     ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
     with pytest.raises(NonGenericArrangementError, match="disagree on truncation sidedness"):
         mg._open_cap_count(sheet, meta, ub, {})
+
+
+def test_open_cap_count_anchored_with_only_bi_infinite_facets_gets_one_cap() -> None:
+    """Anchored cell + only bi-infinite line facets ⇒ n_caps=1 (not 0).
+
+    Production meta-graphs attach ``poly`` to 1-cells, so sidedness filtering drops
+    bi-infinite lines. That filter must not be reused as an existence test for caps.
+    """
+    import networkx as nx
+
+    meta = nx.MultiDiGraph()
+
+    def _add(
+        ss: np.ndarray,
+        dim: int,
+        finite: bool | None,
+        *,
+        poly: Any | None = None,
+        comb_n_zero_faces: int | None = None,
+    ) -> bytes:
+        tag = encode_ss(ss)
+        attrs: dict[str, Any] = {
+            "dim": dim,
+            "ss": ss,
+            "finite": finite,
+            "shis": list(mg.ss_nonzero_indices(ss)),
+            "poly": poly,
+        }
+        if comb_n_zero_faces is not None:
+            attrs["comb_n_zero_faces"] = comb_n_zero_faces
+        meta.add_node(tag, **attrs)
+        return tag
+
+    # 2-cell with a bounded 1-face (anchor) and a bi-infinite line facet (poly set, 0 zeros).
+    sheet = _add(np.array([[1, 1, 1]], dtype=np.int8), 2, False)
+    bounded = _add(np.array([[0, 1, 1]], dtype=np.int8), 1, True)
+    line = _add(
+        np.array([[1, 0, 1]], dtype=np.int8),
+        1,
+        False,
+        poly=_FinitePolyStub(),
+        comb_n_zero_faces=0,
+    )
+    z_a = _add(np.array([[0, 0, 1]], dtype=np.int8), 0, True)
+    z_b = _add(np.array([[0, 1, 0]], dtype=np.int8), 0, True)
+    meta.add_edges_from(
+        [
+            (sheet, bounded, {"shi": 0}),
+            (sheet, line, {"shi": 1}),
+            (bounded, z_a, {"shi": 1}),
+            (bounded, z_b, {"shi": 2}),
+        ]
+    )
+
+    ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
+    # Sidedness filter drops the bi-infinite line; raw facets remain nonempty.
+    assert mg._facets_for_sidedness_propagation(sheet, meta, ub, 1) == []
+    assert mg._raw_unbounded_facets(sheet, meta, ub, 1) == [line]
+    assert mg._open_cap_count(sheet, meta, ub, {}) == 1
+    assert mg._open_cap_count(line, meta, ub, {}) == 2
+
+    # Truncation must assign a sphere-cut (not raise in careful mode). Homology of
+    # this minimal hand-built graph need not be ∂²=0 (line–sheet trunc-bit mismatch
+    # is intentional; full witnesses live in shi-regression / Synthetic_Progress).
+    meta_tr = meta.copy()
+    Complex.truncate_meta_graph(meta_tr)
+    sheet_ext = encode_ss(
+        mg._ss_with_truncation_bits(np.array([[1, 1, 1]], dtype=np.int8), 1, 0)
+    )
+    assert sheet_ext in meta_tr.nodes
+    t1_shi, _t2 = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
+    cap = face_tag(np.asarray(meta_tr.nodes[sheet_ext]["ss"]), int(t1_shi))
+    assert cap in meta_tr.nodes, "anchored sheet must materialize its trunc-cap"
+    assert meta_tr.has_edge(sheet_ext, cap)
+
+
+def test_open_cap_count_with_poly_filters_bi_infinite_from_unanchored_inheritance() -> None:
+    """With ``poly`` set, unanchored all-bi-infinite sheets default to one local cap."""
+    import networkx as nx
+
+    meta = nx.MultiDiGraph()
+
+    def _add(ss: np.ndarray, dim: int, finite: bool | None) -> bytes:
+        tag = encode_ss(ss)
+        meta.add_node(
+            tag,
+            dim=dim,
+            ss=ss,
+            finite=finite,
+            shis=list(mg.ss_nonzero_indices(ss)),
+            poly=_FinitePolyStub() if dim == 1 else None,
+            comb_n_zero_faces=0 if dim == 1 else None,
+        )
+        return tag
+
+    sheet = _add(np.array([[1, 1, 1]], dtype=np.int8), 2, False)
+    line_a = _add(np.array([[0, 1, 1]], dtype=np.int8), 1, False)
+    line_b = _add(np.array([[1, 0, 1]], dtype=np.int8), 1, False)
+    meta.add_edges_from([(sheet, line_a, {"shi": 0}), (sheet, line_b, {"shi": 1})])
+
+    ub = {n for n, a in meta.nodes(data=True) if a.get("finite") is False}
+    # Inheritance filter empty → default local cap (does not raise disagreement).
+    assert mg._facets_for_sidedness_propagation(sheet, meta, ub, 1) == []
+    assert mg._open_cap_count(sheet, meta, ub, {}) == 1
+    assert mg._open_cap_count(line_a, meta, ub, {}) == 2
+    assert mg._open_cap_count(line_b, meta, ub, {}) == 2
 
 
 def _truncation_handbuilt_node(dim: int, ss: list[int], finite: bool | None) -> dict[str, Any]:

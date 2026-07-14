@@ -149,12 +149,17 @@ bits. Bounded cells and rays use `[..., 1, 0]`; cells with two open ends use
 
 | Situation | Caps on this cell |
 |-----------|-------------------|
-| `k≥2`, has bounded `(k−1)`-face and unbounded facets | 1 cap (single sphere-cut patch) |
+| `k≥2`, has bounded `(k−1)`-face and **any** unbounded facet | 1 cap (single sphere-cut patch) |
 | `k≥2`, has bounded `(k−1)`-face, no unbounded facets | None |
 | `k=1`, 2 bounded 0-endpoints | None (bounded segment) |
 | `k=1`, 1 bounded 0-endpoint | 1 cap (ray) |
 | `k=1`, 0 bounded 0-endpoints | 2 caps (line) |
-| `k≥2`, all `(k−1)`-faces unbounded | inherit max openness from unbounded lower faces |
+| `k≥2`, all `(k−1)`-faces unbounded | inherit max openness from *sidedness* facets |
+
+“Any unbounded facet” for the anchored 0-vs-1 rule uses the raw facet list (before
+bi-infinite sidedness filtering). Sidedness filtering drops bi-infinite line facets
+when `poly` is set — that filter drives *inheritance only*, so it cannot silently
+force `n_caps=0` on an anchored cell that still has unbounded facets.
 
 **Phase C — cap cells:** for each needed cap, `cap_tag = face_tag(parent_ss, truncation_bit_index)`.
 If absent, add an ordinary byte-tagged node at dimension `k−1` with the appropriate
@@ -165,12 +170,17 @@ zeroed truncation bit. No `("trunc", …)` tuple nodes.
 [`assemble_face_edges_by_dim()`](../src/relucent/incidence.py), reclassify `finite`, refresh
 `crossings` / `shis`, and run [`verify_meta_graph_one_cells()`](../src/relucent/meta_graph.py).
 
+Cubical `face_tag` rebuild recovers network faces only when parent and face share trunc
+bits. Faces between cells with disagreeing openness (e.g. unilateral coface `(1,0)` and
+bi-infinite line `(1,1)`) are omitted: restoring them without a matching sphere-cut
+breaks `∂²=0`. Those cofaces keep their trunc-cap instead.
+
 **0-cells are never duplicated**, even if marked unbounded.
 
 The idea is to model caps at infinity so homology of the truncated complex reflects the
 topology of unbounded regions. Each unbounded `k`-cell gets its own sphere-cut
 `(k−1)`-cell; if it has a bounded facet the cut is a single connected patch (one cap),
-built from the caps of its unbounded facets.
+built from the caps of its trunc-compatible unbounded facets.
 
 ---
 

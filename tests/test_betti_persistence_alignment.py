@@ -155,7 +155,7 @@ def test_line_boundary_beta0_matches_components(seeded: int) -> None:
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
     betti = db.get_betti_numbers(compactify=False, verify_connected_components=True)
-    assert betti.get(0, 0) >= 1
+    assert betti.get(0, 0) == 1, f"single truncated line segment should have β₀=1, got {betti}"
 
 
 def test_line_boundary_truncated_chain_complex_is_consistent(seeded: int) -> None:

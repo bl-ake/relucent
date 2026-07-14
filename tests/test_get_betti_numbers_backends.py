@@ -52,7 +52,12 @@ def _isolated_meta(dim: int, n: int) -> nx.MultiDiGraph[Any]:
 
 
 def _make_unbounded_two_component_meta() -> nx.MultiDiGraph[Any]:
-    """Meta-graph with two disconnected unbounded 2-component pieces (byte-tagged ss)."""
+    """Meta-graph with two disconnected unbounded sheets, each with two bi-infinite rays.
+
+    Nodes are poly-free so sidedness inheritance keeps both rays and sheets inherit
+    bilateral openness (n_caps=2). For production (``poly`` set) behaviour see
+    ``test_open_cap_count_with_poly_filters_bi_infinite_from_unanchored_inheritance``.
+    """
     meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
 
     def _add(ss: np.ndarray, dim: int) -> bytes:
@@ -327,10 +332,11 @@ def test_get_betti_numbers_kmin0_unaffected() -> None:
 
 
 def test_beta0_truncated_two_components() -> None:
-    """Truncated unbounded complex: bilateral truncation gives β₀ = number of components.
+    """Truncated poly-free digons: bilateral inheritance gives β₀ = number of components.
 
-    Cells with no original boundary get two truncation faces (bilateral), so every 1-cell
-    becomes a proper closed interval and the rank formula gives the correct β₀.
+    Each sheet has two unbounded 1-facets with no 0-faces; without ``poly``, sidedness
+    inheritance keeps both facets and sheets get n_caps=2, so trunc bits match and
+    ``face_tag`` rebuild closes each component.
     """
     meta = _make_unbounded_two_component_meta()
     Complex.truncate_meta_graph(meta)

@@ -23,6 +23,8 @@ from typing import Any
 import networkx as nx
 import numpy as np
 
+import relucent.config as cfg
+
 # Re-export error types (previously defined here)
 from relucent.core.errors import CubicalAmbiguityError as CubicalAmbiguityError
 from relucent.core.errors import CubicalConsistencyError as CubicalConsistencyError
@@ -166,26 +168,41 @@ def _facet_is_anchored_for_sidedness(facet: Any, meta: nx.MultiDiGraph[Any], km1
     return bounded_lower > 0
 
 
-def _facets_for_sidedness_propagation(
+def _raw_unbounded_facets(
     orig: Any,
     meta: nx.MultiDiGraph[Any],
     unbounded: set[Any],
     km1_dim: int,
 ) -> list[Any]:
-    """Unbounded facets whose open-cap counts drive sidedness on an unanchored coface."""
-    candidates = [
+    """Participating unbounded ``(k−1)``-facets (before bi-infinite sidedness filtering)."""
+    return [
         v
         for _, v, _ in meta.out_edges(orig, data=True)
         if int(meta.nodes[v].get("dim", -1)) == km1_dim
         if v in unbounded
         if _facet_participates_in_truncation_sidedness(v, meta)
     ]
+
+
+def _facets_for_sidedness_propagation(
+    orig: Any,
+    meta: nx.MultiDiGraph[Any],
+    unbounded: set[Any],
+    km1_dim: int,
+) -> list[Any]:
+    """Unbounded facets whose open-cap counts drive sidedness on an unanchored coface.
+
+    Bi-infinite line facets (no cubical 0-face anchor) are dropped when ``poly`` is set:
+    inheriting bilateral openness from them onto a unilateral coface creates phantom
+    0-faces. This filter is an *inheritance* policy only — not an existence test for
+    whether the coface needs a truncation cap (see :func:`_open_cap_count`).
+    """
+    candidates = _raw_unbounded_facets(orig, meta, unbounded, km1_dim)
     if candidates and any(meta.nodes[v].get("poly") is not None for v in candidates):
         anchored = [v for v in candidates if _facet_is_anchored_for_sidedness(v, meta, km1_dim)]
         if anchored:
             return anchored
         # Bi-infinite lines keep bilateral caps locally; cofaces fall through to one local cut.
-        # That cut often has no cubical 0-faces onto the line's caps and becomes a phantom.
         return []
     if candidates and all(meta.nodes[v].get("poly") is None for v in candidates):
         return candidates
@@ -220,7 +237,12 @@ def _open_cap_count(
     """How many truncation caps this unbounded cell needs (0, 1, or 2).
 
     Cap is a functor on unbounded cells: each unbounded k-cell maps to a (k-1)-cell
-      sphere-cut, and face incidence is preserved (a cap of a facet is a facet of the cap).
+      sphere-cut, and face incidence is preserved among trunc-bit-compatible cells
+    (a cap of a facet is a facet of the cap).
+
+    Anchored cells (``bounded_lower > 0``) use *raw* unbounded facets to decide whether
+    a sphere-cut exists; bi-infinite sidedness filtering applies only to unanchored
+    inheritance.
     """
     if orig in cache:
         return cache[orig]
@@ -240,16 +262,18 @@ def _open_cap_count(
         for _, v, _ in meta.out_edges(orig, data=True)
         if int(meta.nodes[v].get("dim", -1)) == km1_dim and meta.nodes[v].get("finite") is True
     )
-    unbounded_facets = _facets_for_sidedness_propagation(orig, meta, unbounded, km1_dim)
+    raw_unbounded = _raw_unbounded_facets(orig, meta, unbounded, km1_dim)
     if bounded_lower > 0:
         # Bounded facet anchors the sphere-cut to one connected patch.
-        n = 1 if unbounded_facets else 0
+        # Use raw facets: bi-infinite lines still make the cell unbounded at infinity.
+        n = 1 if raw_unbounded else 0
         cache[orig] = n
         return n
 
-    # Unanchored (k>=2)-cell: propagate sidedness from unbounded facets.
+    # Unanchored (k>=2)-cell: propagate sidedness from filtered unbounded facets.
     # Empty facet list (only unanchored lines) defaults to one local cap.
-    lower_open = [_open_cap_count(v, meta, unbounded, cache) for v in unbounded_facets]
+    sidedness_facets = _facets_for_sidedness_propagation(orig, meta, unbounded, km1_dim)
+    lower_open = [_open_cap_count(v, meta, unbounded, cache) for v in sidedness_facets]
     if lower_open and min(lower_open) != max(lower_open):
         raise NonGenericArrangementError(
             f"unbounded {k}-cell {orig!r} has no bounded (k-1)-facet, but its unbounded "
@@ -409,12 +433,64 @@ def _retag_meta_nodes_from_ss(meta: nx.MultiDiGraph[Any]) -> dict[Any, Any]:
     return tag_remap
 
 
+def _trunc_bits(ss: np.ndarray) -> tuple[int, int]:
+    flat = np.asarray(ss).ravel()
+    return int(flat[-2]), int(flat[-1])
+
+
+def _assert_truncation_invariants(
+    meta: nx.MultiDiGraph[Any],
+    *,
+    pre_trunc_edges: list[tuple[Any, Any, int]],
+    cap_count_cache: dict[Any, int],
+) -> None:
+    """CAREFUL_MODE checks after truncation incidence is assembled.
+
+    Only cubical face edges (``face_tag(parent, shi) == child`` on extended SS) are
+    required to survive when trunc bits agree. Hand-built or non-cubical incidents are
+    ignored.
+    """
+    for u, v, shi in pre_trunc_edges:
+        if u not in meta or v not in meta:
+            continue
+        if meta.has_edge(u, v):
+            continue
+        ss_u = meta.nodes[u].get("ss")
+        ss_v = meta.nodes[v].get("ss")
+        if ss_u is None or ss_v is None:
+            continue
+        ss_u_arr = np.asarray(ss_u, dtype=np.int8)
+        if shi < 0 or shi >= ss_u_arr.size or int(ss_u_arr.ravel()[shi]) == 0:
+            continue
+        # Only enforce survival for edges that remain cubical faces after extension.
+        if face_tag(ss_u_arr, int(shi)) != v:
+            continue
+        if _trunc_bits(ss_u_arr) == _trunc_bits(ss_v):
+            raise CubicalConsistencyError(
+                f"pre-truncation face edge {u!r}->{v!r} was dropped after truncate "
+                + "despite matching trunc bits; incidence rebuild is incomplete."
+            )
+        parent_caps = cap_count_cache.get(u, 0)
+        if parent_caps <= 0 and int(meta.nodes[u].get("dim", -1)) >= 2:
+            raise CubicalConsistencyError(
+                f"pre-truncation face edge {u!r}->{v!r} dropped due to trunc-bit "
+                + f"mismatch {_trunc_bits(ss_u_arr)} vs {_trunc_bits(ss_v)}, but parent "
+                + "has no truncation caps to replace it."
+            )
+
+
 def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     """Augment ``meta`` in place with combinatorial truncation at infinity.
 
     Extends every sign sequence with two truncation bits, materializes cap cells as
     ordinary byte-tagged nodes via :func:`~relucent.graph.incidence.face_tag`, then rebuilds
-    all face edges through :func:`collect_meta_face_edges`.
+    face edges through :func:`collect_meta_face_edges`.
+
+    Network faces between cells whose trunc bits agree are recovered by the cubical
+    ``face_tag`` rebuild. Faces between cells with disagreeing openness (e.g. a
+    unilateral coface and a bi-infinite line) are intentionally omitted: restoring them
+    without a matching sphere-cut breaks ``∂²=0``. Those cofaces receive a trunc-cap
+    instead (see :func:`_open_cap_count`).
 
     Called automatically by :meth:`~relucent.core.complex.Complex.get_betti_numbers` when
     ``compactify=False`` (the default), and by persistent-homology code in
@@ -429,6 +505,9 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     for orig in sorted(unbounded, key=lambda n: int(meta.nodes[n].get("dim", -1))):
         _open_cap_count(orig, meta, unbounded, cap_count_cache)
 
+    # Snapshot for careful-mode incidence audit (node ids change at retag).
+    pre_trunc_edges = [(u, v, int(d.get("shi", -1))) for u, v, d in meta.edges(data=True)]
+
     for n, attrs in meta.nodes(data=True):
         ss0 = attrs.get("ss")
         if ss0 is None:
@@ -441,6 +520,9 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     if tag_remap:
         cap_count_cache = {tag_remap.get(k, k): v for k, v in cap_count_cache.items()}
         unbounded = {tag_remap.get(n, n) for n in unbounded}
+        pre_trunc_edges = [
+            (tag_remap.get(u, u), tag_remap.get(v, v), shi) for u, v, shi in pre_trunc_edges
+        ]
 
     for orig in unbounded:
         oa = meta.nodes[orig]
@@ -471,6 +553,12 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     _reclassify_meta_finite(meta)
     _sync_meta_node_shis(meta, exclude_truncation_bits=True)
     verify_meta_graph_one_cells(meta, truncated=True)
+    if cfg.CAREFUL_MODE:
+        _assert_truncation_invariants(
+            meta,
+            pre_trunc_edges=pre_trunc_edges,
+            cap_count_cache=cap_count_cache,
+        )
 
 
 def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
