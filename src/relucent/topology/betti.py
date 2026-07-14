@@ -15,14 +15,15 @@ Notes:
 * :func:`get_betti_numbers` uses every codimension-one face incidence encoded in ``meta``.
   Truncation and Borel–Moore-style boundaries are handled on :class:`~relucent.core.complex.Complex`.
 * Pass ``verify_chain_complex=True`` to require ``∂²=0`` on the assembled boundary maps;
-  the check uses a packed GF(2) multiply (stacked rows), not dense integer matmuls.
+  the check uses sparse GF(2) matrix multiplication (nonzero pattern only), not dense
+  integer matmuls or a full scan of packed bit columns.
 """
 
 from __future__ import annotations
 
 import sys
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal, overload
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -124,18 +125,46 @@ def _count_weakly_connected_components(meta: Any) -> int:
     return count
 
 
+@overload
 def _packed_boundary_matrix(
     meta: Any,
     nodes_by_dim: dict[int, list[object]],
     *,
     k: int,
     require_shared_faces: bool = False,
-) -> tuple[np.ndarray, int]:
-    """Bit-packed ∂_k: C_k → C_{k-1} (rows index (k−1)-cells, columns index k-cells)."""
+    also_sparse: Literal[False] = False,
+) -> tuple[np.ndarray, int]: ...
+
+
+@overload
+def _packed_boundary_matrix(
+    meta: Any,
+    nodes_by_dim: dict[int, list[object]],
+    *,
+    k: int,
+    require_shared_faces: bool = False,
+    also_sparse: Literal[True],
+) -> tuple[np.ndarray, int, list[list[int]]]: ...
+
+
+def _packed_boundary_matrix(
+    meta: Any,
+    nodes_by_dim: dict[int, list[object]],
+    *,
+    k: int,
+    require_shared_faces: bool = False,
+    also_sparse: bool = False,
+) -> tuple[np.ndarray, int] | tuple[np.ndarray, int, list[list[int]]]:
+    """Bit-packed ∂_k: C_k → C_{k-1} (rows index (k−1)-cells, columns index k-cells).
+
+    When ``also_sparse=True``, also return per-row column-index lists with the same
+    GF(2) XOR fill as the packed matrix (for sparse ∂² checks).
+    """
     rows = nodes_by_dim.get(k - 1, [])
     cols = nodes_by_dim.get(k, [])
     if not rows or not cols:
-        return np.zeros((0, 0), dtype=np.uint64), 0
+        empty = np.zeros((0, 0), dtype=np.uint64)
+        return (empty, 0, []) if also_sparse else (empty, 0)
 
     row_index = {r: i for i, r in enumerate(rows)}
     col_index = {c: j for j, c in enumerate(cols)}
@@ -144,6 +173,7 @@ def _packed_boundary_matrix(
     ncols = len(cols)
     nwords = (ncols + 63) // 64
     packed = np.zeros((nrows, nwords), dtype=np.uint64)
+    row_sets: list[set[int]] | None = [set() for _ in range(nrows)] if also_sparse else None
 
     inc_count: dict[object, int] | None = None
     if require_shared_faces:
@@ -162,7 +192,15 @@ def _packed_boundary_matrix(
         w = j >> 6
         bit = np.uint64(1) << (j & 63)
         packed[i, w] ^= bit
+        if row_sets is not None:
+            if j in row_sets[i]:
+                row_sets[i].discard(j)
+            else:
+                row_sets[i].add(j)
 
+    if also_sparse:
+        assert row_sets is not None
+        return packed, ncols, [list(s) for s in row_sets]
     return packed, ncols
 
 
@@ -203,6 +241,66 @@ def _boundary_row_sets(
         row_sets[i].add(j)
 
     return row_sets, ncols
+
+
+def _packed_to_sparse_rowlists(packed: np.ndarray, ncols: int) -> list[list[int]]:
+    """Extract per-row column indices of 1-bits from a row-packed ``uint64`` matrix."""
+    m = int(packed.shape[0])
+    nwords = int(packed.shape[1])
+    out: list[list[int]] = [[] for _ in range(m)]
+    ncols_i = int(ncols)
+    for i in range(m):
+        cols_i = out[i]
+        row = packed[i]
+        for w in range(nwords):
+            word = int(row[w])
+            if word == 0:
+                continue
+            base = w << 6
+            while word:
+                bit = (word & -word).bit_length() - 1
+                t = base + bit
+                if t < ncols_i:
+                    cols_i.append(t)
+                word &= word - 1
+    return out
+
+
+def gf2_matmul_sparse_rowlists(
+    left_rows: list[list[int]],
+    right_rows: list[list[int]],
+    ncols_right: int,
+) -> np.ndarray:
+    """GF(2) product of sparse matrices given as per-row column-index lists.
+
+    Cost is proportional to the number of intermediate nonzeros
+    ``∑_i ∑_{t ∈ left[i]} |right[t]|``, not to the dense dimensions.
+    """
+    m = len(left_rows)
+    n_mid = len(right_rows)
+    nwords_r = (int(ncols_right) + 63) // 64
+    out = np.zeros((m, nwords_r), dtype=np.uint64)
+    if m == 0 or n_mid == 0 or ncols_right == 0:
+        return out
+
+    for i, ts in enumerate(left_rows):
+        if not ts:
+            continue
+        ones: set[int] = set()
+        for t in ts:
+            if t < 0 or t >= n_mid:
+                raise ValueError(f"left column index {t} out of range for right with {n_mid} rows")
+            for j in right_rows[t]:
+                if j in ones:
+                    ones.discard(j)
+                else:
+                    ones.add(j)
+        if not ones:
+            continue
+        out_row = out[i]
+        for j in ones:
+            out_row[j >> 6] ^= np.uint64(1) << np.uint64(j & 63)
+    return out
 
 
 def _swap_rows_in_col_index(
@@ -361,11 +459,9 @@ def gf2_matmul_packed_stacked_rows(
     bit vector of length ``ncols_*`` stored in ``ceil(ncols_*/64)`` little-endian words
     (column ``j`` lives in bit ``j & 63`` of word ``j >> 6``).
 
-    This implements the **stacked-rows** / ``A``-as-selector view: row ``i`` of the
-    product is the XOR (sum in GF(2)) of those rows ``t`` of ``right`` for which
-    ``left[i, t] == 1``.  No dense ``int64`` matmul and no full expansion of either
-    factor, so ∂² checks scale with column weight of ``left`` rather than forcing a
-    dense ``O(m * n * p)`` integer multiply.
+    Multiplication extracts the sparse nonzero patterns of both factors and composes
+    them with :func:`gf2_matmul_sparse_rowlists`, so cost tracks intermediate nonzeros
+    rather than a dense ``O(m · n · p)`` pass or an ``O(m · n)`` packed-column scan.
 
     Args:
         left: Shape ``(m, nwords_L)`` with ``nwords_L = ceil(ncols_left / 64)``.
@@ -381,30 +477,18 @@ def gf2_matmul_packed_stacked_rows(
     if left.size == 0 or right.size == 0 or ncols_left == 0 or ncols_right == 0:
         return np.zeros((int(left.shape[0]), (int(ncols_right) + 63) // 64), dtype=np.uint64)
 
-    m = int(left.shape[0])
     n_mid = int(ncols_left)
     if int(right.shape[0]) != n_mid:
         raise ValueError(f"right must have ncols_left={n_mid} rows, got {right.shape[0]}")
 
-    nwords_r = (int(ncols_right) + 63) // 64
-    out = np.zeros((m, nwords_r), dtype=np.uint64)
-
-    # Column t of `left` selects row t of `right` into every output row where the bit is 1.
-    for t in range(n_mid):
-        w = t >> 6
-        sh = t & 63
-        col_bits = (left[:, w] >> np.uint64(sh)) & np.uint64(1)
-        rows = np.flatnonzero(col_bits)
-        if rows.size == 0:
-            continue
-        out[rows, :] ^= right[t, :]
-
-    return out
+    left_rows = _packed_to_sparse_rowlists(left, n_mid)
+    right_rows = _packed_to_sparse_rowlists(right, int(ncols_right))
+    return gf2_matmul_sparse_rowlists(left_rows, right_rows, int(ncols_right))
 
 
 def _chain_square_violations(
     *,
-    packed_by_k: dict[int, np.ndarray],
+    sparse_by_k: dict[int, list[list[int]]],
     ncols_by_k: dict[int, int],
     kmin: int,
     kmax: int,
@@ -413,21 +497,21 @@ def _chain_square_violations(
     """Return nonempty list if any ∂_k ∘ ∂_{k+1} is nonzero over GF(2) for kmin < k < kmax."""
     violations: list[dict[str, Any]] = []
     for k in range(max(1, kmin + 1), kmax + 1):
-        p_lo = packed_by_k.get(k)
-        p_hi = packed_by_k.get(k + 1)
-        if p_lo is None or p_hi is None:
+        left_rows = sparse_by_k.get(k)
+        right_rows = sparse_by_k.get(k + 1)
+        if left_rows is None or right_rows is None:
             continue
         n_mid = int(ncols_by_k.get(k, 0))
         n_hi = int(ncols_by_k.get(k + 1, 0))
         if n_mid == 0 or n_hi == 0:
             continue
-        nrows_lo = int(p_lo.shape[0])
-        nrows_hi = int(p_hi.shape[0])
+        nrows_lo = len(left_rows)
+        nrows_hi = len(right_rows)
         _verbose_line(
             verbose,
-            f"chain_square: checking ∂_{k}∘∂_{k + 1} (packed multiply), " + f"shapes ({nrows_lo},{n_mid})@({nrows_hi},{n_hi})",
+            f"chain_square: checking ∂_{k}∘∂_{k + 1} (sparse multiply), " + f"shapes ({nrows_lo},{n_mid})@({nrows_hi},{n_hi})",
         )
-        comp_packed = gf2_matmul_packed_stacked_rows(p_lo, n_mid, p_hi, n_hi)
+        comp_packed = gf2_matmul_sparse_rowlists(left_rows, right_rows, n_hi)
         _mask_trailing_bits_in_last_word(comp_packed, n_hi)
         nonzero = bool(comp_packed.any())
         _verbose_line(
@@ -470,6 +554,7 @@ def get_betti_numbers(
         reduced: If True, return reduced homology (β̃₀ = β₀ - 1 for nonempty complexes).
         verify_chain_complex: If True, require ``∂_k ∘ ∂_{k+1} = 0`` (mod 2) for every ``k``
             where both maps exist; otherwise raise :class:`ChainComplexInconsistent`.
+            Uses sparse GF(2) matrix multiplication over the nonzero incidence pattern.
         verify_connected_components: If True, require rank-formula β₀ to agree with the
             number of path-connected components when ``kmin == 0``; otherwise raise
             :class:`ConnectedComponentsMismatch`.
@@ -521,26 +606,36 @@ def get_betti_numbers(
     _verbose_line(verbose, f"get_betti_numbers: cells by dim kmin={kmin} kmax={kmax} ({counts})")
 
     boundary_rank: dict[int, int] = {k: 0 for k in range(kmin, kmax + 2)}
-    packed_by_k: dict[int, np.ndarray] = {}
+    sparse_by_k: dict[int, list[list[int]]] = {}
     ncols_by_k: dict[int, int] = {}
 
     k_values = list(range(max(1, kmin), kmax + 1))
 
     # -------------------------------------------------------------------
     # Phase A: build all boundary matrices (sequential – fast).
-    # Copies for verify_chain_complex are taken here, before any in-place
-    # rank elimination modifies the arrays.
+    # When verifying, also keep sparse XOR row lists for ∂² checks (no
+    # packed copies; rank may mutate the packed arrays in place).
     # -------------------------------------------------------------------
     matrices: dict[int, tuple[np.ndarray, int]] = {}
     for k in k_values:
-        packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, require_shared_faces=require_shared_faces)
+        if verify_chain_complex:
+            packed, ncols, sparse_rows = _packed_boundary_matrix(
+                meta,
+                nodes_by_dim,
+                k=k,
+                require_shared_faces=require_shared_faces,
+                also_sparse=True,
+            )
+        else:
+            packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, require_shared_faces=require_shared_faces)
+            sparse_rows = None
         ncols_by_k[k] = ncols
         if ncols == 0:
             boundary_rank[k] = 0
             _verbose_line(verbose, f"get_betti_numbers: ∂_{k} skipped (no columns)")
         else:
-            if verify_chain_complex:
-                packed_by_k[k] = packed.copy()
+            if sparse_rows is not None:
+                sparse_by_k[k] = sparse_rows
             matrices[k] = (packed, ncols)
 
     # -------------------------------------------------------------------
@@ -611,7 +706,7 @@ def get_betti_numbers(
     if verify_chain_complex:
         _verbose_line(verbose, "get_betti_numbers: verifying ∂²=0 (chain_square) …")
         viol = _chain_square_violations(
-            packed_by_k=packed_by_k,
+            sparse_by_k=sparse_by_k,
             ncols_by_k=ncols_by_k,
             kmin=kmin,
             kmax=kmax,
