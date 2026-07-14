@@ -5,6 +5,8 @@ Submodules:
 - :mod:`~relucent.graph.incidence` — sign-sequence face rules, dual-graph assembly, and
   meta-graph edge collection. Called from :meth:`~relucent.core.complex.Complex.get_dual_graph`,
   :meth:`~relucent.core.complex.Complex.get_meta_graph`, and :func:`~relucent.verify.certify.certify_complex`.
+- :mod:`~relucent.graph.covectors` — exact sign-intersection reconstruction of the
+  face lattice from labeled cubes in the top-cell dual graph.
 - :mod:`~relucent.graph.meta_graph` — truncation, compactification, and post-assembly audits.
   Called from :meth:`~relucent.core.complex.Complex.get_betti_numbers` and
   :mod:`relucent.topology.persistence`.

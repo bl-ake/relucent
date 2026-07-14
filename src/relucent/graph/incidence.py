@@ -214,15 +214,11 @@ def _dual_edges_flip_neighbors(
             shi_i = int(shi)
             if shi_i >= ss.shape[-1] or int(ss.ravel()[shi_i]) == 0:
                 raise ValueError(f"SHI {shi_i} is out of bounds for sign sequence {ss}.")
-            if int(u.dim) == 1 and u.halfspaces is not None and not u.is_shi_face_feasible(shi_i):
-                continue
             vt = flip_tag(ss, shi_i)
             if vt not in neighbor_tags:
                 continue
             v = tag_to_poly.get(vt)
             if v is None or u.tag == v.tag:
-                continue
-            if int(v.dim) == 1 and v.halfspaces is not None and not v.is_shi_face_feasible(shi_i):
                 continue
             lo, hi = (u.tag, v.tag) if u.tag < v.tag else (v.tag, u.tag)
             if (lo, hi) in seen:
@@ -467,10 +463,9 @@ def verify_shi_flip_neighbors(ss: np.ndarray, shis: Iterable[int], *, neighbor_t
 
 
 def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> list[int]:
-    assigned = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
-    if int(poly.dim) == 1 and poly.halfspaces is not None:
-        assigned = [s for s in assigned if poly.is_shi_face_feasible(int(s))]
-    return assigned
+    if int(poly.dim) == 1 and poly._covector_endpoint_shis is not None:
+        return sorted(int(shi) for shi in poly._covector_endpoint_shis)
+    return cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
 
 
 def set_contracted_shis(cplx: Complex) -> int:
@@ -596,9 +591,8 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
 
     Node ``shis`` use cubical flip-neighbor SHIs, never the propagated LP-derived
     ``poly._shis`` cache -- LP facets can be a strict subset that would silently
-    under-report meta-graph adjacency. For contracted 1-cells, crossings where the
-    corresponding 0-face endpoint is geometrically infeasible are filtered out, matching
-    the behavior of :func:`_contracted_shis_for_poly`.
+    under-report meta-graph adjacency. The meta-graph orchestrator replaces 1-cell
+    SHIs with labels of verified 0-face incidences after face edges are assembled.
 
     Called for every node added in :meth:`~relucent.core.complex.Complex.get_meta_graph`
     (chain cells and lazily discovered face polys).
@@ -612,9 +606,6 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
     ss_arr = np.asarray(poly.ss_np)
     crossings = list(ss_nonzero_indices(ss_arr))
     node_shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags)
-    # 1-cells: filter out crossings whose 0-face endpoint is geometrically infeasible.
-    if int(poly.dim) == 1 and poly.halfspaces is not None:
-        node_shis = [s for s in node_shis if poly.is_shi_face_feasible(int(s))]
     return {
         "poly": poly,
         "dim": int(poly.dim),

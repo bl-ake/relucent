@@ -10,6 +10,10 @@ rely on. Each :class:`CertifyLevel` is cumulative and fails closed:
   complex (every geometric facet has a same-dimension neighbor in the complex).
 - ``GEOMETRIC``: adds a fresh LP recompute of ``_shis`` on every cached cell.
 
+Chain and meta-graph reconstruction consume only the combinatorial certification.
+``COMPLETE`` and ``GEOMETRIC`` remain optional checks for search and geometry APIs;
+they are not part of the covector topology builder.
+
 Repair is conservative and explicit: when ``repair=True`` (the default),
 :func:`~relucent.graph.incidence.build_dual_graph` resyncs each top cell's ``_shis``
 from the combinatorial dual graph before any check runs. No other repair is

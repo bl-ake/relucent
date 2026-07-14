@@ -2,7 +2,7 @@
 
 import hashlib
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import cached_property
 from typing import Any, cast
 
@@ -79,6 +79,8 @@ class Polyhedron:
         self._finite_computed: bool = finite is not None
         self._vertices: np.ndarray | None = None
         self._volume: float | None = None
+        self._covector_infeasible: bool = False
+        self._covector_endpoint_shis: list[int] | None = None
 
         self._hash: int | None = None
         self._tag: bytes | None = None
@@ -164,6 +166,48 @@ class Polyhedron:
             if np.any(ineq_slacks > float(cfg.TOL_HALFSPACE_CONTAINMENT)):
                 return None
         return x
+
+    def verify_vertex_covector(
+        self,
+        vertex_ss: np.ndarray,
+        *,
+        point2preactivations: Callable[[np.ndarray], np.ndarray],
+        sign_margin: float,
+    ) -> np.ndarray | None:
+        """Recover and verify a vertex predicted from this top-dimensional coface.
+
+        Only the equality solve uses floating-point arithmetic. Verification
+        ignores the zero coordinates and requires every predicted nonzero
+        preactivation to lie strictly beyond ``sign_margin``.
+        """
+        ss = np.asarray(vertex_ss, dtype=np.int8)
+        row = ss.ravel()
+        zero_indices = np.flatnonzero(row == 0).astype(np.intp, copy=False)
+        ambient_dim = int(self.ambient_dim)
+        if zero_indices.size != ambient_dim:
+            return None
+
+        hs = np.asarray(self.halfspaces_np, dtype=np.float64)
+        if hs.shape[0] < row.size:
+            raise ValueError(f"Halfspace row count {hs.shape[0]} is smaller than sign-sequence length {row.size}.")
+        equality_normals = hs[zero_indices, :-1]
+        if equality_normals.shape != (ambient_dim, ambient_dim):
+            return None
+        if int(np.linalg.matrix_rank(equality_normals)) != ambient_dim:
+            return None
+
+        point = self._halfspace_point(hs[: row.size], zero_indices)
+        if point is None:
+            return None
+        values = np.asarray(point2preactivations(point), dtype=np.float64).reshape(-1)
+        if values.size != row.size:
+            raise ValueError(f"Network produced {values.size} preactivations for a sign sequence of length {row.size}.")
+
+        nonzero = row != 0
+        signed_values = values[nonzero] * row[nonzero]
+        if np.any(signed_values <= float(sign_margin)):
+            return None
+        return point
 
     def _apply_zero_cell_finite_hint(self) -> None:
         """Mark 0-cells (vertices) as bounded without a Chebyshev LP."""
@@ -1110,6 +1154,8 @@ class Polyhedron:
             "_num_dead_relus": self._num_dead_relus,
             "_interior_point": self._interior_point,
             "_attempted_compute_properties": self._attempted_compute_properties,
+            "_covector_infeasible": self._covector_infeasible,
+            "_covector_endpoint_shis": self._covector_endpoint_shis,
             "warnings": self.warnings,
             "codim": self.codim,
             "dim": self.dim,

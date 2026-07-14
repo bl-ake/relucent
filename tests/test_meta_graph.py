@@ -300,8 +300,8 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
     # Derive expected trunc pads from open-cap counts (not hardcoded bits).
     sheet_n = cap_cache[sheet]
     ray_n = cap_cache[unbounded]
-    t1_s, t2_s = ((1, 1) if sheet_n >= 2 else (1, 0))
-    t1_r, t2_r = ((1, 1) if ray_n >= 2 else (1, 0))
+    t1_s, t2_s = (1, 1) if sheet_n >= 2 else (1, 0)
+    t1_r, t2_r = (1, 1) if ray_n >= 2 else (1, 0)
     sheet_ext = encode_ss(mg._ss_with_truncation_bits(ss_sheet, t1_s, t2_s))
     unbounded_ext = encode_ss(mg._ss_with_truncation_bits(ss_unbounded, t1_r, t2_r))
     t1_shi, t2_shi = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
@@ -311,9 +311,7 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
         for _, v, ed in meta_tr.out_edges(sheet_ext, data=True)
         if int(meta_tr.nodes[v].get("dim", -1)) == 1 and int(ed.get("shi", -1)) in trunc_bit_shis
     ]
-    assert len(cap_one_faces) == sheet_n, (
-        f"expected {sheet_n} truncation-bit cap 1-face(s) on 2-cell, got {cap_one_faces!r}"
-    )
+    assert len(cap_one_faces) == sheet_n, f"expected {sheet_n} truncation-bit cap 1-face(s) on 2-cell, got {cap_one_faces!r}"
 
     sheet_cap_1 = cap_one_faces[0]
     unbounded_cap_0 = _expected_cap_tags(np.asarray(meta_tr.nodes[unbounded_ext]["ss"]), ray_n)[0]
@@ -427,9 +425,7 @@ def test_open_cap_count_anchored_with_only_bi_infinite_facets_gets_one_cap() -> 
     # is intentional; full witnesses live in shi-regression / Synthetic_Progress).
     meta_tr = meta.copy()
     Complex.truncate_meta_graph(meta_tr)
-    sheet_ext = encode_ss(
-        mg._ss_with_truncation_bits(np.array([[1, 1, 1]], dtype=np.int8), 1, 0)
-    )
+    sheet_ext = encode_ss(mg._ss_with_truncation_bits(np.array([[1, 1, 1]], dtype=np.int8), 1, 0))
     assert sheet_ext in meta_tr.nodes
     t1_shi, _t2 = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
     cap = face_tag(np.asarray(meta_tr.nodes[sheet_ext]["ss"]), int(t1_shi))

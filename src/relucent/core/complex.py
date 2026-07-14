@@ -28,7 +28,7 @@ from relucent.core.errors import (
 )
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import SSManager
-from relucent.graph import incidence
+from relucent.graph import covectors, incidence
 from relucent.graph import meta_graph as mg
 from relucent.graph.complex_graph import (
     contract_dual_graph_for_shi,
@@ -406,6 +406,23 @@ class Complex:
         return out
 
     @torch.no_grad()
+    def preactivation_iterator(
+        self,
+        batch: torch.Tensor | np.ndarray,
+    ) -> Generator[torch.Tensor | np.ndarray, None, None]:
+        """Yield the preactivation values used by the sign sequence."""
+        if TORCH_AVAILABLE and isinstance(batch, torch.Tensor):
+            x: torch.Tensor | np.ndarray = batch.reshape((-1, *self._net.input_shape))
+        else:
+            x = np.asarray(batch, dtype=np.float64).reshape((-1, *self._net.input_shape))
+        for i, layer in enumerate(self._net.layers.values()):
+            x = self._net._apply_layer(layer, x)
+            if i in self.ss_layers:
+                yield x
+                if i == self.ss_layers[-1]:
+                    break
+
+    @torch.no_grad()
     def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor | np.ndarray, None, None]:
         """Generate sign sequences for each ReLU layer from a batch of data points.
 
@@ -417,21 +434,20 @@ class Complex:
             torch.Tensor: Sign sequences for each ReLU layer in
                 the network, indicating the activation pattern of that layer.
         """
-        if TORCH_AVAILABLE and isinstance(batch, torch.Tensor):
-            x: torch.Tensor | np.ndarray = batch.reshape((-1, *self._net.input_shape))
-            use_torch = True
-        else:
-            x = np.asarray(batch, dtype=np.float64).reshape((-1, *self._net.input_shape))
-            use_torch = False
-        for i, layer in enumerate(self._net.layers.values()):
-            x = self._net._apply_layer(layer, x)
-            if i in self.ss_layers:
-                if use_torch:
-                    yield torch.sign(torch.as_tensor(x))
-                else:
-                    yield np.sign(np.asarray(x))
-                if i == self.ss_layers[-1]:
-                    break
+        use_torch = TORCH_AVAILABLE and isinstance(batch, torch.Tensor)
+        for values in self.preactivation_iterator(batch):
+            if use_torch:
+                yield torch.sign(torch.as_tensor(values))
+            else:
+                yield np.sign(np.asarray(values))
+
+    def point2preactivations(self, batch: torch.Tensor | np.ndarray) -> np.ndarray | torch.Tensor:
+        """Return stacked ReLU preactivations in sign-sequence order."""
+        is_tensor = TORCH_AVAILABLE and isinstance(batch, torch.Tensor)
+        values = list(self.preactivation_iterator(batch))
+        if is_tensor:
+            return torch.hstack([torch.as_tensor(value) for value in values])
+        return np.hstack([np.asarray(value) for value in values])
 
     def point2ss(self, batch: torch.Tensor | np.ndarray) -> np.ndarray | torch.Tensor:
         """Convert a batch of data points to sign sequences.
@@ -1219,35 +1235,105 @@ class Complex:
         return new_complex
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
-        """Get the chain complex of the complex.
+        """Recover the chain complex from cubical stars in the top-cell dual graph.
 
-        Each contraction step produces one lower-dimensional slice of the complex.
-        The loop terminates when the contracted cells are 0-dimensional (vertices),
-        which have no further faces to contract.
-
-        Phantom vertices (geometrically infeasible 0-cells that would otherwise arise
-        from combinatorial contraction) are prevented upstream:
-        :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible` at 1-cell construction
-        and :func:`~relucent.graph.meta_graph.set_contracted_shis` on each slice.
+        All positive-dimensional cells are recovered by exact sign intersection.
+        Candidate vertices receive one float64 equality solve followed by strict
+        forward-sign verification; no facet or boundedness LP is used here.
 
         Raises:
-            IncompleteDualGraphError: If dual adjacency is incomplete at some dimension;
-                see :meth:`contract`.
+            CubicalConsistencyError: If the labeled top-cell graph is not cubical.
         """
+        self.assert_topology_ready()
+        if len(self) == 0:
+            return [self]
+        ambient_dim = int(self.dim)
+        top_dim = max(int(p.dim) for p in self)
+        top_cells = [p for p in self if int(p.dim) == top_dim]
+        graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
+        incidence.certify_dual_graph(graph, self, top_dim=top_dim)
+        cells_by_dim = covectors.enumerate_covectors(
+            top_cells,
+            graph,
+            ambient_dim=ambient_dim,
+            top_dim=top_dim,
+        )
+
+        vertex_points: dict[bytes, np.ndarray] = {}
+        rejected_vertices: set[bytes] = set()
+        for tag, cell in cells_by_dim.get(0, {}).items():
+            witness = self.tag2poly[min(cell.coface_tags)]
+            point = witness.verify_vertex_covector(
+                cell.ss,
+                point2preactivations=lambda x: np.asarray(self.point2preactivations(x)),
+                sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
+            )
+            if point is None:
+                rejected_vertices.add(tag)
+            else:
+                vertex_points[tag] = point
+
         chain: list[Complex] = [self]
-        while True:
-            cur = chain[-1]
-            if len(cur) == 0:
-                break
-            new_complex = cur.contract(verbose=verbose)
-            if len(new_complex) == 0:
-                break
-            chain.append(new_complex)
-            if verbose:
-                logger.info("Chain: %s, ...", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
-            if new_complex.index2poly[0].dim == 0:
-                # 0-cells are the bottom of the chain; contraction terminates here.
-                break
+        for dim in range(top_dim - 1, -1, -1):
+            recovered = cells_by_dim.get(dim, {})
+            if not recovered:
+                continue
+            cplx = Complex(self.net)
+            ordered_tags = sorted(recovered)
+            if dim == 1:
+                ordered_tags.sort(
+                    key=lambda tag: (
+                        -sum(
+                            incidence.face_tag(recovered[tag].ss, shi) in vertex_points
+                            for shi in incidence.ss_nonzero_indices(recovered[tag].ss)
+                        ),
+                        tag,
+                    )
+                )
+            elif dim == 0 and chain and len(chain[-1]) > 0 and int(chain[-1].index2poly[0].dim) == 1:
+                endpoint_order: list[bytes] = []
+                for one_cell in chain[-1]:
+                    for shi in one_cell._covector_endpoint_shis or []:
+                        endpoint_tag = incidence.face_tag(one_cell.ss_np, shi)
+                        if endpoint_tag in recovered and endpoint_tag not in endpoint_order:
+                            endpoint_order.append(endpoint_tag)
+                ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in endpoint_order]
+            for tag in ordered_tags:
+                cell = recovered[tag]
+                witness_tag = min(cell.coface_tags)
+                witness = self.tag2poly[witness_tag]
+                kwargs: dict[str, Any] = {
+                    "codim": ambient_dim - dim,
+                    "dim": dim,
+                    "_ambient_dim": ambient_dim,
+                }
+                point = vertex_points.get(tag)
+                if dim == 0:
+                    if point is None:
+                        continue
+                    kwargs["halfspaces"] = witness.halfspaces
+                    kwargs["finite"] = True
+                elif dim == 1:
+                    candidate_by_shi = {shi: incidence.face_tag(cell.ss, shi) for shi in incidence.ss_nonzero_indices(cell.ss)}
+                    candidate_vertices = set(candidate_by_shi.values())
+                    kwargs["_covector_endpoint_shis"] = sorted(
+                        shi for shi, face in candidate_by_shi.items() if face in vertex_points
+                    )
+                    kwargs["_covector_infeasible"] = not (candidate_vertices & vertex_points.keys()) and bool(
+                        candidate_vertices & rejected_vertices
+                    )
+                poly = cplx.add_ss(cell.ss, **kwargs)
+                if point is not None:
+                    poly._interior_point = point
+
+            if len(cplx) == 0:
+                continue
+            incidence.set_contracted_shis(cplx)
+            if cfg.CAREFUL_MODE:
+                incidence.verify_contracted_shis(cplx)
+            cplx.set_exploration_state(complete=True, verified=True)
+            chain.append(cplx)
+
         if verbose:
             logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
@@ -1436,9 +1522,7 @@ class Complex:
         meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
 
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
-        # Pre-compute finite for chain-complex cells in parallel; contracted
-        # lower-dim cells don't have finite cached yet (contract() only copies
-        # halfspaces, not the Chebyshev solve result).
+        # Collect the recovered cells once for boundedness classification.
         all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
         logger.info(
             "get_meta_graph: chain complex has %d dimensions, %d cells",
@@ -1449,8 +1533,6 @@ class Complex:
         lookup: dict[bytes, Polyhedron] = dict(self.tag2poly)
         for c_k in by_dim.values():
             lookup.update(c_k.tag2poly)
-
-        top_dim = max(by_dim.keys())
 
         dim_neighbor_tags: dict[int, set[bytes]] = {int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()}
 
@@ -1509,23 +1591,22 @@ class Complex:
                 if face_tag_key not in lookup and face_tag_key in self.tag2poly:
                     lookup[face_tag_key] = self.tag2poly[face_tag_key]
 
-        # Drop any stale finite hints on contracted cells before combinatorial
-        # classification.  Boundedness is not monotone downward (a bounded coface
-        # may still have unbounded faces), so hints from contraction must not
-        # short-circuit the ascending sweep.
+        # Recompute boundedness solely from the recovered face lattice.
         for p in all_chain_polys:
-            if 0 < p.dim < top_dim:
+            if p.dim > 0:
                 p._finite_computed = False
                 p._finite = None
 
         # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
+        covector_infeasible = {p.tag for p in by_dim.get(1, ()) if bool(getattr(p, "_covector_infeasible", False))}
         n_from_faces, infeasible_one_cells = incidence.classify_one_cells_finite_from_face_edges(
             by_dim,
             edges_by_dim,
+            geometric_infeasible=covector_infeasible,
         )
         if infeasible_one_cells:
             logger.info(
-                "get_meta_graph: %d infeasible 1-cells (no 0-faces, empty geometry)",
+                "get_meta_graph: %d 1-cells excluded by rejected combinatorial endpoints",
                 len(infeasible_one_cells),
             )
         if n_from_faces:
@@ -1534,7 +1615,7 @@ class Complex:
                 n_from_faces,
             )
 
-        # Step 2: ascending sweep to fixed point, then LP fallback for stragglers.
+        # Step 2: propagate boundedness upward from the 1-skeleton.
         n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
         if n_ascending:
             logger.info(
@@ -1542,16 +1623,12 @@ class Complex:
                 n_ascending,
             )
 
-        n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
-        if n_lp:
-            logger.info("get_meta_graph: LP fallback classified %d chain cells", n_lp)
-
         pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
         if pending_finite:
             detail = incidence.format_pending_finite_polys(all_chain_polys)
             msg = (
                 f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
-                + "still unclassified after combinatorial passes and LP fallback. "
+                + "still unclassified after combinatorial passes. "
                 + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
                 + detail
             )
@@ -1582,6 +1659,9 @@ class Complex:
             )
 
         comb_zero_by_tag = incidence.combinatorial_zero_faces_by_one_cell(by_dim, edges_by_dim)
+        one_face_shis: dict[bytes, set[int]] = {}
+        for one_tag, _zero_tag, shi in edges_by_dim.get(1, ([], []))[0]:
+            one_face_shis.setdefault(one_tag, set()).add(int(shi))
 
         for k, c_k in sorted(by_dim.items(), reverse=True):
             neighbor_tags = dim_neighbor_tags[int(k)]
@@ -1591,6 +1671,7 @@ class Complex:
                 node_attrs = incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags)
                 if int(p.dim) == 1:
                     node_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(p.tag, 0)
+                    node_attrs["shis"] = sorted(one_face_shis.get(p.tag, set()))
                 meta.add_node(p.tag, **node_attrs)
 
         # Add cached face edges k -> k-1.
@@ -1609,6 +1690,7 @@ class Complex:
                 face_attrs = incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors)
                 if int(lookup[face_tag_key].dim) == 1:
                     face_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(face_tag_key, 0)
+                    face_attrs["shis"] = sorted(one_face_shis.get(face_tag_key, set()))
                 meta.add_node(
                     face_tag_key,
                     **face_attrs,

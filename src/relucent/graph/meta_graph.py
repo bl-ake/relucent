@@ -324,9 +324,6 @@ def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any], *, exclude_truncation_bits:
                 t1, t2 = _truncation_bit_indices(ss_arr)
                 trunc_shis = frozenset({t1, t2})
             shis = cubical_cell_shis(ss_arr, neighbor_tags=neighbor_tags, exclude_shis=trunc_shis)
-            poly = attrs.get("poly")
-            if int(dim) == 1 and poly is not None and poly.halfspaces is not None:
-                shis = [s for s in shis if poly.is_shi_face_feasible(int(s))]
             edge_shis: list[int] = []
             if int(dim) == 1:
                 edge_shis = sorted(
@@ -338,12 +335,8 @@ def _sync_meta_node_shis(meta: nx.MultiDiGraph[Any], *, exclude_truncation_bits:
                         if int(shi) not in trunc_shis
                     }
                 )
-            if int(dim) == 1 and attrs.get("finite") is True and len(shis) < 2:
-                if len(edge_shis) >= 2 or (exclude_truncation_bits and edge_shis):
-                    shis = edge_shis
-            elif exclude_truncation_bits and int(dim) == 1 and len(shis) > 2:
-                # Prefer combinatorial 0-face incidences over excess cubical flips.
-                shis = edge_shis if 1 <= len(edge_shis) <= 2 else shis[:2]
+            if int(dim) == 1:
+                shis = edge_shis
             attrs["shis"] = shis
 
 
@@ -520,9 +513,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     if tag_remap:
         cap_count_cache = {tag_remap.get(k, k): v for k, v in cap_count_cache.items()}
         unbounded = {tag_remap.get(n, n) for n in unbounded}
-        pre_trunc_edges = [
-            (tag_remap.get(u, u), tag_remap.get(v, v), shi) for u, v, shi in pre_trunc_edges
-        ]
+        pre_trunc_edges = [(tag_remap.get(u, u), tag_remap.get(v, v), shi) for u, v, shi in pre_trunc_edges]
 
     for orig in unbounded:
         oa = meta.nodes[orig]
@@ -655,8 +646,8 @@ def verify_meta_graph_incidence(
     """Check assembled meta-graph matches the stateless incidence engine.
 
     - Face edges equal ``ss_nonzero_indices`` zeroings kept by lookup.
-    - Node ``shis`` equal :func:`~relucent.graph.incidence.cubical_cell_shis` on each
-      dimension slice (never the propagated ``poly._shis`` LP cache).
+    - Node ``shis`` equal cubical flip labels above dimension one; 1-cell SHIs are
+      labels of verified 0-face incidences.
     - ``finite`` on chain cells matches combinatorial classification from face edges.
 
     Invoked when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with
@@ -695,9 +686,14 @@ def verify_meta_graph_incidence(
             if poly.tag not in meta.nodes:
                 continue
             expected_shis = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
-            # 1-cells: filter geometrically infeasible crossings, matching meta_node_attrs.
-            if int(poly.dim) == 1 and poly.halfspaces is not None:
-                expected_shis = [s for s in expected_shis if poly.is_shi_face_feasible(int(s))]
+            if int(poly.dim) == 1:
+                expected_shis = sorted(
+                    {
+                        int(data["shi"])
+                        for _u, v, data in meta.out_edges(poly.tag, data=True)
+                        if int(meta.nodes[v].get("dim", -1)) == 0
+                    }
+                )
             actual_shis = sorted(int(s) for s in meta.nodes[poly.tag].get("shis", []))
             if actual_shis != expected_shis:
                 raise AssertionError(f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}")

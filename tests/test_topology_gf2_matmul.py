@@ -49,8 +49,8 @@ def test_gf2_matmul_sparse_rowlists_matches_dense() -> None:
     b = rng.integers(0, 2, size=(n, p), dtype=np.uint8)
     dense_c = (a.astype(np.int64) @ b.astype(np.int64)) % 2
 
-    left_rows = [list(np.flatnonzero(a[i])) for i in range(m)]
-    right_rows = [list(np.flatnonzero(b[t])) for t in range(n)]
+    left_rows = [[int(j) for j in np.flatnonzero(a[i])] for i in range(m)]
+    right_rows = [[int(j) for j in np.flatnonzero(b[t])] for t in range(n)]
     packed = gf2_matmul_sparse_rowlists(left_rows, right_rows, p)
     _mask_trailing_bits_in_last_word(packed, p)
     np.testing.assert_array_equal(_packed_to_dense_mod2(packed, p), dense_c.astype(np.uint8))
