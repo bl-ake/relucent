@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
+
 import networkx as nx
 import numpy as np
 import pytest
@@ -129,9 +131,96 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     monkeypatch.setattr("relucent.geometry.calculations.get_shis", fail)
     monkeypatch.setattr("relucent.core.poly.get_shis", fail)
     monkeypatch.setattr("relucent.verify.certify.verify_lp_flip_neighbors_in_complex", fail)
-    monkeypatch.setattr(Polyhedron, "get_center_inradius", fail)
+    # Chebyshev may run for zero-face 1-cells in geometric_infeasible_one_cells; SHI LPs must not.
 
     chain = cplx.get_chain_complex()
     meta = cplx.get_meta_graph()
     assert chain
+    assert meta.number_of_nodes() > 0
+
+
+def test_get_chain_complex_skips_1cells_with_only_rejected_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Virtual vertices must not leave poisoned 1-cells that wipe nonempty cofaces."""
+    from relucent.graph import covectors, incidence
+    from relucent.utils import encode_ss
+
+    set_seeds(4)
+    cplx = Complex(mlp(widths=[2, 4, 1], add_last_relu=True, init="uniform"))
+    explore_for_topology(cplx, np.zeros(2), max_polys=2000, nworkers=1)
+
+    top_dim = max(int(p.dim) for p in cplx)
+    top_cells = [p for p in cplx if int(p.dim) == top_dim]
+    graph = cplx.get_dual_graph(verbose=False, require_complete=False)
+    cells_by_dim = covectors.enumerate_covectors(top_cells, graph, ambient_dim=int(cplx.dim), top_dim=top_dim)
+    assert cells_by_dim.get(0), "expected at least one combinatorial vertex"
+    reject_tag = next(iter(cells_by_dim[0]))
+
+    dim0_tags = set(cells_by_dim.get(0, {}))
+    expected_skip: set[bytes] = set()
+    for tag, cell in cells_by_dim.get(1, {}).items():
+        candidates = {incidence.face_tag(cell.ss, shi) for shi in incidence.ss_nonzero_indices(cell.ss)}
+        in_dim0 = candidates & dim0_tags
+        if in_dim0 and in_dim0 <= {reject_tag}:
+            expected_skip.add(tag)
+    assert expected_skip, "fixture must yield a 1-cell whose only dim-0 endpoints are rejected"
+
+    original = Polyhedron.verify_vertex_covector
+
+    def patched(
+        self: Polyhedron,
+        vertex_ss: np.ndarray,
+        *,
+        point2preactivations: Callable[[np.ndarray], np.ndarray],
+        sign_margin: float,
+    ) -> np.ndarray | None:
+        tag = encode_ss(np.asarray(vertex_ss, dtype=np.int8))
+        if tag == reject_tag:
+            return None
+        return original(
+            self,
+            vertex_ss,
+            point2preactivations=point2preactivations,
+            sign_margin=sign_margin,
+        )
+
+    monkeypatch.setattr(Polyhedron, "verify_vertex_covector", patched)
+
+    chain = cplx.get_chain_complex(verbose=False)
+    one_cplx = next((c for c in chain if len(c) and int(c.index2poly[0].dim) == 1), None)
+    present_one = {p.tag for p in one_cplx} if one_cplx is not None else set()
+    assert expected_skip.isdisjoint(present_one)
+
+    zero_cplx = next((c for c in chain if len(c) and int(c.index2poly[0].dim) == 0), None)
+    if zero_cplx is not None:
+        assert reject_tag not in {p.tag for p in zero_cplx}
+
+    meta = cplx.get_meta_graph(verbose=False)
+    for p in top_cells:
+        assert p.tag in meta.nodes, "nonempty top cells must survive virtual-edge omission"
+
+
+def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Empty covector-infeasible set must not disable geometric_infeasible_one_cells."""
+    from relucent.graph import incidence
+
+    set_seeds(4)
+    cplx = Complex(mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
+    explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
+    cplx.get_chain_complex()
+
+    calls: list[int] = []
+    real = incidence.geometric_infeasible_one_cells
+
+    def wrapped(
+        by_dim: Mapping[int, Iterable[Polyhedron]],
+        edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]],
+    ) -> set[bytes]:
+        calls.append(1)
+        return real(by_dim, edges_by_dim)
+
+    monkeypatch.setattr(incidence, "geometric_infeasible_one_cells", wrapped)
+    meta = cplx.get_meta_graph(verbose=False)
+    assert calls, "get_meta_graph must still run Chebyshev phantom scan"
     assert meta.number_of_nodes() > 0

@@ -158,7 +158,7 @@
         "n_boundary_cells": 254,
         "truncated_betti": {
           "0": 1,
-          "1": 47
+          "2": 26
         },
         "methods_agree": true
       },
@@ -188,8 +188,8 @@
         "n_boundary_cells": 1072,
         "truncated_betti": {
           "0": 2,
-          "1": 61,
-          "2": 2
+          "1": 1,
+          "2": 34
         },
         "methods_agree": true
       },
@@ -216,14 +216,13 @@
         "max_polys": 0
       },
       "expected": {
-        "n_regions": 63099,
+        "n_regions": 63096,
         "n_boundary_cells": 1330,
         "truncated_betti": {
-          "0": 11,
-          "1": 59,
-          "2": 2
+          "0": 3,
+          "2": 38
         },
-        "methods_agree": true
+        "methods_agree": false
       },
       "boundary_shi": 40
     },
@@ -249,7 +248,7 @@
         "n_boundary_cells": 443,
         "truncated_betti": {
           "0": 1,
-          "1": 10
+          "2": 10
         },
         "methods_agree": true
       },

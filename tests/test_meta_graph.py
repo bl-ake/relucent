@@ -59,7 +59,9 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
     meta = db.get_meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
 
-    # Meta-graph should contain feasible cells; phantoms and their cofaces are excluded.
+    # Meta-graph omits cells with finite is None; nonempty cofaces of covector-virtual
+    # edges are kept (those edges are skipped in get_chain_complex). Chebyshev phantoms
+    # may still trigger coface wipe via propagate_infeasible_exclusion when unbounded.
     meta_tags = set(meta.nodes)
     for cc in chain:
         for p in cc:

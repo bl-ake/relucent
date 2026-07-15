@@ -35,20 +35,21 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
             "deep_2441_seed2",
             [2, 4, 4, 1],
             2,
-            [(43, 2), (76, 1), (33, 0)],
-            276,
-            {0: 1, 1: 1},
+            # Skip virtual (rejected-endpoint) 1-cells: 75 edges remain; one-point
+            # compactification is S² (β₂=1) rather than a spurious β₁ hole.
+            [(43, 2), (75, 1), (33, 0)],
+            282,
+            {0: 1, 2: 1},
         ),
         (
             "deep_3431_seed51",
             [3, 4, 3, 1],
             51,
-            # Chain / edge / Betti goldens refreshed vs earlier WIP that recorded
-            # (119,1) / 900 edges / {0:1, 2:15}; current cubical face discovery
-            # yields more 1-cells and one_point homology in β₁.
-            [(65, 3), (159, 2), (140, 1), (32, 0)],
-            603,
-            {0: 1, 1: 16},
+            # Virtual-edge skip restores earlier WIP counts (119 ones / 900 edges /
+            # one_point β₂=15) that were inflated while poisoned 1-cells remained.
+            [(65, 3), (159, 2), (119, 1), (32, 0)],
+            900,
+            {0: 1, 2: 15},
         ),
     ],
 )
@@ -87,7 +88,7 @@ def test_meta_graph_chain_complex_regression(
     ("name", "architecture", "seed", "betti"),
     [
         ("deep_2441_seed2", [2, 4, 4, 1], 2, {0: 1}),
-        ("deep_3431_seed51", [3, 4, 3, 1], 51, {0: 1, 1: 1}),
+        ("deep_3431_seed51", [3, 4, 3, 1], 51, {0: 1}),
     ],
 )
 def test_truncated_homology_chain_complex_regression(

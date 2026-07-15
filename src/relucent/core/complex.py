@@ -1217,6 +1217,7 @@ class Complex:
             ComplexNotCompleteError: If this complex is not complete.
             ComplexNotVerifiedError: If this complex is not verified.
         """
+        # !!! This should be redone
         self.assert_topology_ready()
         G = self.get_dual_graph(verbose=verbose, require_complete=True)
         new_complex = Complex(self.net)
@@ -1316,11 +1317,12 @@ class Complex:
                 elif dim == 1:
                     candidate_by_shi = {shi: incidence.face_tag(cell.ss, shi) for shi in incidence.ss_nonzero_indices(cell.ss)}
                     candidate_vertices = set(candidate_by_shi.values())
+                    # Virtual edge: every combinatorial endpoint was a rejected virtual vertex.
+                    # Skip it so meta-graph never lists it as a face (avoids coface wipe → spurious β₁).
+                    if not (candidate_vertices & vertex_points.keys()) and bool(candidate_vertices & rejected_vertices):
+                        continue
                     kwargs["_covector_endpoint_shis"] = sorted(
                         shi for shi, face in candidate_by_shi.items() if face in vertex_points
-                    )
-                    kwargs["_covector_infeasible"] = not (candidate_vertices & vertex_points.keys()) and bool(
-                        candidate_vertices & rejected_vertices
                     )
                 poly = cplx.add_ss(cell.ss, **kwargs)
                 if point is not None:
@@ -1598,15 +1600,18 @@ class Complex:
                 p._finite = None
 
         # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
+        # Union leftover covector flags with Chebyshev-empty phantoms (passing only the
+        # covector set would disable geometric_infeasible_one_cells).
         covector_infeasible = {p.tag for p in by_dim.get(1, ()) if bool(getattr(p, "_covector_infeasible", False))}
+        geometric_infeasible = covector_infeasible | incidence.geometric_infeasible_one_cells(by_dim, edges_by_dim)
         n_from_faces, infeasible_one_cells = incidence.classify_one_cells_finite_from_face_edges(
             by_dim,
             edges_by_dim,
-            geometric_infeasible=covector_infeasible,
+            geometric_infeasible=geometric_infeasible,
         )
         if infeasible_one_cells:
             logger.info(
-                "get_meta_graph: %d 1-cells excluded by rejected combinatorial endpoints",
+                "get_meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
                 len(infeasible_one_cells),
             )
         if n_from_faces:
@@ -1623,12 +1628,30 @@ class Complex:
                 n_ascending,
             )
 
+        # Skipping virtual 1-cells (rejected endpoints) can leave higher cells with
+        # incomplete combinatorial faces; resolve those via Chebyshev then re-ascend.
+        pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+        if pending_finite:
+            logger.info(
+                "get_meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
+                pending_finite,
+            )
+            n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
+            if n_lp:
+                logger.info("get_meta_graph: LP fallback classified %d cells", n_lp)
+            n_ascending2 = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
+            if n_ascending2:
+                logger.info(
+                    "get_meta_graph: post-LP ascending sweep classified %d cells",
+                    n_ascending2,
+                )
+
         pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
         if pending_finite:
             detail = incidence.format_pending_finite_polys(all_chain_polys)
             msg = (
                 f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
-                + "still unclassified after combinatorial passes. "
+                + "still unclassified after combinatorial passes and LP fallback. "
                 + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
                 + detail
             )
@@ -1637,7 +1660,7 @@ class Complex:
             logger.warning(msg)
         else:
             logger.info(
-                "get_meta_graph: all %d chain cells classified combinatorially",
+                "get_meta_graph: all %d chain cells classified",
                 len(all_chain_polys),
             )
 
