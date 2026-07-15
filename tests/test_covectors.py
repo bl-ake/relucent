@@ -118,6 +118,48 @@ def test_verify_vertex_covector_uses_only_nonzero_sign_margin() -> None:
     assert rejected is None
 
 
+def test_verify_vertex_covector_skips_dead_relu_coordinates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spurious ±1 on a vanishing normal must not reject a genuine vertex."""
+    import relucent.config as cfg
+
+    monkeypatch.setattr(cfg, "TOL_DEAD_RELU", 1e-8)
+    halfspaces = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1e-15, -1e-15, 2e-15],  # dead / vanishing hyperplane
+            [-1.0, -1.0, -1.0],
+        ]
+    )
+    coface = Polyhedron(
+        None,
+        np.array([[1, 1, -1, 1]], dtype=np.int8),
+        halfspaces=halfspaces,
+        dim=2,
+        _ambient_dim=2,
+    )
+    vertex_ss = np.array([[0, 0, -1, 1]], dtype=np.int8)
+
+    # Dead coord preactivation is below sign_margin; live coords match.
+    point = coface.verify_vertex_covector(
+        vertex_ss,
+        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-14, 2.0]]),
+        sign_margin=1e-7,
+    )
+    assert point is not None
+    assert np.array_equal(point, np.zeros(2))
+
+    # A live hyperplane with the wrong tiny preactivation is still virtual → reject.
+    rejected = coface.verify_vertex_covector(
+        vertex_ss,
+        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-14, 1e-14]]),
+        sign_margin=1e-7,
+    )
+    assert rejected is None
+
+
 def test_default_chain_and_meta_graph_do_not_call_lp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

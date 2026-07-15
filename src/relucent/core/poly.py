@@ -179,6 +179,11 @@ class Polyhedron:
         Only the equality solve uses floating-point arithmetic. Verification
         ignores the zero coordinates and requires every predicted nonzero
         preactivation to lie strictly beyond ``sign_margin``.
+
+        Coordinates whose halfspace normal vanishes (dead / near-dead ReLUs,
+        ``||a|| < TOL_DEAD_RELU``) are not real hyperplanes: they may still
+        carry a spurious combinatorial ``±1`` in ``vertex_ss``, but they are
+        skipped in the sign check so they do not reject genuine vertices.
         """
         ss = np.asarray(vertex_ss, dtype=np.int8)
         row = ss.ravel()
@@ -203,8 +208,13 @@ class Polyhedron:
         if values.size != row.size:
             raise ValueError(f"Network produced {values.size} preactivations for a sign sequence of length {row.size}.")
 
-        nonzero = row != 0
-        signed_values = values[nonzero] * row[nonzero]
+        # Skip vanishing normals: not real cuts, only noise in the sign alphabet.
+        normals = hs[: row.size, :-1]
+        normal_norms = np.linalg.norm(normals, axis=1)
+        active = (row != 0) & (normal_norms >= float(cfg.TOL_DEAD_RELU))
+        if not np.any(active):
+            return None
+        signed_values = values[active] * row[active]
         if np.any(signed_values <= float(sign_margin)):
             return None
         return point

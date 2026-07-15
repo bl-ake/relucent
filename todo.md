@@ -1,5 +1,6 @@
 - Rework `_shi_variable_bounds_to_try()`
 - clean up Poly init
+- Remove Poly's `num_dead_relus`
 - fix torch support for model.py
 - project lower-dim polyhedra for SHI calculations
 - deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
