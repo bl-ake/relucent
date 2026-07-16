@@ -3,9 +3,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Relucent Documentation: Index</title>
+  <title>Relucent Documentation: Covectors (face lattice recovery)</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
@@ -17,8 +18,10 @@
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/custom.js?v=add1a637"></script>
     <script src="_static/js/theme.js"></script>
-    <link rel="index" title="Index" href="#" />
+    <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Filtrations" href="filtration.html" />
+    <link rel="prev" title="Incidence (combinatorial primitives)" href="incidence.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -155,7 +158,7 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
@@ -328,16 +331,16 @@
 <li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Covectors (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -430,8 +433,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Index</li>
+      <li class="breadcrumb-item active">Covectors (face lattice recovery)</li>
       <li class="wy-breadcrumbs-aside">
+            <a href="_sources/covectors.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -439,702 +443,61 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
+  <section id="module-relucent.graph.covectors">
+<span id="covectors-face-lattice-recovery"></span><h1>Covectors (face lattice recovery)<a class="headerlink" href="#module-relucent.graph.covectors" title="Link to this heading"></a></h1>
+<p>Recover a generic cubical face lattice from a labeled tope graph.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.graph.covectors.CovectorCell">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.graph.covectors.</span></span><span class="sig-name descname"><span class="pre">CovectorCell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ss</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coface_tags</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">frozenset</span><span class="p"><span class="pre">[</span></span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_shis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.graph.covectors.CovectorCell" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>One cell recovered from its cubical star of top-dimensional cofaces.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.graph.covectors.CovectorCell.coface_tags">
+<span class="sig-name descname"><span class="pre">coface_tags</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">frozenset</span><span class="p"><span class="pre">[</span></span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.graph.covectors.CovectorCell.coface_tags" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
-<h1 id="index">Index</h1>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.graph.covectors.CovectorCell.ss">
+<span class="sig-name descname"><span class="pre">ss</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ndarray</span></span><a class="headerlink" href="#relucent.graph.covectors.CovectorCell.ss" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
-<div class="genindex-jumpbox">
- <a href="#A"><strong>A</strong></a>
- | <a href="#B"><strong>B</strong></a>
- | <a href="#C"><strong>C</strong></a>
- | <a href="#D"><strong>D</strong></a>
- | <a href="#E"><strong>E</strong></a>
- | <a href="#F"><strong>F</strong></a>
- | <a href="#G"><strong>G</strong></a>
- | <a href="#H"><strong>H</strong></a>
- | <a href="#I"><strong>I</strong></a>
- | <a href="#L"><strong>L</strong></a>
- | <a href="#M"><strong>M</strong></a>
- | <a href="#N"><strong>N</strong></a>
- | <a href="#O"><strong>O</strong></a>
- | <a href="#P"><strong>P</strong></a>
- | <a href="#R"><strong>R</strong></a>
- | <a href="#S"><strong>S</strong></a>
- | <a href="#T"><strong>T</strong></a>
- | <a href="#U"><strong>U</strong></a>
- | <a href="#V"><strong>V</strong></a>
- | <a href="#W"><strong>W</strong></a>
- | <a href="#Z"><strong>Z</strong></a>
- 
-</div>
-<h2 id="A">A</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#relucent.add_output_relu">add_output_relu() (in module relucent)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.add_point">add_point() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.add_polyhedron">add_polyhedron() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.add_ss">add_ss() (relucent.Complex method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="filtration.html#relucent.topology.filtration.AffineOutputFiltration">AffineOutputFiltration (class in relucent.topology.filtration)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.ambient_dim">ambient_dim (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.assemble_face_edges_by_dim">assemble_face_edges_by_dim() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.assert_topology_ready">assert_topology_ready() (relucent.Complex method)</a>
-</li>
-  </ul></td>
-</tr></table>
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.graph.covectors.CovectorCell.tag">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">tag</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bytes</span></span><a class="headerlink" href="#relucent.graph.covectors.CovectorCell.tag" title="Link to this definition"></a></dt>
+<dd><p>Stable sign-sequence tag.</p>
+</dd></dl>
 
-<h2 id="B">B</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.b">b (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.betti_at_filtration_end">betti_at_filtration_end() (in module relucent.topology.persistence)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.betti_curve">betti_curve() (in module relucent.topology.persistence)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.bfs">bfs() (relucent.Complex method)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair.birth">birth (relucent.topology.persistence.PersistencePair attribute)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair.birth_cell">birth_cell (relucent.topology.persistence.PersistencePair attribute)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.build_dual_graph">build_dual_graph() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-</tr></table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.graph.covectors.CovectorCell.zero_shis">
+<span class="sig-name descname"><span class="pre">zero_shis</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#relucent.graph.covectors.CovectorCell.zero_shis" title="Link to this definition"></a></dt>
+<dd></dd></dl>
 
-<h2 id="C">C</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistenceDiagram.cell_filtration">cell_filtration (relucent.topology.persistence.PersistenceDiagram attribute)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.center">center (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.certify">certify() (relucent.Complex method)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.certify_complex">certify_complex() (in module relucent.verify.certify)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.certify_dual_graph">certify_dual_graph() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.CertifyLevel">CertifyLevel (class in relucent.verify.certify)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.ch">ch (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.ChainComplexInconsistent">ChainComplexInconsistent</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.classify_finite_ascending">classify_finite_ascending() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.classify_finite_combinatorial">classify_finite_combinatorial() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.classify_finite_lp_fallback">classify_finite_lp_fallback() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.classify_lazy_face_polys">classify_lazy_face_polys() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.classify_one_cells_finite_from_face_edges">classify_one_cells_finite_from_face_edges() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.clean_data">clean_data() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.codim">codim (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags">coface_tags (relucent.graph.covectors.CovectorCell attribute)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.collect_meta_face_edges">collect_meta_face_edges() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="certify.html#relucent.verify.certify.CertifyLevel.COMBINATORIAL">COMBINATORIAL (relucent.verify.certify.CertifyLevel attribute)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.combine">combine (relucent.topology.filtration.AffineOutputFiltration attribute)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.complete">complete (relucent.Complex property)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.CertifyLevel.COMPLETE">COMPLETE (relucent.verify.certify.CertifyLevel attribute)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex">Complex (class in relucent)</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.ComplexNotCompleteError">ComplexNotCompleteError</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.ComplexNotVerifiedError">ComplexNotVerifiedError</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.compute_geometric_properties">compute_geometric_properties() (relucent.Complex method)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.compute_persistent_homology">compute_persistent_homology() (in module relucent.topology.persistence)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.ConnectedComponentsMismatch">ConnectedComponentsMismatch</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.ConstantFiltration">ConstantFiltration (class in relucent.topology.filtration)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.contract">contract() (relucent.Complex method)</a>
-</li>
-      <li><a href="utilities.html#relucent.convert">convert() (in module relucent)</a>
-</li>
-      <li><a href="covectors.html#relucent.graph.covectors.CovectorCell">CovectorCell (class in relucent.graph.covectors)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.cubical_cell_shis">cubical_cell_shis() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.CubicalAmbiguityError">CubicalAmbiguityError</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.CubicalConsistencyError">CubicalConsistencyError</a>
-</li>
-  </ul></td>
-</tr></table>
+</dd></dl>
 
-<h2 id="D">D</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair.death">death (relucent.topology.persistence.PersistencePair attribute)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair.death_cell">death_cell (relucent.topology.persistence.PersistencePair attribute)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.dfs">dfs() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.dim">dim (relucent.Complex property)</a>
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.graph.covectors.enumerate_covectors">
+<span class="sig-prename descclassname"><span class="pre">relucent.graph.covectors.</span></span><span class="sig-name descname"><span class="pre">enumerate_covectors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">top_cells</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="polyhedron.html#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">graph</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">nx.Graph</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="polyhedron.html#relucent.Polyhedron" title="relucent.Polyhedron"><span class="pre">Polyhedron</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">ambient_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">top_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">bytes</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#relucent.graph.covectors.CovectorCell" title="relucent.graph.covectors.CovectorCell"><span class="pre">CovectorCell</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.graph.covectors.enumerate_covectors" title="Link to this definition"></a></dt>
+<dd><p>Enumerate every generic cell from labeled hypercubes in the tope graph.</p>
+<p>The returned mapping is keyed by cell dimension. A local codimension-<code class="docutils literal notranslate"><span class="pre">c</span></code>
+cell has a complete <code class="docutils literal notranslate"><span class="pre">c</span></code>-cube of top-dimensional cofaces. Its covector
+contains the slice’s fixed zeros plus the <code class="docutils literal notranslate"><span class="pre">c</span></code> varying cube directions.</p>
+</dd></dl>
 
-      <ul>
-        <li><a href="polyhedron.html#relucent.Polyhedron.dim">(relucent.Polyhedron property)</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair.dimension">dimension (relucent.topology.persistence.PersistencePair attribute)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.discover_boundary_complex">discover_boundary_complex() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.dual_edges_top_dim">dual_edges_top_dim() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.dual_graph_edge_top_dim">dual_graph_edge_top_dim() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.DualGraphAsymmetricEdgeError">DualGraphAsymmetricEdgeError</a>
-</li>
-  </ul></td>
-</tr></table>
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.graph.covectors.sign_intersection">
+<span class="sig-prename descclassname"><span class="pre">relucent.graph.covectors.</span></span><span class="sig-name descname"><span class="pre">sign_intersection</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sign_sequences</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#relucent.graph.covectors.sign_intersection" title="Link to this definition"></a></dt>
+<dd><p>Intersect tope signs: retain constants and zero every varying coordinate.</p>
+</dd></dl>
 
-<h2 id="E">E</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="covectors.html#relucent.graph.covectors.enumerate_covectors">enumerate_covectors() (in module relucent.graph.covectors)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.equalities">equalities (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#relucent.explore_for_topology">explore_for_topology() (in module relucent)</a>
-
-      <ul>
-        <li><a href="exploration.html#relucent.search.exploration.explore_for_topology">(in module relucent.search.exploration)</a>
-</li>
-      </ul></li>
-  </ul></td>
-</tr></table>
-
-<h2 id="F">F</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="incidence.html#relucent.graph.incidence.face_tag">face_tag() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.faces">faces (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.feasible">feasible (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.Filtration">Filtration (class in relucent.topology.filtration)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="exploration.html#relucent.search.exploration.finalize_ambient_search">finalize_ambient_search() (in module relucent.search.exploration)</a>
-</li>
-      <li><a href="exploration.html#relucent.search.exploration.finalize_boundary_complex">finalize_boundary_complex() (in module relucent.search.exploration)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.finite">finite (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.finite_cells_subgraph">finite_cells_subgraph() (relucent.Complex static method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.flip_tag">flip_tag() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="G">G</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.G">G (relucent.Complex property)</a>
-</li>
-      <li><a href="utilities.html#relucent.generic_topology_start">generic_topology_start() (in module relucent)</a>
-
-      <ul>
-        <li><a href="exploration.html#relucent.search.exploration.generic_topology_start">(in module relucent.search.exploration)</a>
-</li>
-      </ul></li>
-      <li><a href="certify.html#relucent.verify.certify.CertifyLevel.GEOMETRIC">GEOMETRIC (relucent.verify.certify.CertifyLevel attribute)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.geometric_infeasible_one_cells">geometric_infeasible_one_cells() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.get_betti_numbers">get_betti_numbers() (in module relucent.topology)</a>
-
-      <ul>
-        <li><a href="complex.html#relucent.Complex.get_betti_numbers">(relucent.Complex method)</a>
-</li>
-      </ul></li>
-      <li><a href="complex.html#relucent.Complex.get_betti_numbers_from_meta">get_betti_numbers_from_meta() (relucent.Complex class method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_boundary_cells">get_boundary_cells() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_boundary_complex">get_boundary_complex() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_boundary_edges">get_boundary_edges() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_boundary_graph">get_boundary_graph() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces">get_bounded_halfspaces() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices">get_bounded_vertices() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_center_inradius">get_center_inradius() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_chain_complex">get_chain_complex() (relucent.Complex method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#relucent.get_colors">get_colors() (in module relucent)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_critical_points">get_critical_points() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_dual_graph">get_dual_graph() (relucent.Complex method)</a>
-</li>
-      <li><a href="utilities.html#relucent.get_env">get_env() (in module relucent)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_face">get_face() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_face_by_shis">get_face_by_shis() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_geometry">get_geometry() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_interior_point">get_interior_point() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_meta_graph">get_meta_graph() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.get_neighbor">get_neighbor() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_persistent_homology">get_persistent_homology() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.get_poly_attrs">get_poly_attrs() (relucent.Complex method)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows">gf2_matmul_packed_stacked_rows() (in module relucent.topology)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.gf2_rank_boundary">gf2_rank_boundary() (in module relucent.topology)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.gf2_rank_packed">gf2_rank_packed() (in module relucent.topology)</a>
-</li>
-      <li><a href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets">gf2_rank_sparse_rowsets() (in module relucent.topology)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.greedy_path">greedy_path() (relucent.Complex method)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="H">H</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.halfspaces">halfspaces (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.halfspaces_np">halfspaces_np (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.hamming_astar">hamming_astar() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.hs">hs (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.hyperplanes">hyperplanes (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="I">I</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="certify.html#relucent.core.errors.IncompleteDualGraphError">IncompleteDualGraphError</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.inequalities">inequalities (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.inradius">inradius (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.interior_point">interior_point (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.interior_point_norm">interior_point_norm (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.intrinsic_vertex_coords">intrinsic_vertex_coords() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.is_face_of">is_face_of() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.is_shi_face_feasible">is_shi_face_feasible() (relucent.Polyhedron method)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="L">L</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.load">load() (relucent.Complex class method)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.LogitSublevelFiltration">LogitSublevelFiltration (class in relucent.topology.filtration)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.ConstantFiltration.lower_star">lower_star (relucent.topology.filtration.ConstantFiltration attribute)</a>
-
-      <ul>
-        <li><a href="filtration.html#relucent.topology.filtration.Filtration.lower_star">(relucent.topology.filtration.Filtration attribute)</a>
-</li>
-        <li><a href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.lower_star">(relucent.topology.filtration.NeuronActivationFiltration attribute)</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="filtration.html#relucent.topology.filtration.lower_star_extension">lower_star_extension() (in module relucent.topology.filtration)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="M">M</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="incidence.html#relucent.graph.incidence.meta_node_attrs">meta_node_attrs() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="utilities.html#relucent.mlp">mlp() (in module relucent)</a>
-</li>
-      <li>
-    module
-
-      <ul>
-        <li><a href="certify.html#module-relucent.core.errors">relucent.core.errors</a>
-</li>
-        <li><a href="covectors.html#module-relucent.graph.covectors">relucent.graph.covectors</a>
-</li>
-        <li><a href="incidence.html#module-relucent.graph.incidence">relucent.graph.incidence</a>
-</li>
-        <li><a href="exploration.html#module-relucent.search.exploration">relucent.search.exploration</a>
-</li>
-        <li><a href="topology_api.html#module-relucent.topology">relucent.topology</a>
-</li>
-        <li><a href="filtration.html#module-relucent.topology.filtration">relucent.topology.filtration</a>
-</li>
-        <li><a href="certify.html#module-relucent.verify.certify">relucent.verify.certify</a>
-</li>
-      </ul></li>
-  </ul></td>
-</tr></table>
-
-<h2 id="N">N</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.n">n (relucent.Complex property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.net">net (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration">NeuronActivationFiltration (class in relucent.topology.filtration)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.nflips">nflips() (relucent.Polyhedron method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.non_zero_indices">non_zero_indices (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.NonGenericArrangementError">NonGenericArrangementError</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.num_dead_relus">num_dead_relus (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.num_faces">num_faces (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.num_shis">num_shis (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="O">O</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.one_point_compactify_meta_graph">one_point_compactify_meta_graph() (relucent.Complex static method)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="P">P</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistenceDiagram.pairs">pairs (relucent.topology.persistence.PersistenceDiagram attribute)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.parallel_add">parallel_add() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.parallel_collect_meta_face_edges">parallel_collect_meta_face_edges() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.partial_derivative_on_1cell">partial_derivative_on_1cell() (relucent.Complex method)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistenceDiagram">PersistenceDiagram (class in relucent.topology.persistence)</a>
-</li>
-      <li><a href="persistence.html#relucent.topology.persistence.PersistencePair">PersistencePair (class in relucent.topology.persistence)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.plot">plot() (relucent.Complex method)</a>
-
-      <ul>
-        <li><a href="persistence.html#relucent.topology.persistence.PersistenceDiagram.plot">(relucent.topology.persistence.PersistenceDiagram method)</a>
-</li>
-      </ul></li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.plot_cells">plot_cells() (relucent.Polyhedron method)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="utilities.html#relucent.plot_complex">plot_complex() (in module relucent)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.plot_graph">plot_graph() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="utilities.html#relucent.plot_polyhedron">plot_polyhedron() (in module relucent)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.point2poly">point2poly() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.point2preactivations">point2preactivations() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.point2ss">point2ss() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron">Polyhedron (class in relucent)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.preactivation_iterator">preactivation_iterator() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.propagate_infeasible_exclusion">propagate_infeasible_exclusion() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="R">R</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.random_walk">random_walk() (relucent.Complex method)</a>
-</li>
-      <li><a href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.raw_cell_value">raw_cell_value() (relucent.topology.filtration.AffineOutputFiltration method)</a>
-
-      <ul>
-        <li><a href="filtration.html#relucent.topology.filtration.ConstantFiltration.raw_cell_value">(relucent.topology.filtration.ConstantFiltration method)</a>
-</li>
-        <li><a href="filtration.html#relucent.topology.filtration.Filtration.raw_cell_value">(relucent.topology.filtration.Filtration method)</a>
-</li>
-        <li><a href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.raw_cell_value">(relucent.topology.filtration.NeuronActivationFiltration method)</a>
-</li>
-        <li><a href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration.raw_cell_value">(relucent.topology.filtration.TrainingDistanceFiltration method)</a>
-</li>
-      </ul></li>
-      <li><a href="complex.html#relucent.Complex.recover_from_dual_graph">recover_from_dual_graph() (relucent.Complex method)</a>
-</li>
-      <li>
-    relucent.core.errors
-
-      <ul>
-        <li><a href="certify.html#module-relucent.core.errors">module</a>
-</li>
-      </ul></li>
-      <li>
-    relucent.graph.covectors
-
-      <ul>
-        <li><a href="covectors.html#module-relucent.graph.covectors">module</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li>
-    relucent.graph.incidence
-
-      <ul>
-        <li><a href="incidence.html#module-relucent.graph.incidence">module</a>
-</li>
-      </ul></li>
-      <li>
-    relucent.search.exploration
-
-      <ul>
-        <li><a href="exploration.html#module-relucent.search.exploration">module</a>
-</li>
-      </ul></li>
-      <li>
-    relucent.topology
-
-      <ul>
-        <li><a href="topology_api.html#module-relucent.topology">module</a>
-</li>
-      </ul></li>
-      <li>
-    relucent.topology.filtration
-
-      <ul>
-        <li><a href="filtration.html#module-relucent.topology.filtration">module</a>
-</li>
-      </ul></li>
-      <li>
-    relucent.verify.certify
-
-      <ul>
-        <li><a href="certify.html#module-relucent.verify.certify">module</a>
-</li>
-      </ul></li>
-  </ul></td>
-</tr></table>
-
-<h2 id="S">S</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.save">save() (relucent.Complex method)</a>
-</li>
-      <li><a href="exploration.html#relucent.search.exploration.search_stats_dict">search_stats_dict() (in module relucent.search.exploration)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.searcher">searcher() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.set_contracted_shis">set_contracted_shis() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.set_exploration_state">set_exploration_state() (relucent.Complex method)</a>
-</li>
-      <li><a href="utilities.html#relucent.set_seeds">set_seeds() (in module relucent)</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.ShiFlipInvariantError">ShiFlipInvariantError</a>
-</li>
-      <li><a href="certify.html#relucent.core.errors.ShiProofError">ShiProofError</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.shis">shis (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="covectors.html#relucent.graph.covectors.sign_intersection">sign_intersection() (in module relucent.graph.covectors)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.slice_affine">slice_affine() (relucent.Complex method)</a>
-</li>
-      <li><a href="utilities.html#relucent.split_sequential">split_sequential() (in module relucent)</a>
-</li>
-      <li><a href="covectors.html#relucent.graph.covectors.CovectorCell.ss">ss (relucent.graph.covectors.CovectorCell attribute)</a>
-
-      <ul>
-        <li><a href="polyhedron.html#relucent.Polyhedron.ss">(relucent.Polyhedron property)</a>
-</li>
-      </ul></li>
-      <li><a href="complex.html#relucent.Complex.ss2poly">ss2poly() (relucent.Complex method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.ss_iterator">ss_iterator() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.ss_nonzero_indices">ss_nonzero_indices() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.ss_np">ss_np (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.str_to_poly">str_to_poly() (relucent.Complex method)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.sync_shis_from_dual_graph">sync_shis_from_dual_graph() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="T">T</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="covectors.html#relucent.graph.covectors.CovectorCell.tag">tag (relucent.graph.covectors.CovectorCell property)</a>
-
-      <ul>
-        <li><a href="polyhedron.html#relucent.Polyhedron.tag">(relucent.Polyhedron property)</a>
-</li>
-      </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration">TrainingDistanceFiltration (class in relucent.topology.filtration)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.truncate_meta_graph">truncate_meta_graph() (relucent.Complex static method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.truncation_vertex_id_mapper">truncation_vertex_id_mapper() (relucent.Complex method)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="U">U</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="configuration.html#relucent.config.update_settings">update_settings() (in module relucent.config)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="V">V</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="filtration.html#relucent.topology.filtration.Filtration.values_for_meta">values_for_meta() (relucent.topology.filtration.Filtration method)</a>
-</li>
-      <li><a href="complex.html#relucent.Complex.verified">verified (relucent.Complex property)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.verify_arrangement_genericity">verify_arrangement_genericity() (in module relucent.verify.certify)</a>
-
-      <ul>
-        <li><a href="complex.html#relucent.Complex.verify_arrangement_genericity">(relucent.Complex method)</a>
-</li>
-      </ul></li>
-      <li><a href="certify.html#relucent.verify.certify.verify_boundary_cell">verify_boundary_cell() (in module relucent.verify.certify)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.verify_contracted_shis">verify_contracted_shis() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.verify_dual_graph_cubical">verify_dual_graph_cubical() (in module relucent.graph.incidence)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="incidence.html#relucent.graph.incidence.verify_flip_shi_symmetry">verify_flip_shi_symmetry() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex">verify_lp_flip_neighbors_in_complex() (in module relucent.verify.certify)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.verify_shi_flip_neighbors">verify_shi_flip_neighbors() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="certify.html#relucent.verify.certify.verify_shi_geometry">verify_shi_geometry() (in module relucent.verify.certify)</a>
-</li>
-      <li><a href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph">verify_shis_from_dual_graph() (in module relucent.graph.incidence)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.verify_vertex_covector">verify_vertex_covector() (relucent.Polyhedron method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.vertices">vertices (relucent.Polyhedron property)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.volume">volume (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="W">W</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.W">W (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="complex.html#relucent.Complex.without_last_layer_neuron">without_last_layer_neuron() (relucent.Complex method)</a>
-</li>
-      <li><a href="polyhedron.html#relucent.Polyhedron.Wl2">Wl2 (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-</tr></table>
-
-<h2 id="Z">Z</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="polyhedron.html#relucent.Polyhedron.zero_indices">zero_indices (relucent.Polyhedron property)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis">zero_shis (relucent.graph.covectors.CovectorCell attribute)</a>
-</li>
-  </ul></td>
-</tr></table>
-
+</section>
 
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="incidence.html" class="btn btn-neutral float-left" title="Incidence (combinatorial primitives)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="filtration.html" class="btn btn-neutral float-right" title="Filtrations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 

@@ -1,9 +1,9 @@
 :tocdepth: 0
 
-Filtrations
+Exploration
 ===========
 
-.. automodule:: relucent.topology.filtration
+.. automodule:: relucent.search.exploration
    :members:
    :undoc-members:
    :show-inheritance:
