@@ -22,7 +22,7 @@ When you call `get_betti_numbers()` with defaults (`compactify=False`,
 ```mermaid
 flowchart TD
     search["BFS discovers top-dimensional cells"]
-    chain["get_chain_complex: contract down to 0-cells"]
+    chain["get_chain_complex: recover faces via covectors"]
     meta["get_meta_graph: face edges + bounded/unbounded labels"]
     trunc["truncate_meta_graph + close 1-cell boundaries"]
     rank["topology.get_betti_numbers: rank boundary matrices"]
@@ -36,55 +36,71 @@ Each step is described below.
 
 ## Step 1: Build the chain complex
 
-**Entry point:** [`get_chain_complex()`](../src/relucent/complex.py)
+**Entry point:** [`get_chain_complex()`](../src/relucent/core/complex.py)
 
 The chain complex is a list of `Complex` objects, one per dimension, from the
-top-dimensional cells down to 0-cells (vertices). It is built by repeatedly
-calling [`contract()`](../src/relucent/complex.py).
+top-dimensional cells down to 0-cells (vertices). Lower-dimensional cells are
+recovered from the labeled top-cell dual graph by
+[`enumerate_covectors()`](../src/relucent/graph/covectors.py) — exact sign
+intersection over cubical stars — not by iterative dual-edge contraction.
 
-### How contraction works
+`Complex.contract()` is a thin wrapper that returns
+`get_chain_complex(...)[self.dim - 1]`.
 
-1. Build the **dual graph** — combinatorial adjacency among cells at the current top
-   dimension ([`get_dual_graph()`](../src/relucent/complex.py) →
-   [`dual_edges_top_dim()`](../src/relucent/incidence.py)), then
-   [`sync_shis_from_dual_graph()`](../src/relucent/incidence.py) so each cell's
-   `_shis` list matches incident edge labels.
-2. For each dual edge `(cell_a, cell_b, shi)`, zero `shi` in the sign sequence to
-   get the tag of their shared `(k−1)`-face.
-3. Create that lower-dimensional cell via `add_ss`, passing SHI metadata from
-   [`_codim_one_face_kwargs()`](../src/relucent/complex.py) (SS crossings via
-   [`ss_nonzero_indices()`](../src/relucent/incidence.py); infeasible 1-cells
-   dropped with `is_shi_face_feasible`).
-4. Run [`set_contracted_shis()`](../src/relucent/incidence.py)
-   on the **contracted slice** to set authoritative `_shis` via
-   [`cubical_cell_shis()`](../src/relucent/incidence.py) once all cells are
-   present, then [`verify_contracted_shis()`](../src/relucent/incidence.py)
-   when verifying. Top-dimensional ambient cells do not use this step; their `_shis`
+### How covector recovery works
+
+1. Build the **dual graph** — combinatorial adjacency among top-dimensional cells
+   ([`get_dual_graph()`](../src/relucent/core/complex.py) →
+   [`dual_edges_top_dim()`](../src/relucent/graph/incidence.py)), then
+   [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) so each cell's
+   `_shis` list matches incident edge labels. Certify the labeled graph with
+   [`certify_dual_graph()`](../src/relucent/graph/incidence.py).
+2. For each top cell, read incident SHI labels and enumerate every subset of those
+   labels as a candidate face. The face sign sequence is the
+   [`sign_intersection`](../src/relucent/graph/covectors.py) of the cubical star of
+   top cells obtained by flipping those SHIs
+   ([`enumerate_covectors()`](../src/relucent/graph/covectors.py)).
+3. **Vertices (0-cells)** get one float64 equality solve from a witness coface,
+   then strict forward-sign verification
+   ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)). Rejected
+   (phantom) vertices are dropped; 1-cells whose only combinatorial endpoints were
+   rejected are skipped so they never enter the meta-graph as faces.
+4. Materialize each recovered cell with `add_ss`, then run
+   [`set_contracted_shis()`](../src/relucent/graph/incidence.py) on each lower-dim
+   slice so authoritative `_shis` match
+   [`cubical_cell_shis()`](../src/relucent/graph/incidence.py). In `CAREFUL_MODE`,
+   [`verify_contracted_shis()`](../src/relucent/graph/incidence.py) asserts flip-neighbor
+   symmetry. Top-dimensional ambient cells do not use this step; their `_shis`
    come from the dual graph at search finalize.
 
-The loop stops when contraction produces 0-cells or an empty complex.
+No facet or boundedness LP is used during covector recovery.
 
 ### Dual-graph rules depend on dimension
 
 - **1-dimensional complexes** (`top_dim == 1`): two 1-cells are adjacent if they
   share a combinatorial 0-face (a vertex tag). This uses
-  [`_dual_edges_one_dim()`](../src/relucent/incidence.py).
+  [`_dual_edges_one_dim()`](../src/relucent/graph/incidence.py).
 - **Higher dimensions**: two top cells are adjacent if they are **flip neighbors** —
   you can get from one sign sequence to the other by flipping a single nonzero entry.
-  This uses [`_dual_edges_flip_neighbors()`](../src/relucent/incidence.py).
+  This uses [`_dual_edges_flip_neighbors()`](../src/relucent/graph/incidence.py).
 
 With default config, top-dimensional cells at ``max_dim >= 2`` (and top-level
 ``max_dim == 1`` slices) build edges combinatorially via
-[`dual_edges_top_dim()`](../src/relucent/incidence.py) and sync ``_shis`` from
-those edges. **Contracted** 1-skeleton slices (``max_dim == 1`` but ambient
+[`dual_edges_top_dim()`](../src/relucent/graph/incidence.py) and sync ``_shis`` from
+those edges. **Lower-dimensional** 1-skeleton slices (``max_dim == 1`` but ambient
 ``self.dim > 1``) walk each cell's finalized ``poly.shis`` from
-[`cubical_cell_shis()`](../src/relucent/incidence.py).
+[`cubical_cell_shis()`](../src/relucent/graph/incidence.py).
+
+**Related (not the ambient chain complex):**
+[`get_boundary_cells`](../src/relucent/core/complex.py) /
+[`get_boundary_complex`](../src/relucent/core/complex.py) still create faces from
+dual edges via [`_codim_one_face_kwargs()`](../src/relucent/core/complex.py).
 
 ---
 
 ## Step 2: Build the meta-graph
 
-**Entry point:** [`get_meta_graph()`](../src/relucent/complex.py)
+**Entry point:** [`get_meta_graph()`](../src/relucent/core/complex.py)
 
 The meta-graph is a directed graph whose nodes are cells (at every dimension found
 in the chain complex) and whose edges record codimension-one face incidences. This
@@ -97,12 +113,12 @@ Each node stores `poly`, `dim`, `ss`, `finite` (bounded or not), and `shis`.
 For every cell of dimension `k > 0`:
 
 1. Look at every index `i` where `ss[i] ≠ 0` (via
-   [`ss_nonzero_indices()`](../src/relucent/incidence.py)).
-2. Zero that entry to get a candidate face tag ([`face_tag()`](../src/relucent/incidence.py)).
+   [`ss_nonzero_indices()`](../src/relucent/graph/incidence.py)).
+2. Zero that entry to get a candidate face tag ([`face_tag()`](../src/relucent/graph/incidence.py)).
 3. If a cell with that tag exists in the complex, add a directed edge
    `k-cell → (k−1)-face` with attribute `shi = i`.
 
-This is implemented by [`collect_meta_face_edges()`](../src/relucent/incidence.py)
+This is implemented by [`collect_meta_face_edges()`](../src/relucent/graph/incidence.py)
 (per dimension, in parallel when there are enough cells).
 
 **0-cells:** the face-edge loop skips `k ≤ 0`, so 0-cells never have outgoing face
@@ -121,25 +137,25 @@ Classification is **combinatorial** on the default path — no linear programs.
 | Dimension | Rule |
 |-----------|------|
 | 0-cells | Always bounded |
-| 1-cells | Bounded if at least two distinct combinatorial 0-faces appear in meta face edges ([`classify_one_cells_finite_from_face_edges()`](../src/relucent/incidence.py)). One 0-face → ray (unbounded). No 0-faces → geometric check: empty phantoms (`finite is None`) are excluded; feasible full lines are unbounded |
-| k ≥ 2 | Unbounded if **any** `(k−1)`-face is unbounded; bounded if **all** `(k−1)`-faces are bounded ([`classify_finite_ascending()`](../src/relucent/incidence.py)) |
+| 1-cells | Bounded if at least two distinct combinatorial 0-faces appear in meta face edges ([`classify_one_cells_finite_from_face_edges()`](../src/relucent/graph/incidence.py)). One 0-face → ray (unbounded). No 0-faces → geometric check: empty phantoms (`finite is None`) are excluded; feasible full lines are unbounded |
+| k ≥ 2 | Unbounded if **any** `(k−1)`-face is unbounded; bounded if **all** `(k−1)`-faces are bounded ([`classify_finite_ascending()`](../src/relucent/graph/incidence.py)) |
 
 ### Node `shis` vs face edges
 
-Face edges always scan the full sign sequence ([`ss_nonzero_indices()`](../src/relucent/incidence.py)).
+Face edges always scan the full sign sequence ([`ss_nonzero_indices()`](../src/relucent/graph/incidence.py)).
 Meta-graph node ``shis`` are flip-neighbor crossings derived by
-[`cubical_cell_shis()`](../src/relucent/incidence.py) at node creation — metadata
+[`cubical_cell_shis()`](../src/relucent/graph/incidence.py) at node creation — metadata
 only, not used for boundedness or incidence.
 
 ---
 
 ## Step 3: Truncate at infinity
 
-**Entry point:** [`truncate_meta_graph()`](../src/relucent/meta_graph.py)
+**Entry point:** [`truncate_meta_graph()`](../src/relucent/graph/meta_graph.py)
 
 This runs automatically when `compactify=False` (the default). Truncation is a single
 incidence pipeline: extend sign sequences, materialize cap cells, then rebuild all face
-edges with the same rule as [`get_meta_graph()`](complex.py).
+edges with the same rule as [`get_meta_graph()`](../src/relucent/core/complex.py).
 
 **Phase A — extend SS:** every node’s sign sequence gains **two** trailing truncation
 bits. Bounded cells and rays use `[..., 1, 0]`; cells with two open ends use
@@ -166,9 +182,9 @@ If absent, add an ordinary byte-tagged node at dimension `k−1` with the approp
 zeroed truncation bit. No `("trunc", …)` tuple nodes.
 
 **Phase D — incidence:** clear face edges and rebuild via
-[`collect_meta_face_edges()`](../src/relucent/incidence.py) /
-[`assemble_face_edges_by_dim()`](../src/relucent/incidence.py), reclassify `finite`, refresh
-`crossings` / `shis`, and run [`verify_meta_graph_one_cells()`](../src/relucent/meta_graph.py).
+[`collect_meta_face_edges()`](../src/relucent/graph/incidence.py) /
+[`assemble_face_edges_by_dim()`](../src/relucent/graph/incidence.py), reclassify `finite`, refresh
+`crossings` / `shis`, and run [`verify_meta_graph_one_cells()`](../src/relucent/graph/meta_graph.py).
 
 Cubical `face_tag` rebuild recovers network faces only when parent and face share trunc
 bits. Faces between cells with disagreeing openness (e.g. unilateral coface `(1,0)` and
@@ -186,15 +202,15 @@ built from the caps of its trunc-compatible unbounded facets.
 
 ## Step 4: Rank boundary matrices
 
-**Entry point:** [`topology.get_betti_numbers()`](../src/relucent/topology.py)
+**Entry point:** [`topology.get_betti_numbers()`](../src/relucent/topology/betti.py)
 
 From the (possibly truncated) meta-graph:
 
 1. Group nodes by dimension.
 2. For each `k`, build a GF(2) boundary matrix ∂_k from directed edges
    (`k-cell → (k−1)-face`). Columns index `k`-cells; rows index `(k−1)`-cells.
-   See [`_packed_boundary_matrix()`](../src/relucent/topology.py).
-3. Compute ranks with [`gf2_rank_boundary()`](../src/relucent/topology.py) (C
+   See [`_packed_boundary_matrix()`](../src/relucent/topology/betti.py).
+3. Compute ranks with [`gf2_rank_boundary()`](../src/relucent/topology/betti.py) (C
    extension when available, Python fallback otherwise).
 4. Apply the cellular formula:
 
@@ -212,15 +228,16 @@ Zero entries are dropped from the result.
 After a **complete** ambient BFS (`verify=True` by default), relucent:
 
 1. Rebuilds combinatorial dual-graph edges and syncs top-cell `_shis`
-   ([`finalize_ambient_search()`](../src/relucent/exploration.py) via
-   [`Complex.get_dual_graph()`](../src/relucent/complex.py)).
-2. Runs certification ([`certify_complex()`](../src/relucent/certify.py) at
+   ([`finalize_ambient_search()`](../src/relucent/search/exploration.py) via
+   [`Complex.get_dual_graph()`](../src/relucent/core/complex.py)).
+2. Runs certification ([`certify_complex()`](../src/relucent/verify/certify.py) at
    `CertifyLevel.COMPLETE`), including an LP facet completeness test when
    `cplx.complete is True`.
 
 Certification is skipped if `max_polys` is hit before the frontier empties. Check
-`cplx.complete` and `cplx.verified` before calling `contract()` or
-`get_boundary_complex()`. Re-run certification manually with `Complex.certify()`.
+`cplx.complete` and `cplx.verified` before calling `contract()`,
+`get_chain_complex()`, or `get_boundary_complex()`. Re-run certification manually
+with `Complex.certify()`.
 
 See the Sphinx guide *Exploration and Verification* (`docs/exploration_verification.rst`)
 for user-facing detail.
@@ -235,13 +252,14 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 - **`compactify=True`** — Borel–Moore style: no truncation; only faces with at least
   two cofaces contribute to boundary maps.
 - **`compactify="one_point"`** — adds a single 0-cell at infinity for unbounded
-  1-cell ends ([`one_point_compactify_meta_graph()`](../src/relucent/meta_graph.py)).
+  1-cell ends ([`one_point_compactify_meta_graph()`](../src/relucent/graph/meta_graph.py)).
 - **`respect_finite=True`** — restrict to cells with `finite is True` before ranking
-  ([`finite_cells_subgraph()`](../src/relucent/meta_graph.py)); no truncation.
+  ([`finite_cells_subgraph()`](../src/relucent/graph/meta_graph.py)); no truncation.
 - **`verify_chain_complex=True`** — require ∂² = 0; raises if the complex is
   incomplete.
-- **`get_meta_graph(verify=True)`** — second pass re-deriving SHIs and boundedness
-  from the assembled graph (debugging).
+- **`get_meta_graph(verify=True)`** — runs
+  [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
+  assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
 - **`verify_arrangement_genericity()`** — geometric transversality check on 1-cells
   (off by default; `VERIFY_GENERICITY=False`).
 
@@ -254,7 +272,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Step | Main functions |
 |------|----------------|
 | Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph`, `incidence.*` |
-| Chain complex | `get_chain_complex`, `contract`, `get_dual_graph`, `dual_edges_top_dim`, `_codim_one_face_kwargs`, `set_contracted_shis` |
+| Chain complex | `get_chain_complex`, `covectors.enumerate_covectors`, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
 | Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |

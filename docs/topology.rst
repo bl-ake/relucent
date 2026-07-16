@@ -3,7 +3,7 @@ Topology and Persistent Homology
 
 Relucent can compute **Betti numbers** and **persistent homology** over
 **GF(2)** on the face poset of a discovered ReLU polyhedral (sub)complex. These
-routines build on the same meta-graph convention as contraction and dual-graph
+routines build on the same meta-graph convention as dual-graph and face-poset
 analysis: a codimension-one face of a cell is obtained by zeroing one supporting
 hyperplane index (SHI) in the cell's sign sequence.
 
@@ -35,14 +35,16 @@ cells. Either compute geometry during search (done by default) or run
 outputs are required).
 
 Graph representations
-------------
+---------------------
 
 The :class:`~relucent.core.complex.Complex` class exposes three related graph views:
 
 * **Dual graph** (:meth:`~relucent.core.complex.Complex.get_dual_graph`): adjacency of
   top-dimensional cells only.
-* **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): iterated
-  contraction to lower-dimensional boundary complexes.
+* **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): lower-
+  dimensional faces recovered from cubical stars in the dual graph via
+  :mod:`relucent.graph.covectors` (``Complex.contract()`` returns the codimension-one
+  slice).
 * **Meta-graph** (:meth:`~relucent.core.complex.Complex.get_meta_graph`): face poset
   over all cell dimensions, used by Betti and persistence code.
 
@@ -60,8 +62,6 @@ the chosen homology convention, and returns ``{dimension: β_k}``.
   cofaces contribute to incidence).
 * ``"one_point"``: **one-point compactification** via
   :meth:`~relucent.core.complex.Complex.one_point_compactify_meta_graph`.
-
- Note: ``compactify=True`` is deprecated and will be replaced with ``compactify="bm"`` in a future release.
 
 **``respect_finite``**: restrict to the subcomplex of cells with ``finite is True``
 (no truncation).

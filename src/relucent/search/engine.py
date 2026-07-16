@@ -484,7 +484,8 @@ def searcher(
             searched. Must have push() and pop() methods. If None, uses
             BlockingQueue (FIFO). Defaults to None.
         bound: Constraint radius for numerical stability when computing halfspaces.
-            Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
+            Important for numerical stability. When ``None``, uses
+            :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
         nworkers: Number of worker processes for parallel computation. If None,
             uses the number of CPU cores. Defaults to None.
         verbose: Controls progress output. ``0`` silences all output; ``1``
@@ -501,7 +502,7 @@ def searcher(
             finite ``max_depth`` cap can leave ``complete=False``; with
             ``verify=True`` that raises unless the cap was hit. Frontier SHI LPs
             stay non-strict; certification applies strict checks after dual-graph sync.
-        **kwargs: Additional arguments passed to :func:`~relucent.core.poly.get_shis`.
+        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
         dict: Search information dictionary containing:
@@ -810,7 +811,7 @@ def hamming_astar(
         max_polys: Maximum number of polyhedra to explore during search.
             Defaults to infinity.
         show_pbar: Whether to display a progress bar. Defaults to True.
-        **kwargs: Additional arguments passed to get_shis().
+        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
         dict[str, Any]: A dictionary with the following keys:

@@ -10,7 +10,7 @@ The `relucent` package is organized into domain subpackages.
 | **`model/`** | `model`, `convert_model` | Canonical `ReLUNetwork` and PyTorch conversion |
 | **`geometry/`** | `calculations` | Gurobi/Qhull/SHI routines for `Polyhedron` geometry |
 | **`search/`** | `engine`, `exploration`, `worker_context`, `boundary_*` | BFS/DFS, boundary discovery, multiprocessing workers |
-| **`graph/`** | `incidence`, `meta_graph`, `complex_graph` | Dual graph, meta-graph, cubical incidence |
+| **`graph/`** | `incidence`, `covectors`, `meta_graph`, `complex_graph` | Dual graph, cubical face recovery, meta-graph, network surgery |
 | **`topology/`** | `betti`, `filtration`, `persistence`, `morse`, `_gf2` | Betti numbers, filtrations, persistent homology |
 | **`verify/`** | `certify` | Certification and arrangement verification |
 | **`vis/`** | (package `__init__`) | Plotly plotting |

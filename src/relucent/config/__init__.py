@@ -347,6 +347,7 @@ __all__ = [
     "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
     "VERBOSE",
+    "VERIFY_GENERICITY",
     "VERTEX_TRUST_THRESHOLD",
     "update_settings",
 ]

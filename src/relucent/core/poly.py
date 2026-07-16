@@ -28,7 +28,8 @@ __all__ = ["Polyhedron"]
 class Polyhedron:
     """Represents a polyhedron (linear region) in d-dimensional space.
 
-    Instances of this class should be created by the :func:`relucent.Complex.add_point` method.
+    Prefer creating instances via :meth:`~relucent.Complex.add_point`,
+    :meth:`~relucent.Complex.add_ss`, or search methods — not direct construction.
     """
 
     def __init__(
@@ -254,17 +255,17 @@ class Polyhedron:
 
         For all other dimensions this method returns ``True`` without checking.  Faces
         of k-cells with k > 1 are themselves polytopes; checking their feasibility
-        requires finding an interior point via LP.  In practice the flip-neighbour
-        filter (role 1 in :mod:`relucent.graph.meta_graph`) and construction-time
-        :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` checks prevent
-        phantom cells at dimensions > 0, so this check is not needed there.
+        requires finding an interior point via LP.  In practice the dual-graph /
+        covector recovery path and construction-time
+        :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` checks (boundary
+        faces) prevent phantom cells at dimensions > 0, so this check is not needed there.
 
-        **Invariant**: every 1-cell that passes through the contraction pipeline
+        **Invariant**: every 1-cell that passes through boundary-face construction
         (via :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs`) is constructed
         with ``halfspaces`` set from its coface, so halfspaces are always available.
         A ``ValueError`` is raised when this invariant is violated (i.e. a 1-cell is
         encountered without cached halfspaces), which indicates the cell was
-        constructed outside the normal contraction pipeline.
+        constructed outside the normal boundary-face pipeline.
 
         Note:
             The ``dim != 1`` early-return is mathematically fundamental.  A 0-cell is a

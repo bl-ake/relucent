@@ -129,7 +129,7 @@ Polyhedron and halfspace geometry
      - Gurobi early-stop tolerances for the SHI MIP models.
    * - ``TOL_SHI_OBJECTIVE``
      - ``float``
-     - ``1e-6``
+     - ``1e-8``
      - Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).
    * - ``TOL_NEARLY_VERTICAL``
      - ``float``
@@ -170,7 +170,7 @@ Complex search and parallel add
    * - ``DEFAULT_SEARCH_BOUND``
      - ``float``
      - ``1e8``
-     - Default halfspace bound for :func:`~relucent.search.searcher`, :func:`~relucent.search.hamming_astar`, and matching :class:`~relucent.core.complex.Complex` methods.
+     - Fallback halfspace bound for :func:`~relucent.search.hamming_astar` when ``bound`` is omitted. Ambient BFS / :func:`~relucent.search.searcher` instead use a network-scaled bound from :func:`~relucent._internal.network_scale.default_polyhedron_bound` (``estimate_input_bound`` × ``BOUNDARY_MIP_BOUND_MARGIN``) when ``bound`` is ``None``.
    * - ``ASTAR_BIAS_WEIGHT``
      - ``float``
      - ``0.9``
@@ -190,7 +190,75 @@ Complex search and parallel add
    * - ``BOUNDARY_MIP_BOUND_MARGIN``
      - ``float``
      - ``5.0``
-     - Multiplier applied to layerwise bound propagation when estimating network scale for boundary MIPs and automatic tolerance selection.
+     - Multiplier applied to layerwise bound propagation when estimating network scale for SHI LPs, boundary MIPs, and automatic tolerance selection.
+
+Boundary discovery (MIP pricing)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 28 12 50
+
+   * - Name
+     - Type
+     - Default
+     - Role
+   * - ``BOUNDARY_MIP_EPS``
+     - ``float``
+     - ``1e-4``
+     - Strict-margin tolerance for boundary MIP witness pricing (``z_j = 0`` at the boundary SHI; ``|z_j| >= eps`` elsewhere).
+   * - ``BOUNDARY_PRICING_BRUTE_FORCE_MAX_N``
+     - ``int``
+     - ``18``
+     - When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.
+   * - ``BOUNDARY_MIP_TIME_LIMIT``
+     - ``float``
+     - ``0.0``
+     - Optional Gurobi time limit (seconds) per pricing MIP; ``0`` means no limit.
+   * - ``BOUNDARY_MIP_GUROBI_LOG``
+     - ``bool``
+     - ``False``
+     - Emit full Gurobi solver logs during boundary pricing (independent of ``VERBOSE``).
+   * - ``BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS``
+     - ``int``
+     - ``1000``
+     - Compile ``exclude_tags`` into a compressed trie when at least this many tags are present (``0`` = always).
+   * - ``BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS``
+     - ``int``
+     - ``1000``
+     - Bulk-add per-tag no-goods statically before optimize when at least this many tags are excluded.
+   * - ``BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO``
+     - ``float``
+     - ``2.0``
+     - Static-add all leaf nogoods when trie compression ratio falls below this threshold.
+   * - ``BOUNDARY_MIP_EXCLUSION_BATCH_SIZE``
+     - ``int``
+     - ``4096``
+     - Chunk size for batched Gurobi ``addConstrs`` when emitting exclusion nogoods.
+   * - ``BOUNDARY_MIP_EXCLUSION_WORKERS``
+     - ``int``
+     - ``0``
+     - Workers for parallel nogood compilation; ``0`` = auto, ``1`` = serial.
+   * - ``BOUNDARY_MIP_CUT_ORDER``
+     - ``str``
+     - ``"tag_lex"``
+     - Cut ordering for static/lazy nogoods (``as_is``, ``tag_lex``, ``layer_major``, …).
+   * - ``BOUNDARY_MIP_BULK_NOGOOD_EMIT``
+     - ``str``
+     - ``"auto"``
+     - Bulk matrix emit for static nogoods: ``auto``, ``on``, or ``off``.
+   * - ``BOUNDARY_MIP_STATIC_WAVE_SIZE``
+     - ``int``
+     - ``0``
+     - Static nogood wave size; ``0`` = add all constraints before a single optimize.
+   * - ``BOUNDARY_MIP_CUT_PRIORITY_ENABLED``
+     - ``bool``
+     - ``False``
+     - Assign higher Gurobi priority to trie-compressed / deeper-path cuts.
+   * - ``BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS``
+     - ``int``
+     - ``50000``
+     - Skip trie/static precompilation and rely on lazy MIPSOL cuts when this many tags are excluded.
 
 Topology and logging
 ~~~~~~~~~~~~~~~~~~~~
@@ -204,6 +272,10 @@ Topology and logging
      - Default
      - Role
    * - ``VERIFY_GENERICITY``
+     - ``bool``
+     - ``False``
+     - When True, run geometric genericity / transversality checks (e.g. degenerate 1-cell endpoints). Expensive on large complexes; enabled automatically in :meth:`~relucent.core.complex.Complex.get_boundary_complex`.
+   * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
      - ``float``
      - ``2.0``
      - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.

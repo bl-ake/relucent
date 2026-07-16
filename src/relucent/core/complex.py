@@ -636,7 +636,8 @@ class Complex:
             verbose: Controls progress output. ``0`` silences all output; ``1``
                 (default) shows worker count and progress bars.  When ``None``,
                 falls back to :data:`relucent.config.VERBOSE`.
-            **kwargs: Additional arguments passed to poly_calculations() and get_shis().
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`
+                and related geometry helpers.
 
         Returns:
             list: A list of Polyhedron objects (or None for failed computations)
@@ -689,7 +690,8 @@ class Complex:
                 searched. Must have push() and pop() methods. If None, uses
                 BlockingQueue (FIFO). Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
-                Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
+                Important for numerical stability. When ``None``, uses
+                :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
             verbose: Controls progress output. ``0`` silences all output; ``1``
@@ -708,7 +710,7 @@ class Complex:
                 ``verify=True`` that raises :class:`~relucent.core.complex.IncompleteDualGraphError`
                 unless the cap was hit. Frontier SHI LPs stay non-strict; certification
                 applies strict checks after dual-graph sync.
-            **kwargs: Additional arguments passed to :func:`~relucent.core.poly.get_shis`.
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
         Returns:
             dict: Search information dictionary containing:
@@ -882,7 +884,7 @@ class Complex:
             max_polys: Maximum number of polyhedra to explore during search.
                 Defaults to infinity.
             show_pbar: Whether to display a progress bar. Defaults to True.
-            **kwargs: Additional arguments passed to get_shis().
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
         Returns:
             dict[str, Any]: Dictionary containing the path (if found) and
@@ -1058,7 +1060,7 @@ class Complex:
         return self.G.subgraph([p for edge in edges for p in edge])
 
     def _codim_one_face_kwargs(self, p1: Polyhedron, _p2: Polyhedron, shi: int) -> dict[str, Any]:
-        """Shared kwargs for :meth:`contract` and :meth:`get_boundary_cells` faces.
+        """Shared kwargs for :meth:`get_boundary_cells` faces.
 
         Candidate SHIs are all nonzero sign-sequence crossings on the face (role 2);
         :func:`~relucent.graph.incidence.set_contracted_shis` keeps flip neighbors in the slice.
@@ -1066,6 +1068,7 @@ class Complex:
         :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
 
         Meta-graph **face edges** always use :func:`~relucent.graph.incidence.ss_nonzero_indices`.
+        The ambient chain complex uses :mod:`relucent.graph.covectors` instead of this helper.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1435,8 +1438,8 @@ class Complex:
     def get_meta_graph(self, *, verify: bool = False, verbose: bool = False) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
-        This method mirrors the face-encoding convention used by relucent's contracted
-        chain complex and topology routines: a codimension-1 face of a k-cell is
+        This method mirrors the face-encoding convention used by relucent's chain
+        complex and topology routines: a codimension-1 face of a k-cell is
         obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
 
         Nodes correspond to cells across dimensions k=0..d and are keyed by the
@@ -1452,7 +1455,7 @@ class Complex:
 
         - Face **edges**: :func:`~relucent.graph.incidence.ss_nonzero_indices` + lookup (homology-critical).
         - Node **metadata** (``shis``, ``crossings``): :func:`~relucent.graph.incidence.cubical_cell_shis` on
-          each dimension slice — derived at node creation, not propagated from ``contract``.
+          each dimension slice — derived at node creation, not propagated from face construction.
         - **Boundedness**: combinatorial classification from face edges only.
 
         If ``verify=True``, :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence` checks that
@@ -1465,14 +1468,14 @@ class Complex:
 
         Note:
             The resulting structure encodes the face relations present in the
-            contracted chain returned by :meth:`get_chain_complex`. In particular,
-            boundary faces that are not represented in the contracted chain will
+            chain returned by :meth:`get_chain_complex` (covector recovery from the
+            dual graph). Boundary faces that are not represented in that chain will
             not appear unless they were already present in the chain complexes.
 
             A breadth-first search over full-dimensional regions can still leave this
             graph short of a closed cellular complex: some codimension-one faces of a
             stored cell may not appear as nodes (their sign pattern is missing from the
-            explored complex or from the contracted chain), so incidence data can omit
+            explored complex or from the recovered chain), so incidence data can omit
             entries that true geometry would require. That breaks ``∂² = 0`` for the
             GF(2) boundary maps in :func:`relucent.topology.get_betti_numbers` unless
             ``verify_chain_complex`` is disabled; see that function's documentation.

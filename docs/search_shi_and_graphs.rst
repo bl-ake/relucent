@@ -124,11 +124,12 @@ Relucent uses SHI information in three related but distinct ways. The helpers in
 :mod:`relucent.graph.incidence` document these as **roles 1–3**. Using the wrong rule
 in the wrong place breaks adjacency or homology (``∂² = 0``).
 
-Role 1 — Contraction and contracted slices
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Role 1 — Boundary faces and lower-dimensional slices
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When building lower-dimensional cells via :meth:`~relucent.core.complex.Complex.contract`,
-each codimension-one face seeds SHI candidates from its sign sequence::
+When creating faces for a boundary complex via
+:meth:`~relucent.core.complex.Complex.get_boundary_cells`, each codimension-one face
+seeds SHI candidates from its sign sequence::
 
    SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
 
@@ -136,10 +137,15 @@ The crossing hyperplane is already zeroed, so it is not included.
 :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` applies this at face
 creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
-:meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`. After the full slice is
-known, :func:`~relucent.graph.incidence.set_contracted_shis` sets authoritative
-``_shis`` to :func:`~relucent.graph.incidence.cubical_cell_shis` — the same
-flip-neighbor rule as role 3, restricted to cells in the slice.
+:meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
+
+The ambient **chain complex**
+(:meth:`~relucent.core.complex.Complex.get_chain_complex`) recovers faces differently —
+via :func:`~relucent.graph.covectors.enumerate_covectors` on cubical stars — but still
+finalizes slice ``_shis`` the same way: after the full slice is known,
+:func:`~relucent.graph.incidence.set_contracted_shis` sets authoritative ``_shis`` to
+:func:`~relucent.graph.incidence.cubical_cell_shis` — the same flip-neighbor rule as
+role 3, restricted to cells in the slice.
 
 **Critical:** meta-graph **face edges** still use role 2 (all SS crossings), not
 propagated ``_shis``. Using only ``_shis`` for face discovery omits valid faces
@@ -203,16 +209,16 @@ After complete ambient search (authoritative top cells)
    (the default).
 
 Top-cell ``_shis`` are therefore **re-derived from dual-graph edges**, not left
-as raw LP output. This is the combinatorial cubical model used by contraction
-and topology.
+as raw LP output. This is the combinatorial cubical model used by chain-complex
+recovery and topology.
 
-On contracted slices (boundary, chain complex)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On lower-dimensional slices (boundary, chain complex)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After :meth:`~relucent.core.complex.Complex.contract` creates faces, SHIs are seeded
-from SS crossings (role 1) and finalized by
-:func:`~relucent.graph.incidence.set_contracted_shis` to
-:func:`~relucent.graph.incidence.cubical_cell_shis`. Contracted 1-skeleton dual
+After :meth:`~relucent.core.complex.Complex.get_chain_complex` or
+:meth:`~relucent.core.complex.Complex.get_boundary_cells` materializes faces, SHIs are
+finalized by :func:`~relucent.graph.incidence.set_contracted_shis` to
+:func:`~relucent.graph.incidence.cubical_cell_shis`. Lower-dimensional 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
 
 Boundary discovery seeds slice ``_shis`` from SS crossings
@@ -324,8 +330,9 @@ Uses
 ~~~~
 
 * Finalize after ambient BFS (``finalize_ambient_search``)
-* :meth:`~relucent.core.complex.Complex.contract` and
-  :meth:`~relucent.core.complex.Complex.get_chain_complex`
+* :meth:`~relucent.core.complex.Complex.get_chain_complex` /
+  :meth:`~relucent.core.complex.Complex.contract` and
+  :meth:`~relucent.core.complex.Complex.get_boundary_complex`
 * :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` — reconstruct from
   stored graph + SHI edge labels
 * Visualization (``plot=True`` prepares a PyVis layout)
@@ -355,8 +362,8 @@ input to Betti numbers and persistent homology.
 Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
 
-1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — Repeated contraction
-   from the ambient complex down to 0-cells.
+1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces from
+   cubical stars in the dual graph via :mod:`relucent.graph.covectors`.
 2. **Face edges** — :func:`~relucent.graph.incidence.collect_meta_face_edges` per
    dimension (``ss_nonzero_indices`` + lookup); parallelized when cell count ≥
    ``META_FACE_PARALLEL_MIN_CELLS``.
@@ -365,9 +372,11 @@ Construction pipeline
    :func:`~relucent.graph.incidence.classify_finite_ascending`).
 4. **Node assembly** — :func:`~relucent.graph.incidence.meta_node_attrs` derives
    ``crossings`` and flip-neighbor ``shis`` per dimension slice.
-5. **Optional truncation** — :func:`~relucent.graph.meta_graph.truncate_meta_graph` or
-   :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph` for homology at
-   infinity.
+5. **Optional truncation** — applied later by
+   :meth:`~relucent.core.complex.Complex.get_betti_numbers` via
+   :func:`~relucent.graph.meta_graph.truncate_meta_graph` or
+   :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph` (not by
+   ``get_meta_graph`` itself).
 
 Pass ``verify=True`` to ``get_meta_graph`` only for debugging:
 :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence` checks edges, SHIs, and
@@ -380,7 +389,7 @@ Dual graph vs meta-graph
 
    BFS / finalize  →  dual graph (top-cell adjacency, edge shi)
                          ↓
-                    contract()
+                    get_chain_complex()  (covector face recovery)
                          ↓
                     meta-graph (all dims, face incidences)
                          ↓
@@ -397,14 +406,14 @@ Dual graph vs meta-graph
 +----------------------+---------------------------+---------------------------+
 | SHI on nodes         | Synced from edges (top)   | ``cubical_cell_shis``     |
 |                      | or ``cubical_cell_shis``  | (role 3)                  |
-|                      | on contracted slices      |                           |
+|                      | on lower-dim slices       |                           |
 +----------------------+---------------------------+---------------------------+
 | Face discovery       | Flip neighbors /          | All ``ss_i ≠ 0`` crossings|
 |                      | 0-face sharing            | (role 2)                  |
 +----------------------+---------------------------+---------------------------+
 | Primary consumers    | Search finalize,          | Topology, persistence,    |
-|                      | contraction, dual-graph   | Morse                     |
-|                      | finalize                  |                           |
+|                      | chain complex, dual-graph | Morse                     |
+|                      | recover                   |                           |
 +----------------------+---------------------------+---------------------------+
 
 **Critical invariant:** meta-graph **face edges** use
@@ -428,7 +437,7 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    dual graph, genericity check, ``certify_complex``.
 
 Alternatively, explore the full ambient complex first, then
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` via contraction (requires
+:meth:`~relucent.core.complex.Complex.get_boundary_complex` (requires
 ``assert_topology_ready``).
 
 Related reading

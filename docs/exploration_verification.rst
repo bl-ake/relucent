@@ -97,7 +97,7 @@ Two paths build a decision-boundary complex:
 
 * **Full ambient complex first** — explore the input space (BFS or
   :func:`~relucent.search.exploration.explore_for_topology`), then
-  :meth:`~relucent.core.complex.Complex.get_boundary_complex(i)` contracts faces on
+  :meth:`~relucent.core.complex.Complex.get_boundary_complex(i)` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
 * **Direct boundary discovery** — :meth:`~relucent.core.complex.Complex.discover_boundary_complex(i)`
   uses MIP pricing plus slice-restricted BFS per connected component, then
@@ -111,10 +111,10 @@ During search, ``Polyhedron._shis`` is a frontier heuristic from LP facet solves
 At finalize on a **complete** ambient search, top-cell ``_shis`` are **re-derived**
 from combinatorial dual-graph edges.
 
-On **contracted** slices (boundary complexes, chain-complex steps),
+On **lower-dimensional** slices (boundary complexes, chain-complex steps),
 :func:`~relucent.graph.incidence.set_contracted_shis` sets ``_shis`` to
 :func:`~relucent.graph.incidence.cubical_cell_shis` (flip neighbors in the slice).
-Contracted 1-skeleton dual graphs walk each cell's finalized ``poly.shis`` lists.
+Lower-dimensional 1-skeleton dual graphs walk each cell's finalized ``poly.shis`` lists.
 
 You can re-run certification manually with :meth:`~relucent.core.complex.Complex.certify`.
 

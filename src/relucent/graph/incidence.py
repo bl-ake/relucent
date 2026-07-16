@@ -10,8 +10,8 @@ This module is the single source of truth for that combinatorics.
   :func:`dual_edges_top_dim`, :func:`sync_shis_from_dual_graph`.
 - :meth:`~relucent.core.complex.Complex.get_meta_graph` — :func:`collect_meta_face_edges`,
   :func:`meta_node_attrs`, boundedness classifiers, :func:`propagate_infeasible_exclusion`.
-- :meth:`~relucent.core.complex.Complex.contract` / chain complex — :func:`set_contracted_shis`,
-  :func:`verify_contracted_shis`.
+- :meth:`~relucent.core.complex.Complex.get_chain_complex` / boundary faces —
+  :func:`set_contracted_shis`, :func:`verify_contracted_shis`.
 - :func:`~relucent.verify.certify.certify_complex` — :func:`certify_dual_graph`,
   :func:`verify_flip_shi_symmetry`.
 - :func:`~relucent.search.exploration.finalize_boundary_complex` — contracted SHI assignment.
@@ -469,11 +469,12 @@ def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) ->
 
 
 def set_contracted_shis(cplx: Complex) -> int:
-    """Set authoritative ``_shis`` on a contracted slice after :meth:`~relucent.core.complex.Complex.contract`.
+    """Set authoritative ``_shis`` on a lower-dimensional slice after face recovery.
 
-    Used on the **contract path** (:meth:`~relucent.core.complex.Complex.contract`,
-    :meth:`~relucent.core.complex.Complex.get_boundary_complex`, :meth:`~relucent.core.complex.Complex.get_chain_complex`)
-    and at the end of boundary discovery in :func:`~relucent.search.exploration.finalize_boundary_complex`.
+    Used after :meth:`~relucent.core.complex.Complex.get_chain_complex` materializes a
+    dimension slice, after :meth:`~relucent.core.complex.Complex.get_boundary_complex` /
+    :meth:`~relucent.core.complex.Complex.get_boundary_cells`, and at the end of boundary
+    discovery in :func:`~relucent.search.exploration.finalize_boundary_complex`.
     Assigns :func:`cubical_cell_shis` once the full dimension slice is known.
     Call :func:`verify_contracted_shis` to assert flip-neighbor and symmetry invariants.
 
