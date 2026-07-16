@@ -1206,34 +1206,14 @@ class Complex:
         return boundary
 
     def contract(self, verbose: bool = False) -> Complex:
-        """Contract the maximal cells in the complex.
-
-        Each codimension-one face is keyed by zeroing one dual-graph SHI in the
-        sign sequence.  Face ``shis`` kwargs come from
-        :meth:`_codim_one_face_kwargs`, then :func:`~relucent.graph.incidence.set_contracted_shis`.
+        """Return ``get_chain_complex(...)[self.dim - 1]``.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
             ComplexNotCompleteError: If this complex is not complete.
             ComplexNotVerifiedError: If this complex is not verified.
         """
-        # !!! This should be redone
-        self.assert_topology_ready()
-        G = self.get_dual_graph(verbose=verbose, require_complete=True)
-        new_complex = Complex(self.net)
-        for p1, p2, shi in tqdm(G.edges(data="shi"), desc="Contracting Complex", delay=1, disable=not verbose):
-            new_ss = p1.ss_np.copy()
-            new_ss[0, shi] = 0
-            new_complex.add_ss(
-                new_ss,
-                **self._codim_one_face_kwargs(p1, p2, int(shi)),
-            )
-
-        incidence.set_contracted_shis(new_complex)
-        if len(new_complex) > 0:
-            new_complex.set_exploration_state(complete=True, verified=False)
-            certify.certify_complex(new_complex, level=CertifyLevel.COMPLETE, record_state=True)
-        return new_complex
+        return self.get_chain_complex(verbose=verbose)[self.dim - 1]
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
         """Recover the chain complex from cubical stars in the top-cell dual graph.
