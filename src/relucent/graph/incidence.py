@@ -16,14 +16,20 @@ This module is the single source of truth for that combinatorics.
   :func:`verify_flip_shi_symmetry`.
 - :func:`~relucent.search.exploration.finalize_boundary_complex` — contracted SHI assignment.
 
-**Derived views** (do not confuse SHI semantics):
+**SHI assignment roles 1–3** (see ``docs/search_shi_and_graphs.rst``):
 
-- **Dual-graph edges** (:func:`dual_edges_top_dim`): group top cells by shared
-  face tag (1-cells) or flip neighbor (dim >= 2).
-- **Meta-graph face edges** (:func:`collect_meta_face_edges`): zero each
+- **Role 1** — Contracted / boundary faces: seed ``_shis`` from
+  :func:`ss_nonzero_indices` on the face sign sequence, then finalize with
+  :func:`set_contracted_shis` → :func:`cubical_cell_shis`.
+- **Role 2** — Meta-graph **face edges** (:func:`collect_meta_face_edges`): zero each
   ``ss_i != 0`` and keep the edge iff the resulting face tag is a known cell.
-- **Node metadata** (:func:`meta_node_attrs`): flip-neighbor SHIs via
-  :func:`cubical_cell_shis`, never the LP-derived ``poly._shis`` cache.
+- **Role 3** — Meta-graph **node metadata** (:func:`meta_node_attrs`): flip-neighbor
+  SHIs via :func:`cubical_cell_shis` (1-cells: labels from verified 0-face edges),
+  never the LP-derived ``poly._shis`` cache.
+
+**Dual-graph edges** (:func:`dual_edges_top_dim` via :func:`build_dual_graph`):
+flip-neighbor adjacency on top cells; contracted 1-skeleton slices walk finalized
+``poly._shis``.
 
 Two SHI semantics matter and must not be confused:
 

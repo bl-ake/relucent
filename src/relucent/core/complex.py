@@ -1062,7 +1062,7 @@ class Complex:
     def _codim_one_face_kwargs(self, p1: Polyhedron, _p2: Polyhedron, shi: int) -> dict[str, Any]:
         """Shared kwargs for :meth:`get_boundary_cells` faces.
 
-        Candidate SHIs are all nonzero sign-sequence crossings on the face (role 2);
+        Candidate SHIs are all nonzero sign-sequence crossings on the face (role 1);
         :func:`~relucent.graph.incidence.set_contracted_shis` keeps flip neighbors in the slice.
         Infeasible 1-cell faces are dropped at construction time via
         :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.

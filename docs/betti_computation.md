@@ -75,21 +75,24 @@ intersection over cubical stars — not by iterative dual-edge contraction.
 
 No facet or boundedness LP is used during covector recovery.
 
-### Dual-graph rules depend on dimension
+### Dual-graph rules
 
-- **1-dimensional complexes** (`top_dim == 1`): two 1-cells are adjacent if they
-  share a combinatorial 0-face (a vertex tag). This uses
-  [`_dual_edges_one_dim()`](../src/relucent/graph/incidence.py).
-- **Higher dimensions**: two top cells are adjacent if they are **flip neighbors** —
-  you can get from one sign sequence to the other by flipping a single nonzero entry.
-  This uses [`_dual_edges_flip_neighbors()`](../src/relucent/graph/incidence.py).
+[`build_dual_graph()`](../src/relucent/graph/incidence.py) always routes top cells
+through flip-neighbor adjacency ([`dual_graph_edge_top_dim()`](../src/relucent/graph/incidence.py)
+maps ``max_dim == 1`` complexes to the ``top_dim >= 2`` flip path). For each
+candidate crossing, add an edge when the same-dimension flip neighbor exists in
+the slice ([`_dual_edges_flip_neighbors()`](../src/relucent/graph/incidence.py)).
 
-With default config, top-dimensional cells at ``max_dim >= 2`` (and top-level
-``max_dim == 1`` slices) build edges combinatorially via
-[`dual_edges_top_dim()`](../src/relucent/graph/incidence.py) and sync ``_shis`` from
-those edges. **Lower-dimensional** 1-skeleton slices (``max_dim == 1`` but ambient
-``self.dim > 1``) walk each cell's finalized ``poly.shis`` from
-[`cubical_cell_shis()`](../src/relucent/graph/incidence.py).
+- **Ambient top cells** — candidates from [`ss_nonzero_indices()`](../src/relucent/graph/incidence.py).
+- **Contracted 1-skeleton** (``max_dim == 1``, ambient ``self.dim > 1``) — candidates
+  from each cell's finalized ``poly._shis`` after
+  [`set_contracted_shis()`](../src/relucent/graph/incidence.py).
+
+Then [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) overwrites
+``poly._shis`` from edge labels. The legacy 0-face pairing in
+[`_dual_edges_one_dim()`](../src/relucent/graph/incidence.py) remains for direct
+``dual_edges_top_dim(..., top_dim=1)`` callers only, not for
+``Complex.get_dual_graph()``.
 
 **Related (not the ambient chain complex):**
 [`get_boundary_cells`](../src/relucent/core/complex.py) /

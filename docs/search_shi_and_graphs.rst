@@ -168,7 +168,10 @@ Role 3 — Meta-graph node metadata
 
 :func:`~relucent.graph.incidence.meta_node_attrs` derives ``shis`` (flip-neighbor
 crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
-sequence and same-dimension slice.
+sequence and same-dimension slice. For **1-cells**,
+:meth:`~relucent.core.complex.Complex.get_meta_graph` replaces node ``shis`` with
+the SHI labels of verified 0-face incidences from role-2 face edges (same rule as
+:func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`).
 1-cell boundedness uses 0-face incidence in meta face edges
 (:func:`~relucent.graph.incidence.classify_one_cells_finite_from_face_edges`), not
 ``len(shis)``.
@@ -202,8 +205,9 @@ After complete ambient search (authoritative top cells)
 :meth:`~relucent.core.complex.Complex.get_dual_graph`, which:
 
 1. Builds combinatorial edges with
-   :func:`~relucent.graph.incidence.dual_edges_top_dim` (flip neighbors for
-   ``max_dim ≥ 2``; shared 0-face tags for 1D ambient complexes).
+   :func:`~relucent.graph.incidence.dual_edges_top_dim` (flip neighbors for all
+   complexes built via :func:`~relucent.graph.incidence.build_dual_graph`; see
+   `Edge construction rules`_).
 2. Syncs ``poly._shis`` from incident edge labels via
    :func:`~relucent.graph.incidence.sync_shis_from_dual_graph` when ``repair=True``
    (the default).
@@ -313,15 +317,19 @@ Dual graph
 Edge construction rules
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The rule depends on the complex dimension:
+:func:`~relucent.graph.incidence.build_dual_graph` maps the complex's
+``max_dim`` through :func:`~relucent.graph.incidence.dual_graph_edge_top_dim`
+so top-dimensional cells always use **flip-neighbor** adjacency (never the legacy
+``top_dim == 1`` 0-face pairing in :func:`~relucent.graph.incidence.dual_edges_top_dim`):
 
-* **``max_dim ≥ 2`` or ambient top level** — Combinatorial **flip neighbors**:
-  two cells are adjacent if one sign sequence is obtained from the other by
-  flipping a single nonzero entry.
-* **1D ambient complex** — Cells sharing a combinatorial **0-face** (vertex tag).
-* **Contracted 1-skeleton** (``max_dim == 1`` but ambient ``dim > 1``) — Walk
-  each cell's finalized ``poly.shis`` (from :func:`~relucent.graph.incidence.cubical_cell_shis`)
-  and add edges only when the flip neighbor exists in the complex.
+* **Default** — For each nonzero ``ss_i``, add an edge to the same-dimension flip
+  neighbor when that neighbor exists in the complex (via
+  :func:`~relucent.graph.incidence.ss_nonzero_indices`).
+* **Contracted slice** (``max_dim == 1`` and ambient ``dim > 1``) — Same flip rule,
+  but candidate crossings come from each cell's finalized ``poly._shis`` (from
+  :func:`~relucent.graph.incidence.set_contracted_shis` /
+  :func:`~relucent.graph.incidence.cubical_cell_shis`) instead of the full sign
+  sequence.
 
 After edge construction, :func:`~relucent.graph.incidence.sync_shis_from_dual_graph`
 sets each node's ``_shis`` from incident edge labels when ``repair=True``.
