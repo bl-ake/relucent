@@ -592,9 +592,29 @@ def _poly_trace_name(poly: object) -> str:
     return f"Polyhedron {str(poly)}"
 
 
+def _poly_ss_zero_indices(poly: object) -> list[int] | None:
+    """Indices where the sign sequence is zero, if available."""
+    zeros = getattr(poly, "zero_indices", None)
+    if zeros is not None:
+        try:
+            return [int(i) for i in np.asarray(zeros).ravel().tolist()]
+        except Exception:
+            pass
+    ss = getattr(poly, "ss_np", None)
+    if ss is None:
+        return None
+    try:
+        return [int(i) for i in np.flatnonzero(np.asarray(ss).ravel() == 0).tolist()]
+    except Exception:
+        return None
+
+
 def _poly_hover_text(poly: object) -> str:
-    """Hover label for a polyhedron trace: name plus SHIs when available."""
-    name = _poly_trace_name(poly)
+    """Hover label for a polyhedron trace: name, ss zeros, and SHIs when available."""
+    parts = [_poly_trace_name(poly)]
+    zeros = _poly_ss_zero_indices(poly)
+    if zeros is not None:
+        parts.append(f"ss zeros: {zeros}")
     shis: list[int] | None = None
     cached = getattr(poly, "_shis", None)
     if cached is not None:
@@ -609,9 +629,9 @@ def _poly_hover_text(poly: object) -> str:
                 shis = list(cast(Iterable[int], get_shis()))
             except Exception:
                 shis = None
-    if not shis:
-        return name
-    return f"{name}<br>SHIs: {shis}"
+    if shis:
+        parts.append(f"SHIs: {shis}")
+    return "<br>".join(parts)
 
 
 def _apply_poly_trace_label(trace: Any, poly: object) -> None:

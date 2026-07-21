@@ -38,9 +38,11 @@ __all__ = [
 class LayerJacobians:
     """Jacobians of layer compositions on a fixed sign sequence."""
 
-    by_relu_layer: list[np.ndarray]  # F'_{(i)}|_C after each ReLU block
-    full: np.ndarray  # product through all hidden layers
-    gradient: np.ndarray  # ∇F|_C in input coordinates
+    # Per ReLU block: columns are ∇(pre-activation) before that block's ReLU mask.
+    # Lemma 10 needs these unmasked normals; post-mask rows vanish on inactive sides.
+    by_relu_layer: list[np.ndarray]
+    full: np.ndarray  # hidden-layer product after ReLU masks (input → last hidden)
+    gradient: np.ndarray  # ∇F|_C in input coordinates (logit if trailing output ReLU)
     W_out: np.ndarray  # final linear map G
 
 
@@ -52,7 +54,7 @@ class CriticalPoint:
     tag: bytes
     ss: np.ndarray
     point: np.ndarray | None
-    index: int  # Morse index; -1 marks flat/degenerate cases
+    index: int  # Morse index in {0,...,d}; -1 marks flat/degenerate cases
     is_critical: bool = True
 
 
@@ -86,36 +88,63 @@ def _output_weight(net: ReLUNetwork) -> np.ndarray:
 
 
 def get_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
-    """Lemma 9: Jacobians ``F'_{(i)}|_C`` after each ReLU block and the input gradient."""
+    """Lemma 9: cell Jacobians and input gradient; pre-activation rows for Lemma 10.
+
+    Hidden ``Linear→ReLU`` blocks update a running map. For each block we store the
+    Jacobian **before** that block's ReLU mask (bent-hyperplane normals). Masks are
+    then applied so later layers and ``full`` see the correct inactive columns.
+
+    If the network ends with an output ReLU (decision-boundary topology via
+    ``add_output_relu``), Morse analyzes the **logit** (pre-output-ReLU scalar): the
+    output mask is not applied to ``gradient``, and ``by_relu_layer`` records the
+    logit Jacobian so Lemma 10 can use the output supporting hyperplane.
+    """
     ss_row = _coerce_ss(ss)
     n_in = int(np.prod(net.input_shape))
     current = np.eye(n_in, dtype=np.float64)
     by_relu: list[np.ndarray] = []
     mask_index = 0
 
-    # Same layer walk as get_hs, but we only keep the active-neuron mask (s == +1).
     layers = list(net.layers.values())
+    last_linear_i = max(
+        (i for i, layer in enumerate(layers) if isinstance(layer, LinearLayer)),
+        default=-1,
+    )
+    if last_linear_i < 0:
+        raise ValueError("network has no linear layers")
+
+    # Hidden Linear→ReLU blocks only (stop before the final linear ``G``).
     i = 0
-    while i < len(layers):
+    while i < last_linear_i:
         layer = layers[i]
-        if isinstance(layer, LinearLayer) and i + 1 < len(layers) and isinstance(layers[i + 1], ReLULayer):
+        if isinstance(layer, LinearLayer) and isinstance(layers[i + 1], ReLULayer):
             current = current @ layer.weight.T
             width = layer.weight.shape[0]
+            # Pre-mask columns = ∇preact_j (Lemma 10 / bent hyperplane normals).
+            by_relu.append(current.copy())
             mask = ss_row[0, mask_index : mask_index + width]
             relu = (mask == 1).astype(np.float64)
             current = current * relu[np.newaxis, :]
-            by_relu.append(current.copy())
             mask_index += width
             i += 2
             continue
-        if isinstance(layer, LinearLayer):
-            # Final output layer G; gradient uses W_out separately below.
-            pass
         i += 1
 
-    w_out = _output_weight(net)
-    gradient = (current @ w_out.T).reshape(-1)
-    return LayerJacobians(by_relu_layer=by_relu, full=current, gradient=gradient, W_out=w_out)
+    last_linear_layer = layers[last_linear_i]
+    if not isinstance(last_linear_layer, LinearLayer):
+        raise ValueError(f"expected a LinearLayer at index {last_linear_i}, got {type(last_linear_layer).__name__}")
+    w_out = last_linear_layer.weight
+    full = current.copy()
+    current = current @ w_out.T
+    # Trailing output ReLU: keep logit gradient; still record logit map for Lemma 10.
+    if last_linear_i + 1 < len(layers) and isinstance(layers[last_linear_i + 1], ReLULayer):
+        by_relu.append(current.copy())
+        mask_index += int(w_out.shape[0])
+
+    if current.ndim != 2 or current.shape[1] != 1:
+        raise ValueError("Morse Jacobians require a scalar network output " + f"(got trailing map shape {current.shape})")
+    gradient = current.reshape(-1)
+    return LayerJacobians(by_relu_layer=by_relu, full=full, gradient=gradient, W_out=w_out)
 
 
 def gradient_on_cell(net: ReLUNetwork, ss: np.ndarray) -> np.ndarray:
@@ -197,7 +226,7 @@ def _vertex_edge_direction(
     if zeros.size != n_in:
         raise ValueError(f"vertex sign sequence must have {n_in} zero entries (got {zeros.size}) for Lemma 10 edge directions")
 
-    # W(v, C): row k is the j_k-th row of F'_{(i_k)}|_C for each zero entry at v.
+    # W(v, C): row k = ∇preact of zero-entry (i_k, j_k) on coface C (unmasked at that neuron).
     rows: list[np.ndarray] = []
     for z in zeros:
         r_idx, n_idx = shi_to_relu_neuron(int(z), ssi2maski, ss_layers)
@@ -254,7 +283,12 @@ def _is_collapsed_edge(
     net: ReLUNetwork,
     edge_ss: np.ndarray,
 ) -> bool:
-    """True when the network output is constant along the edge (flat / degenerate)."""
+    """True when the gradient on the coface is zero (F constant on the whole coface).
+
+    This is a sufficient condition for the edge to be flat (zero directional
+    derivative). The complementary case — non-zero gradient orthogonal to the
+    edge direction — is caught downstream by the ``sign == 0`` check.
+    """
     coface = coface_sign_sequence(edge_ss)
     grad = gradient_on_cell(net, coface)
     return bool(np.linalg.norm(grad) <= cfg.TOL_VERIFY_AB_ATOL)
@@ -267,14 +301,38 @@ def is_pl_critical_vertex(
     ssi2maski: list[tuple[int, tuple[int, int]]],
     ss_layers: list[int],
 ) -> tuple[bool, int | None]:
-    """Section 3.2: PL criticality and Morse index at a vertex."""
+    """PL Morse criticality and index (Brooks–Masden Def. 5, Section 3.2 / [19] Thm 3.7.3).
+
+    At a vertex of C(F) the sign sequence has exactly ``n_in`` zero entries, one
+    per bent-hyperplane axis, with edges ``s=±1`` on each axis. Along each axis:
+
+    * opposite ``∂_{vE} F`` signs ⇒ F is monotonic through the vertex (PL regular);
+    * both negative ⇒ both edges oriented toward the vertex (1D local max);
+    * both positive ⇒ both edges oriented away (1D local min).
+
+    The vertex is PL critical when every axis is a 1D local max or min. The Morse
+    index is the number of axes oriented toward the vertex (so index ``0`` is a
+    local min of ``F`` and index ``d`` is a local max in ambient dimension ``d``).
+    Flat / singular directions are reported as degenerate (index ``-1``).
+
+    Args:
+        vertex_ss: Sign sequence of a 0-dimensional cell (vertex) of C(F). Must
+            have exactly ``n_in`` zero entries. Top-dimensional cells (no zeros)
+            return ``(False, None)``; intermediate-dimensional cells raise.
+    """
     assert_scalar_output(net)
     v = _coerce_ss(vertex_ss).ravel()
     zeros = np.flatnonzero(v == 0)
     if zeros.size == 0:
         return False, None
+    n_in = int(np.prod(net.input_shape))
+    if zeros.size != n_in:
+        raise ValueError(
+            f"vertex sign sequence must have exactly {n_in} zero entries "
+            + f"(got {zeros.size}); is_pl_critical_vertex requires a 0-cell of C(F)"
+        )
 
-    # At a vertex, each zero SHI gives a coordinate direction with edges s=±1.
+    # Count bent-hyperplane axes whose ± edges both point toward v.
     towards = 0
     for shi in zeros:
         edge_plus = _edge_ss_from_vertex(vertex_ss, int(shi), 1)
@@ -286,10 +344,11 @@ def is_pl_critical_vertex(
         sign_minus = partial_derivative_sign(vertex_ss, edge_minus, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
         if sign_plus == 0 or sign_minus == 0:
             return True, -1
-        if sign_plus == sign_minus:
+        if sign_plus != sign_minus:
+            # Monotonic along this axis: not a PL Morse critical vertex.
             return False, None
-        # Negative ∂_{vE} F means the edge is oriented towards v (F decreases along v→E).
-        if sign_plus < 0 or sign_minus < 0:
+        # Negative ∂_{vE} F: F decreases along v→E, so the edge is oriented toward v.
+        if sign_plus < 0:
             towards += 1
 
     return True, towards

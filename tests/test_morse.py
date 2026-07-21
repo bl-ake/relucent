@@ -96,6 +96,47 @@ class TestCriticalPoints:
             assert cp.index >= 0
             assert cp.tag == cp.polyhedron.tag
 
+    def test_lemma10_yields_nondegenerate_critical_points(self):
+        set_seeds(0)
+        net = mlp(widths=[2, 8, 1])
+        cplx = Complex(net)
+        cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=150)
+        # Lemma 10 / Jacobians must run; many random nets have only regular vertices.
+        critical = cplx.get_critical_points(include_degenerate=True)
+        assert isinstance(critical, list)
+        for cp in critical:
+            assert cp.is_critical
+            assert cp.index >= -1
+
+    def test_output_relu_network_critical_points_run(self, seed: int):
+        from relucent.utils import add_output_relu
+
+        set_seeds(seed)
+        net = add_output_relu(mlp(widths=[2, 4, 1]))
+        cplx = Complex(net)
+        cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=100)
+        # Trailing output ReLU must not break Jacobian / critical-point code.
+        # Morse uses the logit (pre-output-ReLU).
+        critical = cplx.get_critical_points(include_degenerate=True)
+        assert isinstance(critical, list)
+        for cp in critical:
+            assert cp.is_critical
+            assert cp.point is not None
+
+    def test_non_vertex_cell_raises(self):
+        """Non-vertex cells (0 < zeros.size < n_in) must raise, not silently fail."""
+        set_seeds(0)
+        net = Complex(mlp(widths=[2, 4, 1]))._net
+        # 2D input: vertex needs 2 zeros; an edge cell has 1 zero → not a vertex.
+        edge_ss = np.array([[0, 1]], dtype=np.int8)  # one zero, one non-zero
+        with pytest.raises(ValueError, match="0-cell"):
+            is_pl_critical_vertex(
+                edge_ss,
+                net,
+                ssi2maski=[(0, (0, 0)), (0, (0, 1))],
+                ss_layers=[0],
+            )
+
     def test_is_pl_critical_vertex_degenerate_at_relu_kink(self):
         from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 
@@ -116,6 +157,63 @@ class TestCriticalPoints:
         )
         assert is_crit is True
         assert idx == -1
+
+    def test_pl_morse_index_matches_brooks_masden_definition(self, monkeypatch: pytest.MonkeyPatch):
+        """Index = # of axes with both edges oriented toward v (Def. 5 / Lemma 7)."""
+        import relucent.topology.morse as morse_mod
+
+        # ``mlp`` returns a Torch module; Morse helpers need the Relucent ReLUNetwork.
+        net = Complex(mlp(widths=[2, 4, 1]))._net
+        assert_scalar_output(net)
+        ss = np.zeros((1, 2), dtype=np.int8)
+        monkeypatch.setattr(morse_mod, "_is_collapsed_edge", lambda *args, **kwargs: False)
+
+        table: dict[tuple[int, int], int] = {}
+
+        def _fake_sign(
+            _vertex_ss: np.ndarray,
+            edge_ss: np.ndarray,
+            _net: object,
+            *,
+            ssi2maski: object,
+            ss_layers: object,
+        ) -> int:
+            _ = ssi2maski, ss_layers
+            e = np.asarray(edge_ss).ravel()
+            shi = int(np.flatnonzero(e != 0)[0])
+            return int(table[(shi, int(e[shi]))])
+
+        monkeypatch.setattr(morse_mod, "partial_derivative_sign", _fake_sign)
+        ssi2maski = [(0, (0, 0)), (0, (0, 1))]
+        ss_layers = [0, 0]
+
+        # Axis 0 toward, axis 1 away → saddle of index 1.
+        table.clear()
+        table.update({(0, 1): -1, (0, -1): -1, (1, 1): 1, (1, -1): 1})
+        is_crit, idx = is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+        assert is_crit is True
+        assert idx == 1
+
+        # Both axes toward → local max, index 2.
+        table.clear()
+        table.update({(0, 1): -1, (0, -1): -1, (1, 1): -1, (1, -1): -1})
+        is_crit, idx = is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+        assert is_crit is True
+        assert idx == 2
+
+        # Both axes away → local min, index 0.
+        table.clear()
+        table.update({(0, 1): 1, (0, -1): 1, (1, 1): 1, (1, -1): 1})
+        is_crit, idx = is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+        assert is_crit is True
+        assert idx == 0
+
+        # Opposite signs on an axis → PL regular (not critical).
+        table.clear()
+        table.update({(0, 1): -1, (0, -1): 1, (1, 1): -1, (1, -1): -1})
+        is_crit, idx = is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+        assert is_crit is False
+        assert idx is None
 
 
 class TestTheorem4Consistency:

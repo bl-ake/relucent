@@ -216,7 +216,7 @@ def test_plot_polyhedron_dispatch_and_validation():
 def test_apply_poly_trace_label_includes_shis():
     poly = _poly_with_vertices(
         ambient_dim=3,
-        ss_np=np.array([[1, 1, 1]]),
+        ss_np=np.array([[1, 0, 1, 0]]),
         verts=np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
         net=_tiny_nn(3),
     )
@@ -226,6 +226,8 @@ def test_apply_poly_trace_label_includes_shis():
     assert trace.name == f"Polyhedron {poly}"
     assert trace.hoverinfo == "text"
     hover = str(trace.hovertext)
+    assert "ss zeros:" in hover
+    assert "1" in hover and "3" in hover
     assert "SHIs:" in hover
     assert "2" in hover and "5" in hover and "9" in hover
 

@@ -1,3 +1,5 @@
+- Betti Number Checks
+- Could be something weird in degree zero
 - Rework `_shi_variable_bounds_to_try()`
 - clean up Poly init
 - Remove Poly's `num_dead_relus`
