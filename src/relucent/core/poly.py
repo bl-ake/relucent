@@ -14,6 +14,7 @@ import relucent.config as cfg
 from relucent._internal.torch_compat import torch
 from relucent.geometry.calculations import (
     _affine_null_basis,
+    _remap_zero_indices,
     compute_properties,
     get_hs,
     get_shis,
@@ -449,6 +450,50 @@ class Polyhedron:
         center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)
         return center, inradius
 
+    def _halfspaces_with_bounding_box(self, bound: float, env: Any = None) -> tuple[np.ndarray, np.ndarray | None]:
+        """Stack axis-aligned bounds, drop degenerates, and check feasibility.
+
+        Returns ``(halfspaces, zero_indices)`` where ``zero_indices`` is remapped
+        through degenerate-row removal. Callers must use that remapped array with
+        the returned halfspaces — the raw :attr:`zero_indices` point into the
+        pre-drop stack and would otherwise land on a bounding-box row.
+        """
+        dim = self.halfspaces_np.shape[1] - 1
+        bounds_lhs = np.eye(dim)
+        bounds_rhs = -np.ones((dim, 1)) * bound
+        halfspaces = np.vstack(
+            (
+                self.halfspaces_np,
+                np.hstack((bounds_lhs, bounds_rhs)),
+                np.hstack((-bounds_lhs, bounds_rhs)),
+            )
+        )
+        # Drop near-zero normals (dead constraints); toxic for Gurobi / Qhull.
+        normals = halfspaces[:, :-1]
+        norms = np.linalg.norm(normals, axis=1)
+        deg = norms < cfg.TOL_HALFSPACE_NORMAL
+        zero_indices: np.ndarray | None = np.asarray(self.zero_indices, dtype=np.intp)
+        if zero_indices.size == 0:
+            zero_indices = None
+        if np.any(deg):
+            b = halfspaces[:, -1]
+            # Degenerate row is 0*x + b <= 0; b>0 is outright infeasible.
+            if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
+                bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
+                raise ValueError(
+                    "Degenerate halfspace(s) imply infeasibility after bounding; "
+                    + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
+                )
+            old_to_new = np.full(halfspaces.shape[0], -1, dtype=np.intp)
+            kept = np.flatnonzero(~deg)
+            old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
+            zero_indices = _remap_zero_indices(zero_indices, old_to_new)
+            halfspaces = halfspaces[~deg]
+        env = env or get_env()
+        if solve_radius(env, halfspaces, max_radius=bound, zero_indices=zero_indices)[0] is None:
+            raise ValueError("Bounding box constraints are not feasible")
+        return halfspaces, zero_indices
+
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
 
@@ -466,37 +511,8 @@ class Polyhedron:
         Raises:
             ValueError: If the polyhedron does not intersect the bounded region.
         """
-        bounds_lhs = np.eye(self.halfspaces_np.shape[1] - 1)
-        bounds_rhs = -np.ones((self.halfspaces_np.shape[1] - 1, 1)) * bound
-        halfspaces = np.vstack(
-            (
-                self.halfspaces_np,
-                np.hstack((bounds_lhs, bounds_rhs)),
-                np.hstack((-bounds_lhs, bounds_rhs)),
-            )
-        )
-        # Drop any degenerate rows (near-zero normals). These can arise from dead/near-dead
-        # constraints and are toxic for both Gurobi feasibility checks and Qhull.
-        normals = halfspaces[:, :-1]
-        norms = np.linalg.norm(normals, axis=1)
-        deg = norms < cfg.TOL_HALFSPACE_NORMAL
-        if np.any(deg):
-            b = halfspaces[:, -1]
-            # A degenerate row encodes 0 + b <= 0. If b>0 it's infeasible; raise rather than
-            # silently widening the region by dropping it.
-            if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
-                bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
-                raise ValueError(
-                    "Degenerate halfspace(s) imply infeasibility after bounding; "
-                    + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
-                )
-            halfspaces = halfspaces[~deg]
-        env = env or get_env()
-        feasible = solve_radius(env, halfspaces, max_radius=bound, zero_indices=self.zero_indices)[0] is not None
-        if feasible:
-            return halfspaces
-        else:
-            raise ValueError("Bounding box constraints are not feasible")
+        halfspaces, _ = self._halfspaces_with_bounding_box(bound, env=env)
+        return halfspaces
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Polyhedron):
@@ -619,34 +635,21 @@ class Polyhedron:
             qhull_mode = cfg.QHULL_MODE
 
         try:
-            bounded_halfspaces = self.get_bounded_halfspaces(bound)
+            bounded_halfspaces, zero_idx = self._halfspaces_with_bounding_box(bound)
         except ValueError as e:
             w = RuntimeWarning(f"Error while computing bounded vertices: {e}")
             self.warnings.append(w)
             return None
 
-        n_rows_raw = bounded_halfspaces.shape[0]
-        zero_idx = self.zero_indices[(self.zero_indices >= 0) & (self.zero_indices < n_rows_raw)]
+        if zero_idx is None:
+            zero_idx = np.array([], dtype=np.intp)
 
-        # Last-resort guard: Qhull requires non-degenerate halfspace normals.
-        normals = bounded_halfspaces[:, :-1]
-        norms = np.linalg.norm(normals, axis=1)
-        deg = norms < cfg.TOL_HALFSPACE_NORMAL
-        if np.any(deg):
-            old_to_new = np.full(n_rows_raw, -1, dtype=np.intp)
-            kept = np.flatnonzero(~deg)
-            old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
-            bounded_halfspaces = bounded_halfspaces[~deg]
-            if zero_idx.size > 0:
-                zero_idx = old_to_new[zero_idx]
-                zero_idx = zero_idx[zero_idx >= 0]
-
-        # Recompute interior point
+        # Recompute interior point (equalities already remapped with the halfspaces)
         int_point, _ = solve_radius(
             get_env(),
             bounded_halfspaces,
             max_radius=1000,
-            zero_indices=zero_idx,
+            zero_indices=zero_idx if zero_idx.size > 0 else None,
         )
         if int_point is None:
             raise ValueError("Interior point not found in bounded region")

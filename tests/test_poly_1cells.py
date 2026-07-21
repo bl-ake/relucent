@@ -140,6 +140,34 @@ class TestOneCellsEmbeddedInHigherDimensions:
         endpoints = _sorted_rows(np.asarray(endpoints))
         assert np.allclose(endpoints, np.array([[0.0, 0.0], [1.0, 0.0]]), atol=1e-7)
 
+    def test_bounded_clip_remaps_zero_indices_past_degenerate_row(self):
+        """Degenerate row before an equality must not shift zero_indices onto a box face.
+
+        ``get_bounded_halfspaces`` drops near-zero normals then calls ``solve_radius``
+        with equality indices. If those indices are not remapped, they can point at a
+        newly stacked bounding-box row (e.g. ``x = ±bound``), falsely marking a cell
+        that clearly intersects the plot box as empty. This showed up when plotting
+        flat decision-boundary cells that had a dead ReLU row before the active SHI.
+        """
+        halfspaces = np.array(
+            [
+                [0.0, 0.0, 0.0],  # degenerate; dropped before feasibility
+                [-1.0, 0.0, 0.0],  # x >= 0
+                [1.0, 0.0, -1.0],  # x <= 1
+                [0.0, 1.0, 0.0],  # y == 0 (equality)
+            ]
+        )
+        p = _poly_from_halfspaces(halfspaces=halfspaces, zero_rows={3})
+        assert list(p.zero_indices) == [3]
+
+        bounded = p.get_bounded_halfspaces(bound=2.0)
+        assert bounded.shape[0] >= 4  # inequalities + box; degenerate removed
+        verts = p.get_bounded_vertices(bound=2.0)
+        assert verts is not None
+        verts = _sorted_rows(np.unique(verts, axis=0))
+        assert verts.shape == (2, 2)
+        assert np.allclose(verts, np.array([[0.0, 0.0], [1.0, 0.0]]), atol=1e-7)
+
     def test_segment_in_R3(self):
         # Segment from (0,0,0) to (1,0,0) embedded in R^3 with two equality rows.
         halfspaces = np.array(
