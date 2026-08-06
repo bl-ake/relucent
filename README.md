@@ -35,7 +35,7 @@ import numpy as np
 import torch.nn as nn
 import relucent
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Create Model
     network = nn.Sequential(
         nn.Linear(2, 10),
