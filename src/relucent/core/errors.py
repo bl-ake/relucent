@@ -15,7 +15,6 @@ __all__ = [
     "CubicalConsistencyError",
     "DualGraphAsymmetricEdgeError",
     "IncompleteDualGraphError",
-    "IncompleteChainComplexError",
     "NonGenericArrangementError",
     "ShiFlipInvariantError",
     "ShiProofError",
@@ -37,20 +36,6 @@ class IncompleteDualGraphError(ValueError):
     and :meth:`~relucent.core.complex.Complex.get_meta_graph` require a complete adjacency
     structure among top-dimensional cells. Explore the complex further (e.g. BFS/DFS)
     before building the chain complex or running topology routines.
-    """
-
-
-class IncompleteChainComplexError(ValueError):
-    """The recovered chain complex has too few faces to give reliable Betti numbers.
-
-    Raised by :meth:`~relucent.core.complex.Complex.get_chain_complex` when covector
-    enumeration yields fewer (k−1)-face tags than expected for k-cells at some
-    dimension k ≥ 2.  This means the BFS explored too few top-cells to form the
-    complete hypercube stars required for face recovery in this ambient dimension,
-    so the assembled face lattice is too sparse for meaningful homology.
-
-    To bypass the check (e.g. for debugging): set
-    ``relucent.config.MIN_CHAIN_FACE_COVERAGE = 0``.
     """
 
 

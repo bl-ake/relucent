@@ -42,7 +42,7 @@ Core capabilities include:
    exploration
    certify
    incidence
-   covectors
+   vertex_star
    filtration
    persistence
    topology_api

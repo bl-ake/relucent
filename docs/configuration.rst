@@ -279,10 +279,6 @@ Topology and logging
      - ``float``
      - ``2.0``
      - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.
-   * - ``MIN_CHAIN_FACE_COVERAGE``
-     - ``float``
-     - ``0.5``
-     - Minimum fraction of expected ``(k−1)``-face tags (from ``ss_nonzero_indices``) that must be present in the covector-recovered ``(k−1)``-cell set for every ``k ≥ 2``. Checked in :meth:`~relucent.core.complex.Complex.get_chain_complex`; raises :class:`~relucent.core.errors.IncompleteChainComplexError` when below threshold. Coverage well below ``1.0`` means the BFS has too few top-cells for reliable Betti numbers. Set to ``0`` to disable.
    * - ``VERBOSE``
      - ``int``
      - ``1``

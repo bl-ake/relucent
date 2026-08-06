@@ -280,12 +280,6 @@ VERIFY_GENERICITY: bool = _env_bool("VERIFY_GENERICITY", False)
 # accept a match if ||x - x_intrinsic||_inf <= TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR * tol.
 TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = _env_float("TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0)
 
-# Minimum fraction of expected (k−1)-face tags (from ss_nonzero_indices) that
-# must be present in the covector-recovered (k−1)-cell set for every k ≥ 2.
-# Coverage well below 1.0 means the BFS has too few top-cells for the ambient
-# dimension, and Betti numbers will be unreliable. Set to 0 to disable.
-MIN_CHAIN_FACE_COVERAGE: float = _env_float("MIN_CHAIN_FACE_COVERAGE", 0.5)
-
 # -----------------------------------------------------------------------------
 # Logging / verbosity
 # -----------------------------------------------------------------------------
@@ -338,7 +332,6 @@ __all__ = [
     "GUROBI_SHI_BEST_BD_STOP",
     "GUROBI_SHI_BEST_OBJ_STOP",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
-    "MIN_CHAIN_FACE_COVERAGE",
     "MIN_SEARCH_INRADIUS",
     "MAX_RADIUS",
     "PLOT_DEFAULT_MAXCOORD",

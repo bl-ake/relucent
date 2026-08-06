@@ -141,8 +141,9 @@ creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 
 The ambient **chain complex**
 (:meth:`~relucent.core.complex.Complex.get_chain_complex`) recovers faces differently —
-via :func:`~relucent.graph.covectors.enumerate_covectors` on cubical stars — but still
-finalizes slice ``_shis`` the same way: after the full slice is known,
+by seeding and verifying vertices, then expanding each verified vertex's local
+cubical star (:mod:`relucent.graph.vertex_star`) — but still finalizes slice
+``_shis`` the same way: after the full slice is known,
 :func:`~relucent.graph.incidence.set_contracted_shis` sets authoritative ``_shis`` to
 :func:`~relucent.graph.incidence.cubical_cell_shis` — the same flip-neighbor rule as
 role 3, restricted to cells in the slice.
@@ -370,11 +371,11 @@ input to Betti numbers and persistent homology.
 Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
 
-1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces from
-   cubical stars in the dual graph via :mod:`relucent.graph.covectors`. Checks face
-   coverage against :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE` (raises
-   :class:`~relucent.core.errors.IncompleteChainComplexError` when too low) and
-   cascades rejected vertices upward before materializing lower-dimensional slices.
+1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces by
+   seeding and verifying vertices, then expanding each verified vertex's local
+   cubical star, via :mod:`relucent.graph.vertex_star` (Masden 2022, Theorem 20).
+   Every materialized cell has a verified vertex among its own faces by
+   construction, so no coverage heuristic or cascade drop is needed.
 2. **Face edges** — :func:`~relucent.graph.incidence.collect_meta_face_edges` per
    dimension (``ss_nonzero_indices`` + lookup); parallelized when cell count ≥
    ``META_FACE_PARALLEL_MIN_CELLS``.

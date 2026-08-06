@@ -45,11 +45,14 @@ os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
             "deep_3431_seed51",
             [3, 4, 3, 1],
             51,
-            # Virtual-edge skip restores earlier WIP counts (119 ones / 900 edges /
-            # one_point β₂=15) that were inflated while poisoned 1-cells remained.
-            [(65, 3), (159, 2), (119, 1), (32, 0)],
-            900,
-            {0: 1, 2: 15},
+            # Cascade-drop pre-pass (get_chain_complex) now also skips dim-2 cells
+            # whose every recovered dim-1 face was itself a dropped phantom vertex,
+            # not just dim-1 cells with dropped endpoints. That drops 8 phantom
+            # dim-2 cells (159 -> 151), collapsing the spurious β₂=15 into a single
+            # genuine β₃=1 cavity in the one-point compactification.
+            [(65, 3), (151, 2), (119, 1), (32, 0)],
+            970,
+            {0: 1, 3: 1},
         ),
     ],
 )

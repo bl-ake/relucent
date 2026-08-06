@@ -6,7 +6,7 @@ import os
 import pickle
 import random
 import warnings
-from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterable, Iterator
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
@@ -23,13 +23,12 @@ from relucent.core.errors import (
     ComplexNotCompleteError,
     ComplexNotVerifiedError,
     DualGraphAsymmetricEdgeError,
-    IncompleteChainComplexError,
     IncompleteDualGraphError,
     NonGenericArrangementError,
 )
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import SSManager
-from relucent.graph import covectors, incidence
+from relucent.graph import incidence, vertex_star
 from relucent.graph import meta_graph as mg
 from relucent.graph.complex_graph import (
     contract_dual_graph_for_shi,
@@ -78,7 +77,6 @@ __all__ = [
     "CertifyLevel",
     "INFINITY_POINT_META_NODE",
     "INFINITY_POINT_META_SHI",
-    "IncompleteChainComplexError",
     "IncompleteDualGraphError",
     "NonGenericArrangementError",
     "TRUNCATION_META_SHI",
@@ -94,39 +92,6 @@ RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 # ``compactify="one_point"``: one-point compactification.
 # TODO: deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
 CompactifyMode = bool | Literal["one_point"]
-
-
-def _face_coverage_by_dim(
-    cells_by_dim: Mapping[int, Mapping[bytes, Any]],
-    top_dim: int,
-) -> dict[int, float]:
-    """Fraction of expected ``(k−1)``-faces present for each ``k ≥ 2``.
-
-    Expected faces are the tags from :func:`~relucent.graph.incidence.ss_nonzero_indices`
-    on each ``k``-cell; a face is "present" if that tag appears in the recovered
-    ``(k−1)``-cell set.
-    """
-    out: dict[int, float] = {}
-    for k in range(2, int(top_dim) + 1):
-        cells_k = cells_by_dim.get(k, {})
-        cells_km1 = cells_by_dim.get(k - 1, {})
-        if not cells_k:
-            continue
-        n_expected = sum(
-            len(incidence.ss_nonzero_indices(np.asarray(cell.ss))) for cell in cells_k.values()
-        )
-        if n_expected == 0:
-            continue
-        n_found = sum(
-            sum(
-                1
-                for shi in incidence.ss_nonzero_indices(np.asarray(cell.ss))
-                if incidence.face_tag(np.asarray(cell.ss), int(shi)) in cells_km1
-            )
-            for cell in cells_k.values()
-        )
-        out[k] = float(n_found) / float(n_expected)
-    return out
 
 
 class Complex:
@@ -178,7 +143,6 @@ class Complex:
         self._betti_cache: dict[tuple[bool, CompactifyMode, bool], dict[int, int]] = {}
         self._complete: bool | None = None
         self._verified: bool | None = None
-        self._last_face_coverage: dict[int, float] | None = None
 
     def _invalidate_derived_caches(self) -> None:
         self._dual_graph = None
@@ -200,16 +164,6 @@ class Complex:
         """Record exploration / certification status after search or certify."""
         self._complete = complete
         self._verified = verified
-
-    @property
-    def last_face_coverage(self) -> dict[int, float] | None:
-        """Face-coverage fractions from the most recent :meth:`get_chain_complex` call.
-
-        Maps dimension ``k ≥ 2`` to the fraction of expected ``(k−1)``-faces that
-        were present in the covector-recovered cell set. ``None`` if
-        :meth:`get_chain_complex` has not been called (or the complex was empty).
-        """
-        return self._last_face_coverage
 
     def assert_topology_ready(self) -> None:
         """Require a complete, verified complex before topology routines."""
@@ -1114,7 +1068,7 @@ class Complex:
         :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
 
         Meta-graph **face edges** always use :func:`~relucent.graph.incidence.ss_nonzero_indices`.
-        The ambient chain complex uses :mod:`relucent.graph.covectors` instead of this helper.
+        The ambient chain complex uses :mod:`relucent.graph.vertex_star` instead of this helper.
         """
         ambient = p1.ambient_dim
         codim = p1.codim + 1
@@ -1265,88 +1219,50 @@ class Complex:
         return self.get_chain_complex(verbose=verbose)[self.dim - 1]
 
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
-        """Recover the chain complex from cubical stars in the top-cell dual graph.
+        """Recover the chain complex directly from verified vertices' local stars.
 
-        All positive-dimensional cells are recovered by exact sign intersection.
-        Candidate vertices receive one float64 equality solve followed by strict
-        forward-sign verification; no facet or boundedness LP is used here.
+        Masden (2022), Theorem 20: the sign-sequence complex is a pure,
+        ambient-dimensional cubical complex, so once a vertex (exactly
+        ``ambient_dim`` zero sign entries, Lemma 16) is verified, *every* cell
+        in its local star is algebraically guaranteed to be present (Lemma
+        18's sign-product semigroup) — no independent rediscovery of
+        neighboring top-dimensional cells, dual-graph cube verification, or
+        coverage heuristic is required. See :mod:`relucent.graph.vertex_star`.
 
-        After covector enumeration, face coverage is recorded on
-        :attr:`last_face_coverage` and checked against
-        :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE` (default ``0.5``): if too
-        few expected ``(k−1)``-faces of ``k``-cells are present for any ``k ≥ 2``,
-        raises :class:`~relucent.core.errors.IncompleteChainComplexError`. Set the
-        setting to ``0`` to disable. Rejected (phantom) vertices cascade upward:
-        any cell whose every recovered face was dropped is also omitted from the
-        chain.
+        Candidate vertices receive one float64 equality solve followed by
+        strict forward-sign verification (:meth:`Polyhedron.verify_vertex_covector`);
+        no facet or boundedness LP is used here. Every recovered cell of
+        dimension ``k >= 1`` has, by construction, at least one verified
+        vertex among its own faces (its generating vertex), so a cell can
+        never end up with every endpoint unverifiable.
 
         Raises:
             CubicalConsistencyError: If the labeled top-cell graph is not cubical.
-            IncompleteChainComplexError: If recovered face coverage is below
-                :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`.
         """
         self.assert_topology_ready()
         if len(self) == 0:
-            self._last_face_coverage = {}
             return [self]
         ambient_dim = int(self.dim)
         top_dim = max(int(p.dim) for p in self)
         top_cells = [p for p in self if int(p.dim) == top_dim]
         graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
         incidence.certify_dual_graph(graph, self, top_dim=top_dim)
-        cells_by_dim = covectors.enumerate_covectors(
+
+        def _verify_vertex(root: Polyhedron, candidate_ss: np.ndarray) -> np.ndarray | None:
+            return root.verify_vertex_covector(
+                candidate_ss,
+                point2preactivations=lambda x: np.asarray(self.point2preactivations(x)),
+                sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
+            )
+
+        cells_by_dim, vertices = vertex_star.recover_cells_from_vertices(
             top_cells,
             graph,
             ambient_dim=ambient_dim,
             top_dim=top_dim,
+            verify_vertex=_verify_vertex,
         )
-
-        coverage_by_dim = _face_coverage_by_dim(cells_by_dim, top_dim)
-        self._last_face_coverage = coverage_by_dim
-        min_cov = float(cfg.MIN_CHAIN_FACE_COVERAGE)
-        if min_cov > 0:
-            for k, coverage in coverage_by_dim.items():
-                if coverage < min_cov:
-                    raise IncompleteChainComplexError(
-                        f"get_chain_complex: dim-{k} → dim-{k - 1} face coverage "
-                        + f"{coverage:.2%} < MIN_CHAIN_FACE_COVERAGE={min_cov:.2%}. "
-                        + f"The BFS has too few top-cells to recover the face lattice in "
-                        + f"ambient dim {ambient_dim}. Explore the complex further or set "
-                        + f"relucent.config.MIN_CHAIN_FACE_COVERAGE = 0 to bypass."
-                    )
-
-        vertex_points: dict[bytes, np.ndarray] = {}
-        rejected_vertices: set[bytes] = set()
-        for tag, cell in cells_by_dim.get(0, {}).items():
-            witness = self.tag2poly[min(cell.coface_tags)]
-            point = witness.verify_vertex_covector(
-                cell.ss,
-                point2preactivations=lambda x: np.asarray(self.point2preactivations(x)),
-                sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
-            )
-            if point is None:
-                rejected_vertices.add(tag)
-            else:
-                vertex_points[tag] = point
-
-        # Cascade drop pre-pass: propagate rejected vertices upward so that
-        # higher-dimensional cells whose every recovered face was dropped are
-        # also skipped in the chain-building loop below.
-        cascade_dropped: dict[int, set[bytes]] = {0: set(rejected_vertices)}
-        for k in range(1, top_dim):
-            cells_k = cells_by_dim.get(k, {})
-            cells_km1 = cells_by_dim.get(k - 1, {})
-            dropped_km1 = cascade_dropped.get(k - 1, set())
-            dropped_k: set[bytes] = set()
-            for tag, cell in cells_k.items():
-                recovered_faces = {
-                    incidence.face_tag(np.asarray(cell.ss), int(shi))
-                    for shi in incidence.ss_nonzero_indices(np.asarray(cell.ss))
-                } & set(cells_km1)
-                # Drop if every recovered face was itself dropped
-                if recovered_faces and not (recovered_faces - dropped_km1):
-                    dropped_k.add(tag)
-            cascade_dropped[k] = dropped_k
+        vertex_points = {tag: v.point for tag, v in vertices.items()}
 
         chain: list[Complex] = [self]
         for dim in range(top_dim - 1, -1, -1):
@@ -1359,8 +1275,8 @@ class Complex:
                 ordered_tags.sort(
                     key=lambda tag: (
                         -sum(
-                            incidence.face_tag(recovered[tag].ss, shi) in vertex_points
-                            for shi in incidence.ss_nonzero_indices(recovered[tag].ss)
+                            incidence.face_tag(recovered[tag], shi) in vertex_points
+                            for shi in incidence.ss_nonzero_indices(recovered[tag])
                         ),
                         tag,
                     )
@@ -1374,9 +1290,7 @@ class Complex:
                             endpoint_order.append(endpoint_tag)
                 ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in endpoint_order]
             for tag in ordered_tags:
-                cell = recovered[tag]
-                witness_tag = min(cell.coface_tags)
-                witness = self.tag2poly[witness_tag]
+                ss = recovered[tag]
                 kwargs: dict[str, Any] = {
                     "codim": ambient_dim - dim,
                     "dim": dim,
@@ -1384,21 +1298,15 @@ class Complex:
                 }
                 point = vertex_points.get(tag)
                 if dim == 0:
-                    if tag in cascade_dropped.get(0, set()):
-                        continue
+                    witness = self.tag2poly[vertices[tag].witness_tag]
                     kwargs["halfspaces"] = witness.halfspaces
                     kwargs["finite"] = True
                 elif dim == 1:
-                    if tag in cascade_dropped.get(1, set()):
-                        continue
-                    candidate_by_shi = {shi: incidence.face_tag(cell.ss, shi) for shi in incidence.ss_nonzero_indices(cell.ss)}
+                    candidate_by_shi = {shi: incidence.face_tag(ss, shi) for shi in incidence.ss_nonzero_indices(ss)}
                     kwargs["_covector_endpoint_shis"] = sorted(
                         shi for shi, face in candidate_by_shi.items() if face in vertex_points
                     )
-                else:
-                    if tag in cascade_dropped.get(dim, set()):
-                        continue
-                poly = cplx.add_ss(cell.ss, **kwargs)
+                poly = cplx.add_ss(ss, **kwargs)
                 if point is not None:
                     poly._interior_point = point
 
@@ -1559,27 +1467,15 @@ class Complex:
 
         Note:
             The resulting structure encodes the face relations present in the
-            chain returned by :meth:`get_chain_complex` (covector recovery from the
-            dual graph). Boundary faces that are not represented in that chain will
-            not appear unless they were already present in the chain complexes.
-
-            A breadth-first search over full-dimensional regions can still leave this
-            graph short of a closed cellular complex: some codimension-one faces of a
-            stored cell may not appear as nodes (their sign pattern is missing from the
-            explored complex or from the recovered chain), so incidence data can omit
-            entries that true geometry would require. That breaks ``∂² = 0`` for the
-            GF(2) boundary maps in :func:`relucent.topology.get_betti_numbers` unless
-            ``verify_chain_complex`` is disabled; see that function's documentation.
-            Separately, :meth:`get_chain_complex` raises
-            :class:`~relucent.core.errors.IncompleteChainComplexError` when recovered
-            face coverage falls below :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`
-            (sparse lattices can pass ``∂² = 0`` yet yield unreliable Betti numbers).
+            chain returned by :meth:`get_chain_complex` (vertex-star recovery;
+            see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex
+            in their closure (fully unbounded structure) are not represented —
+            they are handled separately by one-point compactification in
+            :func:`relucent.topology.get_betti_numbers`.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
                 :meth:`get_chain_complex`.
-            IncompleteChainComplexError: If face coverage after covector recovery is
-                below :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`.
         """
         if len(self) == 0:
             logger.info("get_meta_graph: empty complex, returning empty graph")
@@ -2005,11 +1901,6 @@ class Complex:
             nworkers: Number of threads for ranking independent boundary maps concurrently.
                 ``None`` (default): auto (one thread per map when the C backend is available).
                 ``1``: always sequential.  See :func:`relucent.topology.get_betti_numbers`.
-
-        Raises:
-            IncompleteChainComplexError: If :meth:`get_meta_graph` /
-                :meth:`get_chain_complex` finds face coverage below
-                :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`.
         """
         self._warn_research_use("get_betti_numbers")
         if len(self) == 0:

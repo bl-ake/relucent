@@ -17,11 +17,12 @@ Prerequisites
 **Complete exploration.** Local search methods like BFS are sufficient for computing
 topology *only if they run to completion*. Missing neighbors can leave the meta-graph
 short of a closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
-Even when ``∂² = 0`` holds, a sparse face lattice (too few top-cells for the ambient
-dimension) can produce spuriously large Betti numbers;
-:meth:`~relucent.core.complex.Complex.get_chain_complex` therefore checks face coverage
-against :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE` and raises
-:class:`~relucent.core.errors.IncompleteChainComplexError` when recovery is too thin.
+:meth:`~relucent.core.complex.Complex.get_chain_complex` recovers faces algebraically
+from verified vertices' local stars (Masden 2022, Theorem 20; see
+:mod:`relucent.graph.vertex_star`), so every cell whose generating vertex is verified
+is guaranteed present — no coverage heuristic is required. A partial BFS still means
+fewer top cells to seed vertices from, so completeness of the underlying exploration
+still matters for how much of the true arrangement is recovered.
 
 After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :attr:`~relucent.core.complex.Complex.verified` (see :doc:`exploration_verification`).
@@ -47,10 +48,9 @@ The :class:`~relucent.core.complex.Complex` class exposes three related graph vi
 * **Dual graph** (:meth:`~relucent.core.complex.Complex.get_dual_graph`): adjacency of
   top-dimensional cells only.
 * **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): lower-
-  dimensional faces recovered from cubical stars in the dual graph via
-  :mod:`relucent.graph.covectors` (``Complex.contract()`` returns the codimension-one
-  slice). Face coverage is gated by :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`;
-  rejected vertices cascade upward so poisoned higher cells are omitted.
+  dimensional faces recovered by seeding and verifying vertices, then expanding each
+  verified vertex's local cubical star, via :mod:`relucent.graph.vertex_star`
+  (``Complex.contract()`` returns the codimension-one slice).
 * **Meta-graph** (:meth:`~relucent.core.complex.Complex.get_meta_graph`): face poset
   over all cell dimensions, used by Betti and persistence code.
 

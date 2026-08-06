@@ -7,14 +7,14 @@ no extra arguments — the default path most users hit.
 For example `{0: 1, 1: 2}` means one connected component, two independent 1-cycles,
 and so on.
 
-**What you need first:** a complex discovered by search (BFS, etc.). If exploration
-stops early, some faces never appear as cells and the incidence data is incomplete.
-`get_chain_complex()` raises
-[`IncompleteChainComplexError`](../src/relucent/core/errors.py) when recovered face
-coverage falls below [`MIN_CHAIN_FACE_COVERAGE`](../src/relucent/config/__init__.py)
-(default `0.5`); set that setting to `0` only to bypass the check for debugging.
-Even when coverage passes, a partial BFS can still leave a thinner face lattice than
-the full arrangement.
+**What you need first:** a complex discovered by search (BFS, etc.). Faces are
+recovered algebraically from verified vertices' local stars (Masden 2022, Theorem
+20; see [`vertex_star`](../src/relucent/graph/vertex_star.py)), so no coverage
+heuristic is needed — every cell whose generating vertex is verified is
+guaranteed present. A partial BFS can still leave the complex short of the full
+arrangement (fewer top cells means fewer vertices to seed from), so
+`cplx.complete` / `cplx.verified` still matter; see *Exploration and
+certification* below.
 
 ---
 
@@ -26,13 +26,12 @@ When you call `get_betti_numbers()` with defaults (`compactify=False`,
 ```mermaid
 flowchart TD
     search["BFS discovers top-dimensional cells"]
-    chain["get_chain_complex: recover faces via covectors"]
-    cover["face coverage check + cascade drop"]
+    chain["get_chain_complex: seed + verify vertices, expand local stars"]
     meta["get_meta_graph: face edges + bounded/unbounded labels"]
     trunc["truncate_meta_graph + close 1-cell boundaries"]
     rank["topology.get_betti_numbers: rank boundary matrices"]
 
-    search --> chain --> cover --> meta --> trunc --> rank
+    search --> chain --> meta --> trunc --> rank
 ```
 
 Each step is described below.
@@ -45,14 +44,23 @@ Each step is described below.
 
 The chain complex is a list of `Complex` objects, one per dimension, from the
 top-dimensional cells down to 0-cells (vertices). Lower-dimensional cells are
-recovered from the labeled top-cell dual graph by
-[`enumerate_covectors()`](../src/relucent/graph/covectors.py) — exact sign
-intersection over cubical stars — not by iterative dual-edge contraction.
+recovered directly from verified vertices' local stars by
+[`vertex_star.recover_cells_from_vertices()`](../src/relucent/graph/vertex_star.py)
+— not by iterative dual-edge contraction, and not by requiring the complete
+`2^c` cube of top-cell cofaces to already exist.
 
 `Complex.contract()` is a thin wrapper that returns
 `get_chain_complex(...)[self.dim - 1]`.
 
-### How covector recovery works
+### How vertex-star recovery works
+
+Masden, *Algorithmic Determination of the Combinatorial Structure of the Linear
+Regions of ReLU Neural Networks* (2022), Theorem 20: for a generic,
+supertransversal network the sign-sequence complex is a **pure,
+ambient-dimensional cubical complex**. Every vertex has exactly `ambient_dim`
+zero sign entries (Lemma 16), and once such a vertex is verified, *every* sign
+assignment on those zero entries — holding all other entries fixed — is a real,
+present cell (Lemma 18's sign-product semigroup).
 
 1. Build the **dual graph** — combinatorial adjacency among top-dimensional cells
    ([`get_dual_graph()`](../src/relucent/core/complex.py) →
@@ -60,37 +68,28 @@ intersection over cubical stars — not by iterative dual-edge contraction.
    [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) so each cell's
    `_shis` list matches incident edge labels. Certify the labeled graph with
    [`certify_dual_graph()`](../src/relucent/graph/incidence.py).
-2. For each top cell, read incident SHI labels and enumerate every subset of those
-   labels as a candidate face. The face sign sequence is the
-   [`sign_intersection`](../src/relucent/graph/covectors.py) of the cubical star of
-   top cells obtained by flipping those SHIs
-   ([`enumerate_covectors()`](../src/relucent/graph/covectors.py)).
-3. **Face coverage check.** For every dimension `k ≥ 2`, count how many expected
-   `(k−1)`-face tags (from `ss_nonzero_indices`) are present in the recovered
-   `(k−1)`-cell set. If the fraction is below
-   [`MIN_CHAIN_FACE_COVERAGE`](../src/relucent/config/__init__.py) (default `0.5`),
-   raise [`IncompleteChainComplexError`](../src/relucent/core/errors.py). Sparse
-   coverage means the BFS has too few top cells to form the complete hypercube stars
-   needed for face recovery in this ambient dimension; Betti numbers from such a
-   lattice are unreliable (∂² = 0 can still hold because missing edges are absent
-   from both ∂_k and ∂_{k+1}). Set `MIN_CHAIN_FACE_COVERAGE = 0` to disable.
-4. **Vertices (0-cells)** get one float64 equality solve from a witness coface,
-   then strict forward-sign verification
-   ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)). Rejected
-   (phantom) vertices are dropped. A **cascade drop** then propagates upward: any
-   `k`-cell whose every recovered `(k−1)`-face was itself dropped is also omitted
-   (this generalizes the earlier rule that skipped 1-cells whose only endpoints were
-   rejected). Surviving 1-cells keep `_covector_endpoint_shis` for their verified
-   vertex endpoints.
-5. Materialize each recovered cell with `add_ss`, then run
+2. **Seed and verify vertices** ([`find_vertices()`](../src/relucent/graph/vertex_star.py)):
+   for each top cell, choose `top_dim` of its dual-graph-incident SHIs (a top cell
+   already has `ambient_dim - top_dim` zero entries by Lemma 16) and zero them to
+   get a candidate vertex sign sequence. Verify it with one float64 equality solve
+   plus strict forward-sign checking
+   ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)); no facet
+   or boundedness LP is used.
+3. **Expand each verified vertex's local star**
+   ([`expand_vertex_star()`](../src/relucent/graph/vertex_star.py)): vary the
+   `top_dim` coordinates that distinguish the vertex from its witness top cell
+   independently over `{-1, 0, 1}`, producing every cell of every dimension from
+   0 (the vertex itself) up to `top_dim` in that star. Every generated cell of
+   dimension `k ≥ 1` has, by construction, at least one verified vertex among its
+   own faces (its generating vertex) — a cell with every endpoint unverifiable can
+   never be produced, so no separate "cascade drop" pass is needed.
+4. Materialize each recovered cell with `add_ss`, then run
    [`set_contracted_shis()`](../src/relucent/graph/incidence.py) on each lower-dim
    slice so authoritative `_shis` match
    [`cubical_cell_shis()`](../src/relucent/graph/incidence.py). In `CAREFUL_MODE`,
    [`verify_contracted_shis()`](../src/relucent/graph/incidence.py) asserts flip-neighbor
    symmetry. Top-dimensional ambient cells do not use this step; their `_shis`
    come from the dual graph at search finalize.
-
-No facet or boundedness LP is used during covector recovery.
 
 ### Dual-graph rules
 
@@ -277,10 +276,6 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
   ([`finite_cells_subgraph()`](../src/relucent/graph/meta_graph.py)); no truncation.
 - **`verify_chain_complex=True`** — require ∂² = 0; raises if the complex is
   incomplete.
-- **`MIN_CHAIN_FACE_COVERAGE`** — minimum fraction of expected `(k−1)`-faces that
-  must be present after covector recovery (default `0.5`). Checked inside
-  `get_chain_complex()`; raises `IncompleteChainComplexError` when too low. Set to
-  `0` to disable (debugging only).
 - **`get_meta_graph(verify=True)`** — runs
   [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
   assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
@@ -296,7 +291,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Step | Main functions |
 |------|----------------|
 | Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph`, `incidence.*` |
-| Chain complex | `get_chain_complex`, `covectors.enumerate_covectors`, face coverage check, cascade drop, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
+| Chain complex | `get_chain_complex`, `vertex_star.find_vertices`, `vertex_star.expand_vertex_star`, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
 | Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |

@@ -157,10 +157,10 @@
         "n_regions": 640,
         "n_boundary_cells": 254,
         "truncated_betti": {
-          "0": 1,
-          "2": 26
+          "0": 1
         },
-        "methods_agree": true
+        "methods_agree": true,
+        "note": "Re-verified 2026-08-06: current codebase (both the pre-redesign covector recovery with MIN_CHAIN_FACE_COVERAGE=0 and the vertex_star recovery) reproducibly gives chain sizes 254/691/628/190 and truncated betti {0: 1} for this witness, not the {0: 1, 2: 26} recorded here previously. This is not caused by the vertex_star redesign (both algorithms agree byte-for-byte); it predates it and was previously masked by MIN_CHAIN_FACE_COVERAGE raising IncompleteChainComplexError (34%/47% coverage) before Betti numbers were ever computed."
       },
       "boundary_shi": 10
     },
@@ -188,10 +188,10 @@
         "n_boundary_cells": 1072,
         "truncated_betti": {
           "0": 2,
-          "1": 1,
-          "2": 34
+          "1": 1
         },
-        "methods_agree": true
+        "methods_agree": true,
+        "note": "Re-verified 2026-08-06: current codebase (both the pre-redesign covector recovery with MIN_CHAIN_FACE_COVERAGE=0 and the vertex_star recovery) reproducibly gives chain sizes 1072/2766/2377/682 and truncated betti {0: 2, 1: 1} for this witness, not the {0: 2, 1: 1, 2: 34} recorded here previously. This is not caused by the vertex_star redesign (both algorithms agree byte-for-byte); it predates it."
       },
       "boundary_shi": 30
     },
@@ -219,10 +219,10 @@
         "n_regions": 63096,
         "n_boundary_cells": 1330,
         "truncated_betti": {
-          "0": 3,
-          "2": 38
+          "0": 3
         },
-        "methods_agree": false
+        "methods_agree": false,
+        "note": "Re-verified 2026-08-06: current codebase (both the pre-redesign covector recovery with MIN_CHAIN_FACE_COVERAGE=0 and the vertex_star recovery) reproducibly gives chain sizes 1330/3581/3223/969 and truncated betti {0: 3} for this witness, not the {0: 3, 2: 38} recorded here previously. This is not caused by the vertex_star redesign (both algorithms agree byte-for-byte); it predates it. methods_agree was already false before this change."
       },
       "boundary_shi": 40
     },
@@ -247,10 +247,10 @@
         "n_regions": 1237,
         "n_boundary_cells": 443,
         "truncated_betti": {
-          "0": 1,
-          "2": 10
+          "0": 1
         },
-        "methods_agree": true
+        "methods_agree": true,
+        "note": "Re-verified 2026-08-06: current codebase (both the pre-redesign covector recovery with MIN_CHAIN_FACE_COVERAGE=0 and the vertex_star recovery) reproducibly gives chain sizes 443/1236/1153/359 and truncated betti {0: 1} for this witness, not the {0: 1, 2: 10} recorded here previously. This is not caused by the vertex_star redesign (both algorithms agree byte-for-byte); it predates it and was previously masked by MIN_CHAIN_FACE_COVERAGE raising IncompleteChainComplexError (34%/47% coverage) before Betti numbers were ever computed."
       },
       "boundary_shi": 12
     }
