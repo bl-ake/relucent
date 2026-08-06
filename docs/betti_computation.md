@@ -9,8 +9,12 @@ and so on.
 
 **What you need first:** a complex discovered by search (BFS, etc.). If exploration
 stops early, some faces never appear as cells and the incidence data is incomplete.
-You'll still get numbers, but they may not match the true topology of the full
-arrangement.
+`get_chain_complex()` raises
+[`IncompleteChainComplexError`](../src/relucent/core/errors.py) when recovered face
+coverage falls below [`MIN_CHAIN_FACE_COVERAGE`](../src/relucent/config/__init__.py)
+(default `0.5`); set that setting to `0` only to bypass the check for debugging.
+Even when coverage passes, a partial BFS can still leave a thinner face lattice than
+the full arrangement.
 
 ---
 
@@ -23,11 +27,12 @@ When you call `get_betti_numbers()` with defaults (`compactify=False`,
 flowchart TD
     search["BFS discovers top-dimensional cells"]
     chain["get_chain_complex: recover faces via covectors"]
+    cover["face coverage check + cascade drop"]
     meta["get_meta_graph: face edges + bounded/unbounded labels"]
     trunc["truncate_meta_graph + close 1-cell boundaries"]
     rank["topology.get_betti_numbers: rank boundary matrices"]
 
-    search --> chain --> meta --> trunc --> rank
+    search --> chain --> cover --> meta --> trunc --> rank
 ```
 
 Each step is described below.
@@ -60,12 +65,24 @@ intersection over cubical stars — not by iterative dual-edge contraction.
    [`sign_intersection`](../src/relucent/graph/covectors.py) of the cubical star of
    top cells obtained by flipping those SHIs
    ([`enumerate_covectors()`](../src/relucent/graph/covectors.py)).
-3. **Vertices (0-cells)** get one float64 equality solve from a witness coface,
+3. **Face coverage check.** For every dimension `k ≥ 2`, count how many expected
+   `(k−1)`-face tags (from `ss_nonzero_indices`) are present in the recovered
+   `(k−1)`-cell set. If the fraction is below
+   [`MIN_CHAIN_FACE_COVERAGE`](../src/relucent/config/__init__.py) (default `0.5`),
+   raise [`IncompleteChainComplexError`](../src/relucent/core/errors.py). Sparse
+   coverage means the BFS has too few top cells to form the complete hypercube stars
+   needed for face recovery in this ambient dimension; Betti numbers from such a
+   lattice are unreliable (∂² = 0 can still hold because missing edges are absent
+   from both ∂_k and ∂_{k+1}). Set `MIN_CHAIN_FACE_COVERAGE = 0` to disable.
+4. **Vertices (0-cells)** get one float64 equality solve from a witness coface,
    then strict forward-sign verification
    ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)). Rejected
-   (phantom) vertices are dropped; 1-cells whose only combinatorial endpoints were
-   rejected are skipped so they never enter the meta-graph as faces.
-4. Materialize each recovered cell with `add_ss`, then run
+   (phantom) vertices are dropped. A **cascade drop** then propagates upward: any
+   `k`-cell whose every recovered `(k−1)`-face was itself dropped is also omitted
+   (this generalizes the earlier rule that skipped 1-cells whose only endpoints were
+   rejected). Surviving 1-cells keep `_covector_endpoint_shis` for their verified
+   vertex endpoints.
+5. Materialize each recovered cell with `add_ss`, then run
    [`set_contracted_shis()`](../src/relucent/graph/incidence.py) on each lower-dim
    slice so authoritative `_shis` match
    [`cubical_cell_shis()`](../src/relucent/graph/incidence.py). In `CAREFUL_MODE`,
@@ -260,6 +277,10 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
   ([`finite_cells_subgraph()`](../src/relucent/graph/meta_graph.py)); no truncation.
 - **`verify_chain_complex=True`** — require ∂² = 0; raises if the complex is
   incomplete.
+- **`MIN_CHAIN_FACE_COVERAGE`** — minimum fraction of expected `(k−1)`-faces that
+  must be present after covector recovery (default `0.5`). Checked inside
+  `get_chain_complex()`; raises `IncompleteChainComplexError` when too low. Set to
+  `0` to disable (debugging only).
 - **`get_meta_graph(verify=True)`** — runs
   [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
   assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
@@ -275,7 +296,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Step | Main functions |
 |------|----------------|
 | Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph`, `incidence.*` |
-| Chain complex | `get_chain_complex`, `covectors.enumerate_covectors`, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
+| Chain complex | `get_chain_complex`, `covectors.enumerate_covectors`, face coverage check, cascade drop, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
 | Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |

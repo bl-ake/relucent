@@ -371,7 +371,10 @@ Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
 
 1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces from
-   cubical stars in the dual graph via :mod:`relucent.graph.covectors`.
+   cubical stars in the dual graph via :mod:`relucent.graph.covectors`. Checks face
+   coverage against :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE` (raises
+   :class:`~relucent.core.errors.IncompleteChainComplexError` when too low) and
+   cascades rejected vertices upward before materializing lower-dimensional slices.
 2. **Face edges** — :func:`~relucent.graph.incidence.collect_meta_face_edges` per
    dimension (``ss_nonzero_indices`` + lookup); parallelized when cell count ≥
    ``META_FACE_PARALLEL_MIN_CELLS``.

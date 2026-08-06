@@ -17,6 +17,11 @@ Prerequisites
 **Complete exploration.** Local search methods like BFS are sufficient for computing
 topology *only if they run to completion*. Missing neighbors can leave the meta-graph
 short of a closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
+Even when ``∂² = 0`` holds, a sparse face lattice (too few top-cells for the ambient
+dimension) can produce spuriously large Betti numbers;
+:meth:`~relucent.core.complex.Complex.get_chain_complex` therefore checks face coverage
+against :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE` and raises
+:class:`~relucent.core.errors.IncompleteChainComplexError` when recovery is too thin.
 
 After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :attr:`~relucent.core.complex.Complex.verified` (see :doc:`exploration_verification`).
@@ -44,7 +49,8 @@ The :class:`~relucent.core.complex.Complex` class exposes three related graph vi
 * **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): lower-
   dimensional faces recovered from cubical stars in the dual graph via
   :mod:`relucent.graph.covectors` (``Complex.contract()`` returns the codimension-one
-  slice).
+  slice). Face coverage is gated by :data:`~relucent.config.MIN_CHAIN_FACE_COVERAGE`;
+  rejected vertices cascade upward so poisoned higher cells are omitted.
 * **Meta-graph** (:meth:`~relucent.core.complex.Complex.get_meta_graph`): face poset
   over all cell dimensions, used by Betti and persistence code.
 
@@ -68,7 +74,9 @@ the chosen homology convention, and returns ``{dimension: β_k}``.
 
 **``verify_chain_complex``**: when ``True``, require ``∂² = 0`` on the assembled
 boundary maps; raises :class:`~relucent.topology.ChainComplexInconsistent` if the
-explored complex is incomplete.
+explored complex is incomplete. This is complementary to the face-coverage check in
+:meth:`~relucent.core.complex.Complex.get_chain_complex`, which catches sparse lattices
+where ``∂² = 0`` can still hold.
 
 **``nworkers``**: thread count for ranking independent boundary maps (``None``
 auto-selects when the optional C GF(2) backend is available).

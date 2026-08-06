@@ -179,6 +179,8 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     meta = cplx.get_meta_graph()
     assert chain
     assert meta.number_of_nodes() > 0
+    assert cplx.last_face_coverage is not None
+    assert all(0.0 <= v <= 1.0 for v in cplx.last_face_coverage.values())
 
 
 def test_get_chain_complex_skips_1cells_with_only_rejected_endpoints(
@@ -241,6 +243,140 @@ def test_get_chain_complex_skips_1cells_with_only_rejected_endpoints(
     meta = cplx.get_meta_graph(verbose=False)
     for p in top_cells:
         assert p.tag in meta.nodes, "nonempty top cells must survive virtual-edge omission"
+
+
+def test_incomplete_chain_raises_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Coverage check must raise IncompleteChainComplexError when dim-1 cells are absent."""
+    import relucent.config as cfg
+    from relucent.core.errors import IncompleteChainComplexError
+    from relucent.graph import covectors as cov_mod
+
+    set_seeds(4)
+    cplx = Complex(mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
+    explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
+
+    real_enumerate = cov_mod.enumerate_covectors
+
+    def stripped(*args: object, **kwargs: object) -> dict:
+        result = real_enumerate(*args, **kwargs)  # type: ignore[arg-type]
+        # Remove dim-1 entries so dim-2 cells have zero face coverage.
+        return {k: v for k, v in result.items() if k != 1}
+
+    monkeypatch.setattr(cov_mod, "enumerate_covectors", stripped)
+    monkeypatch.setattr(cfg, "MIN_CHAIN_FACE_COVERAGE", 0.5)
+
+    with pytest.raises(IncompleteChainComplexError, match="face coverage"):
+        cplx.get_chain_complex()
+
+
+def test_min_chain_face_coverage_zero_disables_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setting MIN_CHAIN_FACE_COVERAGE=0 must suppress IncompleteChainComplexError."""
+    import relucent.config as cfg
+    from relucent.graph import covectors as cov_mod
+
+    set_seeds(4)
+    cplx = Complex(mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
+    explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
+
+    real_enumerate = cov_mod.enumerate_covectors
+
+    def stripped(*args: object, **kwargs: object) -> dict:
+        result = real_enumerate(*args, **kwargs)  # type: ignore[arg-type]
+        return {k: v for k, v in result.items() if k != 1}
+
+    monkeypatch.setattr(cov_mod, "enumerate_covectors", stripped)
+    monkeypatch.setattr(cfg, "MIN_CHAIN_FACE_COVERAGE", 0.0)
+
+    # Should not raise.
+    chain = cplx.get_chain_complex()
+    assert chain  # at minimum contains self (the top-cell complex)
+    assert cplx.last_face_coverage is not None
+
+
+def test_cascade_drop_higher_cells_when_all_dim1_faces_dropped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 2-cell whose every recovered 1-face is cascade-dropped must itself be dropped."""
+    from relucent.graph import covectors, incidence
+    from relucent.utils import encode_ss
+
+    set_seeds(7)
+    cplx = Complex(mlp(widths=[3, 4, 1], add_last_relu=True, init="uniform"))
+    explore_for_topology(cplx, np.zeros(3), max_polys=2000, nworkers=1)
+
+    top_dim = max(int(p.dim) for p in cplx)
+    if top_dim < 3:
+        pytest.skip("fixture did not produce a complex with dim≥3 (need 2-cells)")
+
+    top_cells = [p for p in cplx if int(p.dim) == top_dim]
+    graph = cplx.get_dual_graph(verbose=False, require_complete=False)
+    cells_by_dim = covectors.enumerate_covectors(
+        top_cells, graph, ambient_dim=int(cplx.dim), top_dim=top_dim
+    )
+    assert cells_by_dim.get(2), "fixture must have at least one 2-cell"
+
+    # Find a 2-cell that has at least one recovered 1-face, and collect all
+    # the dim-0 faces reachable via those 1-faces.  Rejecting all of them
+    # forces every recovered 1-face into cascade_dropped[1], which in turn
+    # forces the 2-cell into cascade_dropped[2].
+    target_2cell_tag: bytes | None = None
+    vertices_to_reject: set[bytes] = set()
+    for tag_2, cell_2 in cells_by_dim[2].items():
+        face_tags_1 = {
+            incidence.face_tag(np.asarray(cell_2.ss), int(shi))
+            for shi in incidence.ss_nonzero_indices(np.asarray(cell_2.ss))
+        } & set(cells_by_dim.get(1, {}))
+        if not face_tags_1:
+            continue
+        # Gather all dim-0 faces of those 1-cells.
+        verts: set[bytes] = set()
+        for tag_1 in face_tags_1:
+            cell_1 = cells_by_dim[1][tag_1]
+            verts |= (
+                {
+                    incidence.face_tag(np.asarray(cell_1.ss), int(shi))
+                    for shi in incidence.ss_nonzero_indices(np.asarray(cell_1.ss))
+                }
+                & set(cells_by_dim.get(0, {}))
+            )
+        target_2cell_tag = tag_2
+        vertices_to_reject = verts
+        break
+
+    if target_2cell_tag is None:
+        pytest.skip("no 2-cell with recovered 1-faces found in fixture")
+
+    original = Polyhedron.verify_vertex_covector
+
+    def patched(
+        self: Polyhedron,
+        vertex_ss: np.ndarray,
+        *,
+        point2preactivations: Callable[[np.ndarray], np.ndarray],
+        sign_margin: float,
+    ) -> np.ndarray | None:
+        tag = encode_ss(np.asarray(vertex_ss, dtype=np.int8))
+        if tag in vertices_to_reject:
+            return None
+        return original(
+            self, vertex_ss, point2preactivations=point2preactivations, sign_margin=sign_margin
+        )
+
+    monkeypatch.setattr(Polyhedron, "verify_vertex_covector", patched)
+    # Disable the coverage check so it doesn't fire first.
+    import relucent.config as cfg
+    monkeypatch.setattr(cfg, "MIN_CHAIN_FACE_COVERAGE", 0.0)
+
+    chain = cplx.get_chain_complex(verbose=False)
+    two_cplx = next((c for c in chain if len(c) > 0 and int(c.index2poly[0].dim) == 2), None)
+    present_2cells = {p.tag for p in two_cplx} if two_cplx is not None else set()
+    assert target_2cell_tag not in present_2cells, (
+        "cascade-dropped 2-cell must not appear in the chain"
+    )
 
 
 def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.MonkeyPatch) -> None:
