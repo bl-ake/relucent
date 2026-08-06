@@ -9,7 +9,7 @@ import pytest
 from relucent import Complex
 from relucent.core.errors import CubicalAmbiguityError
 from relucent.core.poly import Polyhedron
-from relucent.graph.covectors import enumerate_covectors, sign_intersection
+from relucent.graph.covectors import CovectorCell, enumerate_covectors, sign_intersection
 from relucent.search.exploration import explore_for_topology
 from relucent.utils import mlp, set_seeds
 
@@ -259,8 +259,14 @@ def test_incomplete_chain_raises_error(
 
     real_enumerate = cov_mod.enumerate_covectors
 
-    def stripped(*args: object, **kwargs: object) -> dict:
-        result = real_enumerate(*args, **kwargs)  # type: ignore[arg-type]
+    def stripped(
+        top_cells: list[Polyhedron],
+        graph: nx.Graph[Polyhedron],
+        *,
+        ambient_dim: int,
+        top_dim: int | None = None,
+    ) -> dict[int, dict[bytes, CovectorCell]]:
+        result = real_enumerate(top_cells, graph, ambient_dim=ambient_dim, top_dim=top_dim)
         # Remove dim-1 entries so dim-2 cells have zero face coverage.
         return {k: v for k, v in result.items() if k != 1}
 
@@ -284,8 +290,14 @@ def test_min_chain_face_coverage_zero_disables_check(
 
     real_enumerate = cov_mod.enumerate_covectors
 
-    def stripped(*args: object, **kwargs: object) -> dict:
-        result = real_enumerate(*args, **kwargs)  # type: ignore[arg-type]
+    def stripped(
+        top_cells: list[Polyhedron],
+        graph: nx.Graph[Polyhedron],
+        *,
+        ambient_dim: int,
+        top_dim: int | None = None,
+    ) -> dict[int, dict[bytes, CovectorCell]]:
+        result = real_enumerate(top_cells, graph, ambient_dim=ambient_dim, top_dim=top_dim)
         return {k: v for k, v in result.items() if k != 1}
 
     monkeypatch.setattr(cov_mod, "enumerate_covectors", stripped)

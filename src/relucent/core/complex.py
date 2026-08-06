@@ -178,6 +178,7 @@ class Complex:
         self._betti_cache: dict[tuple[bool, CompactifyMode, bool], dict[int, int]] = {}
         self._complete: bool | None = None
         self._verified: bool | None = None
+        self._last_face_coverage: dict[int, float] | None = None
 
     def _invalidate_derived_caches(self) -> None:
         self._dual_graph = None
@@ -208,7 +209,7 @@ class Complex:
         were present in the covector-recovered cell set. ``None`` if
         :meth:`get_chain_complex` has not been called (or the complex was empty).
         """
-        return getattr(self, "_last_face_coverage", None)
+        return self._last_face_coverage
 
     def assert_topology_ready(self) -> None:
         """Require a complete, verified complex before topology routines."""
@@ -1308,10 +1309,10 @@ class Complex:
                 if coverage < min_cov:
                     raise IncompleteChainComplexError(
                         f"get_chain_complex: dim-{k} → dim-{k - 1} face coverage "
-                        f"{coverage:.2%} < MIN_CHAIN_FACE_COVERAGE={min_cov:.2%}. "
-                        f"The BFS has too few top-cells to recover the face lattice in "
-                        f"ambient dim {ambient_dim}. Explore the complex further or set "
-                        f"relucent.config.MIN_CHAIN_FACE_COVERAGE = 0 to bypass."
+                        + f"{coverage:.2%} < MIN_CHAIN_FACE_COVERAGE={min_cov:.2%}. "
+                        + f"The BFS has too few top-cells to recover the face lattice in "
+                        + f"ambient dim {ambient_dim}. Explore the complex further or set "
+                        + f"relucent.config.MIN_CHAIN_FACE_COVERAGE = 0 to bypass."
                     )
 
         vertex_points: dict[bytes, np.ndarray] = {}
