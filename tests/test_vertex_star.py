@@ -67,9 +67,7 @@ def test_expand_vertex_star_covers_every_dimension_up_to_top_dim() -> None:
 
 def test_recover_cells_from_vertices_recovers_square_face_lattice() -> None:
     cells, graph = _square_tope_graph()
-    cells_by_dim, vertices = recover_cells_from_vertices(
-        cells, graph, ambient_dim=2, top_dim=2, verify_vertex=_accept_all
-    )
+    cells_by_dim, vertices = recover_cells_from_vertices(cells, graph, ambient_dim=2, top_dim=2, verify_vertex=_accept_all)
 
     assert {dim: len(found) for dim, found in cells_by_dim.items()} == {0: 1, 1: 4, 2: 4}
     assert len(vertices) == 1

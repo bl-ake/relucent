@@ -1,13 +1,8 @@
 {
     "typeCheckingMode": "recommended",
     "pythonVersion": "3.13",
-    "include": [
-        "src/relucent",
-        "tests"
-    ],
-    "exclude": [
-        "**/site-packages/**"
-    ],
+    "include": ["src/relucent", "tests"],
+    "exclude": ["**/site-packages/**"],
     "reportImportCycles": "none",
     "reportMissingTypeStubs": "none",
     "reportPrivateUsage": "none",
