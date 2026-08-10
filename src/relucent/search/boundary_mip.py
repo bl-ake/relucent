@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 
 __all__ = [
     "BoundaryPricingIncompleteError",
-    "decode_ss_tag",
     "price_boundary_witness",
 ]
 
@@ -88,11 +87,6 @@ def _configure_pricing_mip_logging(model: Model, *, log_path: Path | None) -> No
             model.Params.LogFile = str(log_path)
     else:
         model.Params.OutputFlag = 0
-
-
-def decode_ss_tag(tag: bytes, n: int) -> np.ndarray:
-    """Decode a sign-sequence tag produced by :func:`~relucent.utils.encode_ss`."""
-    return _decode_tag_signs(tag, n).reshape(1, -1)
 
 
 def _decode_tag_signs(tag: bytes, n: int) -> np.ndarray:

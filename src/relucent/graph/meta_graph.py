@@ -10,9 +10,6 @@ module holds operations on an already-assembled meta-graph:
   and :mod:`relucent.topology.persistence`.
 - **Post-assembly audits** — :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`;
   used when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with ``verify=True``.
-
-Re-exports of commonly used incidence primitives and error types are provided
-below for backward compatibility.
 """
 
 from __future__ import annotations
@@ -24,43 +21,10 @@ import networkx as nx
 import numpy as np
 
 import relucent.config as cfg
-
-# Re-export error types (previously defined here)
-from relucent.core.errors import CubicalAmbiguityError as CubicalAmbiguityError
-from relucent.core.errors import CubicalConsistencyError as CubicalConsistencyError
-from relucent.core.errors import NonGenericArrangementError as NonGenericArrangementError
+from relucent.core.errors import CubicalConsistencyError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
-
-# Re-export incidence primitives (previously defined here)
-from relucent.graph.incidence import META_FACE_PARALLEL_MIN_CELLS as META_FACE_PARALLEL_MIN_CELLS
-from relucent.graph.incidence import assemble_face_edges_by_dim as assemble_face_edges_by_dim
-from relucent.graph.incidence import classify_finite_ascending as classify_finite_ascending
-from relucent.graph.incidence import classify_finite_combinatorial as classify_finite_combinatorial
-from relucent.graph.incidence import classify_finite_lp_fallback as classify_finite_lp_fallback
-from relucent.graph.incidence import classify_lazy_face_polys as classify_lazy_face_polys
-from relucent.graph.incidence import classify_one_cells_finite_from_face_edges as classify_one_cells_finite_from_face_edges
-from relucent.graph.incidence import collect_meta_face_edges as collect_meta_face_edges
-from relucent.graph.incidence import cubical_cell_shis as cubical_cell_shis
-from relucent.graph.incidence import dual_edges_top_dim as dual_edges_top_dim
-from relucent.graph.incidence import dual_graph_edge_top_dim as dual_graph_edge_top_dim
-from relucent.graph.incidence import face_tag as face_tag
-from relucent.graph.incidence import flip_tag as flip_tag
-from relucent.graph.incidence import geometric_infeasible_one_cells as geometric_infeasible_one_cells
-from relucent.graph.incidence import meta_node_attrs as meta_node_attrs
-from relucent.graph.incidence import propagate_infeasible_exclusion as propagate_infeasible_exclusion
-from relucent.graph.incidence import set_contracted_shis as set_contracted_shis
-from relucent.graph.incidence import ss_nonzero_indices as ss_nonzero_indices
-from relucent.graph.incidence import sync_shis_from_dual_graph as set_shis_from_dual_graph  # renamed
-from relucent.graph.incidence import sync_shis_from_dual_graph as sync_shis_from_dual_graph
-from relucent.graph.incidence import verify_contracted_shis as verify_contracted_shis
-from relucent.graph.incidence import verify_dual_graph_cubical as verify_dual_graph_cubical
-from relucent.graph.incidence import verify_flip_shi_symmetry as verify_top_cell_flip_shi_symmetry  # renamed
-from relucent.graph.incidence import verify_shi_flip_neighbors as verify_shi_flip_neighbors
-from relucent.graph.incidence import verify_shis_from_dual_graph as verify_shis_from_dual_graph
+from relucent.graph.incidence import assemble_face_edges_by_dim, cubical_cell_shis, face_tag, ss_nonzero_indices
 from relucent.utils import encode_ss
-
-# Geometric check moved to certify.py
-from relucent.verify.certify import verify_arrangement_genericity as verify_arrangement_genericity
 
 # ``shi`` edge attribute for truncation incidences (not a network SHI).
 TRUNCATION_META_SHI: int = -1
@@ -71,39 +35,13 @@ INFINITY_POINT_META_SHI: int = -2
 __all__ = [
     "INFINITY_POINT_META_NODE",
     "INFINITY_POINT_META_SHI",
-    "META_FACE_PARALLEL_MIN_CELLS",
     "TRUNCATION_META_SHI",
-    "CubicalAmbiguityError",
-    "CubicalConsistencyError",
-    "NonGenericArrangementError",
-    "classify_finite_ascending",
-    "classify_lazy_face_polys",
-    "classify_one_cells_finite_from_face_edges",
-    "assemble_face_edges_by_dim",
-    "collect_meta_face_edges",
-    "cubical_cell_shis",
-    "dual_edges_top_dim",
-    "dual_graph_edge_top_dim",
-    "face_tag",
     "finite_cells_subgraph",
-    "flip_tag",
-    "geometric_infeasible_one_cells",
-    "meta_node_attrs",
     "one_point_compactify_meta_graph",
-    "set_contracted_shis",
-    "set_shis_from_dual_graph",
-    "ss_nonzero_indices",
-    "sync_shis_from_dual_graph",
     "truncate_meta_graph",
     "rebuild_meta_graph_face_edges",
-    "verify_contracted_shis",
-    "verify_dual_graph_cubical",
     "verify_meta_graph_incidence",
-    "verify_arrangement_genericity",
     "verify_meta_graph_one_cells",
-    "verify_shi_flip_neighbors",
-    "verify_shis_from_dual_graph",
-    "verify_top_cell_flip_shi_symmetry",
 ]
 
 
@@ -477,7 +415,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
 
     Extends every sign sequence with two truncation bits, materializes cap cells as
     ordinary byte-tagged nodes via :func:`~relucent.graph.incidence.face_tag`, then rebuilds
-    face edges through :func:`collect_meta_face_edges`.
+    face edges through :func:`~relucent.graph.incidence.collect_meta_face_edges`.
 
     Network faces between cells whose trunc bits agree are recovered by the cubical
     ``face_tag`` rebuild. Faces between cells with disagreeing openness (e.g. a

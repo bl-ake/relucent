@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from relucent import Complex, mlp, set_seeds
-from relucent.graph import meta_graph as mg
+from relucent.graph import incidence as mg
 from relucent.search.exploration import explore_for_topology
 from relucent.utils import encode_ss
 from tests.test_betti_decision_boundaries import (

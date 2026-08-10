@@ -9,13 +9,13 @@ import pytest
 from relucent import Complex, mlp
 from relucent.core.errors import CubicalConsistencyError, ShiFlipInvariantError
 from relucent.core.poly import Polyhedron
-from relucent.graph.meta_graph import (
+from relucent.graph.incidence import (
     set_contracted_shis,
-    set_shis_from_dual_graph,
+    sync_shis_from_dual_graph,
     verify_contracted_shis,
+    verify_flip_shi_symmetry,
     verify_shi_flip_neighbors,
     verify_shis_from_dual_graph,
-    verify_top_cell_flip_shi_symmetry,
 )
 from relucent.utils import encode_ss, flip_ss_at_shi
 
@@ -49,10 +49,10 @@ def _asymmetric_one_cell_fixture() -> tuple[Complex, Polyhedron, Polyhedron]:
     return cplx, a, b
 
 
-def test_verify_top_cell_flip_shi_symmetry_raises_on_one_sided_listing() -> None:
+def test_verify_flip_shi_symmetry_raises_on_one_sided_listing() -> None:
     cplx, _a, _b = _asymmetric_one_cell_fixture()
     with pytest.raises(ShiFlipInvariantError, match="Asymmetric SHI"):
-        verify_top_cell_flip_shi_symmetry(cplx)
+        verify_flip_shi_symmetry(cplx)
 
 
 def test_set_contracted_shis_then_verify_succeeds_on_flip_pair() -> None:
@@ -85,5 +85,5 @@ def test_verify_shis_from_dual_graph_matches_edge_labels() -> None:
     graph.add_node(a)
     graph.add_node(b)
     graph.add_edge(a, b, shi=0)
-    set_shis_from_dual_graph(graph)
+    sync_shis_from_dual_graph(graph)
     verify_shis_from_dual_graph(graph)

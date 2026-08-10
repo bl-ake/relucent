@@ -11,7 +11,13 @@ from relucent import Complex, Polyhedron, mlp, set_seeds
 from relucent.core.errors import NonGenericArrangementError
 from relucent.geometry.calculations import get_shis
 from relucent.graph import meta_graph as mg
-from relucent.graph.incidence import face_tag
+from relucent.graph.incidence import (
+    classify_one_cells_finite_from_face_edges,
+    cubical_cell_shis,
+    face_tag,
+    geometric_infeasible_one_cells,
+    ss_nonzero_indices,
+)
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import ChainComplexInconsistent, get_betti_numbers
 from relucent.utils import encode_ss, get_env
@@ -268,7 +274,7 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
             dim=dim,
             ss=ss,
             finite=finite,
-            shis=list(mg.ss_nonzero_indices(ss)),
+            shis=list(ss_nonzero_indices(ss)),
         )
         return tag
 
@@ -342,7 +348,7 @@ def test_open_cap_count_raises_on_unanchored_sidedness_disagreement() -> None:
             dim=dim,
             ss=ss,
             finite=finite,
-            shis=list(mg.ss_nonzero_indices(ss)),
+            shis=list(ss_nonzero_indices(ss)),
         )
         return tag
 
@@ -386,7 +392,7 @@ def test_open_cap_count_anchored_with_only_bi_infinite_facets_gets_one_cap() -> 
             "dim": dim,
             "ss": ss,
             "finite": finite,
-            "shis": list(mg.ss_nonzero_indices(ss)),
+            "shis": list(ss_nonzero_indices(ss)),
             "poly": poly,
         }
         if comb_n_zero_faces is not None:
@@ -448,7 +454,7 @@ def test_open_cap_count_with_poly_filters_bi_infinite_from_unanchored_inheritanc
             dim=dim,
             ss=ss,
             finite=finite,
-            shis=list(mg.ss_nonzero_indices(ss)),
+            shis=list(ss_nonzero_indices(ss)),
             poly=_FinitePolyStub() if dim == 1 else None,
             comb_n_zero_faces=0 if dim == 1 else None,
         )
@@ -469,7 +475,7 @@ def test_open_cap_count_with_poly_filters_bi_infinite_from_unanchored_inheritanc
 
 def _truncation_handbuilt_node(dim: int, ss: list[int], finite: bool | None) -> dict[str, Any]:
     ss_arr = np.array([ss], dtype=np.int8)
-    return {"dim": dim, "ss": ss_arr, "finite": finite, "shis": list(mg.ss_nonzero_indices(ss_arr))}
+    return {"dim": dim, "ss": ss_arr, "finite": finite, "shis": list(ss_nonzero_indices(ss_arr))}
 
 
 def _isolated_ray_meta() -> nx.MultiDiGraph[Any]:
@@ -687,7 +693,7 @@ def test_classify_one_cells_finite_from_face_edges_empty_shis_two_zero_faces() -
     by_dim = {0: [p0, p1], 1: [seg]}
     edges_by_dim = {1: ([(seg.tag, p0.tag, 1), (seg.tag, p1.tag, 2)], [])}
 
-    n = mg.classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim)[0]
+    n = classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim)[0]
     assert n == 1
     assert seg._finite is True
 
@@ -711,7 +717,7 @@ def test_classify_one_cells_finite_from_face_edges_infeasible_left_none() -> Non
     by_dim = {1: [seg]}
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}
 
-    n = mg.classify_one_cells_finite_from_face_edges(
+    n = classify_one_cells_finite_from_face_edges(
         by_dim,
         edges_by_dim,
         geometric_infeasible={seg.tag},
@@ -744,13 +750,13 @@ def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeyp
     by_dim = {1: [seg]}
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}
 
-    infeasible = mg.geometric_infeasible_one_cells(by_dim, edges_by_dim)
+    infeasible = geometric_infeasible_one_cells(by_dim, edges_by_dim)
     assert infeasible == {seg.tag}
 
 
 @pytest.mark.filterwarnings("ignore:Working with k<d polyhedron\\.:UserWarning")
 def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
-    """Meta-graph node ``shis`` match :func:`~relucent.graph.meta_graph.cubical_cell_shis` per slice."""
+    """Meta-graph node ``shis`` match :func:`~relucent.graph.incidence.cubical_cell_shis` per slice."""
     set_seeds(seeded)
     net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
@@ -773,7 +779,7 @@ def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
         if poly is None:
             continue
         neighbor_tags = dim_neighbor_tags.get(dim, set())
-        expected = mg.cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+        expected = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
         if int(poly.dim) == 1 and poly.halfspaces is not None:
             expected = [s for s in expected if poly.is_shi_face_feasible(int(s))]
         meta_shis = sorted(int(s) for s in attrs["shis"])
@@ -805,7 +811,7 @@ def test_top_dim_lp_shis_subset_of_cubical_derivation(seeded: int) -> None:
         lp_shis = _lp_shis(poly, env)
         if lp_shis is None:
             continue
-        cubical = mg.cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
+        cubical = cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
         extra = set(lp_shis) - set(cubical)
         if extra:
             mismatches.append(f"tag={poly.tag!r}: lp={lp_shis} cubical={cubical} extra={sorted(extra)}")

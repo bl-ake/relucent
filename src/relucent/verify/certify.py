@@ -56,7 +56,6 @@ __all__ = [
     "verify_arrangement_genericity",
     "verify_boundary_cell",
     "verify_lp_flip_neighbors_in_complex",
-    "verify_shi_geometry",
 ]
 
 

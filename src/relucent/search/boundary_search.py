@@ -16,7 +16,7 @@ from relucent._internal.logging import logger
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.core.poly import Polyhedron
 from relucent.geometry.calculations import get_shis
-from relucent.graph import meta_graph as mg
+from relucent.graph.incidence import ss_nonzero_indices
 from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.search.engine import (
     SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
@@ -88,13 +88,13 @@ def _ambient_coface_shis_for_boundary_cell(
     """``_shis`` for a boundary top cell, matching :meth:`Complex.get_boundary_cells`.
 
     Returns all nonzero sign-sequence crossings on the slice (finalized by
-    :func:`~relucent.graph.meta_graph.set_contracted_shis`).
+    :func:`~relucent.graph.incidence.set_contracted_shis`).
     """
     ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
     bshi = int(boundary_shi)
     if int(ss.ravel()[bshi]) != 0:
         raise ValueError(f"Expected ss[{bshi}]=0 on boundary cell, got {ss!r}")
-    return sorted(int(s) for s in mg.ss_nonzero_indices(ss))
+    return sorted(int(s) for s in ss_nonzero_indices(ss))
 
 
 def _ambient_boundary_metadata_for_cell(

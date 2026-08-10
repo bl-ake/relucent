@@ -279,8 +279,8 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 - **`get_meta_graph(verify=True)`** — runs
   [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
   assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
-- **`verify_arrangement_genericity()`** — geometric transversality check on 1-cells
-  (off by default; `VERIFY_GENERICITY=False`).
+- **`verify_arrangement_genericity()`** — geometric transversality check on 1-cells,
+  run unconditionally in `get_boundary_complex`.
 
 ---
 

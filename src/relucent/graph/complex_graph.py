@@ -19,7 +19,6 @@ from relucent.model.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 __all__ = [
     "contract_dual_graph_for_shi",
     "delete_ss_columns",
-    "net_remove_ss_layer_and_following_relu",
     "net_without_last_ss_layer_neuron",
 ]
 

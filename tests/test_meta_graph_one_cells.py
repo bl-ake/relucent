@@ -10,8 +10,9 @@ import pytest
 import torch
 
 from relucent import Complex, Polyhedron, mlp, set_seeds
+from relucent.core.errors import CubicalConsistencyError
+from relucent.graph import incidence
 from relucent.graph import meta_graph as mg
-from relucent.graph.meta_graph import CubicalConsistencyError
 from relucent.search.exploration import explore_for_topology
 
 
@@ -79,7 +80,7 @@ def test_classify_one_cells_finite_one_zero_face_is_unbounded() -> None:
     by_dim = {0: [p0], 1: [ray]}
     edges_by_dim = {1: ([(ray.tag, p0.tag, 2)], [])}
 
-    n = mg.classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim)[0]
+    n = incidence.classify_one_cells_finite_from_face_edges(by_dim, edges_by_dim)[0]
     assert n == 1
     assert ray._finite is False
     assert len(ray._shis or []) < 2

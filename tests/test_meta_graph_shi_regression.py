@@ -1,13 +1,13 @@
 """Regression tests for meta-graph SHI / face-incidence fixes.
 
 Face **edges** in :meth:`~relucent.core.complex.Complex.get_meta_graph` must use every
-nonzero sign-sequence entry (:func:`~relucent.graph.meta_graph.ss_nonzero_indices`),
+nonzero sign-sequence entry (:func:`~relucent.graph.incidence.ss_nonzero_indices`),
 not propagated ``_shis`` lists that can be a strict subset of SS crossings.
 
 Face **construction** in :meth:`~relucent.core.complex.Complex.contract` seeds SHI
 candidates from SS crossings and finalizes with
-:func:`~relucent.graph.meta_graph.set_contracted_shis` (
-:func:`~relucent.graph.meta_graph.cubical_cell_shis`). Using propagated ``_shis`` for
+:func:`~relucent.graph.incidence.set_contracted_shis` (
+:func:`~relucent.graph.incidence.cubical_cell_shis`). Using propagated ``_shis`` for
 meta-graph face-edge discovery would omit valid faces and break ``∂² = 0``.
 
 Deep uniform MLPs with seeds 2 and 51 exhibited the latter failure under the

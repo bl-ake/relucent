@@ -271,11 +271,6 @@ PLOT_MARGIN_FACTOR: float = _env_float("PLOT_MARGIN_FACTOR", 1.1)
 # Topology / Betti computation
 # -----------------------------------------------------------------------------
 
-# When True, run geometric genericity / transversality checks (e.g. degenerate
-# 1-cell endpoints). Expensive on large complexes; enabled automatically in
-# :meth:`~relucent.core.complex.Complex.get_boundary_complex`.
-VERIFY_GENERICITY: bool = _env_bool("VERIFY_GENERICITY", False)
-
 # When merging geometrically-computed vertices with combinatorially-identified intrinsic vertices,
 # accept a match if ||x - x_intrinsic||_inf <= TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR * tol.
 TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = _env_float("TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0)
@@ -347,7 +342,6 @@ __all__ = [
     "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
     "VERBOSE",
-    "VERIFY_GENERICITY",
     "VERTEX_TRUST_THRESHOLD",
     "update_settings",
 ]

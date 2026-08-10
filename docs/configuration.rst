@@ -271,10 +271,6 @@ Topology and logging
      - Type
      - Default
      - Role
-   * - ``VERIFY_GENERICITY``
-     - ``bool``
-     - ``False``
-     - When True, run geometric genericity / transversality checks (e.g. degenerate 1-cell endpoints). Expensive on large complexes; enabled automatically in :meth:`~relucent.core.complex.Complex.get_boundary_complex`.
    * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
      - ``float``
      - ``2.0``
