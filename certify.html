@@ -290,7 +290,6 @@
 <li class="toctree-l2"><a class="reference internal" href="#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#relucent.verify.certify.verify_shi_geometry"><code class="docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -331,16 +330,18 @@
 <li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -538,12 +539,6 @@ arrangement is not generic (hyperplanes concur at a point).</p>
 <dt class="sig sig-object py" id="relucent.verify.certify.verify_lp_flip_neighbors_in_complex">
 <span class="sig-prename descclassname"><span class="pre">relucent.verify.certify.</span></span><span class="sig-name descname"><span class="pre">verify_lp_flip_neighbors_in_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cplx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="complex.html#relucent.Complex" title="relucent.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.verify.certify.verify_lp_flip_neighbors_in_complex" title="Link to this definition"></a></dt>
 <dd><p>Every LP facet on a top cell must flip to a same-dimension neighbor in the complex.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="relucent.verify.certify.verify_shi_geometry">
-<span class="sig-prename descclassname"><span class="pre">relucent.verify.certify.</span></span><span class="sig-name descname"><span class="pre">verify_shi_geometry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron" title="relucent.core.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.verify.certify.verify_shi_geometry" title="Link to this definition"></a></dt>
-<dd><p>Recompute SHIs and require the cached list to match.</p>
 </dd></dl>
 
 <p id="module-relucent.core.errors">Exception hierarchy for polyhedral-complex verification and repair.</p>

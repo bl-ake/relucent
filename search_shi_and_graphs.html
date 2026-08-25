@@ -290,7 +290,6 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_shi_geometry"><code class="docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -331,16 +330,18 @@
 <li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -567,8 +568,9 @@ creation (via <a class="reference internal" href="incidence.html#relucent.graph.
 <code class="xref py py-meth docutils literal notranslate"><span class="pre">is_shi_face_feasible()</span></code>.</p>
 <p>The ambient <strong>chain complex</strong>
 (<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code>) recovers faces differently —
-via <a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors" title="relucent.graph.covectors.enumerate_covectors"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a> on cubical stars — but still
-finalizes slice <code class="docutils literal notranslate"><span class="pre">_shis</span></code> the same way: after the full slice is known,
+by seeding and verifying vertices, then expanding each verified vertex’s local
+cubical star (<a class="reference internal" href="vertex_star.html#module-relucent.graph.vertex_star" title="relucent.graph.vertex_star"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.graph.vertex_star</span></code></a>) — but still finalizes slice
+<code class="docutils literal notranslate"><span class="pre">_shis</span></code> the same way: after the full slice is known,
 <a class="reference internal" href="incidence.html#relucent.graph.incidence.set_contracted_shis" title="relucent.graph.incidence.set_contracted_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_contracted_shis()</span></code></a> sets authoritative <code class="docutils literal notranslate"><span class="pre">_shis</span></code> to
 <a class="reference internal" href="incidence.html#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a> — the same flip-neighbor rule as
 role 3, restricted to cells in the slice.</p>
@@ -590,7 +592,10 @@ faces.</p>
 <h3>Role 3 — Meta-graph node metadata<a class="headerlink" href="#role-3-meta-graph-node-metadata" title="Link to this heading"></a></h3>
 <p><a class="reference internal" href="incidence.html#relucent.graph.incidence.meta_node_attrs" title="relucent.graph.incidence.meta_node_attrs"><code class="xref py py-func docutils literal notranslate"><span class="pre">meta_node_attrs()</span></code></a> derives <code class="docutils literal notranslate"><span class="pre">shis</span></code> (flip-neighbor
 crossings) and <code class="docutils literal notranslate"><span class="pre">crossings</span></code> (<code class="docutils literal notranslate"><span class="pre">ss_nonzero_indices</span></code>) from each cell’s sign
-sequence and same-dimension slice.
+sequence and same-dimension slice. For <strong>1-cells</strong>,
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">get_meta_graph()</span></code> replaces node <code class="docutils literal notranslate"><span class="pre">shis</span></code> with
+the SHI labels of verified 0-face incidences from role-2 face edges (same rule as
+<code class="xref py py-func docutils literal notranslate"><span class="pre">verify_meta_graph_incidence()</span></code>).
 1-cell boundedness uses 0-face incidence in meta face edges
 (<a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_one_cells_finite_from_face_edges" title="relucent.graph.incidence.classify_one_cells_finite_from_face_edges"><code class="xref py py-func docutils literal notranslate"><span class="pre">classify_one_cells_finite_from_face_edges()</span></code></a>), not
 <code class="docutils literal notranslate"><span class="pre">len(shis)</span></code>.</p>
@@ -621,8 +626,9 @@ but it is not the final authority on top-cell SHIs after a complete search.</p>
 <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_dual_graph()</span></code>, which:</p>
 <ol class="arabic simple">
 <li><p>Builds combinatorial edges with
-<a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_edges_top_dim" title="relucent.graph.incidence.dual_edges_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a> (flip neighbors for
-<code class="docutils literal notranslate"><span class="pre">max_dim</span> <span class="pre">≥</span> <span class="pre">2</span></code>; shared 0-face tags for 1D ambient complexes).</p></li>
+<a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_edges_top_dim" title="relucent.graph.incidence.dual_edges_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a> (flip neighbors for all
+complexes built via <a class="reference internal" href="incidence.html#relucent.graph.incidence.build_dual_graph" title="relucent.graph.incidence.build_dual_graph"><code class="xref py py-func docutils literal notranslate"><span class="pre">build_dual_graph()</span></code></a>; see
+<a class="reference internal" href="#edge-construction-rules">Edge construction rules</a>).</p></li>
 <li><p>Syncs <code class="docutils literal notranslate"><span class="pre">poly._shis</span></code> from incident edge labels via
 <a class="reference internal" href="incidence.html#relucent.graph.incidence.sync_shis_from_dual_graph" title="relucent.graph.incidence.sync_shis_from_dual_graph"><code class="xref py py-func docutils literal notranslate"><span class="pre">sync_shis_from_dual_graph()</span></code></a> when <code class="docutils literal notranslate"><span class="pre">repair=True</span></code>
 (the default).</p></li>
@@ -661,7 +667,7 @@ same-dimension neighbor in the complex
 (<a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex" title="relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a>).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">GEOMETRIC</span></code> — additionally recompute SHIs with <code class="docutils literal notranslate"><span class="pre">strict=True</span></code> on every cached
 cell and require an exact match
-(<a class="reference internal" href="certify.html#relucent.verify.certify.verify_shi_geometry" title="relucent.verify.certify.verify_shi_geometry"><code class="xref py py-func docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a>).</p></li>
+(<code class="xref py py-func docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code>).</p></li>
 </ul>
 <section id="when-certification-runs">
 <h3>When certification runs<a class="headerlink" href="#when-certification-runs" title="Link to this heading"></a></h3>
@@ -695,15 +701,19 @@ Tests often use <a class="reference internal" href="exploration.html#relucent.se
 <p><strong>Entry point:</strong> <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_dual_graph()</span></code></p>
 <section id="edge-construction-rules">
 <h3>Edge construction rules<a class="headerlink" href="#edge-construction-rules" title="Link to this heading"></a></h3>
-<p>The rule depends on the complex dimension:</p>
+<p><a class="reference internal" href="incidence.html#relucent.graph.incidence.build_dual_graph" title="relucent.graph.incidence.build_dual_graph"><code class="xref py py-func docutils literal notranslate"><span class="pre">build_dual_graph()</span></code></a> maps the complex’s
+<code class="docutils literal notranslate"><span class="pre">max_dim</span></code> through <a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_graph_edge_top_dim" title="relucent.graph.incidence.dual_graph_edge_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_graph_edge_top_dim()</span></code></a>
+so top-dimensional cells always use <strong>flip-neighbor</strong> adjacency (never the legacy
+<code class="docutils literal notranslate"><span class="pre">top_dim</span> <span class="pre">==</span> <span class="pre">1</span></code> 0-face pairing in <a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_edges_top_dim" title="relucent.graph.incidence.dual_edges_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a>):</p>
 <ul class="simple">
-<li><p><strong>``max_dim ≥ 2`` or ambient top level</strong> — Combinatorial <strong>flip neighbors</strong>:
-two cells are adjacent if one sign sequence is obtained from the other by
-flipping a single nonzero entry.</p></li>
-<li><p><strong>1D ambient complex</strong> — Cells sharing a combinatorial <strong>0-face</strong> (vertex tag).</p></li>
-<li><p><strong>Contracted 1-skeleton</strong> (<code class="docutils literal notranslate"><span class="pre">max_dim</span> <span class="pre">==</span> <span class="pre">1</span></code> but ambient <code class="docutils literal notranslate"><span class="pre">dim</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>) — Walk
-each cell’s finalized <code class="docutils literal notranslate"><span class="pre">poly.shis</span></code> (from <a class="reference internal" href="incidence.html#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a>)
-and add edges only when the flip neighbor exists in the complex.</p></li>
+<li><p><strong>Default</strong> — For each nonzero <code class="docutils literal notranslate"><span class="pre">ss_i</span></code>, add an edge to the same-dimension flip
+neighbor when that neighbor exists in the complex (via
+<a class="reference internal" href="incidence.html#relucent.graph.incidence.ss_nonzero_indices" title="relucent.graph.incidence.ss_nonzero_indices"><code class="xref py py-func docutils literal notranslate"><span class="pre">ss_nonzero_indices()</span></code></a>).</p></li>
+<li><p><strong>Contracted slice</strong> (<code class="docutils literal notranslate"><span class="pre">max_dim</span> <span class="pre">==</span> <span class="pre">1</span></code> and ambient <code class="docutils literal notranslate"><span class="pre">dim</span> <span class="pre">&gt;</span> <span class="pre">1</span></code>) — Same flip rule,
+but candidate crossings come from each cell’s finalized <code class="docutils literal notranslate"><span class="pre">poly._shis</span></code> (from
+<a class="reference internal" href="incidence.html#relucent.graph.incidence.set_contracted_shis" title="relucent.graph.incidence.set_contracted_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_contracted_shis()</span></code></a> /
+<a class="reference internal" href="incidence.html#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a>) instead of the full sign
+sequence.</p></li>
 </ul>
 <p>After edge construction, <a class="reference internal" href="incidence.html#relucent.graph.incidence.sync_shis_from_dual_graph" title="relucent.graph.incidence.sync_shis_from_dual_graph"><code class="xref py py-func docutils literal notranslate"><span class="pre">sync_shis_from_dual_graph()</span></code></a>
 sets each node’s <code class="docutils literal notranslate"><span class="pre">_shis</span></code> from incident edge labels when <code class="docutils literal notranslate"><span class="pre">repair=True</span></code>.</p>
@@ -729,8 +739,11 @@ input to Betti numbers and persistent homology.</p>
 <section id="construction-pipeline">
 <h3>Construction pipeline<a class="headerlink" href="#construction-pipeline" title="Link to this heading"></a></h3>
 <ol class="arabic simple">
-<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code> — recover faces from
-cubical stars in the dual graph via <a class="reference internal" href="covectors.html#module-relucent.graph.covectors" title="relucent.graph.covectors"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.graph.covectors</span></code></a>.</p></li>
+<li><p><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code> — recover faces by
+seeding and verifying vertices, then expanding each verified vertex’s local
+cubical star, via <a class="reference internal" href="vertex_star.html#module-relucent.graph.vertex_star" title="relucent.graph.vertex_star"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.graph.vertex_star</span></code></a> (Masden 2022, Theorem 20).
+Every materialized cell has a verified vertex among its own faces by
+construction, so no coverage heuristic or cascade drop is needed.</p></li>
 <li><p><strong>Face edges</strong> — <a class="reference internal" href="incidence.html#relucent.graph.incidence.collect_meta_face_edges" title="relucent.graph.incidence.collect_meta_face_edges"><code class="xref py py-func docutils literal notranslate"><span class="pre">collect_meta_face_edges()</span></code></a> per
 dimension (<code class="docutils literal notranslate"><span class="pre">ss_nonzero_indices</span></code> + lookup); parallelized when cell count ≥
 <code class="docutils literal notranslate"><span class="pre">META_FACE_PARALLEL_MIN_CELLS</span></code>.</p></li>

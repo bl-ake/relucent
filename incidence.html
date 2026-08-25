@@ -20,7 +20,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Covectors (face lattice recovery)" href="covectors.html" />
+    <link rel="next" title="Vertex star (face lattice recovery)" href="vertex_star.html" />
     <link rel="prev" title="Certification" href="certify.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
@@ -290,7 +290,6 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_shi_geometry"><code class="docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -331,16 +330,18 @@
 <li class="toctree-l2"><a class="reference internal" href="#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -461,15 +462,20 @@ This module is the single source of truth for that combinatorics.</p>
 <a class="reference internal" href="#relucent.graph.incidence.verify_flip_shi_symmetry" title="relucent.graph.incidence.verify_flip_shi_symmetry"><code class="xref py py-func docutils literal notranslate"><span class="pre">verify_flip_shi_symmetry()</span></code></a>.</p></li>
 <li><p><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex" title="relucent.search.exploration.finalize_boundary_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a> — contracted SHI assignment.</p></li>
 </ul>
-<p><strong>Derived views</strong> (do not confuse SHI semantics):</p>
+<p><strong>SHI assignment roles 1–3</strong> (see <code class="docutils literal notranslate"><span class="pre">docs/search_shi_and_graphs.rst</span></code>):</p>
 <ul class="simple">
-<li><p><strong>Dual-graph edges</strong> (<a class="reference internal" href="#relucent.graph.incidence.dual_edges_top_dim" title="relucent.graph.incidence.dual_edges_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a>): group top cells by shared
-face tag (1-cells) or flip neighbor (dim &gt;= 2).</p></li>
-<li><p><strong>Meta-graph face edges</strong> (<a class="reference internal" href="#relucent.graph.incidence.collect_meta_face_edges" title="relucent.graph.incidence.collect_meta_face_edges"><code class="xref py py-func docutils literal notranslate"><span class="pre">collect_meta_face_edges()</span></code></a>): zero each
+<li><p><strong>Role 1</strong> — Contracted / boundary faces: seed <code class="docutils literal notranslate"><span class="pre">_shis</span></code> from
+<a class="reference internal" href="#relucent.graph.incidence.ss_nonzero_indices" title="relucent.graph.incidence.ss_nonzero_indices"><code class="xref py py-func docutils literal notranslate"><span class="pre">ss_nonzero_indices()</span></code></a> on the face sign sequence, then finalize with
+<a class="reference internal" href="#relucent.graph.incidence.set_contracted_shis" title="relucent.graph.incidence.set_contracted_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">set_contracted_shis()</span></code></a> → <a class="reference internal" href="#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a>.</p></li>
+<li><p><strong>Role 2</strong> — Meta-graph <strong>face edges</strong> (<a class="reference internal" href="#relucent.graph.incidence.collect_meta_face_edges" title="relucent.graph.incidence.collect_meta_face_edges"><code class="xref py py-func docutils literal notranslate"><span class="pre">collect_meta_face_edges()</span></code></a>): zero each
 <code class="docutils literal notranslate"><span class="pre">ss_i</span> <span class="pre">!=</span> <span class="pre">0</span></code> and keep the edge iff the resulting face tag is a known cell.</p></li>
-<li><p><strong>Node metadata</strong> (<a class="reference internal" href="#relucent.graph.incidence.meta_node_attrs" title="relucent.graph.incidence.meta_node_attrs"><code class="xref py py-func docutils literal notranslate"><span class="pre">meta_node_attrs()</span></code></a>): flip-neighbor SHIs via
-<a class="reference internal" href="#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a>, never the LP-derived <code class="docutils literal notranslate"><span class="pre">poly._shis</span></code> cache.</p></li>
+<li><p><strong>Role 3</strong> — Meta-graph <strong>node metadata</strong> (<a class="reference internal" href="#relucent.graph.incidence.meta_node_attrs" title="relucent.graph.incidence.meta_node_attrs"><code class="xref py py-func docutils literal notranslate"><span class="pre">meta_node_attrs()</span></code></a>): flip-neighbor
+SHIs via <a class="reference internal" href="#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a> (1-cells: labels from verified 0-face edges),
+never the LP-derived <code class="docutils literal notranslate"><span class="pre">poly._shis</span></code> cache.</p></li>
 </ul>
+<p><strong>Dual-graph edges</strong> (<a class="reference internal" href="#relucent.graph.incidence.dual_edges_top_dim" title="relucent.graph.incidence.dual_edges_top_dim"><code class="xref py py-func docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a> via <a class="reference internal" href="#relucent.graph.incidence.build_dual_graph" title="relucent.graph.incidence.build_dual_graph"><code class="xref py py-func docutils literal notranslate"><span class="pre">build_dual_graph()</span></code></a>):
+flip-neighbor adjacency on top cells; contracted 1-skeleton slices walk finalized
+<code class="docutils literal notranslate"><span class="pre">poly._shis</span></code>.</p>
 <p>Two SHI semantics matter and must not be confused:</p>
 <ul class="simple">
 <li><p><strong>Cubical flip SHIs</strong> (<a class="reference internal" href="#relucent.graph.incidence.cubical_cell_shis" title="relucent.graph.incidence.cubical_cell_shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a>): authoritative for dual-graph
@@ -751,7 +757,7 @@ invoked from <a class="reference internal" href="#relucent.graph.incidence.verif
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="certify.html" class="btn btn-neutral float-left" title="Certification" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="covectors.html" class="btn btn-neutral float-right" title="Covectors (face lattice recovery)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="vertex_star.html" class="btn btn-neutral float-right" title="Vertex star (face lattice recovery)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

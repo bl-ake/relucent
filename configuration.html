@@ -291,7 +291,6 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_shi_geometry"><code class="docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -332,16 +331,18 @@
 <li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -495,7 +496,7 @@ environment variables before importing <code class="xref py py-mod docutils lite
 bracketed comma-separated form:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="m">0</span>.01,0.1,1,10,100
 <span class="c1"># or:</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="s1">&#39;[0.01, 0.1, 1, 10, 100]&#39;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="s1">'[0.01, 0.1, 1, 10, 100]'</span>
 </pre></div>
 </div>
 <p><strong>Defaults in function signatures:</strong> Parameters documented as “defaults to
@@ -769,17 +770,12 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VERIFY_GENERICITY</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>When True, run geometric genericity / transversality checks (e.g. degenerate 1-cell endpoints). Expensive on large complexes; enabled automatically in <code class="xref py py-meth docutils literal notranslate"><span class="pre">get_boundary_complex()</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">2.0</span></code></p></td>
 <td><p>When merging geometric vertices with combinatorial intrinsic vertices, accept a match if <span class="math notranslate nohighlight">\(\|x - x_\mathrm{intrinsic}\|_\infty \le\)</span> this factor times the containment tolerance.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
 <td><p>Package logging level during search and parallel work: <code class="docutils literal notranslate"><span class="pre">0</span></code> → WARNING only; <code class="docutils literal notranslate"><span class="pre">1</span></code> → INFO (worker counts, meta-graph progress, …). Also adjustable at runtime via <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a>.</p></td>

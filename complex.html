@@ -290,7 +290,6 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_shi_geometry"><code class="docutils literal notranslate"><span class="pre">verify_shi_geometry()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -331,16 +330,18 @@
 <li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="covectors.html">Covectors (face lattice recovery)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell"><code class="docutils literal notranslate"><span class="pre">CovectorCell</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.coface_tags"><code class="docutils literal notranslate"><span class="pre">CovectorCell.coface_tags</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.ss"><code class="docutils literal notranslate"><span class="pre">CovectorCell.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.tag"><code class="docutils literal notranslate"><span class="pre">CovectorCell.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="covectors.html#relucent.graph.covectors.CovectorCell.zero_shis"><code class="docutils literal notranslate"><span class="pre">CovectorCell.zero_shis</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.enumerate_covectors"><code class="docutils literal notranslate"><span class="pre">enumerate_covectors()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="covectors.html#relucent.graph.covectors.sign_intersection"><code class="docutils literal notranslate"><span class="pre">sign_intersection()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -758,10 +759,20 @@ extra 0-cell at infinity for unbounded 1-cell ends.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="relucent.Complex.get_chain_complex">
 <span class="sig-name descname"><span class="pre">get_chain_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#relucent.Complex" title="relucent.core.complex.Complex"><span class="pre">Complex</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.Complex.get_chain_complex" title="Link to this definition"></a></dt>
-<dd><p>Recover the chain complex from cubical stars in the top-cell dual graph.</p>
-<p>All positive-dimensional cells are recovered by exact sign intersection.
-Candidate vertices receive one float64 equality solve followed by strict
-forward-sign verification; no facet or boundedness LP is used here.</p>
+<dd><p>Recover the chain complex directly from verified vertices’ local stars.</p>
+<p>Masden (2022), Theorem 20: the sign-sequence complex is a pure,
+ambient-dimensional cubical complex, so once a vertex (exactly
+<code class="docutils literal notranslate"><span class="pre">ambient_dim</span></code> zero sign entries, Lemma 16) is verified, <em>every</em> cell
+in its local star is algebraically guaranteed to be present (Lemma
+18’s sign-product semigroup) — no independent rediscovery of
+neighboring top-dimensional cells, dual-graph cube verification, or
+coverage heuristic is required. See <a class="reference internal" href="vertex_star.html#module-relucent.graph.vertex_star" title="relucent.graph.vertex_star"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.graph.vertex_star</span></code></a>.</p>
+<p>Candidate vertices receive one float64 equality solve followed by
+strict forward-sign verification (<a class="reference internal" href="polyhedron.html#relucent.Polyhedron.verify_vertex_covector" title="relucent.Polyhedron.verify_vertex_covector"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Polyhedron.verify_vertex_covector()</span></code></a>);
+no facet or boundedness LP is used here. Every recovered cell of
+dimension <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">&gt;=</span> <span class="pre">1</span></code> has, by construction, at least one verified
+vertex among its own faces (its generating vertex), so a cell can
+never end up with every endpoint unverifiable.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference internal" href="certify.html#relucent.core.errors.CubicalConsistencyError" title="relucent.core.errors.CubicalConsistencyError"><strong>CubicalConsistencyError</strong></a> – If the labeled top-cell graph is not cubical.</p>
@@ -881,16 +892,11 @@ this method and call <a class="reference internal" href="#relucent.Complex.trunc
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The resulting structure encodes the face relations present in the
-chain returned by <a class="reference internal" href="#relucent.Complex.get_chain_complex" title="relucent.Complex.get_chain_complex"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code></a> (covector recovery from the
-dual graph). Boundary faces that are not represented in that chain will
-not appear unless they were already present in the chain complexes.</p>
-<p>A breadth-first search over full-dimensional regions can still leave this
-graph short of a closed cellular complex: some codimension-one faces of a
-stored cell may not appear as nodes (their sign pattern is missing from the
-explored complex or from the recovered chain), so incidence data can omit
-entries that true geometry would require. That breaks <code class="docutils literal notranslate"><span class="pre">∂²</span> <span class="pre">=</span> <span class="pre">0</span></code> for the
-GF(2) boundary maps in <a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers" title="relucent.topology.get_betti_numbers"><code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.topology.get_betti_numbers()</span></code></a> unless
-<code class="docutils literal notranslate"><span class="pre">verify_chain_complex</span></code> is disabled; see that function’s documentation.</p>
+chain returned by <a class="reference internal" href="#relucent.Complex.get_chain_complex" title="relucent.Complex.get_chain_complex"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_chain_complex()</span></code></a> (vertex-star recovery;
+see <a class="reference internal" href="vertex_star.html#module-relucent.graph.vertex_star" title="relucent.graph.vertex_star"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.graph.vertex_star</span></code></a>). Cells with no finite vertex
+in their closure (fully unbounded structure) are not represented —
+they are handled separately by one-point compactification in
+<a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers" title="relucent.topology.get_betti_numbers"><code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.topology.get_betti_numbers()</span></code></a>.</p>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
