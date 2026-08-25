@@ -7,6 +7,7 @@ vertex criticality criterion from Section 3.2.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,7 @@ __all__ = [
     "LayerJacobians",
     "assert_scalar_output",
     "coface_sign_sequence",
+    "critical_flags_for_vertices",
     "get_layer_jacobians",
     "gradient_on_cell",
     "is_pl_critical_vertex",
@@ -87,6 +89,31 @@ def _output_weight(net: ReLUNetwork) -> np.ndarray:
     return last_linear.weight
 
 
+# Thread-local, opt-in memoization for `get_layer_jacobians`: `is_pl_critical_vertex`
+# computes the Jacobian for the same coface twice per edge (once via `_is_collapsed_edge`,
+# again via `partial_derivative_sign`); `_JacobianCacheScope` lets the second call reuse
+# the first's result. Off by default (module functions stay pure/cache-free for every
+# other caller); thread-local so parallel workers (threads or forked processes, each with
+# their own copy of this module-level state) never share a cache across each other.
+_jacobian_cache_state = threading.local()
+
+
+class _JacobianCacheScope:
+    """Scope in which ``get_layer_jacobians`` memoizes by ``(id(net), ss bytes)``.
+
+    Intended to wrap a single vertex's criticality check (see
+    ``is_pl_critical_vertex``): small, short-lived cache, reset on exit so it can
+    never grow unbounded across a whole complex's vertices.
+    """
+
+    def __enter__(self) -> None:
+        self._previous = getattr(_jacobian_cache_state, "cache", None)
+        _jacobian_cache_state.cache = {}
+
+    def __exit__(self, *exc_info: object) -> None:
+        _jacobian_cache_state.cache = self._previous
+
+
 def get_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
     """Lemma 9: cell Jacobians and input gradient; pre-activation rows for Lemma 10.
 
@@ -98,7 +125,22 @@ def get_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
     ``add_output_relu``), Morse analyzes the **logit** (pre-output-ReLU scalar): the
     output mask is not applied to ``gradient``, and ``by_relu_layer`` records the
     logit Jacobian so Lemma 10 can use the output supporting hyperplane.
+
+    Memoized within an active ``_JacobianCacheScope`` (see there); a plain cache miss
+    (or no active scope) falls through to computing it fresh.
     """
+    cache = getattr(_jacobian_cache_state, "cache", None)
+    cache_key = (id(net), _coerce_ss(ss).tobytes()) if cache is not None else None
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
+    result = _compute_layer_jacobians(net, ss)
+    if cache is not None:
+        cache[cache_key] = result
+    return result
+
+
+def _compute_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
     ss_row = _coerce_ss(ss)
     n_in = int(np.prod(net.input_shape))
     current = np.eye(n_in, dtype=np.float64)
@@ -332,26 +374,93 @@ def is_pl_critical_vertex(
             + f"(got {zeros.size}); is_pl_critical_vertex requires a 0-cell of C(F)"
         )
 
-    # Count bent-hyperplane axes whose ± edges both point toward v.
+    # Count bent-hyperplane axes whose ± edges both point toward v. Each edge's Jacobian
+    # is otherwise computed twice below (once in `_is_collapsed_edge`, again in
+    # `partial_derivative_sign`); the cache scope makes the second call reuse the first's
+    # result instead of redoing the same chain of matrix multiplications.
     towards = 0
-    for shi in zeros:
-        edge_plus = _edge_ss_from_vertex(vertex_ss, int(shi), 1)
-        edge_minus = _edge_ss_from_vertex(vertex_ss, int(shi), -1)
-        if _is_collapsed_edge(net, edge_plus) or _is_collapsed_edge(net, edge_minus):
-            return True, -1
+    with _JacobianCacheScope():
+        for shi in zeros:
+            edge_plus = _edge_ss_from_vertex(vertex_ss, int(shi), 1)
+            edge_minus = _edge_ss_from_vertex(vertex_ss, int(shi), -1)
+            if _is_collapsed_edge(net, edge_plus) or _is_collapsed_edge(net, edge_minus):
+                return True, -1
 
-        sign_plus = partial_derivative_sign(vertex_ss, edge_plus, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
-        sign_minus = partial_derivative_sign(vertex_ss, edge_minus, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
-        if sign_plus == 0 or sign_minus == 0:
-            return True, -1
-        if sign_plus != sign_minus:
-            # Monotonic along this axis: not a PL Morse critical vertex.
-            return False, None
-        # Negative ∂_{vE} F: F decreases along v→E, so the edge is oriented toward v.
-        if sign_plus < 0:
-            towards += 1
+            sign_plus = partial_derivative_sign(vertex_ss, edge_plus, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+            sign_minus = partial_derivative_sign(vertex_ss, edge_minus, net, ssi2maski=ssi2maski, ss_layers=ss_layers)
+            if sign_plus == 0 or sign_minus == 0:
+                return True, -1
+            if sign_plus != sign_minus:
+                # Monotonic along this axis: not a PL Morse critical vertex.
+                return False, None
+            # Negative ∂_{vE} F: F decreases along v→E, so the edge is oriented toward v.
+            if sign_plus < 0:
+                towards += 1
 
     return True, towards
+
+
+# Each worker should have at least this many vertices to check, or it's not worth the
+# process it runs in (mirrors `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`'s reasoning
+# for the same Pool-startup-cost tradeoff). Unlike that constant, this one hasn't been
+# calibrated against real checkpoints -- `is_pl_critical_vertex` does several Jacobian
+# chain-multiplications per vertex, i.e. more work per item than a single vertex-covector
+# solve, so this starting point is deliberately conservative (lower) until measured.
+MIN_VERTICES_PER_WORKER = 256
+PARALLEL_CRITICAL_MIN_VERTICES = 2 * MIN_VERTICES_PER_WORKER
+
+
+def _is_pl_critical_vertex_chunk(
+    ss_chunk: list[np.ndarray],
+    net: ReLUNetwork,
+    ssi2maski: list[tuple[int, tuple[int, int]]],
+    ss_layers: list[int],
+) -> list[tuple[bool, int | None]]:
+    """Worker: criticality + Morse index for one chunk of vertex sign sequences."""
+    return [is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in ss_chunk]
+
+
+def critical_flags_for_vertices(
+    vertex_ss_list: list[np.ndarray],
+    net: ReLUNetwork,
+    *,
+    ssi2maski: list[tuple[int, tuple[int, int]]],
+    ss_layers: list[int],
+    nworkers: int = 1,
+) -> list[tuple[bool, int | None]]:
+    """``is_pl_critical_vertex`` for every vertex, sequential or Pool-parallel by size.
+
+    Each vertex's criticality check is independent of every other's -- the same shape
+    of embarrassingly-parallel work as candidate-vertex verification in
+    ``graph.vertex_star.find_vertices``, which already farms out across a worker pool
+    once there's enough of it to justify Pool startup cost. Below the size gate, or
+    with a single worker, this is exactly the plain sequential loop (no Pool overhead
+    for small complexes), and results are returned in the same order as the input list
+    either way.
+    """
+    n = len(vertex_ss_list)
+    if n == 0:
+        return []
+
+    if nworkers <= 1 or n < PARALLEL_CRITICAL_MIN_VERTICES:
+        return [
+            is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in vertex_ss_list
+        ]
+
+    from relucent.utils import get_mp_context
+
+    effective_workers = min(nworkers, max(1, n // MIN_VERTICES_PER_WORKER))
+    chunk_size = max(n // (effective_workers * 4), 1)
+    chunks = [vertex_ss_list[i : i + chunk_size] for i in range(0, n, chunk_size)]
+
+    results: list[tuple[bool, int | None]] = []
+    with get_mp_context().Pool(effective_workers) as pool:
+        for chunk_results in pool.starmap(
+            _is_pl_critical_vertex_chunk,
+            [(chunk, net, ssi2maski, ss_layers) for chunk in chunks],
+        ):
+            results.extend(chunk_results)
+    return results
 
 
 def partial_derivative_on_1cell(

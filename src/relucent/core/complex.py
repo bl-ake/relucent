@@ -1255,9 +1255,17 @@ class Complex:
                 sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
             )
 
+        # Candidate-vertex verification dominates runtime on large complexes (one
+        # equality solve + rank/slack check per candidate, independent of every other
+        # candidate) -- see vertex_star.find_vertices. net/sign_margin let it farm that
+        # out across a worker pool instead of running _verify_vertex sequentially.
+        nworkers = process_aware_cpu_count() or 1
         cells_by_dim, vertices = vertex_star.recover_cells_from_vertices(
             top_cells,
             graph,
+            net=self._net,
+            sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
+            nworkers=nworkers,
             ambient_dim=ambient_dim,
             top_dim=top_dim,
             verify_vertex=_verify_vertex,
@@ -1359,7 +1367,12 @@ class Complex:
         Returns:
             List of :class:`~relucent.topology.morse.CriticalPoint` records.
         """
-        from relucent.topology.morse import CriticalPoint, assert_scalar_output, is_pl_critical_vertex
+        from relucent.topology.morse import (
+            CriticalPoint,
+            assert_scalar_output,
+            critical_flags_for_vertices,
+            is_pl_critical_vertex,
+        )
 
         assert_scalar_output(self._net)
         chain = self.get_chain_complex(verbose=verbose)
@@ -1367,17 +1380,21 @@ class Complex:
             return []
 
         vertex_complex = chain[-1]
-        one_cell_tags: set[bytes] | None = None
+        vertices = list(vertex_complex.index2poly)
+
+        flags: list[tuple[bool, int | None]]
         if require_complete:
             meta = self.get_meta_graph(verbose=verbose)
             one_cell_tags = {tag for tag, attrs in meta.nodes(data=True) if int(attrs.get("dim", -1)) == 1}
 
-        results: list[CriticalPoint] = []
-        for vertex in vertex_complex.index2poly:
-            if require_complete and one_cell_tags is not None:
-                # Incident edges are inferred combinatorially; this checks they were discovered.
-                from relucent.utils import encode_ss
+            # The completeness check reads `self`/`meta` per vertex, so this path stays
+            # sequential; only the common `require_complete=False` case below (every
+            # caller in this codebase) is farmed out across a worker pool.
+            from relucent.utils import encode_ss
 
+            flags = []
+            for vertex in vertices:
+                # Incident edges are inferred combinatorially; this checks they were discovered.
                 v_ss = vertex.ss_np.ravel()
                 for shi in np.flatnonzero(v_ss == 0):
                     for sign in (-1, 1):
@@ -1389,13 +1406,30 @@ class Complex:
                                 f"combinatorial 1-cell {tag!r} incident to vertex {vertex.tag!r} "
                                 + "is missing from the discovered complex"
                             )
-
-            is_critical, index = is_pl_critical_vertex(
-                vertex.ss_np,
+                flags.append(
+                    is_pl_critical_vertex(
+                        vertex.ss_np,
+                        self._net,
+                        ssi2maski=self.ssi2maski,
+                        ss_layers=self.ss_layers,
+                    )
+                )
+        else:
+            # Every vertex's criticality check is independent of every other's (same
+            # shape of work as candidate-vertex verification in get_chain_complex, see
+            # the comment there) -- farm it out across a worker pool once there's enough
+            # of it to be worth Pool startup cost.
+            nworkers = process_aware_cpu_count() or 1
+            flags = critical_flags_for_vertices(
+                [vertex.ss_np for vertex in vertices],
                 self._net,
                 ssi2maski=self.ssi2maski,
                 ss_layers=self.ss_layers,
+                nworkers=nworkers,
             )
+
+        results: list[CriticalPoint] = []
+        for vertex, (is_critical, index) in zip(vertices, flags, strict=True):
             if not is_critical:
                 continue
             if index is None or (index < 0 and not include_degenerate):
