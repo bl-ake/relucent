@@ -443,9 +443,7 @@ def critical_flags_for_vertices(
         return []
 
     if nworkers <= 1 or n < PARALLEL_CRITICAL_MIN_VERTICES:
-        return [
-            is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in vertex_ss_list
-        ]
+        return [is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in vertex_ss_list]
 
     from relucent.utils import get_mp_context
 

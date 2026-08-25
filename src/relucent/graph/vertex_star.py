@@ -236,10 +236,7 @@ def find_vertices(
     pending = _generate_vertex_candidates(top_cells, graph, ambient_dim=ambient_dim, top_dim=top_dim)
 
     use_parallel = (
-        net is not None
-        and sign_margin is not None
-        and nworkers > 1
-        and len(pending) >= PARALLEL_VERIFY_MIN_CANDIDATES
+        net is not None and sign_margin is not None and nworkers > 1 and len(pending) >= PARALLEL_VERIFY_MIN_CANDIDATES
     )
 
     vertices: dict[bytes, VertexRecord] = {}
