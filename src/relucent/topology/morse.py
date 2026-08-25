@@ -106,6 +106,9 @@ class _JacobianCacheScope:
     never grow unbounded across a whole complex's vertices.
     """
 
+    def __init__(self) -> None:
+        self._previous: dict[tuple[int, bytes], LayerJacobians] | None = None
+
     def __enter__(self) -> None:
         self._previous = getattr(_jacobian_cache_state, "cache", None)
         _jacobian_cache_state.cache = {}
