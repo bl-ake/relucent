@@ -143,6 +143,10 @@ Polyhedron and halfspace geometry
      - ``float``
      - ``1e-6``
      - ``allclose`` atol when verifying halfspace ``(A, b)`` against network outputs.
+   * - ``TOL_VERTEX_SIGN_MARGIN``
+     - ``float``
+     - ``1e-12``
+     - Floor for the vertex sign check; each nonzero preactivation must also beat its own float64 rounding at that point.
 
 Complex search and parallel add
 --------------------------------

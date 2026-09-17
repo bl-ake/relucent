@@ -709,7 +709,8 @@ dimension guard elsewhere.</p>
 <dd><p>Recover and verify a vertex predicted from this top-dimensional coface.</p>
 <p>Only the equality solve uses floating-point arithmetic. Verification
 ignores the zero coordinates and requires every predicted nonzero
-preactivation to lie strictly beyond <code class="docutils literal notranslate"><span class="pre">sign_margin</span></code>.</p>
+preactivation past <code class="docutils literal notranslate"><span class="pre">sign_margin</span></code> and its own float64 rounding at the
+vertex.</p>
 <p>Coordinates whose halfspace normal vanishes (dead / near-dead ReLUs,
 <code class="docutils literal notranslate"><span class="pre">||a||</span> <span class="pre">&lt;</span> <span class="pre">TOL_DEAD_RELU</span></code>) are not real hyperplanes: they may still
 carry a spurious combinatorial <code class="docutils literal notranslate"><span class="pre">±1</span></code> in <code class="docutils literal notranslate"><span class="pre">vertex_ss</span></code>, but they are

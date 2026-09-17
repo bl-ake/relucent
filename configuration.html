@@ -595,6 +595,11 @@ shipped <code class="xref py py-mod docutils literal notranslate"><span class="p
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">allclose</span></code> atol when verifying halfspace <code class="docutils literal notranslate"><span class="pre">(A,</span> <span class="pre">b)</span></code> against network outputs.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERTEX_SIGN_MARGIN</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e-12</span></code></p></td>
+<td><p>Floor for the vertex sign check; each nonzero preactivation must also beat its own float64 rounding at that point.</p></td>
+</tr>
 </tbody>
 </table>
 </section>
