@@ -177,6 +177,10 @@ DEFAULT_PLOT_BOUND: float = _env_float("DEFAULT_PLOT_BOUND", 10)
 # when verifying halfspace construction (torch/np allclose atol).
 TOL_VERIFY_AB_ATOL: float = _env_float("TOL_VERIFY_AB_ATOL", 1e-6)
 
+# Floor for the vertex sign check in verify_vertex_covector (also beats
+# each preactivation's own float64 rounding at that point).
+TOL_VERTEX_SIGN_MARGIN: float = _env_float("TOL_VERTEX_SIGN_MARGIN", 1e-12)
+
 # -----------------------------------------------------------------------------
 # Complex search & parallel add
 # -----------------------------------------------------------------------------
@@ -341,6 +345,7 @@ __all__ = [
     "TOL_SHI_HYPERPLANE",
     "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
+    "TOL_VERTEX_SIGN_MARGIN",
     "VERBOSE",
     "VERTEX_TRUST_THRESHOLD",
     "update_settings",

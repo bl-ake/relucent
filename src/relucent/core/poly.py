@@ -180,7 +180,8 @@ class Polyhedron:
 
         Only the equality solve uses floating-point arithmetic. Verification
         ignores the zero coordinates and requires every predicted nonzero
-        preactivation to lie strictly beyond ``sign_margin``.
+        preactivation past ``sign_margin`` and its own float64 rounding at the
+        vertex.
 
         Coordinates whose halfspace normal vanishes (dead / near-dead ReLUs,
         ``||a|| < TOL_DEAD_RELU``) are not real hyperplanes: they may still
@@ -217,7 +218,11 @@ class Polyhedron:
         if not np.any(active):
             return None
         signed_values = values[active] * row[active]
-        if np.any(signed_values <= float(sign_margin)):
+        # Margin tracks each row's magnitude here — a single network-wide
+        # margin sized for the input box was rejecting real near-data vertices.
+        term_scale = np.abs(normals[active]) @ np.abs(np.asarray(point).reshape(-1)) + np.abs(hs[: row.size, -1][active])
+        margin = np.maximum(float(sign_margin), 2.0 * row.size * float(np.finfo(np.float64).eps) * term_scale)
+        if np.any(signed_values <= margin):
             return None
         return point
 

@@ -192,3 +192,35 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
     meta = cplx.get_meta_graph(verbose=False)
     assert calls, "get_meta_graph must still run Chebyshev phantom scan"
     assert meta.number_of_nodes() > 0
+
+
+def test_verify_vertex_covector_margin_follows_rounding_at_the_vertex() -> None:
+    """Clear sign near the origin passes; one inside rounding far out gets rejected."""
+    vertex_ss = np.array([[0, 0, 1]], dtype=np.int8)
+    near = Polyhedron(
+        None,
+        np.array([[1, 1, 1]], dtype=np.int8),
+        halfspaces=np.array([[1e6, 0.0, 0.0], [0.0, 1e6, 0.0], [-1e6, -1e6, -1.0]]),
+        dim=2,
+        _ambient_dim=2,
+    )
+    point = near.verify_vertex_covector(
+        vertex_ss,
+        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-3]]),
+        sign_margin=1e-12,
+    )
+    assert point is not None
+
+    far = Polyhedron(
+        None,
+        np.array([[1, 1, 1]], dtype=np.int8),
+        halfspaces=np.array([[1.0, 0.0, -1e12], [0.0, 1.0, -1e12], [-1.0, -1.0, 1.0]]),
+        dim=2,
+        _ambient_dim=2,
+    )
+    rejected = far.verify_vertex_covector(
+        vertex_ss,
+        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-6]]),
+        sign_margin=1e-12,
+    )
+    assert rejected is None

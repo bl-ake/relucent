@@ -131,3 +131,23 @@ def test_complex_auto_tolerances_false_skips_network_tune(monkeypatch: pytest.Mo
 
 def test_boundary_mip_bound_margin_default() -> None:
     assert cfg.BOUNDARY_MIP_BOUND_MARGIN == 5.0
+
+
+def test_shi_proof_tolerance_covers_lp_feasibility_on_small_weight_networks() -> None:
+    """SHI proof points come from an LP, so slack can hit gurobi's feasibility tol."""
+    from relucent.model.model import LinearLayer
+
+    net = convert(mlp([3, 8, 8, 1]))
+    for layer in net.layers.values():
+        if isinstance(layer, LinearLayer):
+            layer.weight = layer.weight * 1e-3
+            layer.bias = layer.bias * 1e-3
+    tol = compute_tolerances(net=net)
+    gurobi_feasibility_tol = 1e-6
+    assert tol["TOL_SHI_HYPERPLANE"] >= (3 + 1) * gurobi_feasibility_tol
+
+
+def test_vertex_sign_margin_does_not_scale_with_input_box() -> None:
+    small = compute_tolerances(max_coord=1.0)
+    large = compute_tolerances(max_coord=1e8)
+    assert small["TOL_VERTEX_SIGN_MARGIN"] == large["TOL_VERTEX_SIGN_MARGIN"]

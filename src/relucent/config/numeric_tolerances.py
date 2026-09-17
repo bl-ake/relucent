@@ -158,7 +158,11 @@ def compute_tolerances(
     tol_gurobi_obj_stop = _safe(max(tol_shi_objective, gurobi_tol), safety_factor=safety_factor)
 
     k_viol = min(max_constraints, _SHI_PROOF_MAX_VIOLATIONS)
-    tol_shi_hyperplane = _safe(float(k_viol) * dot_floor, safety_factor=safety_factor)
+    # SHI proof points are LP solutions: ~ambient_dim tight rows can each miss
+    # by gurobi_tol, and the LP box goes past max_coord. Without this floor,
+    # small-weight nets reject real facets.
+    shi_proof_floor = float(ambient_dim + 1) * gurobi_tol
+    tol_shi_hyperplane = _safe(max(float(k_viol) * dot_floor, shi_proof_floor), safety_factor=safety_factor)
     tol_nearly_vertical = _safe(math.sqrt(_EPS) * max_halfspace_norm, safety_factor=safety_factor)
     boundary_floor = max(_MIN_BOUNDARY_MIP_EPS, gurobi_tol * max_preactivation)
 
@@ -169,6 +173,9 @@ def compute_tolerances(
         "VERTEX_TRUST_THRESHOLD": tol_vertex_trust,
         "TOL_DEAD_RELU": tol_dead_relu,
         "TOL_VERIFY_AB_ATOL": tol_verify_ab,
+        # Unit-scale floor only; verify_vertex_covector adds per-vertex rounding.
+        # Don't tie this to max_coord — the input box overstates it badly.
+        "TOL_VERTEX_SIGN_MARGIN": _safe(norm_floor, safety_factor=safety_factor),
         "TOL_SHI_OBJECTIVE": tol_shi_objective,
         "GUROBI_SHI_BEST_OBJ_STOP": tol_gurobi_obj_stop,
         "GUROBI_SHI_BEST_BD_STOP": -tol_gurobi_obj_stop,

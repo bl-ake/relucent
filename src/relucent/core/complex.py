@@ -1252,7 +1252,7 @@ class Complex:
             return root.verify_vertex_covector(
                 candidate_ss,
                 point2preactivations=lambda x: np.asarray(self.point2preactivations(x)),
-                sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
+                sign_margin=float(cfg.TOL_VERTEX_SIGN_MARGIN),
             )
 
         # Candidate-vertex verification dominates runtime on large complexes (one
@@ -1264,7 +1264,7 @@ class Complex:
             top_cells,
             graph,
             net=self._net,
-            sign_margin=float(cfg.TOL_VERIFY_AB_ATOL),
+            sign_margin=float(cfg.TOL_VERTEX_SIGN_MARGIN),
             nworkers=nworkers,
             ambient_dim=ambient_dim,
             top_dim=top_dim,
