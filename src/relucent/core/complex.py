@@ -1291,12 +1291,14 @@ class Complex:
                 )
             elif dim == 0 and chain and len(chain[-1]) > 0 and int(chain[-1].index2poly[0].dim) == 1:
                 endpoint_order: list[bytes] = []
+                seen_endpoints: set[bytes] = set()
                 for one_cell in chain[-1]:
                     for shi in one_cell._covector_endpoint_shis or []:
                         endpoint_tag = incidence.face_tag(one_cell.ss_np, shi)
-                        if endpoint_tag in recovered and endpoint_tag not in endpoint_order:
+                        if endpoint_tag in recovered and endpoint_tag not in seen_endpoints:
                             endpoint_order.append(endpoint_tag)
-                ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in endpoint_order]
+                            seen_endpoints.add(endpoint_tag)
+                ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in seen_endpoints]
             for tag in ordered_tags:
                 ss = recovered[tag]
                 kwargs: dict[str, Any] = {
