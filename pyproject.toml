@@ -5,12 +5,12 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "0.9.6"
+version = "0.9.8"
 requires-python = ">= 3.11"
 
 dependencies = [
     "pandas>=2.3",
-    "gurobipy>=10.0.0",
+    "gurobipy>=12,<13",
     "networkx>=2.0",
     "matplotlib>=3.10",
     "numpy>=2.4.1",
