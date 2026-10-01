@@ -8,12 +8,12 @@ Ways to change a setting:
 * Assign directly::
 
     import relucent
-    relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7
+    relucent.config.TOL_VERIFY_AB_ATOL = 1e-7
 
 * Set several at once::
 
     from relucent.config import update_settings
-    update_settings(TOL_HALFSPACE_CONTAINMENT=1e-7, MAX_RADIUS=200)
+    update_settings(TOL_VERIFY_AB_ATOL=1e-7, MAX_RADIUS=200)
 
 * Use an environment variable before import, e.g.
   ``RELUCENT_CAREFUL_MODE=1``. Any public setting works as
@@ -105,33 +105,9 @@ QHULL_MODE: str = _env_str("QHULL_MODE", "IGNORE")
 # faster, but drops cells with no point within MAX_RADIUS of every face.
 MAX_RADIUS: float = _env_float("MAX_RADIUS", 100)
 
-# Trust a HalfspaceIntersection vertex only if the summed residual
-# (halfspace @ vertex + bias) over its supporting halfspaces is below this.
-VERTEX_TRUST_THRESHOLD: float = _env_float("VERTEX_TRUST_THRESHOLD", 1e-6)
-
-# Slack for "point in halfspace": a^T x + b <= TOL_HALFSPACE_CONTAINMENT counts as inside.
-TOL_HALFSPACE_CONTAINMENT: float = _env_float("TOL_HALFSPACE_CONTAINMENT", 1e-6)
-
-# Tolerance for checking interior-point LP results (``solve_radius`` lstsq residuals,
-# ``Polyhedron._halfspace_point`` equalities). A bit looser than
-# :data:`TOL_HALFSPACE_CONTAINMENT` to absorb LP feasibility tolerance and float noise.
-TOL_INTERIOR_VERIFY: float = _env_float("TOL_INTERIOR_VERIFY", 1e-5)
-
-# A ReLU is dead (always off) if |constr_A| < TOL_DEAD_RELU along its column.
-TOL_DEAD_RELU: float = _env_float("TOL_DEAD_RELU", 1e-8)
-
-# Slack for hyperplane intersection in get_shis (A @ x == -b - TOL_SHI_HYPERPLANE).
-TOL_SHI_HYPERPLANE: float = _env_float("TOL_SHI_HYPERPLANE", 1e-6)
-
 # Normals with ||a|| below this are degenerate: a^T x + b <= 0 is redundant if
 # b <= 0 and infeasible otherwise. They can make Qhull fail, so they're handled separately.
 TOL_HALFSPACE_NORMAL: float = _env_float("TOL_HALFSPACE_NORMAL", 1e-12)
-
-# Gurobi stopping criteria for SHI computation.
-# BestObjStop: stop once the objective reaches this (maximization).
-# BestBdStop: stop once the best bound drops to this.
-GUROBI_SHI_BEST_OBJ_STOP: float = _env_float("GUROBI_SHI_BEST_OBJ_STOP", 1e-6)
-GUROBI_SHI_BEST_BD_STOP: float = _env_float("GUROBI_SHI_BEST_BD_STOP", -1e-6)
 
 # Gurobi OptimalityTol for the SHI LP (default 1e-6, minimum 1e-9). At 1e-6 the basis
 # can have a slightly negative exact multiplier, which the exact facet check rejects.
@@ -142,16 +118,6 @@ GUROBI_SHI_OPTIMALITY_TOL: float = _env_float("GUROBI_SHI_OPTIMALITY_TOL", 1e-9)
 # infeasible. On five checkpoints that failed this way, geometric-mean scaling (2)
 # finished four; auto finished none.
 GUROBI_SHI_SCALE_FLAG: int = _env_int("GUROBI_SHI_SCALE_FLAG", 2)
-
-# Minimum SHI LP objective (margin along hyperplane i once that face is relaxed)
-# needed to certify a supporting hyperplane. Same units as slacks a^T x + b.
-# Values near zero (~1e-18) are float noise: no open cell at this tolerance.
-TOL_SHI_OBJECTIVE: float = _env_float("TOL_SHI_OBJECTIVE", 1e-8)
-
-# During search (BFS/A*), raise if a discovered cell's Chebyshev inradius is below
-# this. The literal default is a fallback: ``apply_tolerances()`` normally resets it
-# to half of the effective ``TOL_SHI_OBJECTIVE``.
-MIN_SEARCH_INRADIUS: float = _env_float("MIN_SEARCH_INRADIUS", TOL_SHI_OBJECTIVE / 2)
 
 # In 2D plotting, normal components below this count as zero
 # (nearly vertical line: |w[1]| < TOL_NEARLY_VERTICAL).
@@ -300,27 +266,18 @@ __all__ = [
     "DEFAULT_PARALLEL_ADD_BOUND",
     "DEFAULT_PLOT_BOUND",
     "DEFAULT_SEARCH_BOUND",
-    "GUROBI_SHI_BEST_BD_STOP",
-    "GUROBI_SHI_BEST_OBJ_STOP",
     "GUROBI_SHI_OPTIMALITY_TOL",
     "GUROBI_SHI_SCALE_FLAG",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
-    "MIN_SEARCH_INRADIUS",
     "MAX_RADIUS",
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",
     "QHULL_MODE",
     "TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR",
-    "TOL_DEAD_RELU",
-    "TOL_HALFSPACE_CONTAINMENT",
-    "TOL_INTERIOR_VERIFY",
     "TOL_HALFSPACE_NORMAL",
     "TOL_NEARLY_VERTICAL",
-    "TOL_SHI_HYPERPLANE",
-    "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
     "VERBOSE",
-    "VERTEX_TRUST_THRESHOLD",
     "update_settings",
 ]
 

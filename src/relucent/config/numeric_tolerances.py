@@ -15,10 +15,7 @@ __all__ = ["apply_tolerances", "compute_tolerances"]
 
 _EPS = float(np.finfo(np.float64).eps)
 _GUROBI_FEAS_TOL = 1e-6
-_MIN_SHI_OBJECTIVE = 1e-18
-_MIN_DEAD_RELU = 1e-8
 _MIN_BOUNDARY_MIP_EPS = 1e-4
-_SHI_PROOF_MAX_VIOLATIONS = 100
 
 
 def _gamma(n: int) -> float:
@@ -33,70 +30,22 @@ def _safe(value: float, *, safety_factor: float) -> float:
     return float(np.nextafter(value * safety_factor, np.inf))
 
 
-def _scan_halfspace_magnitudes(net: ReLUNetwork) -> dict[str, float | int]:
+def _max_preactivation(net: ReLUNetwork) -> float:
+    """Layerwise ``|W|_1`` bound on any preactivation magnitude (at least 1)."""
     layers = list(net.layers.values())
-    n_relus = sum(
-        int(layer.weight.shape[0])
-        for i, layer in enumerate(layers)
-        if isinstance(layer, LinearLayer) and i + 1 < len(layers) and isinstance(layers[i + 1], ReLULayer)
-    )
-    if n_relus == 0:
-        return {
-            "max_halfspace_norm": 1.0,
-            "max_abs_bias": 1.0,
-            "max_constraints": 0,
-            "max_column_inf": 0.0,
-            "relu_depth": 0,
-            "max_preactivation": 1.0,
-        }
-
-    mask = np.ones(n_relus, dtype=np.int8)
-    constr_a: np.ndarray | None = None
-    constr_b: np.ndarray | None = None
-    current_a: np.ndarray | None = None
-    current_b: np.ndarray | None = None
-    mask_index = 0
-    relu_depth = 0
     max_preactivation = 1.0
-
-    for layer in net.layers.values():
+    seen_relu = False
+    for layer in layers:
         if isinstance(layer, LinearLayer):
             layer_w = np.asarray(layer.weight, dtype=np.float64)
             layer_b = np.asarray(layer.bias, dtype=np.float64)
-            if current_a is None or current_b is None:
-                constr_a = np.empty((layer_w.shape[1], 0), dtype=np.float64)
-                constr_b = np.empty((1, 0), dtype=np.float64)
-                current_a = np.eye(layer_w.shape[1], dtype=np.float64)
-                current_b = np.zeros((1, layer_w.shape[1]), dtype=np.float64)
-            current_a = current_a @ layer_w.T
-            current_b = current_b @ layer_w.T + layer_b
             row_bounds = np.sum(np.abs(layer_w), axis=1) * max_preactivation + np.abs(layer_b)
             max_preactivation = float(np.max(row_bounds))
         elif isinstance(layer, ReLULayer):
-            assert current_a is not None and current_b is not None and constr_a is not None and constr_b is not None
-            relu_depth += 1
-            layer_mask = mask[mask_index : mask_index + current_a.shape[1]]
-            nonzero_mask = np.where(layer_mask == 0, 1, layer_mask)
-            constr_a = np.concatenate((constr_a, current_a * nonzero_mask), axis=1)
-            constr_b = np.concatenate((constr_b, current_b * nonzero_mask), axis=1)
-            active_a = current_a * (layer_mask == 1)
-            current_a = active_a
-            current_b = current_b * (layer_mask == 1)
-            mask_index += int(active_a.shape[1])
-        elif isinstance(layer, FlattenLayer) and current_a is not None:
+            seen_relu = True
+        elif isinstance(layer, FlattenLayer) and seen_relu:
             raise NotImplementedError("Intermediate flatten layer not supported for magnitude scan")
-
-    assert constr_a is not None and constr_b is not None
-    halfspaces = np.hstack((-constr_a.T, -constr_b.reshape(-1, 1)))
-    row_norms = np.linalg.norm(halfspaces[:, :-1], axis=1)
-    return {
-        "max_halfspace_norm": max(float(np.max(row_norms)) if row_norms.size else 1.0, 1.0),
-        "max_abs_bias": max(float(np.max(np.abs(halfspaces[:, -1]))) if halfspaces.size else 1.0, 1.0),
-        "max_constraints": n_relus,
-        "max_column_inf": float(np.max(np.abs(constr_a))) if constr_a.size else 0.0,
-        "relu_depth": relu_depth,
-        "max_preactivation": max(max_preactivation, 1.0),
-    }
+    return max(max_preactivation, 1.0) if seen_relu else 1.0
 
 
 def compute_tolerances(
@@ -112,8 +61,8 @@ def compute_tolerances(
     vertices, genericity, membership, Morse signs) is checked against the float64 error of
     the rows involved (:mod:`relucent._internal.rounding`), and raises
     :class:`~relucent.core.errors.AmbiguousGeometryError` if that error could flip it.
-    The settings still matter for plotting, the ``boundary_bfs`` MIP (``BOUNDARY_MIP_EPS``),
-    and backward compatibility.
+    The settings here only matter for plotting and the ``boundary_bfs`` MIP
+    (``BOUNDARY_MIP_EPS``).
 
     They used to be scaled per network, but one number can't fit rows whose errors differ by
     five or more orders of magnitude: it rejected every facet on deep nets and was too tight
@@ -121,69 +70,18 @@ def compute_tolerances(
     the ``boundary_bfs`` margin.
     """
     del max_coord
-    gurobi_tol = _GUROBI_FEAS_TOL
-    push_size = 1.0
-    max_halfspace_norm = 1.0
-    max_abs_bias = 1.0
-    max_constraints = 10_000
-    max_column_inf = 0.0
-    relu_depth = 0
     max_preactivation = 1.0
-    max_coord = 1.0
-
     if net is not None:
-        scan = _scan_halfspace_magnitudes(net)
         ambient_dim = int(np.prod(net.input_shape))
-        max_preactivation = float(scan["max_preactivation"])
+        max_preactivation = _max_preactivation(net)
 
     g = _gamma(ambient_dim)
-    dot_floor = g * max_halfspace_norm * max_coord
-    norm_floor = g * max_halfspace_norm
-
-    tol_halfspace_normal = _safe(norm_floor, safety_factor=safety_factor)
-    tol_halfspace_containment = _safe(dot_floor + _EPS * max_abs_bias, safety_factor=safety_factor)
-
-    lstsq_floor = _gamma(ambient_dim) * max(max_halfspace_norm, max_abs_bias, 1.0)
-    interior_cap = max(tol_halfspace_containment, gurobi_tol, lstsq_floor, 10.0 * tol_halfspace_containment)
-    tol_interior_verify = max(_safe(interior_cap, safety_factor=safety_factor), tol_halfspace_containment)
-
-    tol_vertex_trust = _safe(float(max_constraints) * tol_halfspace_containment, safety_factor=safety_factor)
-    dead_floor = max(
-        _gamma(max(relu_depth, 1)) * max_column_inf if max_column_inf > 0.0 else _MIN_DEAD_RELU,
-        _MIN_DEAD_RELU,
-    )
-    tol_dead_relu = _safe(dead_floor, safety_factor=safety_factor)
-    tol_verify_ab = _safe(dot_floor, safety_factor=safety_factor)
-
-    shi_obj_floor = max(dot_floor * push_size, _MIN_SHI_OBJECTIVE)
-    tol_shi_objective = _safe(shi_obj_floor, safety_factor=safety_factor)
-    # BestObjStop shouldn't go below the solver feasibility tolerance, though
-    # TOL_SHI_OBJECTIVE can.
-    tol_gurobi_obj_stop = _safe(max(tol_shi_objective, gurobi_tol), safety_factor=safety_factor)
-
-    k_viol = min(max_constraints, _SHI_PROOF_MAX_VIOLATIONS)
-    # SHI proof points are LP solutions: ~ambient_dim tight rows can each miss by
-    # gurobi_tol. Without this floor, small-weight nets reject real facets.
-    shi_proof_floor = float(ambient_dim + 1) * gurobi_tol
-    tol_shi_hyperplane = _safe(max(float(k_viol) * dot_floor, shi_proof_floor), safety_factor=safety_factor)
-    tol_nearly_vertical = _safe(math.sqrt(_EPS) * max_halfspace_norm, safety_factor=safety_factor)
-    boundary_floor = max(_MIN_BOUNDARY_MIP_EPS, gurobi_tol * max_preactivation)
+    boundary_floor = max(_MIN_BOUNDARY_MIP_EPS, _GUROBI_FEAS_TOL * max_preactivation)
 
     return {
-        "TOL_HALFSPACE_NORMAL": tol_halfspace_normal,
-        "TOL_HALFSPACE_CONTAINMENT": tol_halfspace_containment,
-        "TOL_INTERIOR_VERIFY": tol_interior_verify,
-        "VERTEX_TRUST_THRESHOLD": tol_vertex_trust,
-        "TOL_DEAD_RELU": tol_dead_relu,
-        "TOL_VERIFY_AB_ATOL": tol_verify_ab,
-        "TOL_SHI_OBJECTIVE": tol_shi_objective,
-        "GUROBI_SHI_BEST_OBJ_STOP": tol_gurobi_obj_stop,
-        "GUROBI_SHI_BEST_BD_STOP": -tol_gurobi_obj_stop,
-        # Half the SHI threshold, so thin cells are rejected before relaxed-face
-        # LPs drift into noise.
-        "MIN_SEARCH_INRADIUS": tol_shi_objective / 2.0,
-        "TOL_SHI_HYPERPLANE": tol_shi_hyperplane,
-        "TOL_NEARLY_VERTICAL": tol_nearly_vertical,
+        "TOL_HALFSPACE_NORMAL": _safe(g, safety_factor=safety_factor),
+        "TOL_VERIFY_AB_ATOL": _safe(g, safety_factor=safety_factor),
+        "TOL_NEARLY_VERTICAL": _safe(math.sqrt(_EPS), safety_factor=safety_factor),
         "BOUNDARY_MIP_EPS": _safe(boundary_floor, safety_factor=safety_factor),
     }
 

@@ -99,7 +99,7 @@ def test_configuration_snippets() -> None:
     ns = exec_snippet(snippets[1])
     import relucent.config as cfg
 
-    assert cfg.TOL_HALFSPACE_CONTAINMENT == 1e-7
+    assert cfg.TOL_VERIFY_AB_ATOL == 1e-7
     assert cfg.MAX_RADIUS == 500
     assert cfg.DEFAULT_SEARCH_BOUND == 1e7
     assert "update_settings" in ns

@@ -110,10 +110,8 @@ class Complex:
             net: Any model convertible to relucent's canonical ``NN``.
                 is to be built and queried.
             auto_tolerances: When True (default), set :mod:`relucent.config`
-                tolerance values from this network's weight scale via
-                :func:`~relucent.config.numeric_tolerances.apply_tolerances`. This is
-                the usual runtime source for values such as
-                ``cfg.MIN_SEARCH_INRADIUS`` after import bootstrap.
+                tolerance values for this network via
+                :func:`~relucent.config.numeric_tolerances.apply_tolerances`.
         """
         original_net = net
         if not isinstance(net, ReLUNetwork):

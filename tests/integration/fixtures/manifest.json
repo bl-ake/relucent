@@ -190,8 +190,7 @@
           "0": 2,
           "1": 1
         },
-        "methods_agree": true,
-        "note": "Re-verified 2026-08-06: current codebase (both the pre-redesign covector recovery with MIN_CHAIN_FACE_COVERAGE=0 and the vertex_star recovery) reproducibly gives chain sizes 1072/2766/2377/682 and truncated betti {0: 2, 1: 1} for this witness, not the {0: 2, 1: 1, 2: 34} recorded here previously. This is not caused by the vertex_star redesign (both algorithms agree byte-for-byte); it predates it."
+        "methods_agree": true
       },
       "boundary_shi": 30
     },

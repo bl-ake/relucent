@@ -9,7 +9,7 @@ Automatic tolerance defaults
 ----------------------------
 
 ``import relucent`` computes float64-safe defaults for the tolerance settings
-(``TOL_*``, SHI thresholds, etc.) with
+(``TOL_*``, ``BOUNDARY_MIP_EPS``) with
 :func:`~relucent.config.numeric_tolerances.apply_tolerances` and writes them to
 :mod:`relucent.config`. Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are
 not overwritten. Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the
@@ -28,30 +28,20 @@ exactly when that bound can't settle them, and otherwise raise
 :class:`~relucent.core.errors.AmbiguousGeometryError`. See
 :mod:`relucent._internal.rounding` and :mod:`relucent._internal.exact`.
 
-.. note::
-
-   Several settings are currently still defined and accepted by ``update_settings`` but
-   **no longer read by the library**: ``TOL_HALFSPACE_CONTAINMENT``,
-   ``TOL_INTERIOR_VERIFY``, ``TOL_DEAD_RELU``, ``TOL_SHI_HYPERPLANE``,
-   ``TOL_SHI_OBJECTIVE``, ``VERTEX_TRUST_THRESHOLD``, ``MIN_SEARCH_INRADIUS``,
-   ``GUROBI_SHI_BEST_OBJ_STOP`` and ``GUROBI_SHI_BEST_BD_STOP``. They are kept for
-   backward compatibility, so changing them has no effect. Tables below mark them as
-   *(unused)*.
-
 Changing settings
 -----------------
 
 Import the module (or the package namespace) and assign new values::
 
    import relucent
-   relucent.config.TOL_HALFSPACE_CONTAINMENT = 1e-7
+   relucent.config.TOL_VERIFY_AB_ATOL = 1e-7
    relucent.config.MAX_RADIUS = 500
 
 To set several attributes at once, use :func:`relucent.config.update_settings`::
 
    from relucent.config import update_settings
    update_settings(
-       TOL_HALFSPACE_CONTAINMENT=1e-7,
+       TOL_VERIFY_AB_ATOL=1e-7,
        DEFAULT_SEARCH_BOUND=1e7,
    )
 
@@ -66,12 +56,12 @@ The naming convention is:
 
 ``RELUCENT_<SETTING_NAME>``
 
-For example, to override ``MAX_RADIUS`` and ``TOL_HALFSPACE_CONTAINMENT``:
+For example, to override ``MAX_RADIUS`` and ``TOL_VERIFY_AB_ATOL``:
 
 .. code-block:: bash
 
    export RELUCENT_MAX_RADIUS=500
-   export RELUCENT_TOL_HALFSPACE_CONTAINMENT=1e-7
+   export RELUCENT_TOL_VERIFY_AB_ATOL=1e-7
 
 Read values are parsed at import time of :mod:`relucent.config`, so set
 environment variables before importing :mod:`relucent`.
@@ -119,34 +109,10 @@ Polyhedron and halfspace geometry
      - ``float``
      - ``100``
      - Maximum Chebyshev / interior-point search radius when solving with Gurobi.
-   * - ``VERTEX_TRUST_THRESHOLD``
-     - ``float``
-     - ``1e-6``
-     - *(unused)* Threshold for trusting vertex positions from HalfspaceIntersection.
-   * - ``TOL_HALFSPACE_CONTAINMENT``
-     - ``float``
-     - ``1e-6``
-     - *(unused)* Feasibility tolerance for halfspace containment (:math:`a^\top x + b \le 0`) in checks and related geometry.
-   * - ``TOL_INTERIOR_VERIFY``
-     - ``float``
-     - ``1e-5``
-     - *(unused)* After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than ``TOL_HALFSPACE_CONTAINMENT`` for solver noise).
-   * - ``TOL_DEAD_RELU``
-     - ``float``
-     - ``1e-8``
-     - *(unused)* Column norm below which a ReLU is treated as dead.
-   * - ``TOL_SHI_HYPERPLANE``
-     - ``float``
-     - ``1e-6``
-     - *(unused)* Hyperplane equality tolerance in SHI computation.
    * - ``TOL_HALFSPACE_NORMAL``
      - ``float``
      - ``1e-12``
      - Norms below this are treated as degenerate halfspace normals (used when plotting).
-   * - ``GUROBI_SHI_BEST_OBJ_STOP`` / ``GUROBI_SHI_BEST_BD_STOP``
-     - ``float``
-     - ``1e-6`` / ``-1e-6``
-     - *(unused)* Gurobi early-stop tolerances for the SHI MIP models.
    * - ``GUROBI_SHI_OPTIMALITY_TOL``
      - ``float``
      - ``1e-9``
@@ -155,10 +121,6 @@ Polyhedron and halfspace geometry
      - ``int``
      - ``2``
      - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling.
-   * - ``TOL_SHI_OBJECTIVE``
-     - ``float``
-     - ``1e-8``
-     - *(unused)* Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).
    * - ``TOL_NEARLY_VERTICAL``
      - ``float``
      - ``1e-10``
@@ -187,10 +149,6 @@ Complex search and parallel add
      - ``list[float]``
      - ``[0.01, 0.1, 1, 10, 100]``
      - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.get_ip`.
-   * - ``MIN_SEARCH_INRADIUS``
-     - ``float``
-     - ``TOL_SHI_OBJECTIVE / 2``
-     - *(unused)* Formerly a floor on Chebyshev inradius during BFS/A* search.
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
