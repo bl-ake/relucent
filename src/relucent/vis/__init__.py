@@ -845,10 +845,9 @@ def _complex_figure_2d_cells(
         if label_regions and poly.center is not None:
             fig.add_trace(go.Scatter(x=[poly.center[0]], y=[poly.center[1]], mode="text", text=str(poly), showlegend=False))
     _ensure_minimum_plotted_polyhedra(eligible_polys, plotted_polys, "2D complex cell plot")
-    # Skip empty cells before touching ``interior_point`` (expensive / may raise). Duck-typed
-    # plot stubs may omit ``feasible``; treat those as feasible.
-    # NOTE: Use the already materialized `polys` list so this helper also works with
-    # lightweight test doubles that don't implement Complex.index2poly.
+    # Skip empty cells before touching ``interior_point`` (expensive, may raise). Plot
+    # stubs may omit ``feasible``; treat those as feasible. Uses the materialized
+    # `polys` list so test doubles without Complex.index2poly work too.
     interior_points: list[float] = []
     for p in polys[:100]:
         finite = getattr(p, "finite", True)

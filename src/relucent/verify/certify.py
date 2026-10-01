@@ -1,24 +1,21 @@
-"""Certification pipeline for polyhedral complexes.
+"""Certification of polyhedral complexes.
 
-:func:`certify_complex` is the single entry point for checking that a
-:class:`~relucent.core.complex.Complex` satisfies the invariants topology routines
-rely on. Each :class:`CertifyLevel` is cumulative and fails closed:
+:func:`certify_complex` checks the invariants the topology code relies on. Each
+:class:`CertifyLevel` includes the one before it and fails closed:
 
-- ``COMBINATORIAL``: dual-graph SHI symmetry and cubical face-tag consistency,
-  plus contracted-slice SHI checks on chain-complex slices.
-- ``COMPLETE``: adds LP flip-neighbor completeness on a fully explored ambient
-  complex (every geometric facet has a same-dimension neighbor in the complex).
-- ``GEOMETRIC``: adds a fresh LP recompute of every cached ``_shis`` not computed by ``get_shis`` on its cell.
+- ``COMBINATORIAL``: dual-graph SHI symmetry, cubical face-tag consistency, and
+  contracted-slice SHI checks.
+- ``COMPLETE``: also checks LP flip-neighbor completeness on a fully explored
+  ambient complex (every geometric facet has a neighbor in the complex).
+- ``GEOMETRIC``: also recomputes, with a fresh LP, every cached ``_shis`` that
+  ``get_shis`` didn't compute on its cell.
 
-Chain and meta-graph reconstruction consume only the combinatorial certification.
-``COMPLETE`` and ``GEOMETRIC`` remain optional checks for search and geometry APIs;
-they are not part of the covector topology builder.
+Chain-complex and meta-graph building only need ``COMBINATORIAL``; the other two
+are optional checks for search and geometry.
 
-Repair is conservative and explicit: when ``repair=True`` (the default),
-:func:`~relucent.graph.incidence.build_dual_graph` resyncs each top cell's ``_shis``
-from the combinatorial dual graph before any check runs. No other repair is
-attempted -- a certification failure means the complex needs more exploration,
-not automatic correction.
+With ``repair=True`` (the default), :func:`~relucent.graph.incidence.build_dual_graph`
+resyncs each top cell's ``_shis`` from the dual graph before checking. Nothing else
+is repaired: a failure means the complex needs more exploration.
 """
 
 from __future__ import annotations

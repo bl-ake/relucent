@@ -1236,10 +1236,8 @@ class Complex:
         graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
         incidence.certify_dual_graph(graph, self, top_dim=top_dim)
 
-        # Candidate-vertex verification dominates runtime on large complexes (one
-        # equality solve + rank/slack check per candidate, independent of every other
-        # candidate) -- see vertex_star.find_vertices. net lets it farm that out across
-        # a worker pool instead of verifying sequentially.
+        # Candidate-vertex verification dominates runtime on large complexes (see
+        # vertex_star.find_vertices). Passing net lets it run across a worker pool.
         vertices = vertex_star.find_vertices(
             top_cells,
             graph,
@@ -1447,10 +1445,8 @@ class Complex:
                     )
                 )
         else:
-            # Every vertex's criticality check is independent of every other's (same
-            # shape of work as candidate-vertex verification in get_chain_complex, see
-            # the comment there) -- farm it out across a worker pool once there's enough
-            # of it to be worth Pool startup cost.
+            # Each vertex's criticality check is independent (like candidate verification in
+            # get_chain_complex), so use a worker pool once there's enough work.
             nworkers = process_aware_cpu_count() or 1
             flags = critical_flags_for_vertices(
                 [vertex.ss for vertex in vertices],
@@ -1502,37 +1498,32 @@ class Complex:
         complex and topology routines: a codimension-1 face of a k-cell is
         obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
 
-        Nodes correspond to cells across dimensions k=0..d and are keyed by the
-        polyhedron's stable ``tag``. Each node stores ``poly`` (a representative
-        :class:`~relucent.core.poly.Polyhedron`), ``dim`` (the cell dimension k), and
-        ``ss`` (the cell's sign-sequence array as numpy).
+        Nodes are cells of every dimension k=0..d, keyed by the polyhedron's ``tag``.
+        Each stores ``poly``, ``dim``, and ``ss`` (sign sequence as numpy).
 
-        Directed edges go from a k-cell to a (k-1)-cell whenever the latter is a
-        codimension-1 face of the former under the SHI-zeroing rule. Each edge
-        stores ``shi``, the supporting hyperplane index that was zeroed.
+        Directed edges go from a k-cell to each of its (k-1)-faces under the SHI-zeroing
+        rule, and store ``shi``, the hyperplane index that was zeroed.
 
-        **SHI rules (see** :mod:`relucent.graph.incidence` **module docstring):**
+        How things are derived (details in the :mod:`relucent.graph.incidence` docstring):
 
-        - Face **edges**: :func:`~relucent.graph.incidence.ss_nonzero_indices` + lookup (homology-critical).
-        - Node **metadata** (``shis``, ``crossings``): :func:`~relucent.graph.incidence.cubical_cell_shis` on
-          each dimension slice — derived at node creation, not propagated from face construction.
-        - **Boundedness**: combinatorial classification from face edges only.
+        - Face edges: :func:`~relucent.graph.incidence.ss_nonzero_indices` + lookup.
+        - Node metadata (``shis``, ``crossings``): :func:`~relucent.graph.incidence.cubical_cell_shis`
+          per dimension slice, at node creation.
+        - Boundedness: classified from face edges only.
 
-        If ``verify=True``, :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence` checks that
-        assembled edges, node SHIs, and finite labels match the incidence engine.
+        ``verify=True`` runs :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`
+        to check edges, node SHIs, and finite labels against the incidence code.
 
-        For combinatorial truncation (link-at-infinity homology), build the graph with
-        this method and call :meth:`truncate_meta_graph` on a copy before
-        :func:`relucent.topology.get_betti_numbers` or
-        :meth:`get_betti_numbers_from_meta` with ``compactify=False``.
+        For combinatorial truncation, build the graph here, then call
+        :meth:`truncate_meta_graph` on a copy before
+        :func:`relucent.topology.get_betti_numbers` or :meth:`get_betti_numbers_from_meta`
+        with ``compactify=False``.
 
         Note:
-            The resulting structure encodes the face relations present in the
-            chain returned by :meth:`get_chain_complex` (vertex-star recovery;
-            see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex
-            in their closure (fully unbounded structure) are not represented —
-            they are handled separately by one-point compactification in
-            :func:`relucent.topology.get_betti_numbers`.
+            This encodes the face relations in :meth:`get_chain_complex`'s chain
+            (see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex in their
+            closure aren't represented; one-point compactification in
+            :func:`relucent.topology.get_betti_numbers` handles them.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
@@ -1705,10 +1696,9 @@ class Complex:
         infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
         if infeasible_tags:
             excluded_tags = set(infeasible_tags)
-            # Propagate exclusion only when the complex has genuinely unbounded cells.
-            # On closed bounded surfaces (e.g. torus DB), phantom 1-cells are spurious
-            # combinatorial faces; dropping only those cells (not their cofaces) keeps
-            # correct homology [1, 2, 1] while still filtering bad edges.
+            # Propagate exclusion only if the complex has genuinely unbounded cells. On closed
+            # bounded surfaces (e.g. a torus), phantom 1-cells are spurious faces; dropping
+            # just those (not their cofaces) keeps homology [1, 2, 1] and filters bad edges.
             has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
             if has_unbounded_chain:
                 excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)

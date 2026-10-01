@@ -92,12 +92,11 @@ def _output_weight(net: ReLUNetwork) -> np.ndarray:
     return last_linear.weight
 
 
-# Thread-local, opt-in memoization for `get_layer_jacobians`: `is_pl_critical_vertex`
-# computes the Jacobian for the same coface twice per edge (once via `_is_collapsed_edge`,
-# again via `partial_derivative_sign`); `_JacobianCacheScope` lets the second call reuse
-# the first's result. Off by default (module functions stay pure/cache-free for every
-# other caller); thread-local so parallel workers (threads or forked processes, each with
-# their own copy of this module-level state) never share a cache across each other.
+# Opt-in, thread-local memoization for `get_layer_jacobians`.
+# `is_pl_critical_vertex` needs the same coface Jacobian twice per edge
+# (`_is_collapsed_edge`, then `partial_derivative_sign`); `_JacobianCacheScope` lets
+# the second call reuse the first. Off by default so other callers stay cache-free;
+# thread-local so parallel workers never share a cache.
 _jacobian_cache_state = threading.local()
 
 
@@ -469,10 +468,9 @@ def is_pl_critical_vertex(
             + f"(got {zeros.size}); is_pl_critical_vertex requires a 0-cell of C(F)"
         )
 
-    # Count bent-hyperplane axes whose ± edges both point toward v. Each edge's Jacobian
-    # is otherwise computed twice below (once in `_is_collapsed_edge`, again in
-    # `partial_derivative_sign`); the cache scope makes the second call reuse the first's
-    # result instead of redoing the same chain of matrix multiplications.
+    # Count bent-hyperplane axes whose ± edges both point toward v. The cache scope
+    # saves recomputing each edge's Jacobian (used by both `_is_collapsed_edge` and
+    # `partial_derivative_sign`).
     towards = 0
     with _JacobianCacheScope():
         for shi in zeros:
@@ -495,12 +493,10 @@ def is_pl_critical_vertex(
     return True, towards
 
 
-# Each worker should have at least this many vertices to check, or it's not worth the
-# process it runs in (mirrors `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`'s reasoning
-# for the same Pool-startup-cost tradeoff). Unlike that constant, this one hasn't been
-# calibrated against real checkpoints -- `is_pl_critical_vertex` does several Jacobian
-# chain-multiplications per vertex, i.e. more work per item than a single vertex-covector
-# solve, so this starting point is deliberately conservative (lower) until measured.
+# Each worker needs at least this many vertices to be worth its startup cost (same
+# tradeoff as `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`). Not calibrated yet:
+# `is_pl_critical_vertex` does several Jacobian products per vertex, so this is
+# deliberately conservative (low) until measured.
 MIN_VERTICES_PER_WORKER = 256
 PARALLEL_CRITICAL_MIN_VERTICES = 2 * MIN_VERTICES_PER_WORKER
 

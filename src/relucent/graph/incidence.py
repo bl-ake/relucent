@@ -1,43 +1,34 @@
-"""Cubical incidence engine: combinatorial dual-graph and meta-graph primitives.
+"""Cubical incidence: combinatorial dual-graph and meta-graph primitives.
 
-Every cell is identified by its sign sequence (``ss``); a codimension-1 face is
-obtained by zeroing one nonzero entry (a supporting-hyperplane index, or SHI).
-This module is the single source of truth for that combinatorics.
+Every cell is identified by its sign sequence (``ss``). A codimension-1 face comes
+from zeroing one nonzero entry (a supporting-hyperplane index, or SHI). This module
+holds all of that combinatorics.
 
-**Primary callers**
+Who calls what:
 
-- :meth:`~relucent.core.complex.Complex.get_dual_graph` — :func:`build_dual_graph`,
-  :func:`dual_edges_top_dim`, :func:`sync_shis_from_dual_graph`.
-- :meth:`~relucent.core.complex.Complex.get_meta_graph` — :func:`collect_meta_face_edges`,
-  :func:`meta_node_attrs`, boundedness classifiers, :func:`propagate_infeasible_exclusion`.
-- :meth:`~relucent.core.complex.Complex.get_chain_complex` / boundary faces —
-  :func:`set_contracted_shis`, :func:`verify_contracted_shis`.
-- :func:`~relucent.verify.certify.certify_complex` — :func:`certify_dual_graph`,
-  :func:`verify_flip_shi_symmetry`.
-- :func:`~relucent.search.exploration.finalize_boundary_complex` — contracted SHI assignment.
+- ``Complex.get_dual_graph``: :func:`build_dual_graph`, :func:`dual_edges_top_dim`,
+  :func:`sync_shis_from_dual_graph`.
+- ``Complex.get_meta_graph``: :func:`collect_meta_face_edges`, :func:`meta_node_attrs`,
+  the boundedness classifiers, :func:`propagate_infeasible_exclusion`.
+- ``Complex.get_chain_complex``: :func:`set_contracted_shis`, :func:`verify_contracted_shis`.
+- ``certify_complex``: :func:`certify_dual_graph`, :func:`verify_flip_shi_symmetry`.
 
-**SHI assignment roles 1–3** (see ``docs/search_shi_and_graphs.rst``):
+SHIs get assigned in three places (see ``docs/search_shi_and_graphs.rst``):
 
-- **Role 1** — Contracted / boundary faces: seed ``_shis`` from
-  :func:`ss_nonzero_indices` on the face sign sequence, then finalize with
-  :func:`set_contracted_shis` → :func:`cubical_cell_shis`.
-- **Role 2** — Meta-graph **face edges** (:func:`collect_meta_face_edges`): zero each
-  ``ss_i != 0`` and keep the edge iff the resulting face tag is a known cell.
-- **Role 3** — Meta-graph **node metadata** (:func:`meta_node_attrs`): flip-neighbor
-  SHIs via :func:`cubical_cell_shis` (1-cells: labels from verified 0-face edges),
-  never the LP-derived ``poly._shis`` cache.
+1. Contracted / boundary faces: seed ``_shis`` from :func:`ss_nonzero_indices`, then
+   finish with :func:`set_contracted_shis` -> :func:`cubical_cell_shis`.
+2. Meta-graph face edges (:func:`collect_meta_face_edges`): zero each ``ss_i != 0``
+   and keep the edge if the face tag is a known cell.
+3. Meta-graph node metadata (:func:`meta_node_attrs`): flip-neighbor SHIs via
+   :func:`cubical_cell_shis`, never the LP-derived ``poly._shis`` cache.
 
-**Dual-graph edges** (:func:`dual_edges_top_dim` via :func:`build_dual_graph`):
-flip-neighbor adjacency on top cells; contracted 1-skeleton slices walk finalized
-``poly._shis``.
+Don't mix up the two kinds of SHI:
 
-Two SHI semantics matter and must not be confused:
-
-- **Cubical flip SHIs** (:func:`cubical_cell_shis`): authoritative for dual-graph
-  adjacency, meta-graph node metadata, and contracted slices.
-- **LP facet SHIs** (:func:`~relucent.geometry.calculations.get_shis`):
-  geometric facets on *ambient* top cells; can be a strict subset of the cubical
-  set, so they must never drive meta-graph face-edge or node-metadata assembly.
+- Cubical flip SHIs (:func:`cubical_cell_shis`) drive dual-graph adjacency, meta-graph
+  node metadata, and contracted slices.
+- LP facet SHIs (:func:`~relucent.geometry.calculations.get_shis`) are the geometric
+  facets of ambient top cells. They can be a strict subset of the cubical set, so
+  they must never build meta-graph edges or node metadata.
 """
 
 from __future__ import annotations
@@ -489,17 +480,16 @@ def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) ->
     return cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
 
 
-# Each worker should own at least this many cubical cells, or the Pool overhead is not
-# worth it (mirrors `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`'s startup-cost tradeoff).
-# `cubical_cell_shis` is a tight per-cell loop, so keep the floor high enough that only the
-# large d=4 / deep slices go parallel; every smaller slice stays on the serial path.
+# Each worker needs at least this many cubical cells to be worth the Pool overhead
+# (same tradeoff as `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`). `cubical_cell_shis`
+# is a tight loop, so the floor is high: only large d=4 / deep slices go parallel.
 MIN_CELLS_PER_CONTRACTED_WORKER = 8192
 PARALLEL_CONTRACTED_MIN_CELLS = 2 * MIN_CELLS_PER_CONTRACTED_WORKER
 
-# Broadcast target for the shared neighbor-tag set. Under `fork` the parent sets this before
-# the pool is created and workers inherit it via copy-on-write (the tag set is one bytes
-# object per cell, so pickling it once per worker would dominate); under `spawn` it is sent
-# through the initializer instead. Only ever read inside a worker running `_cubical_shis_chunk`.
+# Shared neighbor-tag set for workers. Under `fork` the parent sets it before creating
+# the pool and workers inherit it copy-on-write (pickling one bytes object per cell per
+# worker would dominate); under `spawn` it goes through the initializer. Only read
+# inside `_cubical_shis_chunk`.
 _contracted_neighbor_tags: set[bytes] | None = None
 
 

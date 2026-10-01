@@ -1,24 +1,24 @@
 """Float64 error bounds for decisions made on a cell's halfspace rows.
 
-A cell's rows ``a_j . x + b_j <= 0`` are composed from the network's weights through its
-activation pattern, so each computed row carries rounding error, and so does every value
-computed from it. Every numerical decision relucent makes (is this row a facet, is this point
-inside that row, are these two vertices the same point) must be right for the network's exact
-rows or raise. This module supplies the bounds those decisions compare against.
+A cell's rows ``a_j . x + b_j <= 0`` are composed from the network's weights, so each
+row carries rounding error, and so does anything computed from it. Every numerical
+decision (is this row a facet? is this point inside? are these vertices the same?)
+must be right for the exact rows, or raise. This module supplies the bounds those
+decisions compare against.
 
-The bound for row ``j`` is carried as a nonnegative *error-scale matrix* ``E`` with the same
-shape as the halfspace matrix: the float64 error of row ``j`` evaluated at ``x`` is at most
+Row ``j``'s bound is stored in an error-scale matrix ``E`` shaped like the halfspace
+matrix. The float64 error of row ``j`` at ``x`` is at most
 
     E[j, :-1] @ |x| + E[j, -1].
 
-For rows composed from a network, ``E = 2 * gamma(K) * [|A| | |b|]`` where ``|A|, |b|`` are the
-rows rebuilt with ``|W|`` through the same pattern (the rounding scale of the composition, which
-cancellation can make far larger than the row itself) and ``K`` counts the inner-product terms
-along the composition plus the evaluation. Transforms of rows (slicing to an affine subspace,
-appending box rows) update ``E`` with their own rounding, so the bound travels with the rows.
+For rows composed from a network, ``E = 2 * gamma(K) * [|A| | |b|]``, where ``|A|, |b|``
+are the rows rebuilt with ``|W|`` through the same pattern (cancellation can make this
+much bigger than the row itself) and ``K`` counts the inner-product terms in the
+composition plus the evaluation. Transforms of rows (slicing, appending box rows)
+update ``E`` with their own rounding, so the bound travels with the rows.
 
-Never replace these bounds by a network-wide constant: row magnitudes on one trained network
-span five or more orders of magnitude, and a single number is wrong in both directions.
+Don't swap these for a network-wide constant: row magnitudes on one network span five
+or more orders of magnitude.
 """
 
 from __future__ import annotations

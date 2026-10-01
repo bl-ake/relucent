@@ -1,22 +1,14 @@
-"""Topology helpers: Betti numbers over GF(2) for ReLU cell complexes.
+"""Betti numbers over GF(2) for ReLU cell complexes.
 
-This module implements the "direct boundary matrix" approach described in the
-user-provided pseudocode:
+Builds a subcomplex, closes it under faces, forms the boundary operators ∂_k over
+GF(2), and reads Betti numbers off their ranks.
 
-- build a chosen subcomplex and close under faces
-- construct boundary operators ∂_k over GF(2)
-- compute Betti numbers from boundary ranks
-
-Notes:
-
-* Coefficients are in GF(2), so orientations are irrelevant.
-* Cells are represented by :class:`relucent.core.poly.Polyhedron` objects; a codimension-1
-  facet of a cell is obtained by setting one nonzero sign entry to 0.
-* :func:`get_betti_numbers` uses every codimension-one face incidence encoded in ``meta``.
-  Truncation and Borel–Moore-style boundaries are handled on :class:`~relucent.core.complex.Complex`.
-* Pass ``verify_chain_complex=True`` to require ``∂²=0`` on the assembled boundary maps;
-  the check uses sparse GF(2) matrix multiplication (nonzero pattern only), not dense
-  integer matmuls or a full scan of packed bit columns.
+* GF(2) coefficients, so orientations don't matter.
+* A codimension-1 facet of a cell comes from setting one nonzero sign entry to 0.
+* :func:`get_betti_numbers` uses every codimension-one incidence in ``meta``.
+  Truncation and Borel–Moore boundaries live on :class:`~relucent.core.complex.Complex`.
+* ``verify_chain_complex=True`` checks ``∂²=0`` with sparse GF(2) products (nonzero
+  pattern only, no dense matmuls).
 """
 
 from __future__ import annotations
@@ -602,31 +594,27 @@ def get_betti_numbers(
             number of path-connected components when ``kmin == 0``; otherwise raise
             :class:`ConnectedComponentsMismatch`.
         verbose: If True, print short progress lines to stderr.
-        nworkers: ``method="dense"`` only: number of threads to use for ranking independent
-            boundary maps concurrently.
-            ``None`` (default): automatically use one thread per non-trivial map when the C
-            backend is available; falls back to sequential for pure-Python rank.
-            ``1`` or ``0``: always sequential.  ``N > 1``: use up to N threads.
-            Parallelism is safe because ctypes releases the GIL during C rank computation,
-            so threads truly run concurrently.
-        method: ``"sparse"`` (default) ranks each boundary map by sparse elimination with
-            low-fill pivots (:func:`gf2_rank_sparse_rowsets`); time and memory follow the
-            number of incidences. ``"dense"`` ranks bit-packed matrices
-            (:func:`gf2_rank_boundary`), which need ``rows × columns / 8`` bytes per map,
-            e.g. 59 GB for a 688k × 688k ∂₂; kept for cross-checking.
+        nworkers: ``method="dense"`` only. Threads for ranking boundary maps concurrently.
+            ``None`` (default) uses one per non-trivial map if the C backend is available,
+            else runs sequentially. ``0`` or ``1`` is always sequential; ``N > 1`` uses up
+            to N. (ctypes releases the GIL, so the threads really run in parallel.)
+        method: ``"sparse"`` (default) ranks each map by sparse elimination with low-fill
+            pivots (:func:`gf2_rank_sparse_rowsets`); cost follows the number of incidences.
+            ``"dense"`` ranks bit-packed matrices (:func:`gf2_rank_boundary`), needing
+            ``rows × columns / 8`` bytes per map (59 GB for a 688k × 688k ∂₂); kept for
+            cross-checking.
 
     Note:
-        Truncation and finite-cell restriction are prepared on
-        :class:`~relucent.core.complex.Complex` before calling this function.
+        Truncation and finite-cell restriction are done on
+        :class:`~relucent.core.complex.Complex` before calling this.
 
-        When the complex has no 0-cells (``kmin > 0``), the lowest-dimensional
-        Betti number is keyed by ``kmin`` rather than ``0``.  For example, a
-        boundary complex consisting only of 1- and 2-cells returns ``{1: n}``
-        where ``n`` is the number of connected components of the 1-skeleton.
+        With no 0-cells (``kmin > 0``), the lowest Betti number is keyed by ``kmin``, not
+        ``0``. E.g. a boundary complex of only 1- and 2-cells returns ``{1: n}``, where
+        ``n`` is the number of connected components of the 1-skeleton.
 
-        When ``kmin == 0``, β₀ is computed from the cellular rank formula on the
-        (possibly truncated and closed) meta-graph. Use ``verify_connected_components=True``
-        to assert it equals the path-component count.
+        With ``kmin == 0``, β₀ comes from the cellular rank formula on the (possibly
+        truncated and closed) meta-graph. ``verify_connected_components=True`` checks it
+        against the path-component count.
     """
     if meta.number_of_nodes() == 0:
         return {}
@@ -687,7 +675,8 @@ def get_betti_numbers(
             verbose=verbose,
         )
 
-    # -------------------------------------------------------------------
+    # Phase A: build all boundary matrices (fast, sequential). When verifying, also keep
+    # sparse XOR row lists for the ∂² checks (rank may mutate the packed arrays).
     # Phase A: build all boundary matrices (sequential – fast).
     # When verifying, also keep sparse XOR row lists for ∂² checks (no
     # packed copies; rank may mutate the packed arrays in place).
@@ -714,7 +703,9 @@ def get_betti_numbers(
                 sparse_by_k[k] = sparse_rows
             matrices[k] = (packed, ncols)
 
-    # -------------------------------------------------------------------
+    # Phase B: rank each non-trivial boundary map. With the C backend and several maps,
+    # use threads (ctypes releases the GIL, so they overlap with each other and with
+    # OpenMP inside the rank call).
     # Phase B: rank each non-trivial boundary map.
     # When the C backend is available and there are multiple maps, run them
     # in parallel threads (ctypes releases the GIL, so threads truly

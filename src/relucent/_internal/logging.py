@@ -1,18 +1,14 @@
 """Package-level logger for relucent.
 
-All user-facing progress and status messages flow through the ``"relucent"``
-logger.  The level is driven by :data:`relucent.config.VERBOSE`:
+Progress and status messages go through the ``"relucent"`` logger, whose level
+follows :data:`relucent.config.VERBOSE`:
 
-* ``VERBOSE >= 1`` (default) → ``logging.INFO``   — normal progress messages
-* ``VERBOSE = 0``             → ``logging.WARNING`` — silent (errors/warnings only)
+* ``VERBOSE >= 1`` (default): ``INFO``, normal progress.
+* ``VERBOSE = 0``: ``WARNING``, quiet.
 
-Higher ``VERBOSE`` values are reserved for future ``DEBUG``-level output.
-
-The logger ships with a single :class:`~logging.StreamHandler` writing plain
-messages (no ``levelname`` prefix) to *stderr*.  Applications that configure
-their own handlers on the ``"relucent"`` logger will take precedence; set
-``logger.propagate = True`` to additionally forward records up to the root
-logger.
+It has one :class:`~logging.StreamHandler` writing plain messages to stderr. Handlers
+you add to the ``"relucent"`` logger take precedence; set ``logger.propagate = True``
+to also forward records to the root logger.
 """
 
 from __future__ import annotations

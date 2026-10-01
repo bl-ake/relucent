@@ -1,19 +1,14 @@
-"""Recover the chain complex directly from verified vertices' local stars.
+"""Recover the chain complex from verified vertices' local stars.
 
-Masden, *Algorithmic Determination of the Combinatorial Structure of the Linear
-Regions of ReLU Neural Networks* (2022), Theorem 20: for a generic,
-supertransversal network the sign-sequence complex ``S(F)`` is a **pure,
-ambient-dimensional cubical complex**. Every vertex has exactly ``ambient_dim``
-zero sign entries (Lemma 16), and once such a vertex is verified, *every*
-sign assignment on those zero entries — holding all other entries fixed — is a
-real, present cell of ``C(F)`` (Lemma 18's sign-product semigroup). No
-independent rediscovery of neighboring top-dimensional cells, dual-graph cube
-verification, or coverage heuristic is required for correctness.
+Masden (2022), Theorem 20: for a generic, supertransversal network the sign-sequence
+complex ``S(F)`` is a pure, ambient-dimensional cubical complex. Every vertex has
+exactly ``ambient_dim`` zero sign entries (Lemma 16), and once one is verified, every
+sign assignment on those entries (others held fixed) is a real cell of ``C(F)``
+(Lemma 18). So there's no need to rediscover neighboring top cells or verify cubes.
 
-This replaces the previous ``graph.covectors`` approach, which only recovered
-a cell when the *complete* ``2^c`` cube of top-dimensional cofaces had been
-independently discovered by BFS — strictly more than the theorem requires, and
-the root cause of cells that provably exist being silently dropped.
+This replaces ``graph.covectors``, which needed BFS to have found the full ``2^c``
+cube of top cells around a vertex. That's more than the theorem needs, and it silently
+dropped cells that provably exist.
 """
 
 from __future__ import annotations
@@ -35,17 +30,11 @@ if TYPE_CHECKING:
 
 __all__ = ["VertexRecord", "cells_from_vertices", "expand_vertex_star", "find_vertices", "recover_cells_from_vertices"]
 
-# Each worker in the pool should have at least this many candidates to verify, or
-# it's not worth the process it runs in. Below one worker's worth (i.e. fewer than
-# PARALLEL_VERIFY_MIN_CANDIDATES candidates total), verification falls back to the
-# sequential `verify_vertex` loop entirely; above it, the *number of workers actually
-# used* scales with candidate count (see `_verify_candidates_parallel`) rather than
-# always spinning up all of `nworkers` -- Pool(32) startup cost is roughly constant
-# regardless of workload, so a candidate count just over the gate should use a
-# couple of workers, not 32. Calibrated against real checkpoints: 1,132 candidates
-# regressed under a 32-worker pool (0.54s serial -> 1.42s parallel, all overhead);
-# 193k and 731k candidates each got ~2x faster. This sits with margin below the
-# smallest win and well above the regression.
+# Each worker needs at least this many candidates to be worth its startup cost.
+# Below this, verification runs serially. Above it, the worker count scales with the
+# candidate count (see `_verify_candidates_parallel`) instead of always using
+# `nworkers`. Measured: 1,132 candidates got slower with 32 workers (0.54s -> 1.42s);
+# 193k and 731k got ~2x faster. This sits between the two.
 MIN_CANDIDATES_PER_WORKER = 4096
 PARALLEL_VERIFY_MIN_CANDIDATES = 2 * MIN_CANDIDATES_PER_WORKER
 
@@ -293,11 +282,9 @@ def _verify_candidates_parallel(
     global _verify_state
     items = list(pending.items())
     n = len(items)
-    # Scale workers to work available rather than always using all of `nworkers`:
-    # Pool startup cost is roughly per-worker, so a candidate count just past the
-    # gate in `find_vertices` should get a couple of workers, not (say) 32 of them
-    # sitting mostly idle. `find_vertices` only calls this once past the gate, so
-    # `effective_nworkers` here is always >= 2.
+    # Scale workers to the work: a candidate count just past the gate in
+    # `find_vertices` should get a couple of workers, not 32 sitting idle.
+    # `effective_nworkers` is always >= 2 here.
     effective_nworkers = min(nworkers, max(1, n // MIN_CANDIDATES_PER_WORKER))
     ctx = get_mp_context()
     if ctx.get_start_method() == "fork":
@@ -314,15 +301,11 @@ def _verify_candidates_parallel(
             _verify_state = None
         return verified_fork
 
-    # `Polyhedron.__reduce__` deliberately drops `_net` when pickling (each worker's
-    # copy of every root would otherwise duplicate the whole network) -- so any
-    # lazily-computed property that needs it must be resolved here, in the process
-    # that still has it, before a root crosses the Pool boundary. `halfspaces_np`
-    # must come first: `ambient_dim`'s fallback path reads `self.halfspaces`, whose own
-    # fallback (self._halfspaces is None) checks `self._halfspaces_np` next -- if that's
-    # already cached (as it will be, immediately below) it's reused instead of
-    # recomputing via `_net`. Only the exact fallback (rebuilding a root's rows exactly when
-    # float64 cannot decide) needs a live network afterward -- that's what `net` is for.
+    # `Polyhedron.__reduce__` drops `_net` when pickling, so lazily-computed properties
+    # that need it must be resolved here, before a root crosses the Pool boundary.
+    # `halfspaces_np` goes first: `ambient_dim` falls back to `self.halfspaces`, which
+    # reuses `_halfspaces_np` if cached instead of recomputing via `_net`. Only the exact
+    # fallback (rebuilding a root's rows when float64 can't decide) still needs `net`.
     seen_roots: set[int] = set()
     for root, _candidate, _combo in pending.values():
         if id(root) in seen_roots:

@@ -606,15 +606,13 @@ class Polyhedron:
         """
         ss = self.ss_np.copy()
         ss[0, shi] = 0
-        # IMPORTANT: do not reuse cached geometry (halfspaces/W/b/shis) from the parent
-        # polyhedron. Setting a sign to 0 changes which constraints are active and can
-        # change the derived halfspace representation; reusing caches can yield an
-        # inconsistent cell complex (and invalid Betti numbers).
+        # Don't reuse cached geometry (halfspaces/W/b/shis) from the parent: zeroing a sign
+        # changes which constraints are active, and stale caches can give an inconsistent
+        # complex (and wrong Betti numbers).
         #
-        # Exception: when there is no associated network and the polyhedron was created
-        # from explicit halfspaces, the halfspace system itself *defines* the geometry.
-        # In that case, the face is represented by the same halfspaces but with one
-        # more constraint treated as an equality (via the zero sign entry).
+        # Exception: with no network and a polyhedron built from explicit halfspaces, those
+        # halfspaces define the geometry. The face is the same system with one more
+        # constraint treated as an equality (via the zero sign entry).
         if self._net is None and self._halfspaces is not None:
             return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss, bound=self.bound)

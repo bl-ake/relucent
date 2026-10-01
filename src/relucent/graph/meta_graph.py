@@ -1,15 +1,13 @@
-"""Meta-graph transforms: truncation, compactification, and assembly audits.
+"""Meta-graph transforms: truncation, compactification, and audits.
 
-Combinatorial primitives (sign-sequence face incidence, dual-graph adjacency,
-boundedness classification) live in :mod:`relucent.graph.incidence`; certification
-of a :class:`~relucent.core.complex.Complex` lives in :mod:`relucent.verify.certify`. This
-module holds operations on an already-assembled meta-graph:
+Face incidence, dual-graph adjacency, and boundedness classification live in
+:mod:`relucent.graph.incidence`; certification lives in :mod:`relucent.verify.certify`.
+This module works on an already-built meta-graph:
 
-- **Truncation / compactification** — :func:`truncate_meta_graph`, :func:`one_point_compactify_meta_graph`,
-  :func:`finite_cells_subgraph`; called from :meth:`~relucent.core.complex.Complex.get_betti_numbers`
-  and :mod:`relucent.topology.persistence`.
-- **Post-assembly audits** — :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`;
-  used when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with ``verify=True``.
+- Truncation / compactification: :func:`truncate_meta_graph`,
+  :func:`one_point_compactify_meta_graph`, :func:`finite_cells_subgraph`.
+- Audits: :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`
+  (run when ``get_meta_graph`` gets ``verify=True``).
 """
 
 from __future__ import annotations

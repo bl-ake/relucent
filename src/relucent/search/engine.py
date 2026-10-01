@@ -424,46 +424,31 @@ def searcher(
     verify: bool = True,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Search for polyhedra in the complex by discovering neighbors.
+    """Search the complex by crossing supporting hyperplanes to find neighbors.
 
-    This is a generic search method that can be configured for different
-    traversal strategies (BFS, DFS, random walk) by providing different
-    queue types. It starts from a given point and explores the complex by
-    crossing supporting hyperplanes to discover adjacent polyhedra.
-
+    Generic over traversal strategy (BFS, DFS, random walk): the queue decides the order.
     See Complex.bfs(), Complex.dfs(), and Complex.random_walk() for examples.
 
     Args:
-        cx: The polyhedral complex (a :class:`~relucent.core.complex.Complex` instance).
-            This is **not** the ``relucent.core.complex`` module used by worker processes;
-            workers read :func:`~relucent.search.worker_context.get_worker_context` instead.
-        start: Starting point (torch.Tensor / np.ndarray / array-like) or a
-            Polyhedron, or None (defaults to origin). Defaults to None.
-        max_depth: Maximum search depth (number of hyperplane crossings).
-            Defaults to infinity.
-        max_polys: Maximum number of polyhedra to discover. Defaults to infinity.
-        queue: Queue object that defines the order in which polyhedra are
-            searched. Must have push() and pop() methods. If None, uses
-            BlockingQueue (FIFO). Defaults to None.
-        bound: Constraint radius for numerical stability when computing halfspaces.
-            Important for numerical stability. When ``None``, uses
+        cx: The :class:`~relucent.core.complex.Complex` (not the module; workers use
+            :func:`~relucent.search.worker_context.get_worker_context`).
+        start: Starting point (tensor / array-like) or a Polyhedron. Defaults to the origin.
+        max_depth: Max number of hyperplane crossings. Defaults to infinity.
+        max_polys: Max number of polyhedra to discover. Defaults to infinity.
+        queue: Anything with push() and pop() that sets the search order.
+            Defaults to a FIFO BlockingQueue.
+        bound: Constraint radius when computing halfspaces. ``None`` uses
             :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
-        nworkers: Number of worker processes for parallel computation. If None,
-            uses the number of CPU cores. Defaults to None.
-        verbose: Controls progress output. ``0`` silences all output; ``1``
-            (default) shows worker count and a progress bar.  When ``None``,
-            falls back to :data:`relucent.config.VERBOSE`.
-        geometry_properties: Iterable of polyhedron cache/property names to
-            compute and retain for each discovered polyhedron. ``None`` (default)
-            performs topology-only search. Pass
-            :data:`ALL_GEOMETRY_PROPERTIES` or a subset to retain optional caches.
-            ``finite``, ``center``, and ``inradius`` are always computed.
-        verify: When True (default), require complete exploration and run
-            :func:`~relucent.verify.certify.certify_complex` at the end. Skipped when
-            exploration hits ``max_polys`` before the frontier is exhausted. A
-            finite ``max_depth`` cap can leave ``complete=False``; with
-            ``verify=True`` that raises unless the cap was hit. Frontier SHIs are
-            certified facets, so certification reuses them after dual-graph sync.
+        nworkers: Worker processes. ``None`` uses the CPU count.
+        verbose: ``0`` is silent, ``1`` (default) shows worker count and a progress bar.
+            ``None`` uses :data:`relucent.config.VERBOSE`.
+        geometry_properties: Polyhedron properties to compute and keep. ``None``
+            (default) is topology-only; pass :data:`ALL_GEOMETRY_PROPERTIES` or a subset
+            for more. ``finite``, ``center``, and ``inradius`` are always computed.
+        verify: If True (default), require complete exploration and run
+            :func:`~relucent.verify.certify.certify_complex` at the end. Skipped if
+            ``max_polys`` stops the search early. A finite ``max_depth`` can leave
+            ``complete=False``, which raises unless the cap was hit.
         **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
@@ -560,10 +545,9 @@ def searcher(
         disable=not verbose,
     )
     pbar.update(n=1)
-    # Clear any stale multiprocessing locks left over from a previous pool in
-    # this process. tqdm acquires a process-wide lock during pool imap_unordered;
-    # if a prior pool was terminated without joining, the lock list can be non-empty
-    # and cause deadlocks on the next pool.
+    # Clear stale multiprocessing locks from an earlier pool. tqdm takes a process-wide
+    # lock during imap_unordered; if a pool was terminated without joining, leftovers
+    # can deadlock the next one.
     pbar.get_lock().locks = []
 
     unprocessed = len(queue)
@@ -763,9 +747,8 @@ def hamming_astar(
 ) -> dict[str, Any]:
     """Find a path between two data polyhedra using the A* search algorithm.
 
-    Uses the A* pathfinding algorithm with a heuristic based on Hamming
-    distance between sign sequences, plus Euclidean distance between interior
-    points to break ties. The heuristic should be admissible for optimal paths.
+    A* with Hamming distance between sign sequences as the heuristic, plus Euclidean
+    distance between interior points to break ties.
 
     Args:
         cx: The polyhedral complex.
@@ -773,8 +756,8 @@ def hamming_astar(
         end: Ending data point as torch.Tensor or np.ndarray.
         nworkers: Number of worker processes for parallel neighbor evaluation.
             ``None`` (default) uses ``min(CPU count, number of ReLU units)``.
-        bound: Constraint radius for numerical stability when computing halfspaces.
-            Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
+        bound: Constraint radius when computing halfspaces.
+            Defaults to config.DEFAULT_SEARCH_BOUND.
         max_polys: Maximum number of polyhedra to explore during search.
             Defaults to infinity.
         show_pbar: Whether to display a progress bar. Defaults to True.

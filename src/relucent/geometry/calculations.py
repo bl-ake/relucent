@@ -148,11 +148,10 @@ def _drop_degenerate_halfspaces_tracked(
     hyperplane = np.any(np.abs(halfspaces[:, :-1]) > errors[:, :-1], axis=1)
     kept_planes = kept[hyperplane[kept]]
     if cfg.CAREFUL_MODE and kept_planes.size > 1:
-        # Check for fully identical rows (same halfspace repeated from two neurons).
-        # Rows with the same direction but different bias are a sign-pattern coincidence
-        # that get_shis handles correctly (the tighter constraint wins). Only rows equal up to
-        # a positive scale within their float64 error (unit-normalised rows closer than the
-        # sum of their relative errors) cause silent SHI mis-detection.
+        # Look for fully identical rows (the same halfspace from two neurons). Same
+        # direction with a different bias is fine: get_shis keeps the tighter constraint.
+        # Only rows equal up to a positive scale, within float64 error (unit-normalised
+        # rows closer than the sum of their relative errors), silently break SHI detection.
         pairs = [
             (int(kept_planes[r]), int(kept_planes[c]))
             for r, c in _near_duplicate_rows(halfspaces[kept_planes], errors[kept_planes])
@@ -190,13 +189,9 @@ def _affine_null_basis(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Null-space basis for the equality sub-system of a halfspace array.
 
-    Separates the equality rows (``zero_indices``) from inequality rows and
-    returns the data needed to project any point or halfspace system into the
-    affine subspace they define.
-
-    The decomposition uses SVD of the equality normals, which is more
-    numerically stable than forming ``A A^T`` explicitly (as a pseudo-inverse
-    based projector would do).
+    Splits the equality rows (``zero_indices``) from the inequalities and returns what
+    you need to project points or halfspace systems into the affine subspace they define.
+    Uses an SVD of the equality normals, which is more stable than forming ``A A^T``.
 
     Args:
         halfspaces: Shape ``(n, d+1)`` halfspace array; last column is bias.
@@ -232,8 +227,8 @@ def _affine_null_basis(
         # Effective norm of inequality normals in the affine subspace (for Chebyshev LP)
         norm_vec = np.linalg.norm(ineqs[:, :-1] @ null_basis, axis=1, keepdims=True)
 
-    The equality rows must be independent beyond their float64 error (``errors``; exact data
-    when omitted): rows dependent within it describe a non-transversal intersection, and
+    The equality rows must be independent beyond their float64 error (``errors``; exact
+    when omitted). Otherwise the intersection isn't transversal and
     :class:`~relucent.core.errors.AmbiguousGeometryError` is raised.
     """
     from relucent._internal import rounding
@@ -534,10 +529,10 @@ def solve_radius(
             b_vec = -equalities[:, -1:].ravel()
             x_feas, *_ = np.linalg.lstsq(A_eq, b_vec, rcond=None)
             x_feas = np.asarray(x_feas, dtype=np.float64).reshape(dim, 1)
-            # _affine_null_basis has checked the equality rows are independent beyond their
-            # error, so the system is consistent and x_feas is a point of it.
-            # No strict inequalities: feasible set is an affine subspace {x : A_eq x = b}.
-            # Relative inradius in that hull is infinite unless the hull is 0-dimensional.
+            # _affine_null_basis checked the equality rows are independent beyond their
+            # error, so the system is consistent and x_feas lies in it. No strict
+            # inequalities: the feasible set is the affine subspace {x : A_eq x = b}, and
+            # its relative inradius is infinite unless it's 0-dimensional.
             rnk = int(np.linalg.matrix_rank(A_eq))
             aff_dim = dim - rnk
             if aff_dim <= 0:
@@ -1168,11 +1163,11 @@ def get_shis(
         bounds_to_try = bounds_to_try[:1]
     last_status: int | None = None
     model: Model | None = None
-    # Coincident hyperplanes make an arrangement non-simple, which relucent does not handle
-    # (neighbors across such a facet differ in more than one sign). Two rows that are the same
-    # halfspace each look redundant, so their facet would silently go missing; a unit that is
-    # identically zero here can coincide with a facet on its other side. Both are detected below
-    # and reported as NonGenericArrangementError; rows coincident to within float64 error count.
+    # Coincident hyperplanes make the arrangement non-simple, which relucent doesn't
+    # handle (neighbors across such a facet differ in more than one sign). Two identical
+    # rows each look redundant, so their facet would silently vanish, and a unit that is
+    # identically zero can coincide with a facet on its other side. Both are caught below
+    # and raise NonGenericArrangementError; rows coincident within float64 error count.
     dup_partners: dict[int, list[int]] = {}
     for r, c in _near_duplicate_rows(h_red, err_red):
         dup_partners.setdefault(r, []).append(c)
@@ -1244,10 +1239,10 @@ def get_shis(
                         _recover_relaxed_shi_lp(model, poly, i)
                     verdict = _certify_facet_from_model(model, z, constrs, j, h_red, err_red, interior_point)
                 if verdict is None and escalate_bound:
-                    # Float64 cannot decide, typically a redundant row parallel to a facet (its
-                    # multiplier is exactly zero) or hyperplanes concurrent at the LP vertex: decide
-                    # exactly, from the cell's verified interior point. The box is only a numerical
-                    # aid here, so the exact question is over the unbounded cell.
+                    # Float64 can't decide (usually a redundant row parallel to a facet, with
+                    # multiplier exactly zero, or hyperplanes concurrent at the LP vertex).
+                    # Decide exactly from the cell's verified interior point. The box is only a
+                    # numerical aid, so the exact question is over the unbounded cell.
                     exact_rows = poly._exact_rows()
                     if exact_rows is not None:
                         from relucent._internal import exact
@@ -1577,10 +1572,10 @@ def _certify_facet(
         sc = a @ zc + b
         ec = rounding.row_errors(err_red, zc)
         bad = others & (s >= -e)
-        # Row values are affine and error bounds convex along the segment, so row r is strictly
-        # negative beyond its error for alpha > alpha_lo, and row j strictly positive for
-        # alpha < alpha_hi. Take the midpoint (alpha_lo can be exactly 0, e.g. a row that is 0
-        # with zero error at z) and re-check everything at the new point.
+        # Row values are affine and error bounds convex along the segment, so row r is
+        # strictly negative beyond its error for alpha > alpha_lo, and row j strictly
+        # positive for alpha < alpha_hi. Take the midpoint (alpha_lo can be exactly 0,
+        # e.g. a row that's 0 with zero error at z) and re-check everything there.
         num = s[bad] + e[bad]
         den = num - (sc[bad] + ec[bad])
         alpha_lo = float(np.max(num / den))

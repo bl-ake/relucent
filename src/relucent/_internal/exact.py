@@ -1,21 +1,21 @@
-"""Exact rational geometry for the two decisions float64 cannot make on ReLU rows.
+"""Exact rational geometry for the two decisions float64 can't make on ReLU rows.
 
-Every float64 weight is a dyadic rational, so a cell's rows, composed from the weights through
-its activation pattern, have exact rational values. ReLU networks produce structural
-coincidences that float64 cannot tell apart from near-coincidences: a deeper unit's normal lies
-exactly in the span of the active normals one layer up, so when few units are active, sets of
-hyperplanes are exactly parallel or exactly concurrent. Two decisions hit these routinely and
-are made here, with :class:`fractions.Fraction` arithmetic on the exact rows, when the float64
-decision falls inside its error bound (:mod:`relucent._internal.rounding`):
+Float64 weights are dyadic rationals, so a cell's composed rows have exact rational
+values. ReLU networks produce structural coincidences that float64 can't tell from
+near-misses: a deeper unit's normal can lie exactly in the span of the active normals
+above it, so hyperplanes end up exactly parallel or exactly concurrent. Two decisions
+hit this often. When float64 falls inside its error bound
+(:mod:`relucent._internal.rounding`), they're made here with
+:class:`fractions.Fraction` arithmetic:
 
-* :func:`exact_point`: where a set of rows vanish, and which side of every other row that is
-  (vertex recovery; parallel rows that never meet).
-* :func:`exact_facet_by_simplex`: whether a row is a facet (a redundant row parallel to a facet
-  has a zero dual multiplier, which float64 cannot certify).
+* :func:`exact_point`: where some rows vanish, and which side of every other row that
+  point is on (vertex recovery; parallel rows that never meet).
+* :func:`exact_facet_by_simplex`: whether a row is a facet (a redundant row parallel
+  to a facet has a zero dual multiplier, which float64 can't certify).
 
-Every other undecidable case raises :class:`~relucent.core.errors.AmbiguousGeometryError`.
-Exact arithmetic is slow (numbers grow to a few hundred bits over a deep composition), so it
-only runs on the ambiguous cases, and the rows of each activation pattern are cached.
+Anything else undecidable raises :class:`~relucent.core.errors.AmbiguousGeometryError`.
+Exact arithmetic is slow (numbers reach a few hundred bits on deep nets), so it only
+runs on ambiguous cases, with each pattern's rows cached.
 """
 
 from __future__ import annotations

@@ -1,11 +1,8 @@
-"""
-JIT-compiled C backend for GF(2) Gaussian elimination rank.
+"""JIT-compiled C backend for GF(2) rank.
 
-On first call the C source ``_gf2_rank.c`` (located next to this file) is
-compiled to a shared library cached in ``__pycache__/`` under a hash-keyed
-name.  The shared library is loaded via :mod:`ctypes`.  If compilation or
-loading fails for any reason, :func:`available` returns ``False`` and callers
-should fall back to the pure-Python path.
+On first use, ``_gf2_rank.c`` (next to this file) is compiled to a shared library cached
+in ``__pycache__/`` and loaded with :mod:`ctypes`. If that fails, :func:`available`
+returns ``False`` and callers fall back to pure Python.
 
 Public API
 ----------

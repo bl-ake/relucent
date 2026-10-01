@@ -1,4 +1,4 @@
-"""Compute and apply float64-safe tolerance defaults for :mod:`relucent.config`."""
+"""Compute and apply float64-safe tolerance defaults."""
 
 from __future__ import annotations
 
@@ -108,21 +108,17 @@ def compute_tolerances(
 ) -> dict[str, float]:
     """Return static values for the tolerance settings in :mod:`relucent.config`.
 
-    None of these settings decides anything on the topology path any more. Every geometric
-    decision (facets, cell emptiness, vertices, genericity, point membership, Morse signs) is
-    made against the float64 error of the specific rows or values involved
-    (:mod:`relucent._internal.rounding`), and raises
-    :class:`~relucent.core.errors.AmbiguousGeometryError` when that error could flip it. The
-    settings remain for plotting (``relucent.vis``), the ``boundary_bfs`` MIP
-    (``BOUNDARY_MIP_EPS``), and backward compatibility.
+    The topology path no longer relies on these. Each geometric decision (facets, emptiness,
+    vertices, genericity, membership, Morse signs) is checked against the float64 error of
+    the rows involved (:mod:`relucent._internal.rounding`), and raises
+    :class:`~relucent.core.errors.AmbiguousGeometryError` if that error could flip it.
+    The settings still matter for plotting, the ``boundary_bfs`` MIP (``BOUNDARY_MIP_EPS``),
+    and backward compatibility.
 
-    They used to be scaled per network by ``estimate_input_bound`` (a product of layer norms,
-    exponential in depth) times the largest composed row norm. One network-wide number stood in
-    for rows whose own errors differ by five or more orders of magnitude, and it was wrong in
-    both directions: loose enough on deep or large-weight nets to reject every facet (BFS stopped
-    at its start region) or merge distinct vertices, and too tight where a proof point sat far
-    out. So ``max_coord`` is ignored, and ``net`` only sets the ambient dimension and the
-    ``boundary_bfs`` margin.
+    They used to be scaled per network, but one number can't fit rows whose errors differ by
+    five or more orders of magnitude: it rejected every facet on deep nets and was too tight
+    elsewhere. So ``max_coord`` is ignored, and ``net`` only sets the ambient dimension and
+    the ``boundary_bfs`` margin.
     """
     del max_coord
     gurobi_tol = _GUROBI_FEAS_TOL
@@ -161,14 +157,13 @@ def compute_tolerances(
 
     shi_obj_floor = max(dot_floor * push_size, _MIN_SHI_OBJECTIVE)
     tol_shi_objective = _safe(shi_obj_floor, safety_factor=safety_factor)
-    # BestObjStop should not be below solver feasibility tolerance, but the
-    # acceptance threshold (TOL_SHI_OBJECTIVE) can be smaller.
+    # BestObjStop shouldn't go below the solver feasibility tolerance, though
+    # TOL_SHI_OBJECTIVE can.
     tol_gurobi_obj_stop = _safe(max(tol_shi_objective, gurobi_tol), safety_factor=safety_factor)
 
     k_viol = min(max_constraints, _SHI_PROOF_MAX_VIOLATIONS)
-    # SHI proof points are LP solutions: ~ambient_dim tight rows can each miss
-    # by gurobi_tol, and the LP box goes past max_coord. Without this floor,
-    # small-weight nets reject real facets.
+    # SHI proof points are LP solutions: ~ambient_dim tight rows can each miss by
+    # gurobi_tol. Without this floor, small-weight nets reject real facets.
     shi_proof_floor = float(ambient_dim + 1) * gurobi_tol
     tol_shi_hyperplane = _safe(max(float(k_viol) * dot_floor, shi_proof_floor), safety_factor=safety_factor)
     tol_nearly_vertical = _safe(math.sqrt(_EPS) * max_halfspace_norm, safety_factor=safety_factor)
@@ -184,8 +179,8 @@ def compute_tolerances(
         "TOL_SHI_OBJECTIVE": tol_shi_objective,
         "GUROBI_SHI_BEST_OBJ_STOP": tol_gurobi_obj_stop,
         "GUROBI_SHI_BEST_BD_STOP": -tol_gurobi_obj_stop,
-        # Search uses the same SHI-scale threshold, with a half-step margin, so
-        # thin cells are rejected before relaxed-face LPs drift into tolerance noise.
+        # Half the SHI threshold, so thin cells are rejected before relaxed-face
+        # LPs drift into noise.
         "MIN_SEARCH_INRADIUS": tol_shi_objective / 2.0,
         "TOL_SHI_HYPERPLANE": tol_shi_hyperplane,
         "TOL_NEARLY_VERTICAL": tol_nearly_vertical,
