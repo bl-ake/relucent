@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import relucent.config as cfg
 from relucent.model.model import LinearLayer, ReLULayer, ReLUNetwork
 
 if TYPE_CHECKING:
@@ -46,6 +45,10 @@ class LayerJacobians:
     full: np.ndarray  # hidden-layer product after ReLU masks (input → last hidden)
     gradient: np.ndarray  # ∇F|_C in input coordinates (logit if trailing output ReLU)
     W_out: np.ndarray  # final linear map G
+    # The same products with |W| (rounding scale of each entry; see relucent._internal.rounding).
+    by_relu_layer_abs: list[np.ndarray] | None = None
+    gradient_abs: np.ndarray | None = None
+    n_terms: int = 1  # inner-product terms accumulated along the longest product
 
 
 @dataclass(frozen=True)
@@ -147,7 +150,10 @@ def _compute_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians
     ss_row = _coerce_ss(ss)
     n_in = int(np.prod(net.input_shape))
     current = np.eye(n_in, dtype=np.float64)
+    current_abs = np.eye(n_in, dtype=np.float64)
     by_relu: list[np.ndarray] = []
+    by_relu_abs: list[np.ndarray] = []
+    n_terms = 1
     mask_index = 0
 
     layers = list(net.layers.values())
@@ -164,12 +170,16 @@ def _compute_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians
         layer = layers[i]
         if isinstance(layer, LinearLayer) and isinstance(layers[i + 1], ReLULayer):
             current = current @ layer.weight.T
+            current_abs = current_abs @ np.abs(layer.weight).T
+            n_terms += int(layer.weight.shape[1])
             width = layer.weight.shape[0]
             # Pre-mask columns = ∇preact_j (Lemma 10 / bent hyperplane normals).
             by_relu.append(current.copy())
+            by_relu_abs.append(current_abs.copy())
             mask = ss_row[0, mask_index : mask_index + width]
             relu = (mask == 1).astype(np.float64)
             current = current * relu[np.newaxis, :]
+            current_abs = current_abs * relu[np.newaxis, :]
             mask_index += width
             i += 2
             continue
@@ -181,15 +191,26 @@ def _compute_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians
     w_out = last_linear_layer.weight
     full = current.copy()
     current = current @ w_out.T
+    current_abs = current_abs @ np.abs(w_out).T
+    n_terms += int(w_out.shape[1])
     # Trailing output ReLU: keep logit gradient; still record logit map for Lemma 10.
     if last_linear_i + 1 < len(layers) and isinstance(layers[last_linear_i + 1], ReLULayer):
         by_relu.append(current.copy())
+        by_relu_abs.append(current_abs.copy())
         mask_index += int(w_out.shape[0])
 
     if current.ndim != 2 or current.shape[1] != 1:
         raise ValueError("Morse Jacobians require a scalar network output " + f"(got trailing map shape {current.shape})")
     gradient = current.reshape(-1)
-    return LayerJacobians(by_relu_layer=by_relu, full=full, gradient=gradient, W_out=w_out)
+    return LayerJacobians(
+        by_relu_layer=by_relu,
+        full=full,
+        gradient=gradient,
+        W_out=w_out,
+        by_relu_layer_abs=by_relu_abs,
+        gradient_abs=current_abs.reshape(-1),
+        n_terms=n_terms,
+    )
 
 
 def gradient_on_cell(net: ReLUNetwork, ss: np.ndarray) -> np.ndarray:
@@ -231,8 +252,13 @@ def _diff_shi(vertex_ss: np.ndarray, edge_ss: np.ndarray) -> int:
     return int(diff[0])
 
 
-def _sign_with_tol(value: float) -> int:
-    if abs(value) <= cfg.TOL_VERIFY_AB_ATOL:
+def _sign_with_bound(value: float, bound: float) -> int:
+    """Sign of ``value``, or 0 when it is zero or within its float64 error ``bound`` of zero.
+
+    0 is the explicit "degenerate or undecidable" answer that the Morse classification counts
+    separately (``morse_count_deg``); it is never guessed to be +1 or -1.
+    """
+    if abs(value) <= bound:
         return 0
     return 1 if value > 0 else -1
 
@@ -246,14 +272,14 @@ def partial_derivative_sign(
     ss_layers: list[int],
 ) -> int:
     """Theorem 4 / Corollary 3: sign of ``∂_{vE} F`` for scalar output."""
-    val = partial_derivative_value(
+    val, bound = partial_derivative_value_with_error(
         vertex_ss,
         edge_ss,
         net,
         ssi2maski=ssi2maski,
         ss_layers=ss_layers,
     )
-    return _sign_with_tol(val)
+    return _sign_with_bound(val, bound)
 
 
 def _vertex_edge_direction(
@@ -318,6 +344,67 @@ def partial_derivative_value(
     return float(jac.gradient @ direction)
 
 
+def partial_derivative_value_with_error(
+    vertex_ss: np.ndarray,
+    edge_ss: np.ndarray,
+    net: ReLUNetwork,
+    *,
+    ssi2maski: list[tuple[int, tuple[int, int]]],
+    ss_layers: list[int],
+) -> tuple[float, float]:
+    """``∂_{vE} F`` and a bound on its float64 error (``inf`` when the direction is undecidable).
+
+    The gradient and the vertex's hyperplane normals are products of the network's weights;
+    each entry's error is at most ``2 gamma(K)`` times the same product with ``|W|``. The
+    direction solves ``W(v, C) d = e``; its error follows from the perturbation of ``W(v, C)``
+    and the solve residual. When ``W(v, C)`` is singular within its error the direction itself
+    cannot be computed, and the bound is ``inf``.
+    """
+    from relucent._internal import rounding
+
+    assert_scalar_output(net)
+    v = _coerce_ss(vertex_ss).ravel()
+    e = _coerce_ss(edge_ss).ravel()
+    if not np.all((e != 0) | (v == 0)):
+        raise ValueError("vertex must be a face of the edge (edge zeros are also zeros at the vertex)")
+    coface = coface_sign_sequence(edge_ss)
+    jac = get_layer_jacobians(net, coface)
+    assert jac.by_relu_layer_abs is not None and jac.gradient_abs is not None
+    g_rel = 2.0 * rounding.gamma(jac.n_terms)
+
+    shi = _diff_shi(vertex_ss, edge_ss)
+    n_in = jac.full.shape[0]
+    zeros = np.flatnonzero(v == 0)
+    if zeros.size != n_in:
+        raise ValueError(f"vertex sign sequence must have {n_in} zero entries (got {zeros.size}) for Lemma 10 edge directions")
+    rows, rows_abs = [], []
+    for z in zeros:
+        r_idx, n_idx = shi_to_relu_neuron(int(z), ssi2maski, ss_layers)
+        rows.append(jac.by_relu_layer[r_idx][:, n_idx])
+        rows_abs.append(jac.by_relu_layer_abs[r_idx][:, n_idx])
+    w_mat = np.vstack(rows)
+    dw = float(np.linalg.norm(g_rel * np.vstack(rows_abs)))
+    smin = float(np.linalg.svd(w_mat, compute_uv=False)[-1])
+    if smin <= 2.0 * dw:
+        return 0.0, float("inf")
+    e_row = np.zeros(n_in, dtype=np.float64)
+    e_row[int(np.where(zeros == shi)[0][0])] = 1.0
+    scale = float(e[shi])
+    d = np.linalg.solve(w_mat, e_row)
+    resid = np.abs(w_mat @ d - e_row) + rounding.gamma(n_in) * (np.abs(w_mat) @ np.abs(d))
+    d_err = (float(np.linalg.norm(resid)) + dw * float(np.linalg.norm(d))) / (smin - dw)
+    direction = scale * d
+    grad = jac.gradient
+    grad_err = g_rel * jac.gradient_abs
+    value = float(grad @ direction)
+    bound = (
+        float(grad_err @ np.abs(direction))
+        + (float(np.linalg.norm(grad)) + float(np.linalg.norm(grad_err))) * d_err
+        + rounding.gamma(n_in) * float(np.abs(grad) @ np.abs(direction))
+    )
+    return value, bound * (1.0 + 8.0 * rounding.EPS)
+
+
 def _edge_ss_from_vertex(vertex_ss: np.ndarray, shi: int, sign: int) -> np.ndarray:
     ss = _coerce_ss(vertex_ss).copy()
     ss.ravel()[int(shi)] = int(sign)
@@ -334,9 +421,14 @@ def _is_collapsed_edge(
     derivative). The complementary case — non-zero gradient orthogonal to the
     edge direction — is caught downstream by the ``sign == 0`` check.
     """
+    from relucent._internal import rounding
+
     coface = coface_sign_sequence(edge_ss)
-    grad = gradient_on_cell(net, coface)
-    return bool(np.linalg.norm(grad) <= cfg.TOL_VERIFY_AB_ATOL)
+    assert_scalar_output(net)
+    jac = get_layer_jacobians(net, coface)
+    assert jac.gradient_abs is not None
+    # Zero, or zero to within every entry's own float64 error: F cannot be shown to vary.
+    return bool(np.all(np.abs(jac.gradient) <= 2.0 * rounding.gamma(jac.n_terms) * jac.gradient_abs))
 
 
 def is_pl_critical_vertex(

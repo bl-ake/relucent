@@ -243,3 +243,58 @@ class TestTheorem4Consistency:
             ss_layers=cplx.ss_layers,
         )
         assert sign == np.sign(val) or (sign == 0 and abs(val) < 1e-8)
+
+
+@pytest.mark.parametrize(("widths", "seed"), [([2, 8, 8, 1], 0), ([2, 8, 8, 1], 1), ([3, 6, 6, 1], 2)])
+def test_critical_points_match_the_chain_complex_route(widths: list[int], seed: int) -> None:
+    """get_critical_points finds vertices without the chain complex; same records as through it."""
+    from relucent.topology.morse import is_pl_critical_vertex
+
+    set_seeds(seed)
+    cplx = Complex(mlp(widths=widths))
+    cplx.bfs(start=np.zeros(widths[0], dtype=np.float64))
+    chain = cplx.get_chain_complex()
+    assert int(chain[-1].index2poly[0].dim) == 0
+    expected = {}
+    for v in chain[-1]:
+        crit, index = is_pl_critical_vertex(v.ss_np, cplx._net, ssi2maski=cplx.ssi2maski, ss_layers=cplx.ss_layers)
+        if crit and index is not None:
+            expected[v.tag] = (index, np.asarray(v.interior_point).reshape(-1))
+    got = {cp.tag: cp for cp in cplx.get_critical_points(include_degenerate=True)}
+    assert set(got) == set(expected)
+    for tag, cp in got.items():
+        assert cp.index == expected[tag][0]
+        assert cp.point is not None and np.array_equal(cp.point, expected[tag][1])
+        assert cp.polyhedron.tag == tag and int(cp.polyhedron.dim) == 0
+
+
+@pytest.mark.parametrize(("seed", "nworkers"), [(0, 1), (3, 1), (0, 3)])
+def test_vertex_screen_drops_only_non_vertices(seed: int, nworkers: int, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Screened (sequentially or across a pool) and unscreened vertex search agree exactly."""
+    from relucent.graph import vertex_star
+
+    monkeypatch.setattr(vertex_star, "PARALLEL_SCREEN_MIN_ROOTS", 1)
+    monkeypatch.setattr(vertex_star, "PARALLEL_VERIFY_MIN_CANDIDATES", 1)
+    monkeypatch.setattr(vertex_star, "MIN_CANDIDATES_PER_WORKER", 1)
+    set_seeds(seed)
+    cplx = Complex(mlp(widths=[3, 8, 8, 1]))
+    cplx.bfs(start=np.zeros(3, dtype=np.float64))
+    top = [p for p in cplx if int(p.dim) == 3]
+    graph = cplx.get_dual_graph(verbose=False, require_complete=False)
+    runs = [
+        vertex_star.find_vertices(
+            top,
+            graph,
+            ambient_dim=3,
+            top_dim=3,
+            verify_vertex=lambda r, c: r.verify_vertex_covector(c),
+            screen=screen,
+            nworkers=nworkers if screen else 1,
+            net=cplx._net,
+        )
+        for screen in (False, True)
+    ]
+    assert list(runs[0]) == list(runs[1]) and len(runs[0]) > 0  # same vertices, same witness order
+    for tag, record in runs[0].items():
+        assert np.array_equal(record.point, runs[1][tag].point)
+        assert record.witness_tag == runs[1][tag].witness_tag

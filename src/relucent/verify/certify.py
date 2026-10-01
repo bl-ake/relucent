@@ -8,7 +8,7 @@ rely on. Each :class:`CertifyLevel` is cumulative and fails closed:
   plus contracted-slice SHI checks on chain-complex slices.
 - ``COMPLETE``: adds LP flip-neighbor completeness on a fully explored ambient
   complex (every geometric facet has a same-dimension neighbor in the complex).
-- ``GEOMETRIC``: adds a fresh LP recompute of ``_shis`` on every cached cell.
+- ``GEOMETRIC``: adds a fresh LP recompute of every cached ``_shis`` not computed by ``get_shis`` on its cell.
 
 Chain and meta-graph reconstruction consume only the combinatorial certification.
 ``COMPLETE`` and ``GEOMETRIC`` remain optional checks for search and geometry APIs;
@@ -33,7 +33,6 @@ import networkx as nx
 import numpy as np
 from tqdm.auto import tqdm
 
-import relucent.config as cfg
 from relucent._internal.logging import logger
 from relucent.core.errors import IncompleteDualGraphError, NonGenericArrangementError, ShiProofError
 from relucent.core.poly import Polyhedron
@@ -102,8 +101,8 @@ def certify_complex(
             Combinatorial invariants are violated.
         IncompleteDualGraphError: ``level >= COMPLETE`` and a geometric facet has
             no same-dimension neighbor in the complex.
-        ShiProofError: ``level == GEOMETRIC`` and a cached ``_shis`` list does not
-            match a fresh LP recompute.
+        ShiProofError: ``level == GEOMETRIC`` and a cached ``_shis`` list not computed by
+            ``get_shis`` on its cell does not match a fresh LP recompute.
     """
     if len(cplx) == 0:
         if record_state:
@@ -165,7 +164,7 @@ def _iter_top_dim_polys(cplx: Complex, top_dim: int) -> Iterable[Polyhedron]:
 
 
 def _poly_has_strict_cached_shis(poly: Polyhedron) -> bool:
-    """Whether ``poly._shis`` came from a strict SHI solve and can be trusted directly."""
+    """Whether ``poly._shis`` is this cell's certified facet list (:func:`get_shis` on it), so needs no recompute."""
     return poly._shis is not None and bool(getattr(poly, "_shis_strict", False))
 
 
@@ -179,7 +178,7 @@ def _verify_lp_neighbors_for_poly(
     from relucent.geometry.calculations import get_shis
 
     try:
-        lp_shis = get_shis(poly, bound=float(bound), strict=True)
+        lp_shis = get_shis(poly, bound=float(bound))
     except ValueError as exc:
         return str(exc), []
     return None, _missing_lp_neighbors_for_shis(poly, shis=lp_shis, top_tags=top_tags)
@@ -325,11 +324,18 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
 
 
 def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None:
-    """Recompute SHIs and require the cached list to match."""
+    """Recompute SHIs and require the cached list to match.
+
+    A cached list that :func:`get_shis` computed on this cell (``_shis_strict``) is already its
+    certified facet list, so only lists assigned some other way (propagated from the dual graph or
+    a coface) are recomputed.
+    """
     from relucent.geometry.calculations import get_shis
 
     if poly._shis is None:
         raise ShiProofError(f"Polyhedron {poly!r} has no cached _shis.")
+    if _poly_has_strict_cached_shis(poly):
+        return
     if bound is None:
         bound = poly.bound
     if bound is None:
@@ -338,7 +344,7 @@ def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None
         if poly._net is None:
             raise ShiProofError(f"Polyhedron {poly!r} has no network for bound estimation.")
         bound = default_polyhedron_bound(poly._net)
-    fresh = get_shis(poly, bound=float(bound), strict=True)
+    fresh = get_shis(poly, bound=float(bound))
     if set(fresh) != set(poly._shis):
         raise ShiProofError(f"Cached _shis {sorted(poly._shis)} != recomputed {sorted(fresh)} on {poly!r}.")
 
@@ -356,38 +362,40 @@ def verify_boundary_cell(poly: Polyhedron, boundary_shi: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _quantize_point_for_genericity(pt: np.ndarray) -> tuple[int, ...]:
-    vec = np.asarray(pt, dtype=np.float64).ravel()
-    scale = max(1.0, float(np.max(np.abs(vec))))
-    step = float(cfg.TOL_INTERIOR_VERIFY) * scale
-    return tuple(int(round(float(x) / step)) for x in vec)
+def _one_cell_endpoint_map(poly: Polyhedron) -> dict[bytes, tuple[int, np.ndarray, float]]:
+    """Map combinatorial 0-face tags to ``(witness shi, point, error radius)`` for a 1-cell.
 
-
-def _one_cell_endpoint_map(poly: Polyhedron) -> dict[bytes, tuple[int, np.ndarray]]:
-    """Map combinatorial 0-face tags to ``(witness shi, geometric point)`` for a 1-cell."""
+    Each endpoint is certified by :meth:`Polyhedron._halfspace_point_with_error`: strictly inside
+    every other row of the cell beyond its float64 error, or the call raises.
+    """
     if int(poly.dim) != 1:
         return {}
-    out: dict[bytes, tuple[int, np.ndarray]] = {}
+    out: dict[bytes, tuple[int, np.ndarray, float]] = {}
     ss = np.asarray(poly.ss_np)
     hs = np.asarray(poly.halfspaces_np)
+    err = np.asarray(poly.halfspaces_err_np)
     for shi in ss_nonzero_indices(ss):
         shi_i = int(shi)
         active = np.array(list(poly.zero_indices) + [shi_i], dtype=np.intp)
-        pt = poly._halfspace_point(hs, active)
-        if pt is None:
+        sol = poly._halfspace_point_with_error(hs, active, err, poly._exact_rows)
+        if sol is None:
             continue
-        out[face_tag(ss, shi_i)] = (shi_i, np.asarray(pt, dtype=np.float64).reshape(-1))
+        pt, pt_err = sol
+        out[face_tag(ss, shi_i)] = (shi_i, np.asarray(pt, dtype=np.float64).reshape(-1), float(pt_err))
     return out
 
 
 def verify_arrangement_genericity(polys: Iterable[Polyhedron]) -> None:
     """Geometric check for 1-dimensional arrangements (transversality).
 
-    Combinatorial 0-face endpoints on a 1-cell must be geometrically distinct,
-    and geometrically coincident endpoints across different 1-cells must share
-    a combinatorial 0-face tag. Violations mean the underlying hyperplane
-    arrangement is not generic (hyperplanes concur at a point).
+    Combinatorial 0-face endpoints on a 1-cell must be geometrically distinct, endpoints that
+    share a combinatorial tag must be the same point, and endpoints with different tags must be
+    different points. Two points are the same or different only when their distance is beyond
+    or within the sum of their float64 error radii; anything in between raises. Violations mean
+    the underlying hyperplane arrangement is not generic (hyperplanes concur at a point).
     """
+    from scipy.spatial import KDTree
+
     cells = [p for p in polys if int(p.dim) == 1]
     if not cells:
         return
@@ -395,43 +403,53 @@ def verify_arrangement_genericity(polys: Iterable[Polyhedron]) -> None:
     endpoint_maps = {p.tag: _one_cell_endpoint_map(p) for p in cells}
 
     for poly in cells:
-        ep_map = endpoint_maps[poly.tag]
-        if not ep_map:
-            continue
-        geom_buckets: dict[tuple[int, ...], list[bytes]] = defaultdict(list)
-        for tag, (_shi, pt) in ep_map.items():
-            geom_buckets[_quantize_point_for_genericity(pt)].append(tag)
-        if len(geom_buckets) < len(ep_map):
+        if len(endpoint_maps[poly.tag]) > 2:
             raise NonGenericArrangementError(
-                "1-cell "
-                + f"{poly!r} has {len(ep_map)} combinatorial endpoint(s) but only "
-                + f"{len(geom_buckets)} distinct geometric location(s); hyperplanes likely "
-                + "concur at a vertex. Try a later training epoch or a non-degenerate "
-                + "initialization."
+                f"1-cell {poly!r} has {len(endpoint_maps[poly.tag])} certified endpoints; a segment has at most 2"
             )
 
-    for i, left in enumerate(cells):
-        left_map = endpoint_maps[left.tag]
-        left_geom = {_quantize_point_for_genericity(pt) for _shi, pt in left_map.values()}
-        left_tags = set(left_map)
-        for right in cells[i + 1 :]:
-            right_map = endpoint_maps[right.tag]
-            right_geom = {_quantize_point_for_genericity(pt) for _shi, pt in right_map.values()}
-            right_tags = set(right_map)
-            shared_geom = left_geom & right_geom
-            shared_tags = left_tags & right_tags
-            if not shared_geom:
-                continue
-            if len(shared_tags) == 0:
-                raise NonGenericArrangementError(
-                    "1-cells "
-                    + f"{left!r} and {right!r} share a geometric endpoint but no combinatorial "
-                    + "0-face tag (non-transversal junction). Try a later training epoch or "
-                    + "more exploration."
-                )
-            if len(shared_tags) > 1:
-                raise NonGenericArrangementError(
-                    "1-cells "
-                    + f"{left!r} and {right!r} share {len(shared_tags)} combinatorial 0-face "
-                    + "tags; adjacency is ambiguous."
-                )
+    # Every endpoint of every cell, deduplicated by (cell, tag).
+    tags: list[bytes] = []
+    points: list[np.ndarray] = []
+    radii: list[float] = []
+    cells_by_tag: dict[bytes, list[bytes]] = defaultdict(list)
+    for cell_tag, ep_map in endpoint_maps.items():
+        for tag, (_shi, pt, pt_err) in ep_map.items():
+            tags.append(tag)
+            points.append(pt)
+            radii.append(pt_err)
+            cells_by_tag[tag].append(cell_tag)
+    if not points:
+        return
+    pts = np.vstack(points)
+    rad = np.asarray(radii, dtype=np.float64)
+    # Candidate pairs within the largest possible "same point" distance; each then judged exactly.
+    for i, j in KDTree(pts).query_pairs(r=2.0 * float(rad.max()) + 1e-300, output_type="ndarray"):
+        dist = float(np.linalg.norm(pts[i] - pts[j]))
+        close = dist <= rad[i] + rad[j]
+        if tags[i] != tags[j] and close:
+            raise NonGenericArrangementError(
+                "two different 0-faces meet at the same point to within float64 error "
+                + "(non-transversal junction: hyperplanes concur at a vertex)"
+            )
+    # Same tag must be the same point: compare each copy to the first.
+    first: dict[bytes, int] = {}
+    for k, tag in enumerate(tags):
+        if tag not in first:
+            first[tag] = k
+            continue
+        i = first[tag]
+        if float(np.linalg.norm(pts[i] - pts[k])) > rad[i] + rad[k]:
+            raise NonGenericArrangementError("one 0-face tag is reached at two different points; adjacency is ambiguous")
+    # Two 1-cells may share at most one endpoint.
+    shared: dict[tuple[bytes, bytes], int] = defaultdict(int)
+    for owners in cells_by_tag.values():
+        owners = sorted(set(owners))
+        for a in range(len(owners)):
+            for b in range(a + 1, len(owners)):
+                shared[(owners[a], owners[b])] += 1
+    for (left, right), n_shared in shared.items():
+        if n_shared > 1:
+            raise NonGenericArrangementError(
+                f"1-cells {left!r} and {right!r} share {n_shared} combinatorial 0-face tags; adjacency is ambiguous."
+            )

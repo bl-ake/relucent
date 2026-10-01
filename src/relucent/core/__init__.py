@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .complex import Complex
     from .errors import (
+        AmbiguousGeometryError,
         ComplexNotCompleteError,
         ComplexNotVerifiedError,
         CubicalAmbiguityError,
@@ -23,6 +24,7 @@ __all__ = [
     "Complex",
     "Polyhedron",
     "SSManager",
+    "AmbiguousGeometryError",
     "ComplexNotCompleteError",
     "ComplexNotVerifiedError",
     "CubicalAmbiguityError",
@@ -38,6 +40,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Complex": (".complex", "Complex"),
     "Polyhedron": (".poly", "Polyhedron"),
     "SSManager": (".ss", "SSManager"),
+    "AmbiguousGeometryError": (".errors", "AmbiguousGeometryError"),
     "ComplexNotCompleteError": (".errors", "ComplexNotCompleteError"),
     "ComplexNotVerifiedError": (".errors", "ComplexNotVerifiedError"),
     "CubicalAmbiguityError": (".errors", "CubicalAmbiguityError"),

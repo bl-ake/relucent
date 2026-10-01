@@ -9,7 +9,7 @@ embedded as lower-dimensional cells in higher ambient dimensions.
 import numpy as np
 import pytest
 
-from relucent import Polyhedron
+from relucent import AmbiguousGeometryError, Polyhedron
 
 
 def _poly_from_halfspaces(*, halfspaces: np.ndarray, zero_rows: set[int] | None = None) -> Polyhedron:
@@ -65,8 +65,9 @@ class TestOneCellsInAmbient1D:
         assert np.allclose(verts[:, 0], np.array([0.0, 1.0]), atol=1e-7)
 
         assert np.array([0.5]) in p
-        assert np.array([0.0]) in p
-        assert np.array([1.0]) in p
+        for endpoint in (0.0, 1.0):  # on a boundary row: undecidable in float64
+            with pytest.raises(AmbiguousGeometryError):
+                _ = np.array([endpoint]) in p
         assert np.array([-0.1]) not in p
         assert np.array([1.1]) not in p
 

@@ -14,8 +14,9 @@ from tqdm.auto import tqdm
 import relucent.config as cfg
 from relucent._internal.logging import logger
 from relucent._internal.network_scale import default_polyhedron_bound
+from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
-from relucent.geometry.calculations import get_shis
+from relucent.geometry.calculations import get_shis, shis_are_certified, without_deprecated_strict
 from relucent.graph.incidence import ss_nonzero_indices
 from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.search.engine import (
@@ -103,8 +104,8 @@ def _ambient_boundary_metadata_for_cell(
     *,
     bound: float | None = None,
     **shis_kwargs: Any,
-) -> tuple[list[int], Any]:
-    """Return ``(_shis, halfspaces)`` matching :meth:`Complex.get_boundary_cells`."""
+) -> tuple[list[int], Any, np.ndarray, np.ndarray | None]:
+    """Return ``(_shis, halfspaces, halfspaces_err, halfspaces_ss)`` matching :meth:`Complex.get_boundary_cells`."""
     bshi = int(boundary_shi)
     net = poly._net
     if bound is None:
@@ -116,7 +117,16 @@ def _ambient_boundary_metadata_for_cell(
         **shis_kwargs,
     )
     p_pos, _ = _ambient_lift_polyhedra(poly, bshi)
-    return shis, p_pos.halfspaces
+    return shis, p_pos.halfspaces, p_pos.halfspaces_err_np, p_pos.halfspaces_rows_ss
+
+
+def _set_coface_rows(poly: Polyhedron, halfspaces: Any, halfspaces_err: np.ndarray, halfspaces_ss: np.ndarray | None) -> None:
+    """Give a boundary cell its ambient coface's rows, with their float64 error scale."""
+    poly._halfspaces = halfspaces
+    poly._halfspaces_np = None
+    poly._halfspaces_err = halfspaces_err
+    poly._halfspaces_ss = halfspaces_ss
+    poly._halfspaces_own = False
 
 
 def _apply_ambient_boundary_shis(
@@ -135,15 +145,15 @@ def _apply_ambient_boundary_shis(
     polys = list(cx)
     if nw <= 1 or len(polys) < 32:
         for poly in polys:
-            shis, halfspaces = _ambient_boundary_metadata_for_cell(
+            shis, halfspaces, halfspaces_err, halfspaces_ss = _ambient_boundary_metadata_for_cell(
                 poly,
                 boundary_shi,
                 bound=bound,
                 **shis_kwargs,
             )
             poly._shis = shis
-            poly._shis_strict = bool(shis_kwargs.get("strict", False))
-            poly._halfspaces = halfspaces
+            poly._shis_strict = False  # slice crossings, not this cell's certified LP facets
+            _set_coface_rows(poly, halfspaces, halfspaces_err, halfspaces_ss)
         return
 
     from relucent.search.worker_context import set_worker_context
@@ -161,10 +171,10 @@ def _apply_ambient_boundary_shis(
             ),
             tasks,
         )
-    for tag, shis, halfspaces in results:
+    for tag, shis, halfspaces, halfspaces_err, halfspaces_ss in results:
         tag_to_poly[tag]._shis = shis
-        tag_to_poly[tag]._shis_strict = bool(shis_kwargs.get("strict", False))
-        tag_to_poly[tag]._halfspaces = halfspaces
+        tag_to_poly[tag]._shis_strict = False  # slice crossings, not this cell's certified LP facets
+        _set_coface_rows(tag_to_poly[tag], halfspaces, halfspaces_err, halfspaces_ss)
     if verbose:
         _phase_log(
             "discover finalize: ambient coface _shis for " + f"{len(polys)} cells ({nw} workers)",
@@ -179,18 +189,18 @@ def _ambient_coface_shis_worker(
     boundary_shi: int,
     bound: float | None,
     shis_kwargs: dict[str, Any],
-) -> tuple[bytes, list[int], Any]:
+) -> tuple[bytes, list[int], Any, np.ndarray, np.ndarray | None]:
     from relucent.search.worker_context import get_worker_context
 
     ctx = get_worker_context()
     poly = Polyhedron(ctx.net, ss)
-    shis, halfspaces = _ambient_boundary_metadata_for_cell(
+    shis, halfspaces, halfspaces_err, halfspaces_ss = _ambient_boundary_metadata_for_cell(
         poly,
         boundary_shi,
         bound=bound,
         **shis_kwargs,
     )
-    return tag, shis, halfspaces
+    return tag, shis, halfspaces, halfspaces_err, halfspaces_ss
 
 
 def boundary_searcher(
@@ -234,7 +244,7 @@ def boundary_searcher(
         verbose = cfg.VERBOSE
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
-    shis_kwargs = dict(kwargs)
+    shis_kwargs = without_deprecated_strict(kwargs)
     if not _is_top_boundary_ss(start.ss_np, boundary_shi):
         raise ValueError(f"Start sign sequence must have ss[{boundary_shi}]=0 as its only zero entry; got {start.ss_np!r}")
 
@@ -263,15 +273,17 @@ def boundary_searcher(
     )
 
     start = cx.add_polyhedron(start, check_exists=False)
+    certified = shis_are_certified(shis_kwargs)
     try:
         result = get_shis(start, bound=bound, **shis_kwargs)
     except ValueError as exc:
         if "Initial Solve Failed" not in str(exc):
             raise
         result = _ambient_coface_shis_for_boundary_cell(start, boundary_shi, bound=bound, **shis_kwargs)
+        certified = False
     assert isinstance(result, list)
     start._shis = [s for s in result if int(s) != boundary_shi]  # boundary hyperplane is not a facet
-    start._shis_strict = bool(shis_kwargs.get("strict", False))
+    start._shis_strict = certified
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
     failed_flips: set[tuple[bytes, int]] = set()
@@ -316,6 +328,11 @@ def boundary_searcher(
                 ):
                     unprocessed -= 1
                     node = cast(Polyhedron, cx.index2poly[node_index])
+                    if isinstance(p, (AmbiguousGeometryError, NonGenericArrangementError)):
+                        # Not a missing neighbor: the geometry itself cannot be decided, or the
+                        # arrangement is not simple. Surface it rather than let it degrade into an
+                        # incomplete-complex error.
+                        raise p
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
                         _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)

@@ -32,7 +32,7 @@ __version__ = _read_version()
 
 if TYPE_CHECKING:
     from .core.complex import Complex
-    from .core.errors import NonGenericArrangementError
+    from .core.errors import AmbiguousGeometryError, NonGenericArrangementError
     from .core.poly import Polyhedron
     from .core.ss import SSManager
     from .model.convert_model import convert
@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "__version__",
+    "AmbiguousGeometryError",
     "Complex",
     "NonGenericArrangementError",
     "Polyhedron",
@@ -63,6 +64,7 @@ __all__ = [
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Complex": ("relucent.core.complex", "Complex"),
+    "AmbiguousGeometryError": ("relucent.core.errors", "AmbiguousGeometryError"),
     "NonGenericArrangementError": ("relucent.core.errors", "NonGenericArrangementError"),
     "Polyhedron": ("relucent.core.poly", "Polyhedron"),
     "SSManager": ("relucent.core.ss", "SSManager"),

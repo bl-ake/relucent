@@ -73,81 +73,6 @@ def test_recover_cells_from_vertices_recovers_square_face_lattice() -> None:
     assert len(vertices) == 1
 
 
-def test_verify_vertex_covector_uses_only_nonzero_sign_margin() -> None:
-    halfspaces = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [-1.0, -1.0, -1.0],
-        ]
-    )
-    coface = Polyhedron(
-        None,
-        np.array([[1, 1, 1]], dtype=np.int8),
-        halfspaces=halfspaces,
-        dim=2,
-        _ambient_dim=2,
-    )
-    vertex_ss = np.array([[0, 0, 1]], dtype=np.int8)
-
-    point = coface.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, 2.0]]),
-        sign_margin=1e-7,
-    )
-    assert point is not None
-    assert np.array_equal(point, np.zeros(2))
-
-    rejected = coface.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, -2.0]]),
-        sign_margin=1e-7,
-    )
-    assert rejected is None
-
-
-def test_verify_vertex_covector_skips_dead_relu_coordinates(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Spurious ±1 on a vanishing normal must not reject a genuine vertex."""
-    import relucent.config as cfg
-
-    monkeypatch.setattr(cfg, "TOL_DEAD_RELU", 1e-8)
-    halfspaces = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [1e-15, -1e-15, 2e-15],  # dead / vanishing hyperplane
-            [-1.0, -1.0, -1.0],
-        ]
-    )
-    coface = Polyhedron(
-        None,
-        np.array([[1, 1, -1, 1]], dtype=np.int8),
-        halfspaces=halfspaces,
-        dim=2,
-        _ambient_dim=2,
-    )
-    vertex_ss = np.array([[0, 0, -1, 1]], dtype=np.int8)
-
-    # Dead coord preactivation is below sign_margin; live coords match.
-    point = coface.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-14, 2.0]]),
-        sign_margin=1e-7,
-    )
-    assert point is not None
-    assert np.array_equal(point, np.zeros(2))
-
-    # A live hyperplane with the wrong tiny preactivation is still virtual → reject.
-    rejected = coface.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-14, 1e-14]]),
-        sign_margin=1e-7,
-    )
-    assert rejected is None
-
-
 def test_default_chain_and_meta_graph_do_not_call_lp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -194,33 +119,45 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
     assert meta.number_of_nodes() > 0
 
 
-def test_verify_vertex_covector_margin_follows_rounding_at_the_vertex() -> None:
-    """Clear sign near the origin passes; one inside rounding far out gets rejected."""
-    vertex_ss = np.array([[0, 0, 1]], dtype=np.int8)
-    near = Polyhedron(
-        None,
-        np.array([[1, 1, 1]], dtype=np.int8),
-        halfspaces=np.array([[1e6, 0.0, 0.0], [0.0, 1e6, 0.0], [-1e6, -1e6, -1.0]]),
-        dim=2,
-        _ambient_dim=2,
-    )
-    point = near.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-3]]),
-        sign_margin=1e-12,
-    )
-    assert point is not None
+def _data_cell(rows: list[list[float]], ss: list[int]) -> Polyhedron:
+    hs = np.array(rows, dtype=np.float64)
+    return Polyhedron(None, np.array([ss], dtype=np.int8), halfspaces=hs, dim=2, _ambient_dim=2)
 
-    far = Polyhedron(
-        None,
-        np.array([[1, 1, 1]], dtype=np.int8),
-        halfspaces=np.array([[1.0, 0.0, -1e12], [0.0, 1.0, -1e12], [-1.0, -1.0, 1.0]]),
-        dim=2,
-        _ambient_dim=2,
-    )
-    rejected = far.verify_vertex_covector(
-        vertex_ss,
-        point2preactivations=lambda _x: np.array([[0.0, 0.0, 1e-6]]),
-        sign_margin=1e-12,
-    )
-    assert rejected is None
+
+def test_verify_vertex_covector_decides_from_the_cell_rows() -> None:
+    """The vertex is kept iff every other row of the cell is strictly negative there."""
+    inside = _data_cell([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [-1.0, -1.0, -1.0]], [1, 1, 1])
+    point = inside.verify_vertex_covector(np.array([[0, 0, 1]], dtype=np.int8))
+    assert point is not None
+    assert np.array_equal(point, np.zeros(2))
+
+    outside = _data_cell([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [-1.0, -1.0, 1.0]], [1, 1, 1])
+    assert outside.verify_vertex_covector(np.array([[0, 0, 1]], dtype=np.int8)) is None
+
+
+def test_verify_vertex_covector_skips_dead_units() -> None:
+    """A dead unit's row (exactly zero normal) is a constant, not a hyperplane: it takes no part."""
+    cell = _data_cell([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -2.0], [-1.0, -1.0, -1.0]], [1, 1, 1, 1])
+    point = cell.verify_vertex_covector(np.array([[0, 0, 1, 1]], dtype=np.int8))
+    assert point is not None
+    # A tiny but nonzero normal is a real (far-away) hyperplane and is judged like any other row.
+    tiny = _data_cell([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1e-15, -1e-15, 2e-15], [-1.0, -1.0, -1.0]], [1, 1, 1, 1])
+    assert tiny.verify_vertex_covector(np.array([[0, 0, 1, 1]], dtype=np.int8)) is None
+
+
+def test_verify_vertex_covector_uses_exact_arithmetic_inside_rounding() -> None:
+    """Far out, a row's float64 value is inside its rounding error: the exact rows decide."""
+    ulp = float(np.spacing(2e12))
+    # Vertex at (1e12, 1e12); the third row is exactly -ulp there, far below float64's resolution
+    # of that evaluation, so only exact arithmetic can keep the vertex.
+    kept = _data_cell([[1.0, 0.0, -1e12], [0.0, 1.0, -1e12], [-1.0, -1.0, 2e12 - ulp]], [1, 1, 1])
+    point = kept.verify_vertex_covector(np.array([[0, 0, 1]], dtype=np.int8))
+    assert point is not None
+    np.testing.assert_array_equal(point, np.array([1e12, 1e12]))
+
+    # Exactly concurrent hyperplanes: a non-generic arrangement, reported as such.
+    from relucent import NonGenericArrangementError
+
+    concurrent = _data_cell([[1.0, 0.0, -1e12], [0.0, 1.0, -1e12], [-1.0, -1.0, 2e12]], [1, 1, 1])
+    with pytest.raises(NonGenericArrangementError):
+        concurrent.verify_vertex_covector(np.array([[0, 0, 1]], dtype=np.int8))

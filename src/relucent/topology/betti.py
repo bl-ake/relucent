@@ -21,6 +21,7 @@ Notes:
 
 from __future__ import annotations
 
+import heapq
 import sys
 from collections.abc import Iterable
 from typing import Any, Literal, overload
@@ -243,6 +244,56 @@ def _boundary_row_sets(
     return row_sets, ncols
 
 
+def _sparse_boundary_maps(
+    meta: Any,
+    nodes_by_dim: dict[int, list[object]],
+    *,
+    require_shared_faces: bool = False,
+) -> dict[int, tuple[list[set[int]], int]]:
+    """Every ∂_k as ``(row sets, ncols)`` from one pass over ``meta``'s edges.
+
+    Matches :func:`_packed_boundary_matrix` entry for entry: rows index (k−1)-cells, columns
+    k-cells, and repeated incidences cancel mod 2. With ``require_shared_faces`` a (k−1)-cell
+    keeps its incidences only when at least two edges come into it from k-cells.
+    """
+    where: dict[object, tuple[int, int]] = {}
+    for k, cells in nodes_by_dim.items():
+        for i, n in enumerate(cells):
+            where[n] = (k, i)
+    maps: dict[int, tuple[list[set[int]], int]] = {
+        k: ([set() for _ in nodes_by_dim.get(k - 1, ())], len(nodes_by_dim[k])) for k in nodes_by_dim if k - 1 in nodes_by_dim
+    }
+    incidences: list[tuple[int, int, int]] = []
+    coface_count: dict[tuple[int, int], int] = {}
+    for u, v in meta.edges():
+        hi, lo = where.get(u), where.get(v)
+        if hi is None or lo is None or lo[0] != hi[0] - 1:
+            continue
+        incidences.append((hi[0], lo[1], hi[1]))
+        if require_shared_faces:
+            coface_count[lo] = coface_count.get(lo, 0) + 1
+    for k, i, j in incidences:
+        if require_shared_faces and coface_count[(k - 1, i)] < 2:
+            continue
+        row = maps[k][0][i]
+        if j in row:
+            row.discard(j)
+        else:
+            row.add(j)
+    return maps
+
+
+def _gf2_product_nnz(left_rows: list[list[int]], right_rows: list[list[int]]) -> int:
+    """Number of nonzeros in the GF(2) product of two matrices given as row index lists."""
+    nnz = 0
+    for ts in left_rows:
+        ones: set[int] = set()
+        for t in ts:
+            ones.symmetric_difference_update(right_rows[t])
+        nnz += len(ones)
+    return nnz
+
+
 def _packed_to_sparse_rowlists(packed: np.ndarray, ncols: int) -> list[list[int]]:
     """Extract per-row column indices of 1-bits from a row-packed ``uint64`` matrix."""
     m = int(packed.shape[0])
@@ -303,23 +354,11 @@ def gf2_matmul_sparse_rowlists(
     return out
 
 
-def _swap_rows_in_col_index(
-    col_to_rows: dict[int, set[int]],
-    row_sets: list[set[int]],
-    i: int,
-    j: int,
-) -> None:
-    row_sets[i], row_sets[j] = row_sets[j], row_sets[i]
-    for c in row_sets[i] | row_sets[j]:
-        rows = col_to_rows.setdefault(c, set())
-        rows.discard(i)
-        rows.discard(j)
-        if c in row_sets[i]:
-            rows.add(i)
-        if c in row_sets[j]:
-            rows.add(j)
-        if not rows:
-            col_to_rows.pop(c, None)
+# Sparse elimination stores each nonzero twice (row and column sets) at roughly this many
+# bytes apiece; once fill-in makes that dearer than one bit per entry of the remaining matrix,
+# the remainder is ranked densely, provided its packed form stays under the byte cap.
+_SPARSE_BYTES_PER_NONZERO = 128
+_DENSE_REMAINDER_MAX_BYTES = 1 << 30
 
 
 def gf2_rank_sparse_rowsets(
@@ -331,61 +370,74 @@ def gf2_rank_sparse_rowsets(
 ) -> int:
     """Gaussian elimination rank over GF(2) on sparse row sets.
 
-    Each row is a set of column indices where the matrix entry is 1.  An inverted
-    index (column → rows) avoids scanning all rows on every elimination step, which
-    matters when boundaries have hundreds of thousands of cells but only a few
-    incidences per column.
+    Each row is a set of column indices where the matrix entry is 1. Pivots are chosen to
+    keep fill-in low (Markowitz-style): always a column of least remaining degree, on its row
+    of least degree. A degree-one column, such as a free face in a cell complex, costs no fill,
+    so the boundary maps of manifold-like complexes reduce with almost none, in time and memory
+    proportional to their nonzeros rather than to rows × columns. If fill-in nonetheless makes
+    the remaining matrix dense enough that bits are cheaper than sets, that remainder (the
+    Schur complement, whose rank adds to the pivots so far) is ranked bit-packed instead.
+
+    ``row_sets`` is consumed.
     """
     nrows = len(row_sets)
     if nrows == 0 or ncols == 0:
         return 0
+    rows = row_sets
+    cols: list[set[int]] = [set() for _ in range(ncols)]
+    for r, cs in enumerate(rows):
+        for c in cs:
+            cols[c].add(r)
+    heap = [(len(s), c) for c, s in enumerate(cols) if s]
+    heapq.heapify(heap)
+    nnz = sum(len(s) for s in cols)
+    next_density_check = 2 * nnz
 
-    col_to_rows: dict[int, set[int]] = {}
-    for r, cols in enumerate(row_sets):
-        for c in cols:
-            col_to_rows.setdefault(c, set()).add(r)
-
+    pbar = tqdm(desc=progress_desc or "GF(2) rank", total=len(heap), leave=False) if progress else None
     rank = 0
-    col_iter: Iterable[int] = range(ncols)
-    if progress:
-        col_iter = tqdm(
-            col_iter,
-            desc=progress_desc or "GF(2) rank",
-            leave=False,
-            total=ncols,
-        )
-
-    for col in col_iter:
-        if rank >= nrows:
-            break
-        candidates = [r for r in col_to_rows.get(col, ()) if r >= rank]
-        if not candidates:
-            continue
-        pivot = min(candidates)
-        if pivot != rank:
-            _swap_rows_in_col_index(col_to_rows, row_sets, rank, pivot)
-
-        pivot_row = row_sets[rank]
-        for r in list(col_to_rows.get(col, ())):
-            if r == rank or r < rank:
-                continue
-            if col not in row_sets[r]:
-                continue
-            old = row_sets[r]
-            new = old ^ pivot_row
-            if new is old:
-                continue
-            row_sets[r] = new
-            for c in old.symmetric_difference(new):
-                rows = col_to_rows.setdefault(c, set())
-                if c in new:
-                    rows.add(r)
-                else:
-                    rows.discard(r)
-                    if not rows:
-                        col_to_rows.pop(c, None)
-        rank += 1
-
+    try:
+        while heap:
+            d, c = heapq.heappop(heap)
+            col = cols[c]
+            if len(col) != d or d == 0:
+                continue  # stale heap entry
+            r = min(col, key=lambda x: len(rows[x]))
+            # Clear row r from every other column by adding column c to it.
+            for c2 in list(rows[r]):
+                if c2 == c:
+                    continue
+                target = cols[c2]
+                for x in col:
+                    if x in target:
+                        target.discard(x)
+                        rows[x].discard(c2)
+                        nnz -= 1
+                    else:
+                        target.add(x)
+                        rows[x].add(c2)
+                        nnz += 1
+                heapq.heappush(heap, (len(target), c2))
+            for x in col:
+                rows[x].discard(c)
+            nnz -= len(col)
+            cols[c] = set()
+            rows[r] = set()
+            rank += 1
+            if pbar is not None:
+                pbar.update(1)
+            if nnz > next_density_check:
+                next_density_check = 2 * nnz
+                live_rows = [i for i, s in enumerate(rows) if s]
+                live_cols = [j for j, s in enumerate(cols) if s]
+                dense_bytes = len(live_rows) * ((len(live_cols) + 63) // 64) * 8
+                if dense_bytes <= min(nnz * _SPARSE_BYTES_PER_NONZERO, _DENSE_REMAINDER_MAX_BYTES):
+                    del cols, heap
+                    renumber = {j: k for k, j in enumerate(live_cols)}
+                    packed = _row_sets_to_packed([{renumber[j] for j in rows[i]} for i in live_rows], len(live_cols))
+                    return rank + int(gf2_rank_boundary(packed, len(live_cols)))
+    finally:
+        if pbar is not None:
+            pbar.close()
     return rank
 
 
@@ -511,23 +563,13 @@ def _chain_square_violations(
             verbose,
             f"chain_square: checking ∂_{k}∘∂_{k + 1} (sparse multiply), " + f"shapes ({nrows_lo},{n_mid})@({nrows_hi},{n_hi})",
         )
-        comp_packed = gf2_matmul_sparse_rowlists(left_rows, right_rows, n_hi)
-        _mask_trailing_bits_in_last_word(comp_packed, n_hi)
-        nonzero = bool(comp_packed.any())
+        nnz = _gf2_product_nnz(left_rows, right_rows)
         _verbose_line(
             verbose,
-            f"chain_square: ∂_{k}∘∂_{k + 1} composition is {'nonzero' if nonzero else 'zero'}",
+            f"chain_square: ∂_{k}∘∂_{k + 1} composition is {'nonzero' if nnz else 'zero'}",
         )
-        if nonzero:
-            dense = _packed_to_dense_mod2(comp_packed, n_hi)
-            nnz = int(np.count_nonzero(dense))
-            violations.append(
-                {
-                    "k": k,
-                    "nnz": nnz,
-                    "shape": [int(comp_packed.shape[0]), int(n_hi)],
-                }
-            )
+        if nnz:
+            violations.append({"k": k, "nnz": nnz, "shape": [nrows_lo, n_hi]})
     return violations
 
 
@@ -540,6 +582,7 @@ def get_betti_numbers(
     verify_connected_components: bool = True,  ## TODO: How slow is this?
     verbose: bool = False,
     nworkers: int | None = None,
+    method: Literal["sparse", "dense"] = "sparse",
 ) -> dict[int, int]:
     """Compute Betti numbers from face incidences in ``meta``.
 
@@ -559,12 +602,18 @@ def get_betti_numbers(
             number of path-connected components when ``kmin == 0``; otherwise raise
             :class:`ConnectedComponentsMismatch`.
         verbose: If True, print short progress lines to stderr.
-        nworkers: Number of threads to use for ranking independent boundary maps concurrently.
+        nworkers: ``method="dense"`` only: number of threads to use for ranking independent
+            boundary maps concurrently.
             ``None`` (default): automatically use one thread per non-trivial map when the C
             backend is available; falls back to sequential for pure-Python rank.
             ``1`` or ``0``: always sequential.  ``N > 1``: use up to N threads.
             Parallelism is safe because ctypes releases the GIL during C rank computation,
             so threads truly run concurrently.
+        method: ``"sparse"`` (default) ranks each boundary map by sparse elimination with
+            low-fill pivots (:func:`gf2_rank_sparse_rowsets`); time and memory follow the
+            number of incidences. ``"dense"`` ranks bit-packed matrices
+            (:func:`gf2_rank_boundary`), which need ``rows × columns / 8`` bytes per map,
+            e.g. 59 GB for a 688k × 688k ∂₂; kept for cross-checking.
 
     Note:
         Truncation and finite-cell restriction are prepared on
@@ -610,6 +659,33 @@ def get_betti_numbers(
     ncols_by_k: dict[int, int] = {}
 
     k_values = list(range(max(1, kmin), kmax + 1))
+
+    if method == "sparse":
+        maps = _sparse_boundary_maps(meta, nodes_by_dim, require_shared_faces=require_shared_faces)
+        k_iter_sparse: Iterable[int] = k_values
+        if verbose:
+            k_iter_sparse = tqdm(k_values, desc="Betti: boundary ranks", unit="∂", leave=False)
+        for k in k_iter_sparse:
+            row_sets, ncols = maps.pop(k, ([], 0))
+            ncols_by_k[k] = ncols
+            if verify_chain_complex and ncols:
+                sparse_by_k[k] = [list(s) for s in row_sets]  # ranking consumes the sets
+            boundary_rank[k] = gf2_rank_sparse_rowsets(row_sets, ncols, progress=verbose, progress_desc=f"GF(2) rank ∂_{k}")
+            _verbose_line(verbose, f"get_betti_numbers: ∂_{k} shape ({len(row_sets)},{ncols}) rank={boundary_rank[k]}")
+            del row_sets
+        return _finish_betti_numbers(
+            meta,
+            nodes_by_dim,
+            boundary_rank,
+            sparse_by_k=sparse_by_k,
+            ncols_by_k=ncols_by_k,
+            kmin=kmin,
+            kmax=kmax,
+            reduced=reduced,
+            verify_chain_complex=verify_chain_complex,
+            verify_connected_components=verify_connected_components,
+            verbose=verbose,
+        )
 
     # -------------------------------------------------------------------
     # Phase A: build all boundary matrices (sequential – fast).
@@ -703,6 +779,36 @@ def get_betti_numbers(
         for k in k_iter:
             _, boundary_rank[k] = _rank_one(k)
 
+    return _finish_betti_numbers(
+        meta,
+        nodes_by_dim,
+        boundary_rank,
+        sparse_by_k=sparse_by_k,
+        ncols_by_k=ncols_by_k,
+        kmin=kmin,
+        kmax=kmax,
+        reduced=reduced,
+        verify_chain_complex=verify_chain_complex,
+        verify_connected_components=verify_connected_components,
+        verbose=verbose,
+    )
+
+
+def _finish_betti_numbers(
+    meta: Any,
+    nodes_by_dim: dict[int, list[object]],
+    boundary_rank: dict[int, int],
+    *,
+    sparse_by_k: dict[int, list[list[int]]],
+    ncols_by_k: dict[int, int],
+    kmin: int,
+    kmax: int,
+    reduced: bool,
+    verify_chain_complex: bool,
+    verify_connected_components: bool,
+    verbose: bool,
+) -> dict[int, int]:
+    """Check ∂²=0 if asked, then Betti numbers from the boundary ranks (zeros trimmed)."""
     if verify_chain_complex:
         _verbose_line(verbose, "get_betti_numbers: verifying ∂²=0 (chain_square) …")
         viol = _chain_square_violations(

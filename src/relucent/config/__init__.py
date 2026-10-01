@@ -150,6 +150,17 @@ TOL_HALFSPACE_NORMAL: float = _env_float("TOL_HALFSPACE_NORMAL", 1e-12)
 GUROBI_SHI_BEST_OBJ_STOP: float = _env_float("GUROBI_SHI_BEST_OBJ_STOP", 1e-6)
 GUROBI_SHI_BEST_BD_STOP: float = _env_float("GUROBI_SHI_BEST_BD_STOP", -1e-6)
 
+# Gurobi's OptimalityTol for the SHI LP (dual feasibility of the simplex basis; Gurobi's default
+# is 1e-6, its minimum 1e-9). A basis that is only optimal to 1e-6 can have a slightly negative
+# exact multiplier, which the exact facet verdict then rejects.
+GUROBI_SHI_OPTIMALITY_TOL: float = _env_float("GUROBI_SHI_OPTIMALITY_TOL", 1e-9)
+
+# Gurobi's ScaleFlag for the SHI LP (-1 automatic, 0 off, 1-3 scaling methods). Composed rows span
+# orders of magnitude and can be nearly parallel; with automatic scaling Gurobi has called LPs of
+# nonempty cells infeasible (a far-out cell's facet LP, and relaxations of feasible LPs). On five
+# checkpoints failing that way, geometric-mean scaling (2) completed four; automatic, none.
+GUROBI_SHI_SCALE_FLAG: int = _env_int("GUROBI_SHI_SCALE_FLAG", 2)
+
 # Minimum SHI LP objective (margin along hyperplane i after relaxing that face) to
 # certify a supporting hyperplane. The objective is in the same units as halfspace
 # slacks a^T x + b. Values near zero (e.g. 1e-18) are floating-point noise and
@@ -176,10 +187,6 @@ DEFAULT_PLOT_BOUND: float = _env_float("DEFAULT_PLOT_BOUND", 10)
 # Tolerance for asserting that computed (A, b) match network outputs
 # when verifying halfspace construction (torch/np allclose atol).
 TOL_VERIFY_AB_ATOL: float = _env_float("TOL_VERIFY_AB_ATOL", 1e-6)
-
-# Floor for the vertex sign check in verify_vertex_covector (also beats
-# each preactivation's own float64 rounding at that point).
-TOL_VERTEX_SIGN_MARGIN: float = _env_float("TOL_VERTEX_SIGN_MARGIN", 1e-12)
 
 # -----------------------------------------------------------------------------
 # Complex search & parallel add
@@ -330,6 +337,8 @@ __all__ = [
     "DEFAULT_SEARCH_BOUND",
     "GUROBI_SHI_BEST_BD_STOP",
     "GUROBI_SHI_BEST_OBJ_STOP",
+    "GUROBI_SHI_OPTIMALITY_TOL",
+    "GUROBI_SHI_SCALE_FLAG",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
     "MIN_SEARCH_INRADIUS",
     "MAX_RADIUS",
@@ -345,7 +354,6 @@ __all__ = [
     "TOL_SHI_HYPERPLANE",
     "TOL_SHI_OBJECTIVE",
     "TOL_VERIFY_AB_ATOL",
-    "TOL_VERTEX_SIGN_MARGIN",
     "VERBOSE",
     "VERTEX_TRUST_THRESHOLD",
     "update_settings",

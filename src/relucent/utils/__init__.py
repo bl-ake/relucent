@@ -286,6 +286,12 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     Returns:
         bytes: A hashable bytes representation of the flattened sign sequence.
     """
+    # Hot path (millions of calls from cubical incidence / chain-complex assembly): a
+    # sign sequence that is already a C-contiguous int8 ndarray needs no coercion —
+    # ``tobytes()`` flattens in C order, exactly what ``.ravel().tobytes()`` produced.
+    if type(ss) is np.ndarray and ss.dtype == np.int8 and ss.flags["C_CONTIGUOUS"]:
+        return ss.tobytes()
+
     ss = ss.detach().cpu().numpy() if isinstance(ss, torch.Tensor) else np.asarray(ss)
 
     ss = ss.astype(np.int8, copy=False)

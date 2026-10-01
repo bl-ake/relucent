@@ -554,7 +554,7 @@ def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]
 def _lp_shis(poly: Polyhedron, env) -> list[int] | None:
     """Supporting hyperplane indices from a fresh ``get_shis`` LP solve."""
     poly._shis = None
-    kwargs: dict[str, Any] = {"env": env, "strict": False}
+    kwargs: dict[str, Any] = {"env": env}
     if poly.bound is not None:
         kwargs["bound"] = float(poly.bound)
     try:

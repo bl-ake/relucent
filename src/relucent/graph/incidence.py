@@ -35,13 +35,14 @@ Two SHI semantics matter and must not be confused:
 
 - **Cubical flip SHIs** (:func:`cubical_cell_shis`): authoritative for dual-graph
   adjacency, meta-graph node metadata, and contracted slices.
-- **LP facet SHIs** (``get_shis(..., strict=True)`` in :mod:`relucent.geometry.calculations`):
+- **LP facet SHIs** (:func:`~relucent.geometry.calculations.get_shis`):
   geometric facets on *ambient* top cells; can be a strict subset of the cubical
   set, so they must never drive meta-graph face-edge or node-metadata assembly.
 """
 
 from __future__ import annotations
 
+import multiprocessing
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any
@@ -53,7 +54,7 @@ import relucent.config as cfg
 from relucent._internal.logging import logger
 from relucent.core.errors import CubicalConsistencyError, DualGraphAsymmetricEdgeError, ShiFlipInvariantError
 from relucent.core.poly import Polyhedron
-from relucent.utils import encode_ss, flip_ss_at_shi, get_mp_context
+from relucent.utils import encode_ss, flip_ss_at_shi, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex
@@ -120,10 +121,11 @@ def face_tag(ss: np.ndarray, shi: int) -> bytes:
     :func:`collect_meta_face_edges`, :func:`verify_dual_graph_cubical`, and truncation cap
     tagging in :func:`~relucent.graph.meta_graph.truncate_meta_graph`.
     """
-    ss_arr = np.asarray(ss, dtype=np.int8)
-    row = ss_arr.reshape(-1).copy()
+    row = np.asarray(ss, dtype=np.int8).reshape(-1).copy()
     row[int(shi)] = 0
-    return encode_ss(row.reshape(ss_arr.shape))
+    # ``row`` is a fresh C-contiguous int8 1-D array, so ``tobytes()`` is byte-for-byte
+    # what ``encode_ss`` would return — skip its re-coercion (this is a hot path).
+    return row.tobytes()
 
 
 def flip_tag(ss: np.ndarray, shi: int) -> bytes:
@@ -133,7 +135,9 @@ def flip_tag(ss: np.ndarray, shi: int) -> bytes:
     whether a nonzero sign-sequence entry has a same-dimension flip neighbor in the slice.
     """
     row = np.asarray(ss, dtype=np.int8).ravel()
-    return encode_ss(flip_ss_at_shi(row, int(shi)).reshape(np.asarray(ss).shape))
+    # ``flip_ss_at_shi`` returns a fresh C-contiguous int8 1-D array; ``tobytes()`` on it
+    # equals ``encode_ss(...)`` byte-for-byte (hot path — avoid the re-coercion).
+    return flip_ss_at_shi(row, int(shi)).tobytes()
 
 
 def dual_graph_edge_top_dim(*, cell_top_dim: int, ambient_dim: int) -> int:
@@ -159,16 +163,22 @@ def cubical_cell_shis(
     contracted slices (:func:`set_contracted_shis`), and debug checks
     (:func:`verify_shi_flip_neighbors`, :func:`verify_meta_graph_incidence`).
     """
-    row = np.asarray(ss, dtype=np.int8).ravel()
+    # Own a mutable C-contiguous int8 copy so we can flip one entry in place, read the tag,
+    # and flip back -- avoiding a fresh array allocation and full re-coercion per neighbor.
+    # This is the dominant per-cell cost of set_contracted_shis on large slices.
+    row = np.asarray(ss, dtype=np.int8).reshape(-1).copy()
     skip = exclude_shis or frozenset()
+    n = row.shape[0]
     kept: list[int] = []
-    for shi in ss_nonzero_indices(np.asarray(ss)):
-        shi_i = int(shi)
+    for shi_i in ss_nonzero_indices(row):
         if shi_i in skip:
             continue
-        if shi_i >= row.shape[0] or row[shi_i] == 0:
+        if shi_i >= n or row[shi_i] == 0:
             continue
-        if encode_ss(flip_ss_at_shi(row, shi_i)) in neighbor_tags:
+        row[shi_i] = -row[shi_i]
+        tag = row.tobytes()
+        row[shi_i] = -row[shi_i]
+        if tag in neighbor_tags:
             kept.append(shi_i)
     return sorted(kept)
 
@@ -468,13 +478,44 @@ def verify_shi_flip_neighbors(ss: np.ndarray, shis: Iterable[int], *, neighbor_t
 # ---------------------------------------------------------------------------
 
 
+def _in_daemon_process() -> bool:
+    """True inside a Pool worker, where a nested Pool would raise (daemons cannot have children)."""
+    return multiprocessing.current_process().daemon
+
+
 def _contracted_shis_for_poly(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> list[int]:
     if int(poly.dim) == 1 and poly._covector_endpoint_shis is not None:
         return sorted(int(shi) for shi in poly._covector_endpoint_shis)
     return cubical_cell_shis(poly.ss_np, neighbor_tags=neighbor_tags)
 
 
-def set_contracted_shis(cplx: Complex) -> int:
+# Each worker should own at least this many cubical cells, or the Pool overhead is not
+# worth it (mirrors `graph.vertex_star.MIN_CANDIDATES_PER_WORKER`'s startup-cost tradeoff).
+# `cubical_cell_shis` is a tight per-cell loop, so keep the floor high enough that only the
+# large d=4 / deep slices go parallel; every smaller slice stays on the serial path.
+MIN_CELLS_PER_CONTRACTED_WORKER = 8192
+PARALLEL_CONTRACTED_MIN_CELLS = 2 * MIN_CELLS_PER_CONTRACTED_WORKER
+
+# Broadcast target for the shared neighbor-tag set. Under `fork` the parent sets this before
+# the pool is created and workers inherit it via copy-on-write (the tag set is one bytes
+# object per cell, so pickling it once per worker would dominate); under `spawn` it is sent
+# through the initializer instead. Only ever read inside a worker running `_cubical_shis_chunk`.
+_contracted_neighbor_tags: set[bytes] | None = None
+
+
+def _init_contracted_worker(neighbor_tags: set[bytes]) -> None:
+    global _contracted_neighbor_tags
+    _contracted_neighbor_tags = neighbor_tags
+
+
+def _cubical_shis_chunk(ss_rows: list[np.ndarray]) -> list[list[int]]:
+    """Worker: flip-neighbor SHIs for one chunk of cell sign sequences."""
+    tags = _contracted_neighbor_tags
+    assert tags is not None, "worker neighbor-tag set was not initialised"
+    return [cubical_cell_shis(ss, neighbor_tags=tags) for ss in ss_rows]
+
+
+def set_contracted_shis(cplx: Complex, *, nworkers: int | None = None) -> int:
     """Set authoritative ``_shis`` on a lower-dimensional slice after face recovery.
 
     Used after :meth:`~relucent.core.complex.Complex.get_chain_complex` materializes a
@@ -484,14 +525,64 @@ def set_contracted_shis(cplx: Complex) -> int:
     Assigns :func:`cubical_cell_shis` once the full dimension slice is known.
     Call :func:`verify_contracted_shis` to assert flip-neighbor and symmetry invariants.
 
+    Each cell's flip-neighbor SHIs depend only on its own sign sequence and the shared
+    slice-wide tag set, so the ``cubical_cell_shis`` pass is embarrassingly parallel (the
+    same shape of work as ``graph.vertex_star.find_vertices`` and
+    ``topology.morse.critical_flags_for_vertices``, which already farm out). It is the
+    dominant serial cost of :meth:`Complex.get_chain_complex` on large d=4 / deep slices,
+    so it is farmed across a worker pool once the slice is big enough to justify Pool
+    startup; below the gate, or in a daemon worker, it is the plain sequential loop.
+
     Returns the number of cells whose ``_shis`` list was changed.
     """
+    global _contracted_neighbor_tags
     if len(cplx) == 0:
         return 0
     neighbor_tags = {p.tag for p in cplx}
-    n_changed = 0
+
+    # 1-cells with recovered covector endpoints take the cheap endpoint shortcut; everything
+    # else needs the cubical flip-neighbor scan, which is what we (optionally) parallelize.
+    endpoint_assign: list[tuple[Polyhedron, list[int]]] = []
+    cubical_polys: list[Polyhedron] = []
     for poly in cplx:
-        assigned = _contracted_shis_for_poly(poly, neighbor_tags=neighbor_tags)
+        if int(poly.dim) == 1 and poly._covector_endpoint_shis is not None:
+            endpoint_assign.append((poly, sorted(int(shi) for shi in poly._covector_endpoint_shis)))
+        else:
+            cubical_polys.append(poly)
+
+    if nworkers is None:
+        nworkers = process_aware_cpu_count() or 1
+    n = len(cubical_polys)
+    use_parallel = nworkers > 1 and n >= PARALLEL_CONTRACTED_MIN_CELLS and not _in_daemon_process()
+
+    if use_parallel:
+        ctx = get_mp_context()
+        effective_workers = min(nworkers, max(1, n // MIN_CELLS_PER_CONTRACTED_WORKER))
+        chunk_size = max(n // (effective_workers * 4), 1)
+        ss_rows = [p.ss_np for p in cubical_polys]
+        chunks = [ss_rows[i : i + chunk_size] for i in range(0, n, chunk_size)]
+        is_fork = ctx.get_start_method() == "fork"
+        # fork: publish once in the parent, workers inherit via copy-on-write (no pickling of
+        # the tag set). spawn: send it through the initializer, once per worker.
+        _contracted_neighbor_tags = neighbor_tags if is_fork else None
+        pool_kwargs: dict[str, Any] = {} if is_fork else {"initializer": _init_contracted_worker, "initargs": (neighbor_tags,)}
+        try:
+            cubical_results: list[list[int]] = []
+            with ctx.Pool(effective_workers, **pool_kwargs) as pool:
+                for chunk_results in pool.map(_cubical_shis_chunk, chunks):
+                    cubical_results.extend(chunk_results)
+        finally:
+            _contracted_neighbor_tags = None
+    else:
+        cubical_results = [cubical_cell_shis(p.ss_np, neighbor_tags=neighbor_tags) for p in cubical_polys]
+
+    n_changed = 0
+    for poly, assigned in endpoint_assign:
+        if assigned != poly._shis:
+            poly._shis = assigned
+            poly._shis_strict = False
+            n_changed += 1
+    for poly, assigned in zip(cubical_polys, cubical_results, strict=True):
         if assigned != poly._shis:
             poly._shis = assigned
             poly._shis_strict = False

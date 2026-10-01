@@ -111,11 +111,11 @@ Search uses a process pool with initializer
 ``(net, env, dim)`` from module-level state — do not call ``set_worker_context``
 from the main process.
 
-When ``verify=True`` (the default for ``bfs``), frontier search keeps SHI LPs
-non-strict (heuristic neighbor discovery). After a complete search,
-:func:`~relucent.search.exploration.finalize_ambient_search` syncs top-cell SHIs from the
-dual graph and runs :func:`~relucent.verify.certify.certify_complex`, which applies strict
-facet checks.
+Every SHI list frontier search computes is certified: each facet decision is proven in
+float64 or exact arithmetic, or raises. After a complete search (``verify=True``, the
+default for ``bfs``), :func:`~relucent.search.exploration.finalize_ambient_search` syncs
+top-cell SHIs from the dual graph and runs :func:`~relucent.verify.certify.certify_complex`,
+which reuses those lists rather than recomputing them.
 
 SHI assignment: three roles
 ---------------------------
@@ -191,13 +191,13 @@ The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
 1. Build halfspaces from the sign sequence; drop degenerate rows.
 2. Work in intrinsic coordinates (null-space of zero-sign equalities).
 3. For each candidate index ``i``: relax halfspace ``i``, maximize along its normal.
-4. If the objective exceeds ``TOL_SHI_OBJECTIVE``, ``i`` is a facet SHI.
-5. With ``strict=True`` (opt-in via ``get_shis`` kwargs), invalid proofs raise
-   :class:`~relucent.core.errors.ShiProofError`; during default ambient search they
-   emit warnings instead.
+4. Certify the answer: ``i`` is a facet when a witness point puts row ``i`` strictly
+   positive and every other row strictly negative beyond their float64 error, and not a
+   facet when a verified dual certificate bounds row ``i`` below zero on the whole cell.
+   When float64 cannot decide, the question is answered in exact arithmetic, or
+   :class:`~relucent.core.errors.AmbiguousGeometryError` is raised.
 
-This is a **heuristic for exploration**: it must be good enough to find neighbors,
-but it is not the final authority on top-cell SHIs after a complete search.
+The ``strict`` option is deprecated and has no effect: every answer is already certified.
 
 After complete ambient search (authoritative top cells)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -248,8 +248,8 @@ after a **complete** search via ``finalize_ambient_search`` at
 * ``COMPLETE`` — additionally requires every LP facet on a top cell to flip to a
   same-dimension neighbor in the complex
   (:func:`~relucent.verify.certify.verify_lp_flip_neighbors_in_complex`).
-* ``GEOMETRIC`` — additionally recompute SHIs with ``strict=True`` on every cached
-  cell and require an exact match
+* ``GEOMETRIC`` — additionally recompute SHIs on every cached cell whose list was not
+  computed by ``get_shis`` on that cell, and require an exact match
   (:func:`~relucent.verify.certify.verify_shi_geometry`).
 
 When certification runs

@@ -29,24 +29,10 @@ def test_ordering_invariants() -> None:
     assert tol["MIN_SEARCH_INRADIUS"] == tol["TOL_SHI_OBJECTIVE"] / 2.0
 
 
-def test_monotonicity_with_max_coord() -> None:
-    tol_small = compute_tolerances(max_coord=1e6)
-    tol_large = compute_tolerances(max_coord=1e7)
-    assert tol_large["TOL_HALFSPACE_CONTAINMENT"] >= tol_small["TOL_HALFSPACE_CONTAINMENT"]
-    assert tol_large["TOL_VERIFY_AB_ATOL"] >= tol_small["TOL_VERIFY_AB_ATOL"]
-
-
 def test_monotonicity_with_ambient_dim() -> None:
     tol_low = compute_tolerances(ambient_dim=2)
     tol_high = compute_tolerances(ambient_dim=500)
     assert tol_high["TOL_HALFSPACE_CONTAINMENT"] >= tol_low["TOL_HALFSPACE_CONTAINMENT"]
-
-
-def test_network_tolerances_use_tighter_coord_scale() -> None:
-    net = convert(mlp([2, 8, 1]))
-    global_tol = compute_tolerances()
-    net_tol = compute_tolerances(net=net)
-    assert net_tol["TOL_HALFSPACE_CONTAINMENT"] < global_tol["TOL_HALFSPACE_CONTAINMENT"]
 
 
 def test_containment_probe_accepts_feasible_point() -> None:
@@ -147,7 +133,77 @@ def test_shi_proof_tolerance_covers_lp_feasibility_on_small_weight_networks() ->
     assert tol["TOL_SHI_HYPERPLANE"] >= (3 + 1) * gurobi_feasibility_tol
 
 
-def test_vertex_sign_margin_does_not_scale_with_input_box() -> None:
+def test_shi_objective_stays_below_push_size_for_large_input_box() -> None:
+    """The SHI objective is at most push_size (1), so an acceptance threshold near it rejects every facet."""
     small = compute_tolerances(max_coord=1.0)
-    large = compute_tolerances(max_coord=1e8)
-    assert small["TOL_VERTEX_SIGN_MARGIN"] == large["TOL_VERTEX_SIGN_MARGIN"]
+    large = compute_tolerances(max_coord=1e15)
+    assert small["TOL_SHI_OBJECTIVE"] < 1e-6
+    assert large["TOL_SHI_OBJECTIVE"] <= 1e-6
+    assert large["MIN_SEARCH_INRADIUS"] <= 5e-7
+
+
+def test_bfs_explores_deep_large_weight_network() -> None:
+    """Uncapped, this net's TOL_SHI_OBJECTIVE is 15 and BFS stopped at its start region."""
+    import torch
+
+    from relucent.core.complex import Complex
+    from relucent.model.model import LinearLayer
+
+    torch.manual_seed(0)
+    net = convert(mlp([2, 6, 6, 6, 6, 6, 1]))
+    for layer in net.layers.values():
+        if isinstance(layer, LinearLayer):
+            layer.weight = layer.weight * 35.0
+            layer.bias = layer.bias * 35.0
+    saved = {name: getattr(cfg, name) for name in [*compute_tolerances(), "CAREFUL_MODE"]}
+    try:
+        # CAREFUL_MODE's checks are not what this test is about; keep it to the search itself.
+        update_settings(CAREFUL_MODE=False)
+        cplx = Complex(net, auto_tolerances=True)
+        assert cfg.TOL_SHI_OBJECTIVE <= 1e-6
+        cplx.bfs(start=torch.zeros(2, dtype=torch.float64) + 0.123, verbose=False)
+    finally:
+        update_settings(**saved)
+    ss = np.asarray(cplx.point2ss(np.random.default_rng(0).standard_normal((512, 2))))
+    assert len(cplx) > 1
+    assert all(s in cplx for s in ss)
+
+
+def test_tolerances_do_not_scale_with_the_network() -> None:
+    """No setting follows a network's weights or depth: that one-number-per-network scaling was the defect."""
+    from relucent.model.model import LinearLayer
+
+    small = convert(mlp([2, 8, 8, 1]))
+    big = convert(mlp([2, 8, 8, 1]))
+    for layer in big.layers.values():
+        if isinstance(layer, LinearLayer):
+            layer.weight = layer.weight * 1e3
+            layer.bias = layer.bias * 1e3
+    a, b = compute_tolerances(net=small), compute_tolerances(net=big)
+    for name in a:
+        if name != "BOUNDARY_MIP_EPS":
+            assert a[name] == b[name], name
+    assert compute_tolerances(max_coord=1.0) == compute_tolerances(max_coord=1e15)
+
+
+def test_genericity_tells_vertices_apart_by_their_own_error() -> None:
+    """Two distinct segment endpoints 1e-9 apart are distinct; the old 2e-6 grid merged them."""
+    from relucent.core.poly import Polyhedron
+    from relucent.verify.certify import verify_arrangement_genericity
+
+    # Two collinear unit-length segments on the x-axis meeting near x = 0: [-1, -1e-9] and [0, 1].
+    left = Polyhedron(
+        None,
+        np.array([[0, 1, 1]], dtype=np.int8),
+        halfspaces=np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, -1.0], [1.0, 0.0, 1e-9]]),
+        dim=1,
+        _ambient_dim=2,
+    )
+    right = Polyhedron(
+        None,
+        np.array([[0, 1, 1, 1]], dtype=np.int8),
+        halfspaces=np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [1.0, 0.0, -1.0], [0.0, 0.0, -1.0]]),
+        dim=1,
+        _ambient_dim=2,
+    )
+    verify_arrangement_genericity([left, right])

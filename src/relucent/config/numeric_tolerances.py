@@ -8,8 +8,6 @@ from typing import Any
 
 import numpy as np
 
-import relucent.config as cfg
-from relucent._internal.network_scale import estimate_input_bound
 from relucent.config import update_settings
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
@@ -108,7 +106,25 @@ def compute_tolerances(
     max_coord: float | None = None,
     safety_factor: float = 2.0,
 ) -> dict[str, float]:
-    """Return recommended values for derived tolerance settings in :mod:`relucent.config`."""
+    """Return static values for the tolerance settings in :mod:`relucent.config`.
+
+    None of these settings decides anything on the topology path any more. Every geometric
+    decision (facets, cell emptiness, vertices, genericity, point membership, Morse signs) is
+    made against the float64 error of the specific rows or values involved
+    (:mod:`relucent._internal.rounding`), and raises
+    :class:`~relucent.core.errors.AmbiguousGeometryError` when that error could flip it. The
+    settings remain for plotting (``relucent.vis``), the ``boundary_bfs`` MIP
+    (``BOUNDARY_MIP_EPS``), and backward compatibility.
+
+    They used to be scaled per network by ``estimate_input_bound`` (a product of layer norms,
+    exponential in depth) times the largest composed row norm. One network-wide number stood in
+    for rows whose own errors differ by five or more orders of magnitude, and it was wrong in
+    both directions: loose enough on deep or large-weight nets to reject every facet (BFS stopped
+    at its start region) or merge distinct vertices, and too tight where a proof point sat far
+    out. So ``max_coord`` is ignored, and ``net`` only sets the ambient dimension and the
+    ``boundary_bfs`` margin.
+    """
+    del max_coord
     gurobi_tol = _GUROBI_FEAS_TOL
     push_size = 1.0
     max_halfspace_norm = 1.0
@@ -117,21 +133,13 @@ def compute_tolerances(
     max_column_inf = 0.0
     relu_depth = 0
     max_preactivation = 1.0
+    max_coord = 1.0
 
     if net is not None:
         scan = _scan_halfspace_magnitudes(net)
         ambient_dim = int(np.prod(net.input_shape))
-        max_coord = estimate_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN))
-        max_halfspace_norm = float(scan["max_halfspace_norm"])
-        max_abs_bias = float(scan["max_abs_bias"])
-        max_constraints = int(scan["max_constraints"])
-        max_column_inf = float(scan["max_column_inf"])
-        relu_depth = int(scan["relu_depth"])
         max_preactivation = float(scan["max_preactivation"])
-    elif max_coord is None:
-        max_coord = float(cfg.DEFAULT_SEARCH_BOUND)
 
-    assert max_coord is not None
     g = _gamma(ambient_dim)
     dot_floor = g * max_halfspace_norm * max_coord
     norm_floor = g * max_halfspace_norm
@@ -173,9 +181,6 @@ def compute_tolerances(
         "VERTEX_TRUST_THRESHOLD": tol_vertex_trust,
         "TOL_DEAD_RELU": tol_dead_relu,
         "TOL_VERIFY_AB_ATOL": tol_verify_ab,
-        # Unit-scale floor only; verify_vertex_covector adds per-vertex rounding.
-        # Don't tie this to max_coord — the input box overstates it badly.
-        "TOL_VERTEX_SIGN_MARGIN": _safe(norm_floor, safety_factor=safety_factor),
         "TOL_SHI_OBJECTIVE": tol_shi_objective,
         "GUROBI_SHI_BEST_OBJ_STOP": tol_gurobi_obj_stop,
         "GUROBI_SHI_BEST_BD_STOP": -tol_gurobi_obj_stop,

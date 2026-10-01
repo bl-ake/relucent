@@ -169,3 +169,90 @@ def test_transpose_rank_matches_direct() -> None:
     assert gf2_rank_boundary(packed.copy(), ncols) == gf2_rank_packed(packed.copy(), ncols)
     transposed, ncols_t = _transpose_packed(packed, ncols)
     assert gf2_rank_packed(transposed.copy(), ncols_t) == gf2_rank_packed(packed.copy(), ncols)
+
+
+def test_sparse_rank_finishes_dense_remainder_when_fill_in_densifies(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fill-in past the density threshold hands the Schur complement to packed rank."""
+    import relucent.topology.betti as betti
+
+    calls: list[int] = []
+    real = betti.gf2_rank_boundary
+
+    def spy(packed: np.ndarray, ncols: int, **kwargs: object) -> int:
+        del kwargs
+        calls.append(ncols)
+        return real(packed, ncols)
+
+    monkeypatch.setattr(betti, "gf2_rank_boundary", spy)
+    # Random regular bipartite patterns (expander-like) admit no low-fill pivot order.
+    rng = np.random.default_rng(1)
+    for trial in range(4):
+        n = 300
+        row_sets: list[set[int]] = [set() for _ in range(n)]
+        for _ in range(5):
+            for i, j in enumerate(rng.permutation(n)):
+                row_sets[i].symmetric_difference_update({int(j)})
+        expected = gf2_rank_packed(_row_sets_to_packed(row_sets, n), n)
+        assert gf2_rank_sparse_rowsets(row_sets, n) == expected, trial
+    assert calls, "no trial densified enough to exercise the dense remainder"
+
+
+def _random_meta(rng: np.random.Generator, counts: tuple[int, ...], faces_per_cell: int, *, repeat: bool):
+    import networkx as nx
+
+    meta = nx.MultiDiGraph()
+    for k, n in enumerate(counts):
+        meta.add_nodes_from(((k, i) for i in range(n)), dim=k)
+    for k in range(1, len(counts)):
+        for i in range(counts[k]):
+            for j in rng.choice(counts[k - 1], size=min(faces_per_cell, counts[k - 1]), replace=False):
+                meta.add_edge((k, i), (k - 1, int(j)))
+                if repeat and rng.random() < 0.1:
+                    meta.add_edge((k, i), (k - 1, int(j)))  # cancels mod 2
+    return meta
+
+
+@pytest.mark.parametrize("require_shared_faces", [False, True])
+def test_sparse_and_dense_betti_agree(require_shared_faces: bool) -> None:
+    """Both rank methods give the same Betti numbers, including repeated (mod-2 cancelling) edges."""
+    from relucent.topology import get_betti_numbers
+
+    rng = np.random.default_rng(11)
+    for _ in range(20):
+        counts = tuple(int(v) for v in rng.integers(5, 40, size=int(rng.integers(2, 5))))
+        meta = _random_meta(rng, counts, int(rng.integers(1, 5)), repeat=True)
+        kw = {"require_shared_faces": require_shared_faces, "verify_connected_components": False}
+        assert get_betti_numbers(meta, method="sparse", **kw) == get_betti_numbers(meta, method="dense", **kw)
+
+
+def test_sparse_boundary_maps_match_packed() -> None:
+    from relucent.topology.betti import _sparse_boundary_maps
+
+    rng = np.random.default_rng(3)
+    meta = _random_meta(rng, (30, 50, 40, 12), 4, repeat=True)
+    nodes_by_dim = {k: [n for n, d in meta.nodes(data="dim") if d == k] for k in range(4)}
+    for shared in (False, True):
+        maps = _sparse_boundary_maps(meta, nodes_by_dim, require_shared_faces=shared)
+        for k in (1, 2, 3):
+            packed, ncols = _packed_boundary_matrix(meta, nodes_by_dim, k=k, require_shared_faces=shared)
+            rows, nc = maps[k]
+            assert nc == ncols
+            assert np.array_equal(_row_sets_to_packed(rows, ncols), packed)
+
+
+def test_chain_square_violation_counts_product_nonzeros() -> None:
+    """A 2-cell whose boundary is an open path breaks ∂∂=0; the count matches the dense product."""
+    import networkx as nx
+
+    from relucent.topology import ChainComplexInconsistent, get_betti_numbers
+
+    meta = nx.MultiDiGraph()
+    meta.add_nodes_from([(0, i) for i in range(3)], dim=0)
+    meta.add_nodes_from([(1, i) for i in range(2)], dim=1)
+    meta.add_node((2, 0), dim=2)
+    meta.add_edges_from([((1, 0), (0, 0)), ((1, 0), (0, 1)), ((1, 1), (0, 1)), ((1, 1), (0, 2))])
+    meta.add_edges_from([((2, 0), (1, 0)), ((2, 0), (1, 1))])
+    for method in ("sparse", "dense"):
+        with pytest.raises(ChainComplexInconsistent) as info:
+            get_betti_numbers(meta, verify_chain_complex=True, method=method)
+        assert info.value.violations == [{"k": 1, "nnz": 2, "shape": [3, 1]}]

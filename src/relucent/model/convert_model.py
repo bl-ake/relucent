@@ -7,7 +7,7 @@ which consists of Linear and ReLU layers only.
 
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import TypeGuard
+from typing import Any, TypeGuard
 
 import numpy as np
 import numpy.typing as npt
@@ -194,6 +194,40 @@ def avgpool2d_to_affine(avgpool: nn.AvgPool2d, input_size: tuple[int, int, int])
     return torch_conv_layer_to_affine(conv2d, input_size)
 
 
+def _as_float64(value: Any) -> np.ndarray:
+    if isinstance(value, torch.Tensor):
+        return value.detach().double().cpu().numpy()
+    return np.asarray(value, dtype=np.float64)
+
+
+def _conversion_error_bound(layers: Mapping[str, object], x: torch.Tensor, dtype: torch.dtype) -> np.ndarray:
+    """Bound on |source output - converted output| at ``x`` from rounding alone.
+
+    Both models evaluate the same affine maps and ReLUs in ``dtype``, in a different order.
+    Each output's rounding is at most ``gamma(K)`` times the network evaluated with ``|W|``,
+    ``|b|`` and ``|x|`` and every unit on (an upper bound for any activation pattern), computed
+    over the layers *before* consecutive linear maps are merged, since a merged product's ``|W|``
+    can be far smaller than the product of the ``|W|``'s the source model rounds through.
+    """
+    from relucent._internal import rounding
+
+    v = np.abs(x.detach().double().cpu().numpy()).reshape(-1)
+    n_terms = 1
+    for layer in layers.values():
+        weight = getattr(layer, "weight", None)
+        if weight is None:
+            continue  # ReLU / Flatten / pooling-free reshape: nonnegative input passes through
+        w = np.abs(_as_float64(weight))
+        bias = getattr(layer, "bias", None)
+        b = 0.0 if bias is None else np.abs(_as_float64(bias)).reshape(-1)
+        v = w.reshape(w.shape[0], -1) @ v + b
+        n_terms += int(w.reshape(w.shape[0], -1).shape[1]) + 1
+    u = float(torch.finfo(dtype).eps) / 2.0 if dtype.is_floating_point else rounding.EPS
+    g = n_terms * u / (1.0 - n_terms * u)
+    # Two evaluations, each off by at most g times the abs network; 4 ulps for the bound itself.
+    return 2.0 * g * v * (1.0 + 4.0 * rounding.EPS)
+
+
 def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDict[str, nn.Module]:
     """Combine consecutive Linear layers into a single layer.
 
@@ -344,6 +378,7 @@ def convert(
             raise ValueError(f"Module {name} is not supported: {module}")
         x = module(x)
         module.to(device=device)
+    uncombined_layers = dict(layers)
     layers = combine_linear_layers(layers)
     canonical_layers = _canonicalize_named_layers(layers)
     new_model = ReLUNetwork(layers=canonical_layers, input_shape=(np.prod(input_shape, dtype=int),))
@@ -357,11 +392,10 @@ def convert(
             old_y = model(x)
             new_y = torch.as_tensor(new_model(x))
             if cfg.CAREFUL_MODE:
-                assert torch.allclose(
-                    old_y,
-                    new_y,
-                    atol=cfg.TOL_VERIFY_AB_ATOL,
-                    rtol=cfg.TOL_VERIFY_AB_ATOL,
+                bound = _conversion_error_bound(uncombined_layers, x, dtype)
+                diff = (old_y.detach().double().reshape(-1) - new_y.detach().double().reshape(-1)).abs()
+                assert bool((diff <= torch.as_tensor(bound, dtype=torch.float64)).all()), (
+                    f"converted model differs from the source by {float(diff.max()):.3e}, beyond its rounding bound"
                 )
         except Exception as e:
             raise ValueError(f"Conversion failed: {e}") from e

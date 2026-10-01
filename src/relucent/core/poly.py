@@ -11,9 +11,13 @@ import plotly.graph_objects as go
 from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 import relucent.config as cfg
+from relucent._internal import rounding
 from relucent._internal.torch_compat import torch
+from relucent.core.errors import AmbiguousGeometryError
 from relucent.geometry.calculations import (
+    DegenerateHalfspaceInfeasibility,
     _affine_null_basis,
+    _drop_degenerate_halfspaces_tracked,
     _remap_zero_indices,
     compute_properties,
     get_hs,
@@ -38,6 +42,8 @@ class Polyhedron:
         net: ReLUNetwork | Any,
         ss: np.ndarray | torch.Tensor,
         halfspaces: np.ndarray | torch.Tensor | None = None,
+        halfspaces_err: np.ndarray | None = None,
+        halfspaces_ss: np.ndarray | None = None,
         W: np.ndarray | torch.Tensor | None = None,
         b: np.ndarray | torch.Tensor | None = None,
         finite: bool | None = None,
@@ -63,6 +69,19 @@ class Polyhedron:
         self._ss = self._coerce_ss_to_int(ss)
         self._halfspaces: torch.Tensor | np.ndarray | None = halfspaces
         self._halfspaces_np: np.ndarray | None = None
+        # Float64 error scale of the rows (see relucent._internal.rounding). Rows handed in
+        # from elsewhere must bring theirs; rows this cell composes itself get it computed.
+        self._halfspaces_err: np.ndarray | None = halfspaces_err
+        self._halfspaces_own: bool = halfspaces is None
+        # Rows supplied by a caller with no error scale and no source sign sequence are the
+        # caller's data, taken as exact. (Every internal hand-off passes both.)
+        self._halfspaces_user: bool = halfspaces is not None and halfspaces_err is None and halfspaces_ss is None
+        # Whether the rows are exact data (a net-less cell, or a caller's rows) rather than rows
+        # composed from a network in float64. Kept separately from ``_net``, which pickling drops.
+        self._rows_data: bool = net is None or self._halfspaces_user
+        # Sign sequence whose composed rows ``halfspaces`` are, when handed in from another cell
+        # (so their error scale and exact values can be rebuilt; see relucent._internal).
+        self._halfspaces_ss: np.ndarray | None = halfspaces_ss
         self._w: torch.Tensor | np.ndarray | None = W
         self._b: torch.Tensor | np.ndarray | None = b
         self._Wl2: float | None = None
@@ -74,6 +93,8 @@ class Polyhedron:
         self.bound = bound
 
         self._shis: list[int] | None = shis
+        # Whether ``_shis`` is this cell's certified facet list (get_shis on it), as opposed to a
+        # list assigned from the dual graph or a coface; certification recomputes only the latter.
         self._shis_strict: bool = False
         self._hs: HalfspaceIntersection | None = None
         self._ch: ConvexHull | None = None
@@ -126,67 +147,93 @@ class Polyhedron:
         return None
 
     @staticmethod
-    def _halfspace_point(hs: np.ndarray, eq_indices: np.ndarray) -> np.ndarray | None:
-        """Attempt to find the point defined by treating ``eq_indices`` rows as equalities.
+    def _halfspace_point(
+        hs: np.ndarray,
+        eq_indices: np.ndarray,
+        errors: np.ndarray | None = None,
+        exact_rows: Callable[[], list[list[Any]] | None] | None = None,
+    ) -> np.ndarray | None:
+        """The point where the ``eq_indices`` rows vanish, if it satisfies every other row.
 
-        Solves the linear system ``hs[eq_indices, :-1] @ x = -hs[eq_indices, -1]`` via
-        least-squares.  Two checks are applied:
-
-        1. **Residual check** (equality rows): ``‖a_eq @ x − b_eq‖ ≤ TOL_INTERIOR_VERIFY``
-           (relative to ``‖b_eq‖``).  A large residual means the equality system is
-           inconsistent — no such point exists.
-        2. **Slack check** (inequality rows only): each row *not* in ``eq_indices`` must
-           satisfy ``a_i @ x + b_i ≤ TOL_HALFSPACE_CONTAINMENT``.  Equality rows are
-           excluded because their satisfaction is already covered by the residual check
-           with the intentionally looser ``TOL_INTERIOR_VERIFY`` tolerance; applying the
-           stricter ``TOL_HALFSPACE_CONTAINMENT`` to them could reject valid points when
-           the lstsq residual is in the ``(TOL_HALFSPACE_CONTAINMENT, TOL_INTERIOR_VERIFY]``
-           range.
+        Solves ``hs[eq_indices, :-1] @ x = -hs[eq_indices, -1]`` and judges each other row at
+        the solution against its own float64 error (``errors``, the rows' error scale from
+        :mod:`relucent._internal.rounding`; exact data when omitted), widened by the solve error.
 
         Returns:
-            The feasible point as a 1-D float64 array, or ``None`` if the equality
-            system is inconsistent or the candidate point violates any inequality
-            halfspace.
-        """
-        H = np.asarray(hs, dtype=np.float64)
-        eq = H[eq_indices]
-        a_eq = eq[:, :-1]
-        b_eq = -eq[:, -1]
-        x, *_ = np.linalg.lstsq(a_eq, b_eq, rcond=None)
-        x = np.asarray(x, dtype=np.float64).reshape(-1)
-        if a_eq.size > 0:
-            res = float(np.linalg.norm(a_eq @ x - b_eq))
-            scale = max(1.0, float(np.linalg.norm(b_eq)))
-            if res > float(cfg.TOL_INTERIOR_VERIFY) * scale:
-                return None
-        n_rows = H.shape[0]
-        n_eq = len(eq_indices)
-        if n_rows > n_eq:
-            eq_mask = np.zeros(n_rows, dtype=bool)
-            eq_mask[np.asarray(eq_indices, dtype=np.intp)] = True
-            ineq_slacks = H[~eq_mask, :-1] @ x + H[~eq_mask, -1]
-            if np.any(ineq_slacks > float(cfg.TOL_HALFSPACE_CONTAINMENT)):
-                return None
-        return x
+            The point, or ``None`` when the equality system has no solution or some other row
+            is violated beyond its error.
 
-    def verify_vertex_covector(
-        self,
-        vertex_ss: np.ndarray,
-        *,
-        point2preactivations: Callable[[np.ndarray], np.ndarray],
-        sign_margin: float,
-    ) -> np.ndarray | None:
+        Raises:
+            AmbiguousGeometryError: When the equality rows are dependent within their error, or
+                another row vanishes at the point to within its error (the point lies on a further
+                hyperplane, so whether it belongs to the cell cannot be decided).
+        """
+        sol = Polyhedron._halfspace_point_with_error(hs, eq_indices, errors, exact_rows)
+        return None if sol is None else sol[0]
+
+    @staticmethod
+    def _halfspace_point_with_error(
+        hs: np.ndarray,
+        eq_indices: np.ndarray,
+        errors: np.ndarray | None = None,
+        exact_rows: Callable[[], list[list[Any]] | None] | None = None,
+    ) -> tuple[np.ndarray, float] | None:
+        """:meth:`_halfspace_point` plus a bound on the point's distance to the exact point.
+
+        When float64 cannot decide and ``exact_rows`` can rebuild the rows exactly, the decision
+        is made in exact arithmetic (:func:`relucent._internal.exact.exact_point`) instead.
+        """
+        try:
+            return Polyhedron._halfspace_point_float(hs, eq_indices, errors)
+        except AmbiguousGeometryError:
+            rows = exact_rows() if exact_rows is not None else None
+            if rows is None:
+                raise
+            from relucent._internal import exact
+
+            return exact.exact_point(rows[: np.asarray(hs).shape[0]], np.asarray(eq_indices, dtype=np.intp))
+
+    @staticmethod
+    def _halfspace_point_float(
+        hs: np.ndarray, eq_indices: np.ndarray, errors: np.ndarray | None = None
+    ) -> tuple[np.ndarray, float] | None:
+        """Float64 half of :meth:`_halfspace_point_with_error`; raises when it cannot decide."""
+        H = np.asarray(hs, dtype=np.float64)
+        E = rounding.exact_rows_error(H) if errors is None else np.asarray(errors, dtype=np.float64)
+        eq_idx = np.asarray(eq_indices, dtype=np.intp)
+        sol = rounding.solve_equalities(H, E, eq_idx)
+        if sol is None:
+            return None
+        x, x_err = sol
+        others = np.flatnonzero(~np.isin(np.arange(H.shape[0]), eq_idx))
+        # Rows with an exactly zero normal are constants, decided when the cell was built.
+        others = others[~np.all(H[others, :-1] == 0.0, axis=1)]
+        if others.size == 0:
+            return x, x_err
+        side = rounding.classify_rows(H, E, x, x_err, rows=others)
+        if np.any(side == 1):
+            return None
+        if np.all(side == -1):
+            return x, x_err
+        raise AmbiguousGeometryError(
+            f"the point where rows {eq_idx.tolist()} vanish also lies on rows "
+            + f"{others[side == 0].tolist()} to within float64 error"
+        )
+
+    def verify_vertex_covector(self, vertex_ss: np.ndarray) -> np.ndarray | None:
         """Recover and verify a vertex predicted from this top-dimensional coface.
 
-        Only the equality solve uses floating-point arithmetic. Verification
-        ignores the zero coordinates and requires every predicted nonzero
-        preactivation past ``sign_margin`` and its own float64 rounding at the
-        vertex.
+        ``vertex_ss`` is this cell's sign sequence with more entries set to zero, ``ambient_dim`` in
+        all. This cell's rows are those of a full-dimensional cell whose closure contains it. It is
+        a vertex of this cell's closure exactly when the point where those rows vanish satisfies
+        every other row of this cell strictly, and then its covector is ``vertex_ss`` (a unit's
+        preactivation equals this cell's affine row on the whole closure). Both are decided in
+        float64 against each row's own error by :meth:`_halfspace_point`, or exactly when that
+        cannot decide and the rows can be rebuilt exactly. Rows with an exactly zero normal (dead
+        units) are constants, not hyperplanes, and do not take part.
 
-        Coordinates whose halfspace normal vanishes (dead / near-dead ReLUs,
-        ``||a|| < TOL_DEAD_RELU``) are not real hyperplanes: they may still
-        carry a spurious combinatorial ``±1`` in ``vertex_ss``, but they are
-        skipped in the sign check so they do not reject genuine vertices.
+        Raises:
+            AmbiguousGeometryError: When the decision falls inside float64 error.
         """
         ss = np.asarray(vertex_ss, dtype=np.int8)
         row = ss.ravel()
@@ -195,36 +242,19 @@ class Polyhedron:
         if zero_indices.size != ambient_dim:
             return None
 
-        hs = np.asarray(self.halfspaces_np, dtype=np.float64)
+        own = np.asarray(self.ss_np, dtype=np.int8).ravel()
+        keep = row != 0
+        if own.size != row.size or not np.array_equal(own[keep], row[keep]) or np.any(row[own == 0] != 0):
+            raise ValueError(
+                "verify_vertex_covector needs a covector obtained by zeroing entries of this cell's sign sequence"
+            )
+        hs = np.asarray(self.halfspaces_np, dtype=np.float64)[: row.size]
+        err = np.asarray(self.halfspaces_err_np, dtype=np.float64)[: row.size]
         if hs.shape[0] < row.size:
             raise ValueError(f"Halfspace row count {hs.shape[0]} is smaller than sign-sequence length {row.size}.")
-        equality_normals = hs[zero_indices, :-1]
-        if equality_normals.shape != (ambient_dim, ambient_dim):
-            return None
-        if int(np.linalg.matrix_rank(equality_normals)) != ambient_dim:
-            return None
-
-        point = self._halfspace_point(hs[: row.size], zero_indices)
-        if point is None:
-            return None
-        values = np.asarray(point2preactivations(point), dtype=np.float64).reshape(-1)
-        if values.size != row.size:
-            raise ValueError(f"Network produced {values.size} preactivations for a sign sequence of length {row.size}.")
-
-        # Skip vanishing normals: not real cuts, only noise in the sign alphabet.
-        normals = hs[: row.size, :-1]
-        normal_norms = np.linalg.norm(normals, axis=1)
-        active = (row != 0) & (normal_norms >= float(cfg.TOL_DEAD_RELU))
-        if not np.any(active):
-            return None
-        signed_values = values[active] * row[active]
-        # Margin tracks each row's magnitude here — a single network-wide
-        # margin sized for the input box was rejecting real near-data vertices.
-        term_scale = np.abs(normals[active]) @ np.abs(np.asarray(point).reshape(-1)) + np.abs(hs[: row.size, -1][active])
-        margin = np.maximum(float(sign_margin), 2.0 * row.size * float(np.finfo(np.float64).eps) * term_scale)
-        if np.any(signed_values <= margin):
-            return None
-        return point
+        if np.any(np.all(hs[zero_indices, :-1] == 0.0, axis=1)):
+            return None  # a dead unit's constant row is not a hyperplane: no vertex on it
+        return self._halfspace_point(hs, zero_indices, err, self._exact_rows)
 
     def _apply_zero_cell_finite_hint(self) -> None:
         """Mark 0-cells (vertices) as bounded without a Chebyshev LP."""
@@ -246,7 +276,7 @@ class Polyhedron:
         zidx = self.zero_indices
         if zidx.size == 0:
             raise ValueError("0-cell has no equality (zero) constraints in its sign sequence")
-        x = self._halfspace_point(hs, zidx)
+        x = self._halfspace_point(hs, zidx, self.halfspaces_err_np, self._exact_rows)
         if x is None:
             raise ValueError("0-cell halfspace system is infeasible or candidate point violates active inequalities")
         return x
@@ -294,7 +324,7 @@ class Polyhedron:
                 + "indicates the cell was constructed outside the normal pipeline."
             )
         active = np.array(list(self.zero_indices) + [shi], dtype=np.intp)
-        return self._halfspace_point(hs, active) is not None
+        return self._halfspace_point(hs, active, self.halfspaces_err_np, self._exact_rows) is not None
 
     def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         """Return an integer-typed sign sequence (values in {-1, 0, 1})."""
@@ -425,6 +455,7 @@ class Polyhedron:
                 self.halfspaces_np[:],
                 zero_indices=self.zero_indices,
                 max_radius=max_radius,
+                errors=self.halfspaces_err_np,
             )[0]
             assert isinstance(interior_point, np.ndarray)
             interior_point = interior_point.squeeze()
@@ -452,7 +483,12 @@ class Polyhedron:
             pt = self._interior_point_from_equalities()
             return pt.reshape(-1, 1), 0.0
         env = env or get_env()
-        center, inradius = solve_radius(env, self.halfspaces_np[:], zero_indices=self.zero_indices)
+        center, inradius = solve_radius(
+            env,
+            self.halfspaces_np[:],
+            zero_indices=self.zero_indices,
+            errors=self.halfspaces_err_np,
+        )
         return center, inradius
 
     def _halfspaces_with_bounding_box(self, bound: float, env: Any = None) -> tuple[np.ndarray, np.ndarray | None]:
@@ -463,6 +499,13 @@ class Polyhedron:
         the returned halfspaces — the raw :attr:`zero_indices` point into the
         pre-drop stack and would otherwise land on a bounding-box row.
         """
+        halfspaces, zero_indices, _ = self._halfspaces_with_bounding_box_err(bound, env=env)
+        return halfspaces, zero_indices
+
+    def _halfspaces_with_bounding_box_err(
+        self, bound: float, env: Any = None
+    ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray]:
+        """:meth:`_halfspaces_with_bounding_box` plus the float64 error scale of the returned rows."""
         dim = self.halfspaces_np.shape[1] - 1
         bounds_lhs = np.eye(dim)
         bounds_rhs = -np.ones((dim, 1)) * bound
@@ -473,31 +516,24 @@ class Polyhedron:
                 np.hstack((-bounds_lhs, bounds_rhs)),
             )
         )
-        # Drop near-zero normals (dead constraints); toxic for Gurobi / Qhull.
-        normals = halfspaces[:, :-1]
-        norms = np.linalg.norm(normals, axis=1)
-        deg = norms < cfg.TOL_HALFSPACE_NORMAL
+        errors = np.vstack((self.halfspaces_err_np, rounding.box_rows_error(dim, bound)))
         zero_indices: np.ndarray | None = np.asarray(self.zero_indices, dtype=np.intp)
         if zero_indices.size == 0:
             zero_indices = None
-        if np.any(deg):
-            b = halfspaces[:, -1]
-            # Degenerate row is 0*x + b <= 0; b>0 is outright infeasible.
-            if np.any(b[deg] > cfg.TOL_HALFSPACE_CONTAINMENT):
-                bad = np.flatnonzero(deg & (b > cfg.TOL_HALFSPACE_CONTAINMENT)).tolist()
-                raise ValueError(
-                    "Degenerate halfspace(s) imply infeasibility after bounding; "
-                    + f"rows={bad}, tol_normal={cfg.TOL_HALFSPACE_NORMAL:g}"
-                )
-            old_to_new = np.full(halfspaces.shape[0], -1, dtype=np.intp)
-            kept = np.flatnonzero(~deg)
-            old_to_new[kept] = np.arange(kept.size, dtype=np.intp)
+        # Drop constant rows (exactly zero normal); toxic for Gurobi / Qhull.
+        try:
+            kept_hs, old_to_new = _drop_degenerate_halfspaces_tracked(halfspaces, errors=errors)
+        except DegenerateHalfspaceInfeasibility as error:
+            raise ValueError(f"Degenerate halfspace(s) imply infeasibility after bounding: {error}") from error
+        if kept_hs.shape[0] != halfspaces.shape[0]:
             zero_indices = _remap_zero_indices(zero_indices, old_to_new)
-            halfspaces = halfspaces[~deg]
+            errors = errors[old_to_new >= 0]
+            halfspaces = kept_hs
         env = env or get_env()
-        if solve_radius(env, halfspaces, max_radius=bound, zero_indices=zero_indices)[0] is None:
+        center, _ = solve_radius(env, halfspaces, max_radius=bound, zero_indices=zero_indices, errors=errors)
+        if center is None:
             raise ValueError("Bounding box constraints are not feasible")
-        return halfspaces, zero_indices
+        return halfspaces, zero_indices, errors
 
     def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
@@ -531,6 +567,15 @@ class Polyhedron:
             self._hash = hash(self.tag)
         return self._hash
 
+    def _same_rows_kwargs(self) -> dict[str, Any]:
+        """Constructor kwargs for a net-less cell that shares this cell's rows (and their provenance)."""
+        return {
+            "halfspaces": self._halfspaces,
+            "halfspaces_err": self.halfspaces_err_np,
+            "_rows_data": self._rows_data,
+            "bound": self.bound,
+        }
+
     def get_neighbor(self, shi: int) -> "Polyhedron":
         """Get the neighbor polyhedron across the supporting hyperplane at index shi.
 
@@ -547,7 +592,7 @@ class Polyhedron:
         # preserve them when flipping an inequality sign. The feasible region in input
         # space is the same; only the sign sequence label changes.
         if self._net is None and self._halfspaces is not None:
-            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
+            return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss)
 
     def get_face(self, shi: int) -> "Polyhedron":
@@ -571,7 +616,7 @@ class Polyhedron:
         # In that case, the face is represented by the same halfspaces but with one
         # more constraint treated as an equality (via the zero sign entry).
         if self._net is None and self._halfspaces is not None:
-            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
+            return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss, bound=self.bound)
 
     def get_face_by_shis(self, shis: Iterable[int]) -> "Polyhedron":
@@ -585,7 +630,7 @@ class Polyhedron:
         for shi in shis:
             ss[0, int(shi)] = 0
         if self._net is None and self._halfspaces is not None:
-            return Polyhedron(None, ss, halfspaces=self._halfspaces, bound=self.bound)
+            return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss, bound=self.bound)
 
     @property
@@ -640,7 +685,7 @@ class Polyhedron:
             qhull_mode = cfg.QHULL_MODE
 
         try:
-            bounded_halfspaces, zero_idx = self._halfspaces_with_bounding_box(bound)
+            bounded_halfspaces, zero_idx, bounded_err = self._halfspaces_with_bounding_box_err(bound)
         except ValueError as e:
             w = RuntimeWarning(f"Error while computing bounded vertices: {e}")
             self.warnings.append(w)
@@ -655,6 +700,7 @@ class Polyhedron:
             bounded_halfspaces,
             max_radius=1000,
             zero_indices=zero_idx if zero_idx.size > 0 else None,
+            errors=bounded_err,
         )
         if int_point is None:
             raise ValueError("Interior point not found in bounded region")
@@ -668,7 +714,7 @@ class Polyhedron:
         # HalfspaceIntersection expects a full-dimensional interior. For k<d cells
         # (equalities induced by zero sign entries), project to nullspace coords.
         if zero_idx.size > 0:
-            x0, null_basis, ineq_mask = _affine_null_basis(bounded_halfspaces, zero_idx)
+            x0, null_basis, ineq_mask = _affine_null_basis(bounded_halfspaces, zero_idx, errors=bounded_err)
 
             if null_basis.shape[1] == 0:
                 return x0.reshape(1, -1)
@@ -692,11 +738,10 @@ class Polyhedron:
             b = projected_halfspaces[:, 1]
             lower = -float("inf")
             upper = float("inf")
-            tol_a = cfg.TOL_HALFSPACE_NORMAL
-            tol_b = cfg.TOL_HALFSPACE_CONTAINMENT
             for ai, bi in zip(a, b, strict=True):
-                if abs(ai) <= tol_a:
-                    if bi > tol_b:
+                if ai == 0.0:
+                    # A row parallel to the segment; the segment was certified nonempty.
+                    if bi > 0.0:
                         raise ValueError("Infeasible 1D projected halfspace system")
                     continue
                 cutoff = -bi / ai
@@ -704,7 +749,7 @@ class Polyhedron:
                     upper = min(upper, cutoff)
                 else:
                     lower = max(lower, cutoff)
-            if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper + tol_b:
+            if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper:
                 raise ValueError("Projected 1D intersection is empty or unbounded")
             reduced_vertices = np.array([[lower], [upper]], dtype=np.float64)
             vertices = remap_vertices(reduced_vertices)
@@ -882,6 +927,10 @@ class Polyhedron:
         self._w = w
         self._b = b
         self._halfspaces_np = None
+        self._halfspaces_err = None
+        self._halfspaces_own = True
+        self._halfspaces_user = False
+        self._rows_data = False
         self._num_dead_relus = num_dead_relus
 
     @property
@@ -952,6 +1001,62 @@ class Polyhedron:
             else:
                 raise TypeError(f"Unsupported halfspaces type: {type(hs)}")
         return self._halfspaces_np
+
+    @property
+    def halfspaces_err_np(self) -> np.ndarray:
+        """Float64 error scale of :attr:`halfspaces_np`, row for row (see :mod:`relucent._internal.rounding`)."""
+        if self._halfspaces_err is None:
+            hs = self.halfspaces_np
+            if self._rows_data:
+                self._halfspaces_err = rounding.exact_rows_error(hs)
+            elif self._net is None:
+                raise ValueError(f"Polyhedron {self!r} holds network rows without the network or their error scale")
+            elif self._halfspaces_own:
+                self._halfspaces_err = rounding.halfspaces_error_for_ss(self._net, self.ss_np)
+            elif self._halfspaces_ss is not None:
+                self._halfspaces_err = rounding.halfspaces_error_for_ss(self._net, self._halfspaces_ss)
+            else:
+                # Rows cached without their error scale (pickled before scales were tracked).
+                # They may be a coface's, so only use this cell's own scale if they match.
+                try:
+                    own, *_ = get_hs(Polyhedron(self._net, self.ss_np), force_numpy=True)
+                except AssertionError:
+                    own = None
+                own_np = None if own is None else own if isinstance(own, np.ndarray) else own.detach().cpu().numpy()
+                if own_np is None or own_np.shape != hs.shape or not np.array_equal(own_np, hs):
+                    raise ValueError(
+                        f"Polyhedron {self!r} was given halfspaces from another sign sequence "
+                        + "without their error scale; pass halfspaces_err alongside halfspaces."
+                    )
+                self._halfspaces_err = rounding.halfspaces_error_for_ss(self._net, self.ss_np)
+            if self._halfspaces_err.shape != hs.shape:
+                raise ValueError(f"halfspaces_err shape {self._halfspaces_err.shape} != halfspaces {hs.shape}")
+        return self._halfspaces_err
+
+    def _exact_rows(self) -> list[list[Any]] | None:
+        """This cell's rows in exact rational arithmetic, or None when they cannot be rebuilt."""
+        from fractions import Fraction
+
+        from relucent._internal import exact
+
+        if self._rows_data:
+            # Rows given as data are exact as stored (their error scale is evaluation-only).
+            return [[Fraction(float(v)) for v in r] for r in self.halfspaces_np]
+        ss = self.halfspaces_rows_ss
+        # No network attached (e.g. in a worker), or too wide to rebuild exactly in reasonable
+        # time: callers raise instead.
+        if self._net is None or ss is None or not exact.exact_rows_affordable(self._net):
+            return None
+        return exact.exact_rows_for_ss(self._net, ss)
+
+    @property
+    def halfspaces_rows_ss(self) -> np.ndarray | None:
+        """Sign sequence that generated :attr:`halfspaces_np`, when known."""
+        if self._rows_data:
+            return None
+        if self._halfspaces_own:
+            return self.ss_np
+        return self._halfspaces_ss
 
     @property
     def W(self) -> torch.Tensor | np.ndarray:
@@ -1087,6 +1192,7 @@ class Polyhedron:
             elif bound is None:
                 bound = cfg.DEFAULT_SEARCH_BOUND
             self._shis = get_shis(self, bound=float(bound))
+            self._shis_strict = True
         assert isinstance(self._shis, list)
         return self._shis
 
@@ -1140,13 +1246,31 @@ class Polyhedron:
         return h.hexdigest()[:8]
 
     def __contains__(self, point: np.ndarray | torch.Tensor) -> bool:
-        """Check if a point (ndarray or Tensor) is contained in the polyhedron."""
-        halfspaces = self.halfspaces_np if isinstance(point, np.ndarray) else self.halfspaces
-        if isinstance(point, torch.Tensor) and isinstance(halfspaces, np.ndarray):
-            point = point.detach().cpu().numpy().astype(halfspaces.dtype)
-        point = point.reshape(1, -1)
-        dists = point @ halfspaces[:, :-1].T + halfspaces[:, -1]
-        return bool((dists <= cfg.TOL_HALFSPACE_CONTAINMENT).all().item())
+        """Check if a point (ndarray or Tensor) is in the closed polyhedron.
+
+        Each row is judged at the point against its own float64 error. The rows of this cell's
+        zero entries (its equalities, for a lower-dimensional cell) hold when they are within that
+        error of zero: no float64 point lies exactly on a face's affine hull, so a point on the
+        face to within rounding is on the face.
+
+        Raises:
+            AmbiguousGeometryError: If the point lies on an inequality row to within that row's
+                error and no row is clearly violated.
+        """
+        if not isinstance(point, np.ndarray):
+            point = cast(Any, point).detach().cpu().numpy()
+        x = np.asarray(point, dtype=np.float64).reshape(-1)
+        side = rounding.classify_rows(self.halfspaces_np, self.halfspaces_err_np, x, 0.0)
+        if np.any(side == 1):
+            return False
+        undecided = side == 0
+        zero_idx = np.asarray(self.zero_indices, dtype=np.intp)
+        undecided[zero_idx[zero_idx < undecided.size]] = False
+        if not np.any(undecided):
+            return True
+        raise AmbiguousGeometryError(
+            f"point lies on rows {np.flatnonzero(undecided).tolist()} of {self!r} to within float64 error"
+        )
 
     def __mul__(self, other: "Polyhedron") -> "Polyhedron":
         """Returns a new Polyhedron object based on sign sequence multiplication"""
@@ -1154,6 +1278,14 @@ class Polyhedron:
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
+        if "_halfspaces_own" not in state and state.get("_halfspaces_np") is not None:
+            # Pickled before error scales were tracked: the cached rows may be a coface's.
+            self._halfspaces_own = False
+        self.__dict__.setdefault("_halfspaces_ss", None)
+        self.__dict__.setdefault("_halfspaces_user", False)
+        self.__dict__.setdefault("_rows_data", False)
+        self.__dict__.setdefault("_halfspaces_err", None)
+        self.__dict__.setdefault("_halfspaces_own", self.__dict__.get("_halfspaces_np") is None)
         if self._finite is True and self._center is None:
             self._finite_computed = False
 
@@ -1180,11 +1312,28 @@ class Polyhedron:
             "dim": self.dim,
             "_ambient_dim": self._ambient_dim,
             "_halfspaces_np": self._halfspaces_np,
+            "_halfspaces_err": self._pickled_halfspaces_err(),
+            "_halfspaces_own": self._halfspaces_own,
+            "_halfspaces_user": self._halfspaces_user,
+            "_rows_data": self._rows_data,
+            "_halfspaces_ss": self._halfspaces_ss,
             "_w": self._w,
             "_b": self._b,
             "bound": self.bound,
         }
         return state
+
+    def _pickled_halfspaces_err(self) -> np.ndarray | None:
+        """Error scale to pickle with the rows: only when it cannot be rebuilt after unpickling.
+
+        Rows that are data, the cell's own composition, or a known sign sequence's composition get
+        their scale recomputed from the reattached network, so it need not double the payload.
+        """
+        if self._rows_data or self._halfspaces_own or self._halfspaces_ss is not None:
+            return None
+        if self._halfspaces_err is None and self._halfspaces_np is not None and self._net is not None:
+            return self.halfspaces_err_np
+        return self._halfspaces_err
 
     def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
         return (

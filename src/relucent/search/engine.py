@@ -16,9 +16,9 @@ import relucent.config as cfg
 from relucent._internal.logging import logger
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.torch_compat import torch
-from relucent.core.errors import ShiProofError
+from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
-from relucent.geometry.calculations import get_shis
+from relucent.geometry.calculations import get_shis, shis_are_certified, without_deprecated_strict
 from relucent.search.exploration import (
     finalize_ambient_search,
     search_stats_dict,
@@ -77,23 +77,16 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
 
 
 def true_phantom_neighbor_error(error: object) -> bool:
-    """Return True when a queued flip-neighbor is geometrically empty.
+    """Always False: no queued flip-neighbor is legitimately empty.
 
-    These are combinatorial flip labels with no nonempty activation region (or a
-    Chebyshev inradius in the empty band matched by :func:`~relucent.geometry.calculations.solve_radius`).
-    They are not worker faults and should not block search completeness.
+    Neighbors are queued only across facets that :func:`~relucent.geometry.calculations.get_shis`
+    certified, i.e. with a witness point just past the facet and inside every other row. The
+    region across such a facet is nonempty, so an empty neighbor means something upstream is
+    wrong and must block completeness. (This used to excuse neighbors whose Chebyshev radius fell
+    in a tolerance band; those were artefacts of misjudged facets.) Kept for API compatibility.
     """
-    msg = str(error)
-    if msg == "Polyhedron is infeasible (empty).":
-        return True
-    if not msg.startswith("Inradius "):
-        return False
-    try:
-        inradius = float(msg.removeprefix("Inradius ").strip())
-    except ValueError:
-        return False
-    verify_tol = float(cfg.TOL_INTERIOR_VERIFY)
-    return inradius <= 0.0 and inradius > -verify_tol
+    del error
+    return False
 
 
 def blocking_bad_shi_computations(bad_shi_computations: list[Any]) -> list[Any]:
@@ -121,43 +114,17 @@ def _cancel_pending_neighbor(
         failed_flips.add((waiter.tag, int(waiter_shi)))
 
 
-def _enforce_min_search_inradius(poly: Polyhedron, *, env: Any) -> None:
-    """Require either sufficient inradius or a valid interior witness point.
-
-    Skips 0-cells (vertices), infeasible regions, and unbounded cells.
-    """
-    if poly.dim == 0:
-        return
-    if poly.finite is not True:
-        return
-    if poly._inradius is None:
-        poly._ensure_chebyshev_center(env=env)
-    inradius = poly._inradius
-    if inradius is None or inradius == float("inf"):
-        return
-    min_r = cfg.MIN_SEARCH_INRADIUS
-    if inradius < min_r:
-        msg = (
-            f"Polyhedron inradius {inradius:.4e} is below MIN_SEARCH_INRADIUS ({min_r:.4e}). "
-            + "A cell this thin (often with neighbors equally thin across a shared face) "
-            + "can leave opposing halfspaces within the SHI objective tolerance after "
-            + "relaxation; tighten scaling or lower RELUCENT_TOL_SHI_OBJECTIVE."
-        )
-        try:
-            witness = poly.get_interior_point(env=env)
-        except ValueError as error:
-            raise ValueError(msg + f" Witness point search failed: {error}") from error
-        poly._interior_point = np.asarray(witness).reshape(-1)
-        poly.warnings.append(RuntimeWarning(msg + " Witness point found; continuing search."))
-
-
 def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
     """Retain geometry caches listed in *properties*; drop other heavy caches."""
     # Workers only need what search asked for; drop the rest to keep IPC payloads small.
     requested = {str(name).strip() for name in properties if str(name).strip()}
     if "halfspaces_np" in requested:
         requested.add("halfspaces")  # np view and list form are paired
-    for name, attrs in (("halfspaces", ("_halfspaces", "_halfspaces_np")), ("W", ("_w",)), ("b", ("_b",))):
+    for name, attrs in (
+        ("halfspaces", ("_halfspaces", "_halfspaces_np", "_halfspaces_err")),
+        ("W", ("_w",)),
+        ("b", ("_b",)),
+    ):
         if name not in requested:
             for attr in attrs:
                 setattr(p, attr, None)
@@ -182,14 +149,12 @@ def _worker_prepare_poly(
     """Compute geometry (and optionally SHIs) on *p*. Return an error, or None on success."""
     try:
         p.get_geometry(props, env=env)
-    except ValueError as error:
+    except (ValueError, AmbiguousGeometryError) as error:
         return error
     if p.finite is None:
-        return ValueError("Polyhedron is infeasible (empty).")
-    try:
-        _enforce_min_search_inradius(p, env=env)
-    except ValueError as error:
-        return error
+        # Thin cells need no special case: solve_radius only reports a cell nonempty with a
+        # center verified strictly inside every row, and raises when it cannot decide.
+        return AmbiguousGeometryError(f"Polyhedron {p!r} is infeasible (empty), but it was reached across a certified facet")
     if need_interior and p._interior_point is None:
         p._interior_point = p.get_interior_point(env=env)
     if shis_kwargs is not None:
@@ -197,7 +162,7 @@ def _worker_prepare_poly(
             if p._shis is None:
                 result = get_shis(p, env=env, **shis_kwargs)
                 p._shis = result[0] if isinstance(result, tuple) else result
-                p._shis_strict = bool(shis_kwargs.get("strict", False))
+                p._shis_strict = shis_are_certified(shis_kwargs)
         except Exception as error:
             return error
     retain_geometry_caches(p, props)
@@ -212,13 +177,8 @@ def _start_shis_for_search(
     bound: float,
     shis_kwargs: dict[str, Any],
 ) -> list[int]:
-    """SHIs for the search seed cell; relax strict proofs once on failure."""
-    try:
-        result = get_shis(start, bound=bound, **shis_kwargs)
-    except ShiProofError:
-        relaxed = dict(shis_kwargs)
-        relaxed["strict"] = False
-        result = get_shis(start, bound=bound, **relaxed)
+    """SHIs for the search seed cell (certified like every other cell's; no fallback)."""
+    result = get_shis(start, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
     return result
 
@@ -226,7 +186,7 @@ def _start_shis_for_search(
 def _apply_cube_filter(p: Polyhedron, cube_mode: str, cube_radius: float) -> bool:
     """Return whether *p* should be kept under the cube filter (possibly clipping it)."""
     try:
-        bounded = p.get_bounded_halfspaces(cube_radius)
+        bounded, _, bounded_err = p._halfspaces_with_bounding_box_err(cube_radius)
     except ValueError:
         # Outside the box entirely — keep only if we're explicitly hunting exterior cells.
         return cube_mode == "exclude"
@@ -236,6 +196,8 @@ def _apply_cube_filter(p: Polyhedron, cube_mode: str, cube_radius: float) -> boo
         return False  # drop anything that touches the box
     p._halfspaces = bounded  # type: ignore[assignment]  # clipped: replace with bounded form
     p._halfspaces_np = bounded
+    p._halfspaces_err = bounded_err
+    p._halfspaces_own = False
     return p.feasible
 
 
@@ -500,8 +462,8 @@ def searcher(
             :func:`~relucent.verify.certify.certify_complex` at the end. Skipped when
             exploration hits ``max_polys`` before the frontier is exhausted. A
             finite ``max_depth`` cap can leave ``complete=False``; with
-            ``verify=True`` that raises unless the cap was hit. Frontier SHI LPs
-            stay non-strict; certification applies strict checks after dual-graph sync.
+            ``verify=True`` that raises unless the cap was hit. Frontier SHIs are
+            certified facets, so certification reuses them after dual-graph sync.
         **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
@@ -524,7 +486,7 @@ def searcher(
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
 
-    shis_kwargs = dict(kwargs)
+    shis_kwargs = without_deprecated_strict(kwargs)
 
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
@@ -576,7 +538,7 @@ def searcher(
     if (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
     start._shis = _start_shis_for_search(start, bound=bound, shis_kwargs=shis_kwargs)
-    start._shis_strict = bool(shis_kwargs.get("strict", False))
+    start._shis_strict = shis_are_certified(shis_kwargs)
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
     # Seed the frontier: each task is (neighbor ss, shi crossed, depth, parent index).
@@ -623,6 +585,11 @@ def searcher(
                 ):
                     unprocessed -= 1
                     node = cast(Polyhedron, cx.index2poly[node_index])
+                    if isinstance(p, (AmbiguousGeometryError, NonGenericArrangementError)):
+                        # Not a missing neighbor: the geometry itself cannot be decided, or the
+                        # arrangement is not simple. Surface it rather than let it degrade into an
+                        # incomplete-complex error.
+                        raise p
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
                         _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
@@ -849,6 +816,7 @@ def hamming_astar(
     Raises:
         ValueError: If the start point lies exactly on a neuron's boundary.
     """
+    kwargs = without_deprecated_strict(kwargs)
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
 
@@ -860,7 +828,7 @@ def hamming_astar(
 
         start_poly._interior_point = start_poly.get_interior_point()
         start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))
-        start_poly._shis_strict = False
+        start_poly._shis_strict = True
         return {
             "path": [start_poly],
             "succeeded": True,
@@ -904,7 +872,7 @@ def hamming_astar(
     result = get_shis(start_poly, bound=bound, **kwargs)
     assert isinstance(result, list)
     start_poly._shis = result
-    start_poly._shis_strict = bool(kwargs.get("strict", False))
+    start_poly._shis_strict = shis_are_certified(kwargs)
 
     openSet.push((start_poly,), fScore[start_poly])
 

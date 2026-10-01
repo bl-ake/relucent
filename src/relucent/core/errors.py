@@ -9,6 +9,7 @@ errors from the verification pipeline.
 from __future__ import annotations
 
 __all__ = [
+    "AmbiguousGeometryError",
     "ComplexNotCompleteError",
     "ComplexNotVerifiedError",
     "CubicalAmbiguityError",
@@ -61,3 +62,13 @@ class CubicalAmbiguityError(CubicalConsistencyError):
 
 class NonGenericArrangementError(ValueError):
     """Geometric genericity / transversality is violated (degenerate endpoints or junctions)."""
+
+
+class AmbiguousGeometryError(RuntimeError):
+    """A geometric decision falls inside its float64 error bound, so it cannot be made correctly.
+
+    Raised instead of guessing: which side of a hyperplane a point lies on, whether a row is a
+    facet, whether a cell is empty, or whether two computed points coincide, when the computed
+    value is within the rounding error of the network's exact rows. A ``RuntimeError`` rather than
+    a ``ValueError`` so that handlers written for recoverable ``ValueError`` exceptions do not swallow it.
+    """

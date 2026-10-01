@@ -17,9 +17,11 @@ from tqdm.auto import tqdm
 
 import relucent.config as cfg
 import relucent.verify.certify as certify
+from relucent._internal import rounding
 from relucent._internal.logging import logger
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 from relucent.core.errors import (
+    AmbiguousGeometryError,
     ComplexNotCompleteError,
     ComplexNotVerifiedError,
     DualGraphAsymmetricEdgeError,
@@ -708,8 +710,8 @@ class Complex:
                 is skipped when exploration hits ``max_polys`` before the frontier is
                 exhausted. A finite ``max_depth`` cap can leave ``complete=False``; with
                 ``verify=True`` that raises :class:`~relucent.core.complex.IncompleteDualGraphError`
-                unless the cap was hit. Frontier SHI LPs stay non-strict; certification
-                applies strict checks after dual-graph sync.
+                unless the cap was hit. Frontier SHIs are certified facets, so certification
+                reuses them after dual-graph sync.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
         Returns:
@@ -942,10 +944,10 @@ class Complex:
         For a cell with halfspace representation ``Ax + b <= 0``, the intersection in
         parameter space is ``{t : (A @ V) t + (A @ x0 + b) <= 0}``, a polyhedron in ``R^k``.
 
-        Feasibility is tested via a Chebyshev-center LP using ``scipy.optimize.linprog``.
-        An intersection is included when the optimal Chebyshev radius ``r >= -tol``.
-        An unbounded LP (LP status 3) means ``r -> +inf``, which implies the subspace
-        lies entirely inside that cell — always included.
+        Feasibility is tested with :func:`~relucent.geometry.calculations.solve_radius` on the
+        sliced rows, whose float64 error is carried from the cell's. An intersection is included
+        when it has a verified interior point (or an unbounded radius, meaning the subspace lies
+        entirely inside that cell).
 
         The returned :class:`Complex` is backed by a stub :class:`~relucent.model.model.ReLUNetwork`
         with ``input_shape=(k,)`` and no ReLU layers, so ``cpx.dim == k`` and
@@ -963,20 +965,21 @@ class Complex:
             x0: Base point of the affine subspace, shape ``(d,)``.
             V: Direction matrix, shape ``(d, k)``. Columns need not be orthonormal.
                 Pass a 1-D array of shape ``(d,)`` for a line (``k=1``).
-            tol: Feasibility tolerance. Defaults to ``cfg.TOL_HALFSPACE_CONTAINMENT``.
+            tol: Ignored (kept for API compatibility): every row is judged against its own
+                float64 error, and an undecidable intersection raises
+                :class:`~relucent.core.errors.AmbiguousGeometryError`.
 
         Returns:
             A new :class:`Complex` in ``k``-dimensional parameter space, containing
             one :class:`~relucent.core.poly.Polyhedron` per non-empty intersection.
             The complex can be plotted directly with :meth:`plot` for ``k`` in ``{2, 3}``.
         """
-        ## TODO: Switch to Gurobi / existing Polyhedron methods
-        from scipy.optimize import linprog
-
+        from relucent.geometry.calculations import solve_radius
         from relucent.model.model import LinearLayer, ReLUNetwork
+        from relucent.utils import get_env
 
-        if tol is None:
-            tol = float(cfg.TOL_HALFSPACE_CONTAINMENT)
+        del tol  # each row is judged against its own float64 error instead
+        env = get_env()
 
         x0_arr = np.asarray(x0, dtype=np.float64).reshape(-1)
         # Ensure V is 2-D: a 1-D vector becomes a (d, 1) column
@@ -991,7 +994,8 @@ class Complex:
         out = Complex(stub_net)
 
         def _slice_poly_kwargs(parent: Polyhedron, halfspaces: np.ndarray) -> dict[str, Any]:
-            kwargs: dict[str, Any] = {"halfspaces": halfspaces, "_ambient_dim": k}
+            err = rounding.slice_error(parent.halfspaces_np, parent.halfspaces_err_np, V_arr, x0_arr)
+            kwargs: dict[str, Any] = {"halfspaces": halfspaces, "halfspaces_err": err, "_ambient_dim": k}
             if parent._shis is not None:
                 kwargs["shis"] = list(parent._shis)
             for attr in ("_codim", "_dim", "_finite"):
@@ -1011,32 +1015,30 @@ class Complex:
 
             if k == 0:
                 # Subspace is a single point; just check containment of x0
-                if bool((b_v <= tol).all()):
-                    out.add_polyhedron(
-                        Polyhedron(
-                            stub_net,
-                            poly.ss_np,
-                            **_slice_poly_kwargs(poly, b_v.reshape(-1, 1)),
-                        ),
-                        check_exists=False,
-                    )
+                b_err = rounding.slice_error(H, poly.halfspaces_err_np, V_arr, x0_arr)[:, -1]
+                if np.any(b_v > b_err):
+                    continue
+                if not np.all(b_v < -b_err):
+                    raise AmbiguousGeometryError(f"the slice point lies on a row of {poly!r} to within float64 error")
+                out.add_polyhedron(
+                    Polyhedron(
+                        stub_net,
+                        poly.ss_np,
+                        **_slice_poly_kwargs(poly, b_v.reshape(-1, 1)),
+                    ),
+                    check_exists=False,
+                )
                 continue
 
             H_slice = np.column_stack([A_v, b_v])  # (m, k+1)
 
-            # Chebyshev-center LP: max r s.t. a_vi^T t + r ||a_vi|| + b_vi <= 0
-            # Non-empty iff optimal r >= -tol; status 3 (unbounded) means r -> +inf
-            norms = np.linalg.norm(A_v, axis=1)  # row norms for Chebyshev radius
-            res = linprog(
-                np.r_[np.zeros(k), -1.0],  # objective: maximize r
-                A_ub=np.column_stack([A_v, norms]),
-                b_ub=-b_v,
-                bounds=[(None, None)] * (k + 1),
-                method="highs",
-            )
-            if res.status == 3 or (res.status == 0 and float(res.x[-1]) >= -tol):
+            # Chebyshev-center LP on the sliced rows, certified against their own error:
+            # a verified interior point or an unbounded radius means the slice is nonempty.
+            kwargs = _slice_poly_kwargs(poly, H_slice)
+            center, radius = solve_radius(env, H_slice, errors=kwargs["halfspaces_err"])
+            if center is not None or radius == float("inf"):
                 out.add_polyhedron(
-                    Polyhedron(stub_net, poly.ss_np, **_slice_poly_kwargs(poly, H_slice)),
+                    Polyhedron(stub_net, poly.ss_np, **kwargs),
                     check_exists=False,
                 )
         if len(out) > 0:
@@ -1081,9 +1083,12 @@ class Complex:
             new_ss = p1.ss_np.copy()
             new_ss[0, shi_i] = 0
             probe = Polyhedron(
-                None,
+                p1._net,
                 new_ss,
                 halfspaces=p1.halfspaces,
+                halfspaces_err=p1.halfspaces_err_np,
+                halfspaces_ss=p1.halfspaces_rows_ss,
+                _rows_data=p1._rows_data,
                 codim=codim,
                 dim=face_dim,
                 _ambient_dim=ambient,
@@ -1091,6 +1096,9 @@ class Complex:
             candidate_shis = [s for s in candidate_shis if probe.is_shi_face_feasible(int(s))]
         poly_kwargs: dict[str, Any] = {
             "halfspaces": p1.halfspaces,
+            "halfspaces_err": p1.halfspaces_err_np,
+            "halfspaces_ss": p1.halfspaces_rows_ss,
+            "_rows_data": p1._rows_data,
             "shis": candidate_shis,
             "codim": codim,
             "dim": face_dim,
@@ -1218,6 +1226,50 @@ class Complex:
         """
         return self.get_chain_complex(verbose=verbose)[self.dim - 1]
 
+    def _verified_vertices(self) -> tuple[int, dict[bytes, vertex_star.VertexRecord]]:
+        """``(top_dim, vertices)``: every verified vertex of this complete, verified complex.
+
+        The vertices of :meth:`get_chain_complex` (its 0-cells), without the rest of the chain.
+        """
+        top_dim = max(int(p.dim) for p in self)
+        top_cells = [p for p in self if int(p.dim) == top_dim]
+        graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
+        incidence.certify_dual_graph(graph, self, top_dim=top_dim)
+
+        # Candidate-vertex verification dominates runtime on large complexes (one
+        # equality solve + rank/slack check per candidate, independent of every other
+        # candidate) -- see vertex_star.find_vertices. net lets it farm that out across
+        # a worker pool instead of verifying sequentially.
+        vertices = vertex_star.find_vertices(
+            top_cells,
+            graph,
+            net=self._net,
+            nworkers=process_aware_cpu_count() or 1,
+            ambient_dim=int(self.dim),
+            top_dim=top_dim,
+            verify_vertex=Polyhedron.verify_vertex_covector,
+            screen=True,
+        )
+        return top_dim, vertices
+
+    def _vertex_polyhedron(self, cplx: Complex, vertex: vertex_star.VertexRecord) -> Polyhedron:
+        """Add a verified vertex to ``cplx`` as a 0-cell carrying its witness's rows and its point."""
+        ambient_dim = int(self.dim)
+        witness = self.tag2poly[vertex.witness_tag]
+        poly = cplx.add_ss(
+            vertex.ss,
+            codim=ambient_dim,
+            dim=0,
+            _ambient_dim=ambient_dim,
+            halfspaces=witness.halfspaces,
+            halfspaces_err=witness.halfspaces_err_np,
+            halfspaces_ss=witness.halfspaces_rows_ss,
+            _rows_data=witness._rows_data,
+            finite=True,
+        )
+        poly._interior_point = vertex.point
+        return poly
+
     def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
         """Recover the chain complex directly from verified vertices' local stars.
 
@@ -1229,8 +1281,9 @@ class Complex:
         neighboring top-dimensional cells, dual-graph cube verification, or
         coverage heuristic is required. See :mod:`relucent.graph.vertex_star`.
 
-        Candidate vertices receive one float64 equality solve followed by
-        strict forward-sign verification (:meth:`Polyhedron.verify_vertex_covector`);
+        Candidate vertices receive one float64 equality solve followed by a
+        check against every other row of their witness cell
+        (:meth:`Polyhedron.verify_vertex_covector`);
         no facet or boundedness LP is used here. Every recovered cell of
         dimension ``k >= 1`` has, by construction, at least one verified
         vertex among its own faces (its generating vertex), so a cell can
@@ -1243,33 +1296,8 @@ class Complex:
         if len(self) == 0:
             return [self]
         ambient_dim = int(self.dim)
-        top_dim = max(int(p.dim) for p in self)
-        top_cells = [p for p in self if int(p.dim) == top_dim]
-        graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
-        incidence.certify_dual_graph(graph, self, top_dim=top_dim)
-
-        def _verify_vertex(root: Polyhedron, candidate_ss: np.ndarray) -> np.ndarray | None:
-            return root.verify_vertex_covector(
-                candidate_ss,
-                point2preactivations=lambda x: np.asarray(self.point2preactivations(x)),
-                sign_margin=float(cfg.TOL_VERTEX_SIGN_MARGIN),
-            )
-
-        # Candidate-vertex verification dominates runtime on large complexes (one
-        # equality solve + rank/slack check per candidate, independent of every other
-        # candidate) -- see vertex_star.find_vertices. net/sign_margin let it farm that
-        # out across a worker pool instead of running _verify_vertex sequentially.
-        nworkers = process_aware_cpu_count() or 1
-        cells_by_dim, vertices = vertex_star.recover_cells_from_vertices(
-            top_cells,
-            graph,
-            net=self._net,
-            sign_margin=float(cfg.TOL_VERTEX_SIGN_MARGIN),
-            nworkers=nworkers,
-            ambient_dim=ambient_dim,
-            top_dim=top_dim,
-            verify_vertex=_verify_vertex,
-        )
+        top_dim, vertices = self._verified_vertices()
+        cells_by_dim = vertex_star.cells_from_vertices(vertices, top_dim=top_dim)
         vertex_points = {tag: v.point for tag, v in vertices.items()}
 
         chain: list[Complex] = [self]
@@ -1308,10 +1336,9 @@ class Complex:
                 }
                 point = vertex_points.get(tag)
                 if dim == 0:
-                    witness = self.tag2poly[vertices[tag].witness_tag]
-                    kwargs["halfspaces"] = witness.halfspaces
-                    kwargs["finite"] = True
-                elif dim == 1:
+                    self._vertex_polyhedron(cplx, vertices[tag])
+                    continue
+                if dim == 1:
                     candidate_by_shi = {shi: incidence.face_tag(ss, shi) for shi in incidence.ss_nonzero_indices(ss)}
                     kwargs["_covector_endpoint_shis"] = sorted(
                         shi for shi, face in candidate_by_shi.items() if face in vertex_points
@@ -1377,12 +1404,15 @@ class Complex:
         )
 
         assert_scalar_output(self._net)
-        chain = self.get_chain_complex(verbose=verbose)
-        if not chain or chain[-1].index2poly[0].dim != 0:
+        self.assert_topology_ready()
+        if len(self) == 0:
             return []
-
-        vertex_complex = chain[-1]
-        vertices = list(vertex_complex.index2poly)
+        # Criticality needs only each vertex's sign sequence, so find the verified vertices
+        # (the 0-cells of get_chain_complex) without building the rest of the chain complex.
+        _, found = self._verified_vertices()
+        if not found:
+            return []
+        vertices = [found[tag] for tag in sorted(found)]
 
         flags: list[tuple[bool, int | None]]
         if require_complete:
@@ -1397,7 +1427,7 @@ class Complex:
             flags = []
             for vertex in vertices:
                 # Incident edges are inferred combinatorially; this checks they were discovered.
-                v_ss = vertex.ss_np.ravel()
+                v_ss = vertex.ss.ravel()
                 for shi in np.flatnonzero(v_ss == 0):
                     for sign in (-1, 1):
                         edge_ss = v_ss.copy()
@@ -1410,7 +1440,7 @@ class Complex:
                             )
                 flags.append(
                     is_pl_critical_vertex(
-                        vertex.ss_np,
+                        vertex.ss,
                         self._net,
                         ssi2maski=self.ssi2maski,
                         ss_layers=self.ss_layers,
@@ -1423,36 +1453,31 @@ class Complex:
             # of it to be worth Pool startup cost.
             nworkers = process_aware_cpu_count() or 1
             flags = critical_flags_for_vertices(
-                [vertex.ss_np for vertex in vertices],
+                [vertex.ss for vertex in vertices],
                 self._net,
                 ssi2maski=self.ssi2maski,
                 ss_layers=self.ss_layers,
                 nworkers=nworkers,
             )
 
+        vertex_complex = Complex(self.net)
         results: list[CriticalPoint] = []
         for vertex, (is_critical, index) in zip(vertices, flags, strict=True):
             if not is_critical:
                 continue
             if index is None or (index < 0 and not include_degenerate):
                 continue
-
-            point: np.ndarray | None
-            try:
-                # Interior point is optional; criticality is combinatorial.
-                point = np.asarray(vertex.interior_point, dtype=np.float64).reshape(-1)
-            except (ValueError, TypeError):
-                point = None
-
             results.append(
                 CriticalPoint(
-                    polyhedron=vertex,
+                    polyhedron=self._vertex_polyhedron(vertex_complex, vertex),
                     tag=vertex.tag,
-                    ss=vertex.ss_np.copy(),
-                    point=point,
+                    ss=np.asarray(vertex.ss, dtype=np.int8).copy(),
+                    point=np.asarray(vertex.point, dtype=np.float64).reshape(-1),
                     index=int(index),
                 )
             )
+        if len(vertex_complex):
+            incidence.set_contracted_shis(vertex_complex)
         return results
 
     @staticmethod

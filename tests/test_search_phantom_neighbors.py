@@ -1,34 +1,29 @@
-"""Search completeness when flip-neighbors are geometrically empty (true phantoms)."""
+"""Search completeness when a flip-neighbor fails: nothing is excused as a "phantom".
+
+Neighbors are queued only across certified facets, so the region across one is nonempty. A
+neighbor that comes back empty therefore signals an upstream error and must leave BFS
+incomplete; an undecidable one (``AmbiguousGeometryError``) is raised outright.
+"""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-import relucent.config as cfg
-from relucent import Complex, mlp
+from relucent import AmbiguousGeometryError, Complex, mlp
 from relucent.search import blocking_bad_shi_computations, true_phantom_neighbor_error
 
 
-def test_true_phantom_neighbor_error_empty_polyhedron() -> None:
-    assert true_phantom_neighbor_error("Polyhedron is infeasible (empty).")
-
-
-def test_true_phantom_neighbor_error_near_zero_negative_inradius() -> None:
-    tol = float(cfg.TOL_INTERIOR_VERIFY)
-    assert true_phantom_neighbor_error(f"Inradius {-tol / 2:.4e}")
-    assert not true_phantom_neighbor_error(f"Inradius {-2 * tol:.4e}")
-
-
-def test_true_phantom_neighbor_error_rejects_worker_faults() -> None:
+def test_no_error_is_a_phantom() -> None:
+    assert not true_phantom_neighbor_error("Polyhedron is infeasible (empty).")
+    assert not true_phantom_neighbor_error("Inradius -1.0000e-12")
     assert not true_phantom_neighbor_error("Model status: 5")
-    assert not true_phantom_neighbor_error("Polyhedron inradius 1.0000e-12 is below MIN_SEARCH_INRADIUS")
 
 
-def test_blocking_bad_shi_computations_filters_phantoms() -> None:
-    phantom = (object(), 1, 1, "Polyhedron is infeasible (empty).")
-    real = (object(), 2, 1, "Model status: 5")
-    assert blocking_bad_shi_computations([phantom, real]) == [real]
+def test_every_failed_neighbor_blocks_completeness() -> None:
+    empty = (object(), 1, 1, "Polyhedron is infeasible (empty).")
+    fault = (object(), 2, 1, "Model status: 5")
+    assert blocking_bad_shi_computations([empty, fault]) == [empty, fault]
 
 
 class _SyncPool:
@@ -61,20 +56,16 @@ class _SyncMpContext:
         return _SyncPool(nworkers, initializer=initializer, initargs=initargs)
 
 
-def test_bfs_complete_when_only_phantom_mistakes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Phantom-only failures must not leave BFS incomplete."""
-    model = mlp(widths=[2, 6, 1], add_last_relu=True)
-    cplx = Complex(model)
-    real_calls = {"n": 0}
-
+def _patch_first_worker(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     import relucent.search.engine as search_mod
 
     original = search_mod._worker_prepare_poly
+    calls = {"n": 0}
 
     def _fake_worker(p, props, *, env, shis_kwargs=None, need_interior=False, shuffle_shis=False):
-        real_calls["n"] += 1
-        if real_calls["n"] == 1:
-            return ValueError("Polyhedron is infeasible (empty).")
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return error
         return original(
             p,
             props,
@@ -87,6 +78,17 @@ def test_bfs_complete_when_only_phantom_mistakes(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(search_mod, "_worker_prepare_poly", _fake_worker)
     monkeypatch.setattr(search_mod, "get_mp_context", lambda: _SyncMpContext())
 
-    stats = cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1)
+
+def test_bfs_incomplete_when_a_neighbor_comes_back_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_first_worker(monkeypatch, ValueError("Polyhedron is infeasible (empty)."))
+    cplx = Complex(mlp(widths=[2, 6, 1], add_last_relu=True))
+    stats = cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1, verify=False)
     assert len(stats["Bad SHI Computations"]) >= 1
-    assert cplx.complete is True
+    assert cplx.complete is not True
+
+
+def test_bfs_raises_on_ambiguous_neighbor(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_first_worker(monkeypatch, AmbiguousGeometryError("cannot decide"))
+    cplx = Complex(mlp(widths=[2, 6, 1], add_last_relu=True))
+    with pytest.raises(AmbiguousGeometryError):
+        cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1)

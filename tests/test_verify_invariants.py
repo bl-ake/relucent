@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import numpy as np
 import pytest
 
@@ -139,6 +137,7 @@ def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytes
         raise ValueError("synthetic SHI failure")
 
     monkeypatch.setattr(calc, "get_shis", _boom)
+    _forget_certified_shis(cplx)  # as if the lists had been assigned rather than computed
 
     with pytest.raises(IncompleteDualGraphError, match="failed to recompute SHIs"):
         verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
@@ -204,11 +203,18 @@ def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pyte
     verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
 
 
+def _forget_certified_shis(cplx: Complex) -> None:
+    """Mark every cached SHI list as assigned, not computed, so certification recomputes it."""
+    for poly in cplx:
+        poly._shis_strict = False
+
+
 def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
+    _forget_certified_shis(cplx)  # exercise the recompute path, serial and in workers
 
     verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
     verify_lp_flip_neighbors_in_complex(cplx, nworkers=2)
@@ -219,6 +225,7 @@ def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
+    _forget_certified_shis(cplx)
 
     with pytest.raises(IncompleteDualGraphError) as serial_err:
         verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
@@ -229,7 +236,8 @@ def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
     assert str(serial_err.value) == str(parallel_err.value)
 
 
-def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
+def test_start_shis_for_search_does_not_relax_on_shi_proof_error(monkeypatch) -> None:
+    """A failed facet proof on the seed cell propagates: it is never retried."""
     from relucent.core.errors import ShiProofError
     from relucent.core.poly import Polyhedron
     from relucent.search.engine import _start_shis_for_search
@@ -237,19 +245,17 @@ def test_start_shis_for_search_relaxed_on_shi_proof_error(monkeypatch) -> None:
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     start = cplx.add_point(np.zeros((1, 2), dtype=np.float64))
-    strict_flags: list[bool | None] = []
+    calls: list[object] = []
 
     def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
         _ = poly, bound
-        strict_flags.append(cast(bool | None, kwargs.get("strict")))
-        if kwargs.get("strict") is not False:
-            raise ShiProofError("invalid proof")
-        return [0]
+        calls.append(kwargs)
+        raise ShiProofError("invalid proof")
 
     monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
-    shis = _start_shis_for_search(start, bound=1.0, shis_kwargs={"strict": True})
-    assert shis == [0]
-    assert strict_flags == [True, False]
+    with pytest.raises(ShiProofError):
+        _start_shis_for_search(start, bound=1.0, shis_kwargs={})
+    assert calls == [{}]
 
 
 def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
@@ -284,27 +290,61 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     assert not invalid_proof_warns
 
 
-def test_searcher_verify_keeps_frontier_shis_non_strict(monkeypatch) -> None:
+def test_searcher_drops_deprecated_strict_and_marks_shis_certified(monkeypatch) -> None:
     from relucent.core.poly import Polyhedron
     from relucent.search import searcher
     from relucent.utils import BlockingQueue
 
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
-    strict_flags: list[bool | None] = []
+    seen: list[dict[str, object]] = []
 
     def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
         _ = poly, bound
-        strict_flags.append(cast(bool | None, kwargs.get("strict")))
+        seen.append(kwargs)
         return []
 
     monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
-    searcher(
-        cplx,
-        start=np.zeros((1, 2), dtype=np.float64),
-        queue=BlockingQueue(),
-        verify=True,
-        verbose=0,
-    )
-    assert strict_flags
-    assert all(flag is not True for flag in strict_flags)
+    with pytest.warns(FutureWarning, match="strict"):
+        searcher(
+            cplx,
+            start=np.zeros((1, 2), dtype=np.float64),
+            queue=BlockingQueue(),
+            verify=True,
+            verbose=0,
+            strict=True,
+        )
+    assert seen and all("strict" not in kwargs for kwargs in seen)
+    assert all(poly._shis_strict for poly in cplx if poly._shis is not None)
+
+
+def test_shi_options_that_change_the_answer_are_not_certified() -> None:
+    from relucent.geometry.calculations import shis_are_certified
+
+    assert shis_are_certified({}) and shis_are_certified({"bound": 5.0, "push_size": 2.0})
+    assert not shis_are_certified({"subset": [0, 1]})
+    assert not shis_are_certified({"escalate_bound": False})
+    assert not shis_are_certified({"new_method": True})
+
+
+def test_geometric_certify_recomputes_only_assigned_shis(monkeypatch: pytest.MonkeyPatch) -> None:
+    import relucent.geometry.calculations as calc
+    from relucent.verify.certify import verify_shi_geometry
+
+    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    cplx = Complex(model)
+    cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
+    top = next(p for p in cplx if p.dim == cplx.dim)
+    recomputed: list[object] = []
+    orig_get_shis = calc.get_shis
+
+    def _counting(poly, *args, **kwargs):
+        recomputed.append(poly)
+        return orig_get_shis(poly, *args, **kwargs)
+
+    monkeypatch.setattr(calc, "get_shis", _counting)
+    verify_shi_geometry(top)  # computed by get_shis on this cell: already certified
+    assert recomputed == []
+    top._shis_strict = False  # as if assigned from the dual graph
+    verify_shi_geometry(top)
+    assert recomputed == [top]

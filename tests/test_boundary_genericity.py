@@ -62,13 +62,16 @@ def test_boundary_degenerate_v_raises_non_generic(
     set_seeds(seeded)
     model = _degenerate_v_boundary_model()
     cplx = Complex(model)
-    cplx.bfs(start=np.array([[0.5, -0.3]], dtype=np.float64), max_polys=32, verbose=False, verify=False)
-    cplx.set_exploration_state(complete=True, verified=True)
     db = Complex(model)
-    for poly in cplx.get_boundary_cells(cplx.n - 1, verify=False):
-        db.add_polyhedron(poly, check_exists=False)
-
-    with pytest.raises(NonGenericArrangementError, match="distinct geometric|geometric endpoint"):
+    # With no biases the V's hyperplanes are exactly concurrent, and where one hidden unit is off
+    # the output's hyperplane coincides exactly with the other's. Either is proven in exact
+    # arithmetic as soon as it is met: during BFS (coincident facet), while boundary cells are
+    # built, or in the genericity check.
+    with pytest.raises(NonGenericArrangementError):
+        cplx.bfs(start=np.array([[0.5, -0.3]], dtype=np.float64), max_polys=32, verbose=False, verify=False)
+        cplx.set_exploration_state(complete=True, verified=True)
+        for poly in cplx.get_boundary_cells(cplx.n - 1, verify=False):
+            db.add_polyhedron(poly, check_exists=False)
         db.verify_arrangement_genericity()
 
 

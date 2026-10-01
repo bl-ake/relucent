@@ -72,8 +72,8 @@ present cell (Lemma 18's sign-product semigroup).
    for each top cell, choose `top_dim` of its dual-graph-incident SHIs (a top cell
    already has `ambient_dim - top_dim` zero entries by Lemma 16) and zero them to
    get a candidate vertex sign sequence. Verify it with one float64 equality solve
-   plus strict forward-sign checking
-   ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)); no facet
+   plus a check of every other row of the witness cell, made exactly when float64
+   cannot decide ([`Polyhedron.verify_vertex_covector`](../src/relucent/core/poly.py)); no facet
    or boundedness LP is used.
 3. **Expand each verified vertex's local star**
    ([`expand_vertex_star()`](../src/relucent/graph/vertex_star.py)): vary the
