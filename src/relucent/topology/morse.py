@@ -83,15 +83,6 @@ def _coerce_ss(ss: np.ndarray) -> np.ndarray:
     return arr
 
 
-def _output_weight(net: ReLUNetwork) -> np.ndarray:
-    last_linear: LinearLayer | None = None
-    for layer in net.layers.values():
-        if isinstance(layer, LinearLayer):
-            last_linear = layer
-    assert last_linear is not None
-    return last_linear.weight
-
-
 # Opt-in, thread-local memoization for `get_layer_jacobians`.
 # `is_pl_critical_vertex` needs the same coface Jacobian twice per edge
 # (`_is_collapsed_edge`, then `partial_derivative_sign`); `_JacobianCacheScope` lets

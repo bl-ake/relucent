@@ -103,15 +103,6 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
 
         return res
 
-    def dec_tuple(x: int, shape: tuple[int, int, int]) -> tuple[int, int, int]:
-        res: list[int] = []
-        for i in reversed(range(len(shape))):
-            res.append(x % shape[i])
-            x //= shape[i]
-
-        rev = list(reversed(res))
-        return rev[0], rev[1], rev[2]
-
     _, w, h = input_size
 
     # Formula from the Torch docs:

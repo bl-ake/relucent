@@ -597,53 +597,6 @@ def _cb_lazy_nogood_from_indices(
     return True
 
 
-def _cb_lazy_nogood(
-    model: Model,
-    tag: bytes,
-    y_vars: list[Any],
-    boundary_shi: int,
-    n: int,
-) -> bool:
-    """Add a lazy no-good cut excluding ``tag``; return False if the cut would be empty."""
-    indices = _nogood_flip_indices(tag, boundary_shi, n)
-    if indices is None:
-        return False
-    return _cb_lazy_nogood_from_indices(model, indices, y_vars)
-
-
-def _add_pattern_exclusion(
-    model: Model,
-    y_vars: list[Any],
-    boundary_shi: int,
-    exclude_tags: Iterable[bytes],
-    n: int,
-    *,
-    verbose: bool = False,
-    start_idx: int = 0,
-) -> int:
-    """Add no-good cuts requiring the solution pattern to differ from each excluded tag.
-
-    Returns the next constraint index (for stable ``exclude_{i}`` names).
-    """
-    tag_list = list(exclude_tags)
-    if not tag_list:
-        return start_idx
-    specs = _parallel_build_nogood_specs(tag_list, boundary_shi=boundary_shi, n=n, nworkers=1)
-    if verbose and len(specs) < len(tag_list):
-        _pricing_log(
-            "boundary pricing MIP: skipped "
-            + f"{len(tag_list) - len(specs)} empty no-goods (no free ReLU indicators to flip)",
-            verbose=True,
-        )
-    return _batch_add_nogood_constraints(
-        model,
-        specs,
-        y_vars,
-        name_prefix="exclude_",
-        start_idx=start_idx,
-    )
-
-
 def _ss_from_y_values(
     y_vals: list[float],
     *,
@@ -656,19 +609,6 @@ def _ss_from_y_values(
         else:
             ss_parts.append(1 if y_val >= 0.5 else -1)
     return np.asarray(ss_parts, dtype=np.int8).reshape(1, -1)
-
-
-def _ss_from_mip_solution(
-    y_vars: list[Any],
-    z_by_shi: list[Any],
-    *,
-    boundary_shi: int,
-    eps: float,
-) -> np.ndarray:
-    """Build a sign sequence from solved MIP ReLU indicators ``y``."""
-    del z_by_shi, eps  # sign bits are enforced via ``y``; ``z`` may be loose at large big-M.
-    y_vals = [float(np.asarray(yj.X).item()) for yj in y_vars]
-    return _ss_from_y_values(y_vals, boundary_shi=boundary_shi)
 
 
 def _is_mip_proven_infeasible(status: int) -> bool:
