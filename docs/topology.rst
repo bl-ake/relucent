@@ -24,6 +24,15 @@ is guaranteed present — no coverage heuristic is required. A partial BFS still
 fewer top cells to seed vertices from, so completeness of the underlying exploration
 still matters for how much of the true arrangement is recovered.
 
+:meth:`~relucent.core.complex.Complex.get_chain_complex`,
+:meth:`~relucent.core.complex.Complex.get_meta_graph`, and therefore
+:meth:`~relucent.core.complex.Complex.get_betti_numbers` and
+:meth:`~relucent.core.complex.Complex.get_persistent_homology` all call
+:meth:`~relucent.core.complex.Complex.assert_topology_ready`, so they raise
+:class:`~relucent.core.errors.ComplexNotCompleteError` or
+:class:`~relucent.core.errors.ComplexNotVerifiedError` unless the complex is complete and
+verified.
+
 After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :attr:`~relucent.core.complex.Complex.verified` (see :doc:`exploration_verification`).
 :meth:`~relucent.core.complex.Complex.contract` and
@@ -73,13 +82,20 @@ the chosen homology convention, and returns ``{dimension: β_k}``.
 (no truncation).
 
 **``verify_chain_complex``**: when ``True``, require ``∂² = 0`` on the assembled
-boundary maps; raises :class:`~relucent.topology.ChainComplexInconsistent` if the
-explored complex is incomplete. This is complementary to the face-coverage check in
-:meth:`~relucent.core.complex.Complex.get_chain_complex`, which catches sparse lattices
-where ``∂² = 0`` can still hold.
+boundary maps; raises :class:`~relucent.topology.ChainComplexInconsistent` if they are
+inconsistent. Passing it bypasses the per-complex Betti cache.
 
-**``nworkers``**: thread count for ranking independent boundary maps (``None``
-auto-selects when the optional C GF(2) backend is available).
+**``verify_connected_components``**: when ``True``, check that β₀ from the rank formula
+agrees with the number of connected components, raising
+:class:`~relucent.topology.ConnectedComponentsMismatch` otherwise (default ``False`` on
+:class:`~relucent.core.complex.Complex`; ``True`` when calling
+:func:`relucent.topology.get_betti_numbers` directly).
+
+**``reduced``**: return reduced homology (β̃₀ = β₀ − 1).
+
+**``nworkers``**: thread count for ranking boundary maps concurrently. It only applies to
+the ``method="dense"`` ranking in :func:`relucent.topology.get_betti_numbers` (see
+*Performance*), so it has no effect on the default path.
 
 Example:
 
@@ -165,10 +181,21 @@ Betti numbers after all cells have entered.
 Performance
 -----------
 
-Boundary-matrix rank computation can use an optional **C extension**
-(``relucent.topology._gf2``), JIT-compiled from ``_gf2_rank.c`` when a C compiler is
-available. The public flag :data:`relucent.topology.C_BACKEND_AVAILABLE` reports
-whether the fast path is loaded; otherwise relucent falls back to pure Python.
+:func:`relucent.topology.get_betti_numbers` ranks each GF(2) boundary map with
+``method="sparse"`` by default: Gaussian elimination on the incidence sets with low-fill
+pivots (:func:`relucent.topology.gf2_rank_sparse_rowsets`), so cost and memory follow the
+number of incidences rather than ``rows × columns``. If fill-in makes the remainder dense,
+that remainder is ranked bit-packed.
+
+``method="dense"`` ranks the full bit-packed matrices and needs ``rows × columns / 8``
+bytes per map (about 59 GB for a 688k × 688k ∂₂), so it is only kept for cross-checking.
+It is not exposed through :class:`~relucent.core.complex.Complex`; call
+:func:`relucent.topology.get_betti_numbers` on a meta-graph to use it.
+
+Bit-packed ranking uses an optional **C extension** (``relucent.topology._gf2``),
+JIT-compiled from ``_gf2_rank.c`` when a C compiler is available. The public flag
+:data:`relucent.topology.C_BACKEND_AVAILABLE` reports whether the fast path is loaded;
+otherwise relucent falls back to pure Python.
 
 Set ``verbose=True`` on topology and persistence calls for progress on stderr.
 Package-wide search logging is controlled by :data:`relucent.config.VERBOSE`.

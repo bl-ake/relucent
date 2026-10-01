@@ -7,13 +7,14 @@ no extra arguments — the default path most users hit.
 For example `{0: 1, 1: 2}` means one connected component, two independent 1-cycles,
 and so on.
 
-**What you need first:** a complex discovered by search (BFS, etc.). Faces are
+**What you need first:** a complete, verified complex discovered by search (BFS, etc.;
+`get_chain_complex` calls `assert_topology_ready`). Faces are
 recovered algebraically from verified vertices' local stars (Masden 2022, Theorem
 20; see [`vertex_star`](../src/relucent/graph/vertex_star.py)), so no coverage
 heuristic is needed — every cell whose generating vertex is verified is
-guaranteed present. A partial BFS can still leave the complex short of the full
+guaranteed present. A partial BFS would leave the complex short of the full
 arrangement (fewer top cells means fewer vertices to seed from), so
-`cplx.complete` / `cplx.verified` still matter; see *Exploration and
+`cplx.complete` and `cplx.verified` must both be `True`; see *Exploration and
 certification* below.
 
 ---
@@ -228,9 +229,15 @@ From the (possibly truncated) meta-graph:
 1. Group nodes by dimension.
 2. For each `k`, build a GF(2) boundary matrix ∂_k from directed edges
    (`k-cell → (k−1)-face`). Columns index `k`-cells; rows index `(k−1)`-cells.
-   See [`_packed_boundary_matrix()`](../src/relucent/topology/betti.py).
-3. Compute ranks with [`gf2_rank_boundary()`](../src/relucent/topology/betti.py) (C
-   extension when available, Python fallback otherwise).
+3. Compute ranks. The default `method="sparse"` builds each map as sparse row sets
+   ([`_sparse_boundary_maps()`](../src/relucent/topology/betti.py)) and ranks it with
+   [`gf2_rank_sparse_rowsets()`](../src/relucent/topology/betti.py): low-fill-pivot
+   elimination whose cost follows the number of incidences, switching to bit-packed
+   ranking only for a remainder that has become dense. `method="dense"` builds
+   [`_packed_boundary_matrix()`](../src/relucent/topology/betti.py) and ranks it with
+   [`gf2_rank_boundary()`](../src/relucent/topology/betti.py) (C extension when
+   available, Python fallback otherwise). It needs `rows × columns / 8` bytes per map
+   and is kept for cross-checking; `Complex` does not expose it.
 4. Apply the cellular formula:
 
    `β_k = (number of k-cells) − rank(∂_k) − rank(∂_{k+1})`
@@ -238,7 +245,9 @@ From the (possibly truncated) meta-graph:
 When there are no 0-cells (e.g. a boundary complex with only 1- and 2-cells), the
 lowest key in the returned dictionary is `1`, not `0`.
 
-Zero entries are dropped from the result.
+Zero entries are dropped from the result. With `verify_connected_components=True`
+(the default for `topology.get_betti_numbers`, `False` via `Complex`), β₀ is checked
+against the number of connected components.
 
 ---
 
@@ -274,8 +283,12 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
   1-cell ends ([`one_point_compactify_meta_graph()`](../src/relucent/graph/meta_graph.py)).
 - **`respect_finite=True`** — restrict to cells with `finite is True` before ranking
   ([`finite_cells_subgraph()`](../src/relucent/graph/meta_graph.py)); no truncation.
-- **`verify_chain_complex=True`** — require ∂² = 0; raises if the complex is
-  incomplete.
+- **`verify_chain_complex=True`** — require ∂² = 0; raises
+  `ChainComplexInconsistent` if not. Bypasses the Betti cache.
+- **`verify_connected_components=True`** — check rank-formula β₀ against the
+  connected-component count; raises `ConnectedComponentsMismatch` on mismatch.
+- **`method="dense"`** (`topology.get_betti_numbers` only) — bit-packed ranking
+  instead of sparse elimination; `nworkers` applies only here.
 - **`get_meta_graph(verify=True)`** — runs
   [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
   assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
@@ -295,7 +308,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |
-| Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_packed_boundary_matrix`, `gf2_rank_boundary` |
+| Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_sparse_boundary_maps`, `gf2_rank_sparse_rowsets` (default); `_packed_boundary_matrix`, `gf2_rank_boundary` (`method="dense"`) |
 
 ### 0-cells and 1-cells at a glance
 

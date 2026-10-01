@@ -90,7 +90,8 @@ Search loop
    ``_worker_prepare_poly`` in :mod:`relucent.search`.
 3. **Main process** — On success, add the polyhedron and enqueue new neighbors
    for every SHI except the one just crossed. Failed flips are recorded so the
-   same ``(poly, shi)`` pair is not retried.
+   same ``(poly, shi)`` pair is not retried. Since queued neighbors lie across
+   certified facets, an empty neighbor is never excused: it blocks completeness.
 4. **Termination** — Search is **complete** when the frontier is empty, no
    ``max_polys`` cap was hit, and no ``max_depth`` neighbor was left unqueued.
 5. **Finalize** — :func:`~relucent.search.exploration.finalize_ambient_search`
@@ -98,8 +99,8 @@ Search loop
    runs verification.
 
 Workers always compute ``finite``, ``center``, and ``inradius`` even in
-topology-only mode (``geometry_properties=None``). SHI reliability checks and
-thin-cell guards depend on Chebyshev data. Optional geometry (halfspaces,
+topology-only mode (``geometry_properties=None``). The facet checks depend on a
+Chebyshev center verified strictly inside every row. Optional geometry (halfspaces,
 vertices, volume, …) is controlled by ``geometry_properties``; see
 :doc:`search_geometry`.
 
@@ -265,7 +266,7 @@ When certification runs
 |                               | (``complete=False``, ``verified=False``)       |
 +-------------------------------+------------------------------------------------+
 | ``max_depth`` cap with        | ``complete=False``; with ``verify=True``       |
-| unqueued neighbors            | raises :class:`~relucent.core.complex.IncompleteDualGraphError` |
+| unqueued neighbors            | raises :class:`~relucent.core.errors.IncompleteDualGraphError` |
 +-------------------------------+------------------------------------------------+
 | Intentional partial           | Pass ``verify=False``                          |
 | exploration                   |                                                |

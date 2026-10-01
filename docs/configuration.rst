@@ -8,15 +8,35 @@ can tune behavior for your model or hardware without editing source files.
 Automatic tolerance defaults
 ----------------------------
 
-``import relucent`` computes float64-safe defaults for tolerance settings
-(``TOL_*``, SHI thresholds, etc.) and writes them to :mod:`relucent.config`.
-Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are not overwritten.
-Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the legacy
+``import relucent`` computes float64-safe defaults for the tolerance settings
+(``TOL_*``, SHI thresholds, etc.) with
+:func:`~relucent.config.numeric_tolerances.apply_tolerances` and writes them to
+:mod:`relucent.config`. Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are
+not overwritten. Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the
 literals in :mod:`relucent.config`.
 
-:class:`~relucent.core.complex.Complex` calls
-:func:`~relucent.config.numeric_tolerances.apply_tolerances` for its network by default
-(``auto_tolerances=True``). Pass ``auto_tolerances=False`` to skip that step.
+:class:`~relucent.core.complex.Complex` calls ``apply_tolerances`` again for its
+network by default (``auto_tolerances=True``). Pass ``auto_tolerances=False`` to skip
+that step.
+
+These values are static: they depend on the ambient dimension (and, for the
+``boundary_bfs`` MIP margin ``BOUNDARY_MIP_EPS``, the network's layerwise scale), not on a
+per-network scan of the halfspace magnitudes. The topology path does not use them for
+its decisions. Facets, emptiness, vertices, genericity, membership, and Morse signs are
+each checked against a float64 error bound computed from the rows involved, decided
+exactly when that bound can't settle them, and otherwise raise
+:class:`~relucent.core.errors.AmbiguousGeometryError`. See
+:mod:`relucent._internal.rounding` and :mod:`relucent._internal.exact`.
+
+.. note::
+
+   Several settings are currently still defined and accepted by ``update_settings`` but
+   **no longer read by the library**: ``TOL_HALFSPACE_CONTAINMENT``,
+   ``TOL_INTERIOR_VERIFY``, ``TOL_DEAD_RELU``, ``TOL_SHI_HYPERPLANE``,
+   ``TOL_SHI_OBJECTIVE``, ``VERTEX_TRUST_THRESHOLD``, ``MIN_SEARCH_INRADIUS``,
+   ``GUROBI_SHI_BEST_OBJ_STOP`` and ``GUROBI_SHI_BEST_BD_STOP``. They are kept for
+   backward compatibility, so changing them has no effect. Tables below mark them as
+   *(unused)*.
 
 Changing settings
 -----------------
@@ -102,35 +122,43 @@ Polyhedron and halfspace geometry
    * - ``VERTEX_TRUST_THRESHOLD``
      - ``float``
      - ``1e-6``
-     - Threshold for trusting vertex positions from HalfspaceIntersection.
+     - *(unused)* Threshold for trusting vertex positions from HalfspaceIntersection.
    * - ``TOL_HALFSPACE_CONTAINMENT``
      - ``float``
      - ``1e-6``
-     - Feasibility tolerance for halfspace containment (:math:`a^\top x + b \le 0`) in checks and related geometry.
+     - *(unused)* Feasibility tolerance for halfspace containment (:math:`a^\top x + b \le 0`) in checks and related geometry.
    * - ``TOL_INTERIOR_VERIFY``
      - ``float``
      - ``1e-5``
-     - After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than ``TOL_HALFSPACE_CONTAINMENT`` for solver noise).
+     - *(unused)* After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than ``TOL_HALFSPACE_CONTAINMENT`` for solver noise).
    * - ``TOL_DEAD_RELU``
      - ``float``
      - ``1e-8``
-     - Column norm below which a ReLU is treated as dead.
+     - *(unused)* Column norm below which a ReLU is treated as dead.
    * - ``TOL_SHI_HYPERPLANE``
      - ``float``
      - ``1e-6``
-     - Hyperplane equality tolerance in SHI computation.
+     - *(unused)* Hyperplane equality tolerance in SHI computation.
    * - ``TOL_HALFSPACE_NORMAL``
      - ``float``
      - ``1e-12``
-     - Norms below this are treated as degenerate halfspace normals.
+     - Norms below this are treated as degenerate halfspace normals (used when plotting).
    * - ``GUROBI_SHI_BEST_OBJ_STOP`` / ``GUROBI_SHI_BEST_BD_STOP``
      - ``float``
      - ``1e-6`` / ``-1e-6``
-     - Gurobi early-stop tolerances for the SHI MIP models.
+     - *(unused)* Gurobi early-stop tolerances for the SHI MIP models.
+   * - ``GUROBI_SHI_OPTIMALITY_TOL``
+     - ``float``
+     - ``1e-9``
+     - Gurobi ``OptimalityTol`` for the SHI LP (Gurobi's minimum is ``1e-9``). At the Gurobi default of ``1e-6`` the final basis can have a slightly negative exact multiplier, which the exact facet check rejects.
+   * - ``GUROBI_SHI_SCALE_FLAG``
+     - ``int``
+     - ``2``
+     - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling.
    * - ``TOL_SHI_OBJECTIVE``
      - ``float``
      - ``1e-8``
-     - Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).
+     - *(unused)* Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).
    * - ``TOL_NEARLY_VERTICAL``
      - ``float``
      - ``1e-10``
@@ -142,7 +170,7 @@ Polyhedron and halfspace geometry
    * - ``TOL_VERIFY_AB_ATOL``
      - ``float``
      - ``1e-6``
-     - ``allclose`` atol when verifying halfspace ``(A, b)`` against network outputs.
+     - ``allclose`` atol when verifying halfspace ``(A, b)`` against network outputs (used in :mod:`relucent.vis` checks).
 
 Complex search and parallel add
 --------------------------------
@@ -162,7 +190,7 @@ Complex search and parallel add
    * - ``MIN_SEARCH_INRADIUS``
      - ``float``
      - ``TOL_SHI_OBJECTIVE / 2``
-     - During BFS/A* search, thin cells below this floor trigger an interior witness-point check; search continues if a witness is found and raises only if witness search fails.
+     - *(unused)* Formerly a floor on Chebyshev inradius during BFS/A* search.
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
@@ -186,7 +214,7 @@ Complex search and parallel add
    * - ``DEFAULT_COMPLEX_PLOT_BOUND``
      - ``float``
      - ``10000``
-     - Default bound for :meth:`~relucent.core.complex.Complex.plot_cells` when ``bound`` is omitted.
+     - Default bound for :meth:`~relucent.core.complex.Complex.plot` of a 2D complex when ``bound`` is omitted.
    * - ``BOUNDARY_MIP_BOUND_MARGIN``
      - ``float``
      - ``5.0``

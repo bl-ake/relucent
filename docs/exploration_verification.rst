@@ -37,7 +37,7 @@ completeness check would false-fail.
 
 A finite ``max_depth`` cap can leave ``complete=False`` even when the queue is
 empty (neighbors beyond the depth limit were not queued). With ``verify=True``,
-that raises :class:`~relucent.core.complex.IncompleteDualGraphError` unless
+that raises :class:`~relucent.core.errors.IncompleteDualGraphError` unless
 ``max_polys`` was hit.
 
 For intentional partial exploration, pass ``verify=False`` or accept
@@ -86,9 +86,13 @@ Topology prerequisites
 (deserialized complexes), call
 :meth:`~relucent.core.complex.Complex.set_exploration_state` explicitly.
 
-:meth:`~relucent.core.complex.Complex.get_betti_numbers` does **not** require
-``assert_topology_ready`` — it can run on partial complexes, but results may be
-wrong if neighbors are missing.
+:meth:`~relucent.core.complex.Complex.get_chain_complex`,
+:meth:`~relucent.core.complex.Complex.get_meta_graph`,
+:meth:`~relucent.core.complex.Complex.get_betti_numbers`, and
+:meth:`~relucent.core.complex.Complex.get_persistent_homology` also go through
+``assert_topology_ready``. On an incomplete or unverified complex they raise
+:class:`~relucent.core.errors.ComplexNotCompleteError` or
+:class:`~relucent.core.errors.ComplexNotVerifiedError`.
 
 Boundary discovery
 ------------------
