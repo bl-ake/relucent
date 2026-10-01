@@ -25,6 +25,7 @@ def relu_linear_blocks(net: ReLUNetwork) -> list[LinearLayer]:
 
 
 def count_relu_units(net: ReLUNetwork) -> int:
+    """Total number of ReLU units (rows of linear layers that feed a ReLU)."""
     return sum(int(layer.weight.shape[0]) for layer in relu_linear_blocks(net))
 
 

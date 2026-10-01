@@ -1,3 +1,9 @@
+"""Plotly visualization of complexes, polyhedra, and persistence diagrams.
+
+Most users call :meth:`Complex.plot <relucent.core.complex.Complex.plot>` or
+:func:`plot_complex`; :func:`plot_polyhedron` builds traces for a single cell.
+"""
+
 from __future__ import annotations
 
 # pyright: reportExplicitAny=false

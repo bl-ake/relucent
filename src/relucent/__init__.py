@@ -1,3 +1,8 @@
+"""Relucent: polyhedral complexes of ReLU networks.
+
+The public API is exported lazily from this module; see https://bl-ake.github.io/relucent/.
+"""
+
 import os
 import tomllib
 from importlib import import_module

@@ -113,10 +113,12 @@ class TorchMLP(nn.Sequential):
 
     @property
     def layers(self) -> OrderedDict[str, nn.Module]:
+        """Named submodules, in order."""
         return cast(OrderedDict[str, nn.Module], self._modules)
 
     @property
     def device(self) -> str:
+        """Device of the first parameter as a string (``"cpu"`` if there are none)."""
         try:
             return str(next(self.parameters()).device)
         except StopIteration:
@@ -124,6 +126,7 @@ class TorchMLP(nn.Sequential):
 
     @property
     def dtype(self) -> torch.dtype:
+        """Dtype of the first parameter (``torch.float64`` if there are none)."""
         try:
             return next(self.parameters()).dtype
         except StopIteration:
@@ -392,7 +395,7 @@ def _new_deque() -> deque[object]:
 
 
 class NonBlockingQueue(Generic[T, Q]):
-    """Just a normal queue"""
+    """Plain queue; ``pop`` raises ``IndexError``/``KeyError`` when empty, which ends iteration."""
 
     def __init__(
         self,
@@ -428,15 +431,18 @@ class NonBlockingQueue(Generic[T, Q]):
             yield task
 
     def pop(self) -> T:
+        """Remove and return the next element."""
         return self._pop_element(self.deque)
 
     def push(self, element: T, priority: float | None = None) -> None:
+        """Add an element; ``priority`` is used only if the queue was built with ``push_with_priority``."""
         if priority is None or self._push_with_priority is None:
             self._push_element(self.deque, element)
         else:
             self._push_with_priority(self.deque, element, priority)
 
     def close(self) -> None:
+        """Mark the queue as closed."""
         self.closed = True
 
     def __len__(self) -> int:
@@ -444,7 +450,7 @@ class NonBlockingQueue(Generic[T, Q]):
 
 
 class BlockingQueue(Generic[T, Q]):
-    """Queue that patiently waits for new elements if you pop() while it's empty"""
+    """Thread-safe queue whose ``pop`` waits for new elements while empty, until the queue is closed."""
 
     def __init__(
         self,
@@ -483,6 +489,7 @@ class BlockingQueue(Generic[T, Q]):
             yield task
 
     def pop(self) -> T:
+        """Remove and return the next element, waiting if empty; raises ``IndexError`` once closed and drained."""
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
                 self.lock.wait(timeout=cfg.BLOCKING_QUEUE_WAIT_TIMEOUT)
@@ -491,6 +498,7 @@ class BlockingQueue(Generic[T, Q]):
             return self._pop_element(self.deque)
 
     def push(self, element: T, priority: float | None = None) -> None:
+        """Add an element; ``priority`` is used only if the queue was built with ``push_with_priority``."""
         with self.lock:
             if priority is None or self._push_with_priority is None:
                 self._push_element(self.deque, element)
@@ -499,6 +507,7 @@ class BlockingQueue(Generic[T, Q]):
             self.lock.notify()
 
     def close(self) -> None:
+        """Mark the queue as closed and wake all waiting consumers."""
         with self.lock:
             self.closed = True
             self.lock.notify_all()

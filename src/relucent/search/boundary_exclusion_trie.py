@@ -24,6 +24,16 @@ NogoodPathSpec = tuple[tuple[int, int], ...]
 
 @dataclass
 class CompileStats:
+    """Statistics from :meth:`ForbiddenPatternTrie.compile_to_model`.
+
+    Fields:
+        n_tags: Number of forbidden patterns inserted.
+        n_constraints: Number of no-good constraints emitted.
+        n_saturated_nodes: Number of saturated subtrees compiled.
+        compile_seconds: Wall-clock compile time.
+        fully_saturated: True if every pattern is forbidden (no feasible cell remains).
+    """
+
     n_tags: int
     n_constraints: int
     n_saturated_nodes: int
@@ -32,6 +42,7 @@ class CompileStats:
 
     @property
     def compression_ratio(self) -> float:
+        """Tags per emitted constraint (higher means better compression)."""
         if self.n_constraints == 0:
             return float(self.n_tags) if self.n_tags > 0 else 1.0
         return self.n_tags / self.n_constraints
@@ -68,6 +79,7 @@ class ForbiddenPatternTrie:
         *,
         verbose: bool = False,
     ) -> ForbiddenPatternTrie:
+        """Build a trie from bytes-encoded sign sequences of length ``n``; ``verbose`` shows a progress bar."""
         trie = cls(n, boundary_shi)
         tag_list = list(tags)
         if not tag_list:
@@ -115,6 +127,7 @@ class ForbiddenPatternTrie:
         self.n_tags += 1
 
     def insert(self, tag: bytes) -> None:
+        """Add one bytes-encoded sign sequence of length ``n`` to the forbidden set."""
         signs = np.frombuffer(tag, dtype=np.int8, count=self.n)
         self._insert_signs(signs)
 
@@ -123,6 +136,7 @@ class ForbiddenPatternTrie:
         return 0 if remaining < 0 else 1 << remaining
 
     def is_saturated(self, node: _TrieNode, depth: int) -> bool:
+        """Whether ``node`` at ``depth`` has every possible completion forbidden."""
         if depth < 0 or depth >= self.n_free:
             return False
         capacity = self._subtree_capacity(depth)
@@ -170,6 +184,7 @@ class ForbiddenPatternTrie:
             path.pop()
 
     def collect_saturated_specs(self, *, include_leaves: bool = False) -> list[NogoodPathSpec]:
+        """Return each saturated subtree as a path of ``(index, sign)`` pairs (plus single leaves if requested)."""
         specs: list[NogoodPathSpec] = []
         self._collect_specs_node(self.root, 0, [], specs, include_leaves=include_leaves)
         return specs

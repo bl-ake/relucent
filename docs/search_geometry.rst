@@ -1,5 +1,5 @@
 Search Geometry and Memory Management
-==================================
+=====================================
 
 Relucent separates **topology discovery** from **geometric cache computation** so
 you can control runtime and memory for your workload.

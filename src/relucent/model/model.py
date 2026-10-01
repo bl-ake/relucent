@@ -20,17 +20,23 @@ __all__ = ["ReLUNetwork", "LinearLayer", "ReLULayer", "FlattenLayer"]
 
 @dataclass
 class LinearLayer:
+    """Affine map ``x -> x @ weight.T + bias``; ``weight`` has shape ``(out, in)``."""
+
     weight: np.ndarray
     bias: np.ndarray
 
 
 @dataclass
 class ReLULayer:
+    """Elementwise ``max(x, 0)``. Each unit of the preceding linear layer is one hyperplane."""
+
     pass
 
 
 @dataclass
 class FlattenLayer:
+    """Reshape each sample to a vector, keeping the batch dimension."""
+
     pass
 
 
@@ -38,7 +44,18 @@ Layer = LinearLayer | ReLULayer | FlattenLayer
 
 
 class ReLUNetwork:
-    """Canonical feedforward network: affine + ReLU (+ optional input flatten)."""
+    """Canonical feedforward network: affine + ReLU (+ optional input flatten).
+
+    Args:
+        layers: Layers in order, either an iterable (auto-named ``layer0``, ``layer1``, ...) or a
+            mapping from layer name to layer.
+        input_shape: Shape of one input sample. If omitted, it is inferred as
+            ``(in_features,)`` from the first :class:`LinearLayer`; a ``ValueError`` is raised if the
+            network has no linear layer.
+
+    After construction, ``layers`` (ordered name -> layer mapping), ``input_shape``, and ``trained_on``
+    (optional training data used by distance-to-training filtrations; ``None`` by default) are available.
+    """
 
     def __init__(
         self,
@@ -59,12 +76,17 @@ class ReLUNetwork:
 
     @property
     def num_relus(self) -> int:
+        """Number of :class:`ReLULayer` layers (not neurons)."""
         return sum(isinstance(layer, ReLULayer) for layer in self.layers.values())
 
     def __call__(self, data: np.ndarray | Any) -> np.ndarray | Any:
         return self.forward(data)
 
     def forward(self, data: np.ndarray | Any) -> np.ndarray | Any:
+        """Run the network on a NumPy array or torch tensor.
+
+        ``data`` is reshaped to ``(-1, *input_shape)``; the output has the same array type as the input.
+        """
         x = data.reshape((-1,) + self.input_shape)
         for layer in self.layers.values():
             x = self._apply_layer(layer, x)
@@ -90,6 +112,11 @@ class ReLUNetwork:
     def get_all_layer_outputs(
         self, data: np.ndarray | Any, layers: Container[str] | None = None, verbose: bool = False
     ) -> OrderedDict[str, np.ndarray | Any]:
+        """Return the output of each layer for ``data``.
+
+        Unlike :meth:`forward`, ``data`` is not reshaped first. ``layers`` restricts the result to the named
+        layers (default: all); ``verbose`` logs each layer as it runs.
+        """
         outputs: list[tuple[str, np.ndarray | Any]] = []
         x = data
         for name, layer in self.layers.items():
@@ -101,6 +128,12 @@ class ReLUNetwork:
         return OrderedDict(outputs)
 
     def shi2weights(self, shi: int, return_idx: bool = False) -> np.ndarray | tuple[str, int]:
+        """Locate the neuron behind hyperplane index ``shi``.
+
+        Hyperplane indices count the rows of all linear layers in order. Returns that neuron's weight row,
+        or ``(layer_name, row_within_layer)`` if ``return_idx`` is true. Raises ``ValueError`` if ``shi``
+        is out of range.
+        """
         remaining_rows = shi
         for name, layer in self.layers.items():
             if isinstance(layer, LinearLayer):

@@ -41,7 +41,14 @@ PARALLEL_VERIFY_MIN_CANDIDATES = 2 * MIN_CANDIDATES_PER_WORKER
 
 @dataclass(frozen=True)
 class VertexRecord:
-    """A verified vertex, with everything needed to expand its local star."""
+    """A verified vertex, with everything needed to expand its local star.
+
+    Fields:
+        ss: Sign sequence of the vertex (zeros mark the hyperplanes through it).
+        point: Coordinates of the vertex in input space.
+        witness_tag: Tag of a top-dimensional cell known to contain this vertex.
+        varying_shis: Hyperplane indices that vary among the cells around the vertex.
+    """
 
     ss: np.ndarray
     point: np.ndarray
@@ -50,6 +57,7 @@ class VertexRecord:
 
     @property
     def tag(self) -> bytes:
+        """Bytes-encoded sign sequence, the key used by :class:`~relucent.core.ss.SSManager`."""
         return encode_ss(self.ss)
 
 

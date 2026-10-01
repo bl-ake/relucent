@@ -27,16 +27,17 @@ Neighbors across a codimension-one face differ by flipping one nonzero ``ss``
 entry to ``0`` (crossing that hyperplane). The SHI labels which hyperplane was
 crossed.
 
-+----------------------------+--------------------------------------------------+
-| Concept                    | Role                                             |
-+============================+==================================================+
-| ``ss``                     | Stable cell identity (injective for nonempty     |
-|                            | regions)                                         |
-+----------------------------+--------------------------------------------------+
-| ``Polyhedron._shis``       | Which halfspace rows are true boundary facets    |
-+----------------------------+--------------------------------------------------+
-| Dual-graph edge ``shi``    | Hyperplane shared by two adjacent top cells      |
-+----------------------------+--------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Concept
+     - Role
+   * - ``ss``
+     - Stable cell identity (injective for nonempty regions)
+   * - ``Polyhedron._shis``
+     - Which halfspace rows are true boundary facets
+   * - Dual-graph edge ``shi``
+     - Hyperplane shared by two adjacent top cells
 
 SHIs are computed by Gurobi LPs in :func:`~relucent.geometry.calculations.get_shis` and
 cached on ``Polyhedron._shis``. The public :attr:`~relucent.core.poly.Polyhedron.shis`
@@ -48,17 +49,24 @@ How search works
 Entry points
 ~~~~~~~~~~~~
 
-+----------------------------+-------------+-----------------------------------+
-| Method                     | Queue       | Use                               |
-+============================+=============+===================================+
-| :meth:`~relucent.core.complex.Complex.bfs` | FIFO        | Default local exploration          |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.dfs` | LIFO        | Depth-first variant                |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.random_walk` | Random pop  | Stochastic exploration             |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.searcher` | Configurable | Generic traversal                 |
-+----------------------------+-------------+-----------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Method
+     - Queue
+     - Use
+   * - :meth:`~relucent.core.complex.Complex.bfs`
+     - FIFO
+     - Default local exploration
+   * - :meth:`~relucent.core.complex.Complex.dfs`
+     - LIFO
+     - Depth-first variant
+   * - :meth:`~relucent.core.complex.Complex.random_walk`
+     - Random pop
+     - Stochastic exploration
+   * - :meth:`~relucent.core.complex.Complex.searcher`
+     - Configurable
+     - Generic traversal
 
 All delegate to :func:`~relucent.search.searcher`, which runs a parallel frontier
 expansion over flip-neighbors.
@@ -166,7 +174,7 @@ strict subset of SS crossings, so using only ``_shis`` here would omit valid
 faces.
 
 Role 3 — Meta-graph node metadata
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.graph.incidence.meta_node_attrs` derives ``shis`` (flip-neighbor
 crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
@@ -256,21 +264,19 @@ after a **complete** search via ``finalize_ambient_search`` at
 When certification runs
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-+-------------------------------+------------------------------------------------+
-| Situation                     | Behavior                                       |
-+===============================+================================================+
-| Complete search,              | Dual-graph sync +                              |
-| ``verify=True``               | ``certify_complex(level=COMPLETE)``            |
-+-------------------------------+------------------------------------------------+
-| ``max_polys`` cap hit         | Certification skipped                          |
-|                               | (``complete=False``, ``verified=False``)       |
-+-------------------------------+------------------------------------------------+
-| ``max_depth`` cap with        | ``complete=False``; with ``verify=True``       |
-| unqueued neighbors            | raises :class:`~relucent.core.errors.IncompleteDualGraphError` |
-+-------------------------------+------------------------------------------------+
-| Intentional partial           | Pass ``verify=False``                          |
-| exploration                   |                                                |
-+-------------------------------+------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Situation
+     - Behavior
+   * - Complete search, ``verify=True``
+     - Dual-graph sync + ``certify_complex(level=COMPLETE)``
+   * - ``max_polys`` cap hit
+     - Certification skipped (``complete=False``, ``verified=False``)
+   * - ``max_depth`` cap with unqueued neighbors
+     - ``complete=False``; with ``verify=True`` raises :class:`~relucent.core.errors.IncompleteDualGraphError`
+   * - Intentional partial exploration
+     - Pass ``verify=False``
 
 Boundary-specific checks
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -302,19 +308,21 @@ Dual graph
 
 **Entry point:** :meth:`~relucent.core.complex.Complex.get_dual_graph`
 
-+------------------+----------------------------------------------------------+
-| Aspect           | Detail                                                   |
-+==================+==========================================================+
-| Type             | ``networkx.Graph``                                       |
-+------------------+----------------------------------------------------------+
-| Nodes            | Top-dimensional ``Polyhedron`` objects (or relabeled ints)|
-+------------------+----------------------------------------------------------+
-| Edges            | Adjacent cells sharing a codimension-one face            |
-+------------------+----------------------------------------------------------+
-| Edge attribute   | ``shi`` — hyperplane crossed between endpoints           |
-+------------------+----------------------------------------------------------+
-| Cache            | Stored on ``Complex._dual_graph``; property ``G``        |
-+------------------+----------------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Aspect
+     - Detail
+   * - Type
+     - ``networkx.Graph``
+   * - Nodes
+     - Top-dimensional ``Polyhedron`` objects (or relabeled ints)
+   * - Edges
+     - Adjacent cells sharing a codimension-one face
+   * - Edge attribute
+     - ``shi`` — hyperplane crossed between endpoints
+   * - Cache
+     - Stored on ``Complex._dual_graph``; property ``G``
 
 Edge construction rules
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -355,19 +363,21 @@ input to Betti numbers and persistent homology.
 
 **Entry point:** :meth:`~relucent.core.complex.Complex.get_meta_graph`
 
-+------------------+----------------------------------------------------------+
-| Aspect           | Detail                                                   |
-+==================+==========================================================+
-| Type             | ``networkx.MultiDiGraph``                                |
-+------------------+----------------------------------------------------------+
-| Nodes            | All cells ``k = 0 … d`` from the chain complex           |
-+------------------+----------------------------------------------------------+
-| Node attrs       | ``poly``, ``dim``, ``ss``, ``finite``, ``crossings``, ``shis`` |
-+------------------+----------------------------------------------------------+
-| Edges            | Directed ``k-cell → (k−1)-face``                         |
-+------------------+----------------------------------------------------------+
-| Edge attr        | ``shi`` — hyperplane zeroed to reach the face            |
-+------------------+----------------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Aspect
+     - Detail
+   * - Type
+     - ``networkx.MultiDiGraph``
+   * - Nodes
+     - All cells ``k = 0 … d`` from the chain complex
+   * - Node attrs
+     - ``poly``, ``dim``, ``ss``, ``finite``, ``crossings``, ``shis``
+   * - Edges
+     - Directed ``k-cell → (k−1)-face``
+   * - Edge attr
+     - ``shi`` — hyperplane zeroed to reach the face
 
 Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
@@ -408,26 +418,30 @@ Dual graph vs meta-graph
                          ↓
                     get_betti_numbers()
 
-+----------------------+---------------------------+---------------------------+
-|                      | Dual graph                | Meta-graph                |
-+======================+===========================+===========================+
-| Dimension scope      | Top cells only            | All dims in chain complex |
-+----------------------+---------------------------+---------------------------+
-| Edge meaning         | Same-dim adjacency        | Codim-one face incidence  |
-+----------------------+---------------------------+---------------------------+
-| SHI on edges         | Crossing hyperplane       | Hyperplane zeroed to face |
-+----------------------+---------------------------+---------------------------+
-| SHI on nodes         | Synced from edges (top)   | ``cubical_cell_shis``     |
-|                      | or ``cubical_cell_shis``  | (role 3)                  |
-|                      | on lower-dim slices       |                           |
-+----------------------+---------------------------+---------------------------+
-| Face discovery       | Flip neighbors /          | All ``ss_i ≠ 0`` crossings|
-|                      | 0-face sharing            | (role 2)                  |
-+----------------------+---------------------------+---------------------------+
-| Primary consumers    | Search finalize,          | Topology, persistence,    |
-|                      | chain complex, dual-graph | Morse                     |
-|                      | recover                   |                           |
-+----------------------+---------------------------+---------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - 
+     - Dual graph
+     - Meta-graph
+   * - Dimension scope
+     - Top cells only
+     - All dims in chain complex
+   * - Edge meaning
+     - Same-dim adjacency
+     - Codim-one face incidence
+   * - SHI on edges
+     - Crossing hyperplane
+     - Hyperplane zeroed to face
+   * - SHI on nodes
+     - Synced from edges (top) or ``cubical_cell_shis`` on lower-dim slices
+     - ``cubical_cell_shis`` (role 3)
+   * - Face discovery
+     - Flip neighbors / 0-face sharing
+     - All ``ss_i ≠ 0`` crossings (role 2)
+   * - Primary consumers
+     - Search finalize, chain complex, dual-graph recover
+     - Topology, persistence, Morse
 
 **Critical invariant:** meta-graph **face edges** use
 :func:`~relucent.graph.incidence.ss_nonzero_indices` (role 2), not propagated

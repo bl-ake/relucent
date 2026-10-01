@@ -349,7 +349,10 @@ class Polyhedron:
 
     @property
     def net(self) -> ReLUNetwork:
-        """The neural network I belong to"""
+        """The :class:`~relucent.model.model.ReLUNetwork` this polyhedron belongs to.
+
+        Raises ``ValueError`` if unset; it can be set once and not changed afterwards.
+        """
         if self._net is None:
             raise ValueError("Polyhedron has no associated network.")
         return self._net
@@ -362,7 +365,7 @@ class Polyhedron:
 
     @property
     def ss(self) -> np.ndarray | torch.Tensor:
-        """My sign sequence."""
+        """My sign sequence (entries in {-1, 0, 1}, one per ReLU unit). Assigning it clears derived caches."""
         return self._ss
 
     @ss.setter
@@ -406,6 +409,7 @@ class Polyhedron:
 
     @property
     def inequalities(self) -> np.ndarray:
+        """Rows of ``halfspaces_np`` for the nonzero sign-sequence entries (the strict inequality constraints)."""
         return self.halfspaces_np[self.non_zero_indices]
 
     @property
@@ -854,6 +858,18 @@ class Polyhedron:
         project: float | None = None,
         **kwargs: Any,
     ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
+        """Plot this 2D cell lifted through the network (its graph over the input plane).
+
+        Args:
+            fill: Plotly fill mode for the outline.
+            showlegend: Whether to show a legend entry.
+            bound: Plot bound; defaults to ``config.DEFAULT_PLOT_BOUND``.
+            project: If set, flatten the lifted surface to this height.
+            **kwargs: Passed to :func:`relucent.plot_polyhedron`.
+
+        Returns:
+            The mesh/outline traces, or ``None`` if plotting failed.
+        """
         if bound is None:
             bound = cfg.DEFAULT_PLOT_BOUND
         from relucent.vis import plot_polyhedron

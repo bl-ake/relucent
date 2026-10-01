@@ -40,12 +40,18 @@ Core capabilities include:
    complex
    polyhedron
    exploration
+   boundary_search
    certify
+   model
+   sign_sequences
+   geometry
+   meta_graph
    incidence
    vertex_star
    filtration
    persistence
    topology_api
+   morse
    utilities
 
 Indices and tables
