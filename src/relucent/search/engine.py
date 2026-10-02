@@ -7,7 +7,7 @@ import warnings
 from collections import defaultdict, deque
 from collections.abc import Callable, Iterable
 from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -20,8 +20,8 @@ from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementEr
 from relucent.core.poly import Polyhedron
 from relucent.geometry.calculations import get_shis, shis_are_certified, without_deprecated_strict
 from relucent.search.exploration import (
+    SearchResult,
     finalize_ambient_search,
-    search_stats_dict,
 )
 from relucent.search.worker_context import get_worker_context, set_worker_context, worker_context_scope
 from relucent.utils import (
@@ -403,6 +403,10 @@ def astar_calculations(
     return p, *rest
 
 
+# How the searcher treats cells against the cube ``[-cube_radius, cube_radius]^d``.
+CubeMode = Literal["unrestricted", "intersect", "clipped", "exclude"]
+
+
 @with_verbosity
 def searcher(
     cx: "Complex",
@@ -414,11 +418,11 @@ def searcher(
     nworkers: int | None = None,
     verbose: int | None = None,
     cube_radius: float | None = None,
-    cube_mode: str = "unrestricted",
+    cube_mode: CubeMode = "unrestricted",
     geometry_properties: Iterable[str] | None = None,
     verify: bool = True,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> SearchResult:
     """Search the complex by crossing supporting hyperplanes to find neighbors.
 
     Generic over traversal strategy (BFS, DFS, random walk): the queue decides the order.
@@ -447,13 +451,7 @@ def searcher(
         **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
-        dict: Search information dictionary containing:
-            - "Search Depth": Maximum depth reached
-            - "Avg # Facets Uncorrected": Average number of facets per polyhedron
-            - "Search Time": Elapsed time in seconds
-            - "Bad SHI Computations": List of failed computations
-            - "Complete": Whether search completed (no unprocessed items)
-            - "Verified": Whether certification passed (``None`` if not run)
+        :class:`~relucent.search.exploration.SearchResult`.
 
     Raises:
         ValueError: If the start point lies on a hyperplane (has zero in SS).
@@ -503,9 +501,9 @@ def searcher(
     if cube_mode != "unrestricted" and not _apply_cube_filter(start, cube_mode, cast(float, cube_radius)):
         queue.close()
         cx.set_exploration_state(complete=True, verified=False)
-        return search_stats_dict(
+        return SearchResult(
             depth=0,
-            rolling_average=0.0,
+            mean_facets=0.0,
             search_time=0.0,
             bad_shi_computations=[],
             complete=True,
@@ -666,9 +664,9 @@ def searcher(
             invalid_proof_suppressed,
         )
 
-    return search_stats_dict(
+    return SearchResult(
         depth=depth,
-        rolling_average=rolling_average,
+        mean_facets=rolling_average,
         search_time=search_time,
         bad_shi_computations=bad_shi_computations,
         complete=complete,

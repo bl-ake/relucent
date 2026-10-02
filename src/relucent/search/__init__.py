@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from .engine import (
         ALL_GEOMETRY_PROPERTIES,
         SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
+        CubeMode,
         astar_calculations,
         blocking_bad_shi_computations,
         get_ip,
@@ -19,10 +20,13 @@ if TYPE_CHECKING:
         searcher,
         true_phantom_neighbor_error,
     )
+    from .exploration import SearchResult
 
 __all__ = [
     "ALL_GEOMETRY_PROPERTIES",
     "SEARCH_REQUIRED_GEOMETRY_PROPERTIES",
+    "CubeMode",
+    "SearchResult",
     "astar_calculations",
     "blocking_bad_shi_computations",
     "get_ip",

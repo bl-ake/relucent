@@ -105,8 +105,8 @@ def test_bfs_finds_thin_strip(eps: float, monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("RELUCENT_CAREFUL_MODE", "0")
     cplx = Complex(_strip_net(eps))
     info = cplx.bfs(start=np.array([-1.0], dtype=np.float64), max_polys=20, nworkers=1, verbose=0, verify=True)
-    assert info["Complete"] is True
-    assert not info["Bad SHI Computations"]
+    assert info.complete is True
+    assert not info.bad_shi_computations
     assert len(cplx) == 3
 
 
