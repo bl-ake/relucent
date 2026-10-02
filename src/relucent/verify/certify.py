@@ -28,9 +28,8 @@ from typing import TYPE_CHECKING
 
 import networkx as nx
 import numpy as np
-from tqdm.auto import tqdm
 
-from relucent._internal.logging import logger
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent.core.errors import IncompleteDualGraphError, NonGenericArrangementError, ShiProofError
 from relucent.core.poly import Polyhedron
 from relucent.graph.incidence import (
@@ -70,6 +69,7 @@ _LEVEL_RANK: dict[CertifyLevel, int] = {
 }
 
 
+@with_verbosity
 def certify_complex(
     cplx: Complex,
     *,
@@ -77,6 +77,7 @@ def certify_complex(
     repair: bool = True,
     graph: nx.Graph[Polyhedron] | None = None,
     record_state: bool = False,
+    verbose: int | None = None,
 ) -> None:
     """Run the certification pipeline up to ``level``; sets ``cplx._verified`` on success.
 
@@ -92,6 +93,8 @@ def certify_complex(
         record_state: When True, also update
             :meth:`~relucent.core.complex.Complex.set_exploration_state` so callers
             do not need a separate state write.
+        verbose: Output level: ``0`` quiet, ``1`` progress bar, ``2`` per-stage detail.
+            ``None`` uses :data:`relucent.config.VERBOSE`.
 
     Raises:
         ShiFlipInvariantError, DualGraphAsymmetricEdgeError, CubicalConsistencyError:
@@ -101,6 +104,7 @@ def certify_complex(
         ShiProofError: ``level == GEOMETRIC`` and a cached ``_shis`` list not computed by
             ``get_shis`` on its cell does not match a fresh LP recompute.
     """
+    del verbose  # applied by @with_verbosity
     if len(cplx) == 0:
         if record_state:
             complete = True if cplx._complete is None else bool(cplx._complete)
@@ -112,29 +116,29 @@ def certify_complex(
     top_dim = max(int(p.dim) for p in cplx)
     is_contracted_slice = top_dim != int(cplx.dim)
 
-    g = graph if graph is not None else cplx.get_dual_graph(verbose=False, repair=repair)
+    g = graph if graph is not None else cplx.get_dual_graph(repair=repair)
 
-    logger.info("certify_complex: flip-SHI symmetry ...")
+    logger.debug("certify_complex: flip-SHI symmetry ...")
     t_stage = time.perf_counter()
     verify_flip_shi_symmetry(cplx)
-    logger.info("certify_complex: flip-SHI symmetry finished in %.1fs", time.perf_counter() - t_stage)
+    logger.debug("certify_complex: flip-SHI symmetry finished in %.1fs", time.perf_counter() - t_stage)
 
-    logger.info("certify_complex: dual-graph certification ...")
+    logger.debug("certify_complex: dual-graph certification ...")
     t_stage = time.perf_counter()
     certify_dual_graph(g, cplx)
-    logger.info("certify_complex: dual-graph certification finished in %.1fs", time.perf_counter() - t_stage)
+    logger.debug("certify_complex: dual-graph certification finished in %.1fs", time.perf_counter() - t_stage)
 
     if is_contracted_slice:
-        logger.info("certify_complex: contracted-slice SHI checks ...")
+        logger.debug("certify_complex: contracted-slice SHI checks ...")
         t_stage = time.perf_counter()
         verify_contracted_shis(cplx)
-        logger.info("certify_complex: contracted-slice SHI checks finished in %.1fs", time.perf_counter() - t_stage)
+        logger.debug("certify_complex: contracted-slice SHI checks finished in %.1fs", time.perf_counter() - t_stage)
 
     if _LEVEL_RANK[level] >= _LEVEL_RANK[CertifyLevel.COMPLETE] and cplx.complete is True:
-        logger.info("certify_complex: LP facet completeness certification ...")
+        logger.debug("certify_complex: LP facet completeness certification ...")
         t_stage = time.perf_counter()
         verify_lp_flip_neighbors_in_complex(cplx)  # skip expensive LPs on partial complexes
-        logger.info("certify_complex: LP facet completeness finished in %.1fs", time.perf_counter() - t_stage)
+        logger.debug("certify_complex: LP facet completeness finished in %.1fs", time.perf_counter() - t_stage)
 
     if _LEVEL_RANK[level] >= _LEVEL_RANK[CertifyLevel.GEOMETRIC]:
         for poly in cplx:
@@ -244,7 +248,7 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
     requested_workers = nworkers or process_aware_cpu_count() or 1
     worker_count = max(1, min(requested_workers, len(tasks))) if tasks else 1
     if tasks:
-        logger.info(
+        logger.debug(
             "verify_lp_flip_neighbors_in_complex: certifying %d top cells "
             + "(%d trusted cached SHIs, %d LP recertify, %d worker%s)",
             total_cells,
@@ -254,14 +258,14 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
             "" if worker_count == 1 else "s",
         )
     else:
-        logger.info(
+        logger.debug(
             "verify_lp_flip_neighbors_in_complex: certifying %d top cells " + "(trusted cached SHIs only, no LP recertify)",
             total_cells,
         )
     t_verify = time.perf_counter()
     missing: list[str] = []
-    pbar = tqdm(
-        desc="verify_lp_flip_neighbors_in_complex",
+    pbar = progress(
+        desc="Certifying LP facets",
         total=total_cells,
         mininterval=1,
     )
@@ -299,7 +303,7 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
                 pbar.update()
     pbar.close()
 
-    logger.info(
+    logger.debug(
         "verify_lp_flip_neighbors_in_complex: certified %d top cells in %.1fs",
         total_cells,
         time.perf_counter() - t_verify,

@@ -213,7 +213,7 @@ def restore_shis_by_tag(cplx: Complex, shis_by_tag: Mapping[bytes, list[int]]) -
 
 
 def export_dual_graph_payload(cplx: Complex) -> dict[str, Any]:
-    graph = cplx.get_dual_graph(relabel=True, verbose=False)
+    graph = cplx.get_dual_graph(relabel=True)
     source = 0
     initial_ss = np.asarray(cplx.index2poly[source].ss_np, dtype=np.int8)
     return {

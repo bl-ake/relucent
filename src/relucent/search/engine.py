@@ -13,7 +13,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent._internal.logging import logger
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
@@ -250,6 +250,7 @@ def geometric_calculations(
     return (p, poly_index, *rest)
 
 
+@with_verbosity
 def parallel_compute_geometric_properties(
     cx: "Complex",
     nworkers: int | None = None,
@@ -264,25 +265,21 @@ def parallel_compute_geometric_properties(
         geometry_properties: Iterable of cache/property names to compute and
             retain on each polyhedron. Defaults to
             :data:`ALL_GEOMETRY_PROPERTIES`.
-        verbose: Controls progress output. ``0`` silences all output; ``1``
-            (default) shows worker count and a progress bar.  When ``None``,
-            falls back to :data:`relucent.config.VERBOSE`.
+        verbose: ``0`` silences output; ``1`` shows worker counts and progress bars;
+            ``2`` adds debug detail. ``None`` uses :data:`relucent.config.VERBOSE`.
     """
-    if verbose is None:
-        verbose = cfg.VERBOSE
-
+    del verbose  # applied by @with_verbosity
     if len(cx) == 0:
         return {"Computed": 0, "Failed": []}
 
     nworkers = nworkers or process_aware_cpu_count()
-    if verbose:
-        logger.info("Computing geometric properties on %d workers", nworkers)
+    logger.info("Computing geometric properties on %d workers", nworkers)
 
     tasks = [(poly.ss_np, poly._shis, bool(getattr(poly, "_shis_strict", False)), i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
     computed = 0
     with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
-        for result in tqdm(
+        for result in progress(
             pool.imap_unordered(
                 partial(
                     geometric_calculations,
@@ -293,7 +290,6 @@ def parallel_compute_geometric_properties(
             total=len(tasks),
             desc="Computing Geometry",
             mininterval=5,
-            disable=not verbose,
         ):
             poly_or_error, poly_index, *_ = result
             if isinstance(poly_or_error, Polyhedron):
@@ -306,6 +302,7 @@ def parallel_compute_geometric_properties(
     return {"Computed": computed, "Failed": failed}
 
 
+@with_verbosity
 def parallel_add(
     cx: "Complex",
     points: Iterable[torch.Tensor | np.ndarray],
@@ -328,25 +325,22 @@ def parallel_add(
             Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
         geometry_properties: Iterable of cache/property names to compute and retain
             on each polyhedron. Defaults to :data:`ALL_GEOMETRY_PROPERTIES`.
-        verbose: Controls progress output. ``0`` silences all output; ``1``
-            (default) shows worker count and progress bars.  When ``None``,
-            falls back to :data:`relucent.config.VERBOSE`.
+        verbose: ``0`` silences output; ``1`` shows worker counts and progress bars;
+            ``2`` adds debug detail. ``None`` uses :data:`relucent.config.VERBOSE`.
 
     Returns:
         list: A list of Polyhedron objects (or None for failed computations)
             corresponding to the input points.
     """
-    if verbose is None:
-        verbose = cfg.VERBOSE
+    del verbose  # applied by @with_verbosity
     if bound is None:
         bound = cfg.DEFAULT_PARALLEL_ADD_BOUND
 
     nworkers = nworkers or process_aware_cpu_count()
-    if verbose:
-        logger.info("parallel_add using %d workers", nworkers)
+    logger.info("parallel_add using %d workers", nworkers)
     sss = [
         (s.detach().cpu().numpy() if isinstance(s := cx.point2ss(p), torch.Tensor) else s)
-        for p in tqdm(points, desc="Getting SSs", mininterval=5, disable=not verbose)
+        for p in progress(points, desc="Getting SSs", mininterval=5)
     ]  # materialize SSs up front so pool tasks are plain numpy arrays
 
     tasks = [(ss, None, i) for i, ss in enumerate(sss)]
@@ -357,7 +351,7 @@ def parallel_add(
                 geometry_properties=geometry_properties,
                 bound=bound,
             ),
-            tqdm(tasks, desc="Adding Polys", mininterval=5, disable=not verbose),
+            progress(tasks, desc="Adding Polys", mininterval=5),
         )
     # results are (poly_or_error, poly_index); restore original order
     ordered: list[Polyhedron | None] = [None] * len(sss)
@@ -409,6 +403,7 @@ def astar_calculations(
     return p, *rest
 
 
+@with_verbosity
 def searcher(
     cx: "Complex",
     start: "torch.Tensor | np.ndarray | Polyhedron | None" = None,
@@ -440,8 +435,8 @@ def searcher(
         bound: Constraint radius when computing halfspaces. ``None`` uses
             :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
         nworkers: Worker processes. ``None`` uses the CPU count.
-        verbose: ``0`` is silent, ``1`` (default) shows worker count and a progress bar.
-            ``None`` uses :data:`relucent.config.VERBOSE`.
+        verbose: ``0`` silences output; ``1`` shows worker counts and progress bars;
+            ``2`` adds debug detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         geometry_properties: Polyhedron properties to compute and keep. ``None``
             (default) is topology-only; pass :data:`ALL_GEOMETRY_PROPERTIES` or a subset
             for more. ``finite``, ``center``, and ``inradius`` are always computed.
@@ -465,9 +460,7 @@ def searcher(
         IncompleteDualGraphError: If ``verify`` is True and exploration stops early
             for reasons other than hitting ``max_polys``.
     """
-    if verbose is None:
-        verbose = cfg.VERBOSE
-
+    del verbose  # applied by @with_verbosity
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
 
@@ -477,8 +470,7 @@ def searcher(
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
     elif cube_mode != "unrestricted":
         assert cube_radius is not None, "cube_radius must be provided when cube_mode is not 'unrestricted'"
-        if verbose:
-            logger.info("Applying cube filter with mode '%s' and radius %s", cube_mode, cube_radius)
+        logger.info("Applying cube filter with mode '%s' and radius %s", cube_mode, cube_radius)
     elif cube_radius is not None:
         warnings.warn("cube_radius is provided but cube_mode is 'unrestricted'. Ignoring cube_radius.", stacklevel=2)
         cube_radius = None
@@ -493,8 +485,7 @@ def searcher(
     # that deferred queueing because discovery was already pending.
     pending_neighbors: dict[bytes, list[tuple[int, int]]] = {}
     nworkers = nworkers or process_aware_cpu_count()
-    if verbose:
-        logger.info("searcher running on %d workers", nworkers)
+    logger.info("searcher running on %d workers", nworkers)
     if queue is None:
         queue = BlockingQueue(
             queue_class=deque,
@@ -538,11 +529,10 @@ def searcher(
     rolling_average = len(start.shis)
     bad_shi_computations: list[Any] = []
     invalid_proof_suppressed = 0
-    pbar = tqdm(
+    pbar = progress(
         desc="Search Progress",
         mininterval=5,
         total=max_polys if max_polys != float("inf") else None,
-        disable=not verbose,
     )
     pbar.update(n=1)
     # Clear stale multiprocessing locks from an earlier pool. tqdm takes a process-wide
@@ -666,12 +656,11 @@ def searcher(
     do_verify = verify and complete and not hit_cap
     finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
 
-    if verbose:
-        n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
-        if n_phantom:
-            logger.info("searcher: ignored %d true phantom flip-neighbor(s)", n_phantom)
+    n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
+    if n_phantom:
+        logger.info("searcher: ignored %d true phantom flip-neighbor(s)", n_phantom)
 
-    if verbose and invalid_proof_suppressed:
+    if invalid_proof_suppressed:
         logger.info(
             "searcher: suppressed %d invalid SHI proof(s) during frontier exploration",
             invalid_proof_suppressed,
@@ -734,6 +723,7 @@ def greedy_path(
     return _greedy_path_helper(cx, start_poly, end_poly)
 
 
+@with_verbosity
 def hamming_astar(
     cx: "Complex",
     start: torch.Tensor | np.ndarray | Polyhedron,
@@ -741,7 +731,7 @@ def hamming_astar(
     nworkers: int | None = None,
     bound: float | None = None,
     max_polys: float = float("inf"),
-    show_pbar: bool = True,
+    verbose: int | None = None,
     num_threads: int | None = None,  ## TODO: Any benefits from using multiple threads here?
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -760,7 +750,8 @@ def hamming_astar(
             Defaults to config.DEFAULT_SEARCH_BOUND.
         max_polys: Maximum number of polyhedra to explore during search.
             Defaults to infinity.
-        show_pbar: Whether to display a progress bar. Defaults to True.
+        verbose: ``0`` silences output; ``1`` shows a progress bar. ``None`` uses
+            :data:`relucent.config.VERBOSE`.
         **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
@@ -799,6 +790,7 @@ def hamming_astar(
     Raises:
         ValueError: If the start point lies exactly on a neuron's boundary.
     """
+    del verbose  # applied by @with_verbosity
     kwargs = without_deprecated_strict(kwargs)
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
@@ -860,12 +852,11 @@ def hamming_astar(
     openSet.push((start_poly,), fScore[start_poly])
 
     bad_shi_computations = []
-    pbar = tqdm(
+    pbar = progress(
         desc="Search Progress",
         mininterval=1,
         leave=True,
         total=max_polys if max_polys != float("inf") else None,
-        disable=not show_pbar,
     )
     pbar.update(n=1)
 

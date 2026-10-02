@@ -17,10 +17,9 @@ import numpy as np
 import plotly.colors as pc
 import plotly.graph_objects as go
 from scipy.spatial import ConvexHull
-from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent._internal.logging import logger
+from relucent._internal.logging import logger, progress
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 
 if TYPE_CHECKING:
@@ -740,7 +739,7 @@ def _complex_figure_1_skeleton(
     poly_plot_kwargs = {k: v for k, v in kwargs.items() if k not in excluded_poly_kwargs}
     eligible_polys = 0
     plotted_polys = 0
-    for poly in tqdm(skeleton_complex, desc="Plotting 1-skeleton", total=len(skeleton_complex), delay=1):
+    for poly in progress(skeleton_complex, desc="Plotting 1-skeleton", total=len(skeleton_complex), delay=1):
         if not _poly_intersects_plot_bound(poly, bound):
             continue
         if hide_unbounded and getattr(poly, "finite", True) is False:
@@ -821,7 +820,7 @@ def _complex_figure_2d_cells(
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
+    for c, poly in progress(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound):
             continue
         if hide_unbounded and getattr(poly, "finite", True) is False:
@@ -899,7 +898,7 @@ def _complex_figure_3d_cells(
     colors = _per_poly_colors(cpx, polys, color, remap_equitable=True)
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
+    for c, poly in progress(zip(colors, polys, strict=True), desc="Plotting 3D Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
             continue
         if hide_unbounded and getattr(poly, "finite", True) is False:
@@ -961,7 +960,7 @@ def _complex_figure_graph(
     meshes: list[go.Mesh3d | go.Scatter3d] = []
     eligible_polys = 0
     plotted_polys = 0
-    for c, poly in tqdm(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
+    for c, poly in progress(zip(colors, polys, strict=True), desc="Plotting Polyhedra", total=len(polys), delay=1):
         if not _poly_intersects_plot_bound(poly, bound_effective):
             continue
         if hide_unbounded and getattr(poly, "finite", True) is False:

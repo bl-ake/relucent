@@ -280,7 +280,7 @@ def test_vertex_screen_drops_only_non_vertices(seed: int, nworkers: int, monkeyp
     cplx = Complex(mlp(widths=[3, 8, 8, 1]))
     cplx.bfs(start=np.zeros(3, dtype=np.float64))
     top = [p for p in cplx if int(p.dim) == 3]
-    graph = cplx.get_dual_graph(verbose=False, require_complete=False)
+    graph = cplx.get_dual_graph(require_complete=False)
     runs = [
         vertex_star.find_vertices(
             top,

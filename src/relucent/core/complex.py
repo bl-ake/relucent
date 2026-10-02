@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 import networkx as nx
 import numpy as np
 import plotly.graph_objects as go
-from tqdm.auto import tqdm
 
 import relucent.config as cfg
 import relucent.verify.certify as certify
 from relucent._internal import rounding
-from relucent._internal.logging import logger
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 from relucent.core.errors import (
     AmbiguousGeometryError,
@@ -183,13 +182,14 @@ class Complex:
         level: CertifyLevel = CertifyLevel.COMPLETE,
         repair: bool = True,
         graph: nx.Graph[Polyhedron] | None = None,
+        verbose: int | None = None,
     ) -> None:
         """Certify this complex and record the result via :meth:`set_exploration_state`.
 
         See :func:`relucent.verify.certify.certify_complex` for the certification levels
         and the (conservative, ``_shis``-only) repair this performs.
         """
-        certify.certify_complex(self, level=level, repair=repair, graph=graph, record_state=True)
+        certify.certify_complex(self, level=level, repair=repair, graph=graph, record_state=True, verbose=verbose)
 
     def __repr__(self) -> str:
         net_name = type(self._net).__name__ if getattr(self, "_net", None) is not None else "None"
@@ -385,7 +385,7 @@ class Complex:
         out = Complex(new_net)
         out.net = new_net if isinstance(self.net, ReLUNetwork) else self.net
 
-        dual = self.get_dual_graph(relabel=True, verbose=False)
+        dual = self.get_dual_graph(relabel=True)
         if dual.number_of_nodes() == 0:
             return out
 
@@ -626,9 +626,8 @@ class Complex:
             geometry_properties: Iterable of cache/property names to compute and
                 retain on each polyhedron. Defaults to
                 :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
-            verbose: Controls progress output. ``0`` silences all output; ``1``
-                (default) shows worker count and progress bars.  When ``None``,
-                falls back to :data:`relucent.config.VERBOSE`.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`
                 and related geometry helpers.
 
@@ -687,9 +686,8 @@ class Complex:
                 :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
-            verbose: Controls progress output. ``0`` silences all output; ``1``
-                (default) shows worker count and a progress bar.  When ``None``,
-                falls back to :data:`relucent.config.VERBOSE`.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             geometry_properties: Iterable of polyhedron cache/property names to
                 compute and retain for each discovered polyhedron during search.
                 ``None`` (default) performs topology-only search. Pass
@@ -753,9 +751,8 @@ class Complex:
             nworkers: Number of worker processes (defaults to CPU count).
             properties: Iterable of cache/property names to compute and retain.
                 Defaults to :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
-            verbose: Controls progress output. ``0`` silences all output; ``1``
-                (default) shows worker count and a progress bar.  When ``None``,
-                falls back to :data:`relucent.config.VERBOSE`.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         """
         return _parallel_compute_geometric_properties_fn(
             self,
@@ -857,7 +854,7 @@ class Complex:
         nworkers: int | None = None,
         bound: float | None = None,
         max_polys: float = float("inf"),
-        show_pbar: bool = True,
+        verbose: int | None = None,
         num_threads: int = 1,
         **kwargs: Any,
     ) -> dict[str, Any]:
@@ -876,7 +873,8 @@ class Complex:
                 Important for numerical stability. Defaults to config.DEFAULT_SEARCH_BOUND.
             max_polys: Maximum number of polyhedra to explore during search.
                 Defaults to infinity.
-            show_pbar: Whether to display a progress bar. Defaults to True.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
         Returns:
@@ -896,7 +894,7 @@ class Complex:
             nworkers=nworkers,
             bound=bound,
             max_polys=max_polys,
-            show_pbar=show_pbar,
+            verbose=verbose,
             num_threads=num_threads,
             **kwargs,
         )
@@ -1038,16 +1036,14 @@ class Complex:
                 incidence.verify_contracted_shis(out)
         return out
 
-    def get_boundary_edges(self, i: int, verbose: bool = False) -> set[tuple[Polyhedron, Polyhedron]]:
+    @with_verbosity
+    def get_boundary_edges(self, i: int, verbose: int | None = None) -> set[tuple[Polyhedron, Polyhedron]]:
         """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
+        del verbose  # applied by @with_verbosity
         assert 0 <= i < self.n, f"Neuron index out of range: {i} not in [0, {self.n})"
-        return {
-            (a, b)
-            for a, b, shi in tqdm(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1, disable=not verbose)
-            if shi == i
-        }
+        return {(a, b) for a, b, shi in progress(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1) if shi == i}
 
-    def get_boundary_graph(self, i: int, verbose: bool = False) -> nx.Graph[Polyhedron]:
+    def get_boundary_graph(self, i: int, verbose: int | None = None) -> nx.Graph[Polyhedron]:
         """Get the induced subgraph of neuron i's BH."""
         edges = list(self.get_boundary_edges(i, verbose=verbose))
         return self.G.subgraph([p for edge in edges for p in edge])
@@ -1097,13 +1093,14 @@ class Complex:
         }
         return poly_kwargs
 
-    def get_boundary_cells(self, i: int, verbose: bool = False, *, verify: bool = True) -> set[Polyhedron]:
+    @with_verbosity
+    def get_boundary_cells(self, i: int, verbose: int | None = None, *, verify: bool = True) -> set[Polyhedron]:
         """Get all (d-1)-cells in neuron i's BH."""
         from relucent.search.boundary_search import _both_ambient_cofaces_feasible
 
         faces = set()
         edges = list(self.get_boundary_edges(i, verbose=verbose))
-        for edge in tqdm(edges, desc="Getting Boundary Cells", delay=1, disable=not verbose):
+        for edge in progress(edges, desc="Getting Boundary Cells", delay=1):
             p1, p2 = edge[0], edge[1]
             shi = int(self.G.edges[edge]["shi"])
             if verify and (shi not in p1.shis or shi not in p2.shis):
@@ -1122,7 +1119,8 @@ class Complex:
             faces.add(p)
         return faces
 
-    def get_boundary_complex(self, i: int, verbose: bool = False) -> Complex:
+    @with_verbosity
+    def get_boundary_complex(self, i: int, verbose: int | None = None) -> Complex:
         """Get the boundary complex of neuron i.
 
         Raises:
@@ -1131,13 +1129,12 @@ class Complex:
             ComplexNotVerifiedError: If the input complex is not verified.
         """
         self.assert_topology_ready()
-        self._dual_graph = self.get_dual_graph(verbose=verbose, require_complete=True)
+        self._dual_graph = self.get_dual_graph(require_complete=True)
         cplx = Complex(self.net)
-        for poly in tqdm(
+        for poly in progress(
             self.get_boundary_cells(i, verbose=verbose, verify=True),
             desc="Getting Boundary Complex",
             delay=1,
-            disable=not verbose,
         ):
             cplx.add_polyhedron(poly, check_exists=False)
         incidence.set_contracted_shis(cplx)
@@ -1156,7 +1153,7 @@ class Complex:
     def discover_boundary_complex(
         self,
         i: int,
-        verbose: bool = False,
+        verbose: int | None = None,
         *,
         return_stats: Literal[False] = False,
         **kwargs: Any,
@@ -1166,7 +1163,7 @@ class Complex:
     def discover_boundary_complex(
         self,
         i: int,
-        verbose: bool = False,
+        verbose: int | None = None,
         *,
         return_stats: Literal[True],
         **kwargs: Any,
@@ -1175,7 +1172,7 @@ class Complex:
     def discover_boundary_complex(
         self,
         i: int,
-        verbose: bool = False,
+        verbose: int | None = None,
         *,
         return_stats: bool = False,
         **kwargs: Any,
@@ -1187,7 +1184,8 @@ class Complex:
 
         Args:
             i: Global supporting-hyperplane index (bent hyperplane).
-            verbose: If True, show search progress.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             return_stats: If True, return ``(complex, stats)`` with timing metadata.
             **kwargs: Forwarded to :func:`~relucent.search.boundary_search.discover_boundary_complex`.
 
@@ -1207,7 +1205,7 @@ class Complex:
             return boundary, stats
         return boundary
 
-    def contract(self, verbose: bool = False) -> Complex:
+    def contract(self, verbose: int | None = None) -> Complex:
         """Return ``get_chain_complex(...)[self.dim - 1]``.
 
         Raises:
@@ -1224,7 +1222,7 @@ class Complex:
         """
         top_dim = max(int(p.dim) for p in self)
         top_cells = [p for p in self if int(p.dim) == top_dim]
-        graph = cast(Any, self.get_dual_graph(verbose=False, require_complete=False))
+        graph = cast(Any, self.get_dual_graph(require_complete=False))
         incidence.certify_dual_graph(graph, self, top_dim=top_dim)
 
         # Candidate-vertex verification dominates runtime on large complexes (see
@@ -1259,7 +1257,8 @@ class Complex:
         poly._interior_point = vertex.point
         return poly
 
-    def get_chain_complex(self, verbose: bool = False) -> list[Complex]:
+    @with_verbosity
+    def get_chain_complex(self, verbose: int | None = None) -> list[Complex]:
         """Recover the chain complex directly from verified vertices' local stars.
 
         Masden (2022), Theorem 20: the sign-sequence complex is a pure,
@@ -1281,6 +1280,7 @@ class Complex:
         Raises:
             CubicalConsistencyError: If the labeled top-cell graph is not cubical.
         """
+        del verbose  # applied by @with_verbosity
         self.assert_topology_ready()
         if len(self) == 0:
             return [self]
@@ -1344,8 +1344,7 @@ class Complex:
             cplx.set_exploration_state(complete=True, verified=True)
             chain.append(cplx)
 
-        if verbose:
-            logger.info("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
+        logger.debug("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
         return chain
 
     def partial_derivative_on_1cell(
@@ -1363,12 +1362,13 @@ class Complex:
 
         return _pd_1cell(one_cell, from_vertex, self, value=value)
 
+    @with_verbosity
     def get_critical_points(
         self,
         *,
         require_complete: bool = False,
         include_degenerate: bool = False,
-        verbose: bool = False,
+        verbose: int | None = None,
     ) -> list[CriticalPoint]:
         """Return PL Morse critical vertices and their indices in the discovered complex.
 
@@ -1380,7 +1380,8 @@ class Complex:
                 each tested vertex to appear in the complex.
             include_degenerate: If True, include flat / degenerate critical vertices
                 (index ``-1``).
-            verbose: Log chain-complex progress.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
 
         Returns:
             List of :class:`~relucent.topology.morse.CriticalPoint` records.
@@ -1482,7 +1483,8 @@ class Complex:
         """Augment ``meta`` in place with a single point-at-infinity 0-cell."""
         return mg.one_point_compactify_meta_graph(meta)
 
-    def get_meta_graph(self, *, verify: bool = False, verbose: bool = False) -> nx.MultiDiGraph[Any]:
+    @with_verbosity
+    def get_meta_graph(self, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
 
         This method mirrors the face-encoding convention used by relucent's chain
@@ -1521,14 +1523,13 @@ class Complex:
                 :meth:`get_chain_complex`.
         """
         if len(self) == 0:
-            logger.info("get_meta_graph: empty complex, returning empty graph")
+            logger.debug("get_meta_graph: empty complex, returning empty graph")
             return nx.MultiDiGraph()
 
         nworkers = process_aware_cpu_count() or 1
-        logger.info(
-            "get_meta_graph: starting (verify=%s, verbose=%s, nworkers=%d)",
+        logger.debug(
+            "get_meta_graph: starting (verify=%s, nworkers=%d)",
             verify,
-            verbose,
             nworkers,
         )
 
@@ -1545,7 +1546,7 @@ class Complex:
         # Add all cells as nodes, keyed by stable poly.tag (bytes).
         # Collect the recovered cells once for boundedness classification.
         all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
-        logger.info(
+        logger.debug(
             "get_meta_graph: chain complex has %d dimensions, %d cells",
             len(by_dim),
             len(all_chain_polys),
@@ -1570,7 +1571,7 @@ class Complex:
             valid_face_tags = set(lookup.keys())
             use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
             if use_parallel:
-                logger.info(
+                logger.debug(
                     "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
                     int(k),
                     nworkers,
@@ -1588,25 +1589,16 @@ class Complex:
                     face_mode = "sequential (nworkers <= 1)"
                 else:
                     face_mode = "sequential"
-                logger.info(
+                logger.debug(
                     "get_meta_graph: k=%d face edges %s (%d cells)",
                     int(k),
                     face_mode,
                     len(cells),
                 )
-                if verbose:
-                    edges, extra_tags = incidence.collect_meta_face_edges(
-                        list(
-                            tqdm(
-                                cells,
-                                desc=f"Building meta-graph faces (k={k})",
-                                leave=False,
-                            )
-                        ),
-                        valid_face_tags,
-                    )
-                else:
-                    edges, extra_tags = incidence.collect_meta_face_edges(cells, valid_face_tags)
+                edges, extra_tags = incidence.collect_meta_face_edges(
+                    list(progress(cells, desc=f"Building meta-graph faces (k={k})", leave=False)),
+                    valid_face_tags,
+                )
             edges_by_dim[int(k)] = (edges, extra_tags)
             for face_tag_key in set(extra_tags):
                 if face_tag_key not in lookup and face_tag_key in self.tag2poly:
@@ -1629,12 +1621,12 @@ class Complex:
             geometric_infeasible=geometric_infeasible,
         )
         if infeasible_one_cells:
-            logger.info(
+            logger.debug(
                 "get_meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
                 len(infeasible_one_cells),
             )
         if n_from_faces:
-            logger.info(
+            logger.debug(
                 "get_meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
                 n_from_faces,
             )
@@ -1642,7 +1634,7 @@ class Complex:
         # Step 2: propagate boundedness upward from the 1-skeleton.
         n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
         if n_ascending:
-            logger.info(
+            logger.debug(
                 "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
                 n_ascending,
             )
@@ -1651,16 +1643,16 @@ class Complex:
         # incomplete combinatorial faces; resolve those via Chebyshev then re-ascend.
         pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
         if pending_finite:
-            logger.info(
+            logger.debug(
                 "get_meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
                 pending_finite,
             )
             n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
             if n_lp:
-                logger.info("get_meta_graph: LP fallback classified %d cells", n_lp)
+                logger.debug("get_meta_graph: LP fallback classified %d cells", n_lp)
             n_ascending2 = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
             if n_ascending2:
-                logger.info(
+                logger.debug(
                     "get_meta_graph: post-LP ascending sweep classified %d cells",
                     n_ascending2,
                 )
@@ -1678,7 +1670,7 @@ class Complex:
                 raise AssertionError(msg)
             logger.warning(msg)
         else:
-            logger.info(
+            logger.debug(
                 "get_meta_graph: all %d chain cells classified",
                 len(all_chain_polys),
             )
@@ -1693,7 +1685,7 @@ class Complex:
             has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
             if has_unbounded_chain:
                 excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
-            logger.info(
+            logger.debug(
                 "get_meta_graph: excluding %d infeasible cells (%d total excluded)",
                 len(infeasible_tags),
                 len(excluded_tags),
@@ -1743,10 +1735,10 @@ class Complex:
             )
 
         if verify:
-            logger.info("get_meta_graph: verify pass (incidence engine consistency)")
+            logger.debug("get_meta_graph: verify pass (incidence engine consistency)")
             mg.verify_meta_graph_incidence(meta, by_dim, lookup)
 
-        logger.info(
+        logger.debug(
             "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
             meta.number_of_nodes(),
             meta.number_of_edges(),
@@ -1792,7 +1784,7 @@ class Complex:
         respect_finite: bool = False,
         verify_chain_complex: bool = False,
         verify_connected_components: bool = False,
-        verbose: bool = False,
+        verbose: int | None = None,
         nworkers: int | None = None,
     ) -> dict[int, int]:
         """Compute Betti numbers from an existing meta-graph.
@@ -1829,6 +1821,7 @@ class Complex:
             nworkers=nworkers,
         )
 
+    @with_verbosity
     def get_betti_numbers(
         self,
         *,
@@ -1837,14 +1830,14 @@ class Complex:
         respect_finite: bool = False,
         verify_chain_complex: bool = False,
         verify_connected_components: bool = False,
-        verbose: bool = False,
+        verbose: int | None = None,
         nworkers: int | None = None,
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
         Builds a meta-graph from this complex, applies truncation when appropriate, then
-        delegates to :meth:`get_betti_numbers_from_meta`. Pass ``verbose=True`` for
-        stderr progress from meta-graph construction and boundary maps.
+        delegates to :meth:`get_betti_numbers_from_meta`. ``verbose`` controls progress
+        output from meta-graph construction and boundary maps.
 
         Results are cached per ``(reduced, compactify, respect_finite)`` and survive
         :meth:`save` / :meth:`load`. The cache is cleared when polyhedra are added or
@@ -1892,7 +1885,7 @@ class Complex:
         compactify: bool = False,
         respect_finite: bool = False,
         lower_star: bool | None = None,
-        verbose: bool = False,
+        verbose: int | None = None,
     ) -> object:
         """Compute persistent homology over GF(2) for a :class:`~relucent.topology.filtration.Filtration`.
 
@@ -1941,7 +1934,7 @@ class Complex:
         if int(top_dim) < 2:
             return {}
 
-        G = self.get_dual_graph(verbose=False)
+        G = self.get_dual_graph()
 
         # vertex_tag -> (S, incident top cells)
         vtx: dict[bytes, tuple[tuple[int, ...], list[Polyhedron]]] = {}
@@ -2086,7 +2079,6 @@ class Complex:
         match_locations: bool = False,
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
-        verbose: bool = False,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[Polyhedron]: ...
@@ -2103,7 +2095,6 @@ class Complex:
         match_locations: bool = False,
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
-        verbose: bool = False,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[int]: ...
@@ -2119,7 +2110,6 @@ class Complex:
         match_locations: bool = False,
         show_node_labels: bool = False,
         show_edge_labels: bool = False,
-        verbose: bool = True,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
@@ -2147,7 +2137,6 @@ class Complex:
                 of their polyhedra (only works for 2D complexes). Defaults to False.
             show_node_labels: If True, show node labels in the graph. Defaults to False.
             show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
-            verbose: If True, print progress messages. Defaults to True.
             require_complete: If True, raise :class:`IncompleteDualGraphError` when
                 boundary neighbors are missing (checked via an LP facet recompute on
                 full ambient top cells). Defaults to False. Used by :meth:`contract`.
@@ -2169,7 +2158,6 @@ class Complex:
         """
         if len(self) == 0:
             return nx.Graph()
-        _ = verbose
         max_dim = max(poly.dim for poly in self)
         top_cells = [poly for poly in self if poly.dim == max_dim]
         graph = incidence.build_dual_graph(top_cells, top_dim=max_dim, ambient_dim=int(self.dim), repair=repair)
@@ -2261,7 +2249,7 @@ class Complex:
         graph.nodes[source]["poly"] = initial_p
         # ``nx.bfs_edges`` yields only the N-1 tree edges, so the progress bar
         # total must be in terms of nodes, not the total number of dual edges.
-        for edge in tqdm(
+        for edge in progress(
             nx.bfs_edges(graph, source=source),
             desc="Recovering Polyhedra",
             total=graph.number_of_nodes() - 1,

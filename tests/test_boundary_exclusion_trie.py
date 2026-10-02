@@ -35,7 +35,7 @@ def _compile_tags(
     env = get_env()
     model = Model("trie_test", env)
     y_vars = [model.addVar(vtype=GRB.BINARY, name=f"y_{j}") for j in range(n)]
-    trie = ForbiddenPatternTrie.from_tags(tags, n, boundary_shi, verbose=False)
+    trie = ForbiddenPatternTrie.from_tags(tags, n, boundary_shi)
     stats = trie.compile_to_model(model, y_vars, include_leaves=include_leaves)
     model.close()
     return stats.n_constraints, stats.fully_saturated

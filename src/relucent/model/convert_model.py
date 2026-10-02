@@ -11,9 +11,9 @@ from typing import Any, TypeGuard
 
 import numpy as np
 import numpy.typing as npt
-from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.logging import progress
 from relucent._internal.torch_compat import nn, torch
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
@@ -118,7 +118,7 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
     fc.weight.data.fill_(0.0)
 
     # Output coordinates
-    for xo, yo in tqdm(
+    for xo, yo in progress(
         range2d(output_size[0], output_size[1]),
         desc="Converting Conv2d to Linear",
         total=output_size[0] * output_size[1],

@@ -86,7 +86,7 @@ def _populate_line(cplx: Complex) -> None:
 
 
 def _dual_components(cplx: Complex) -> int:
-    dual = cplx.get_dual_graph(verbose=False, require_complete=False)
+    dual = cplx.get_dual_graph(require_complete=False)
     if dual.number_of_nodes() == 0:
         return 0
     return nx.number_connected_components(dual)

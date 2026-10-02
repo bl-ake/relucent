@@ -54,7 +54,7 @@ def test_empty_boundary_complex_verifies() -> None:
     assert len(boundary) == 0
     assert boundary.complete is True
     assert boundary.verified is True
-    assert boundary.get_dual_graph(verbose=False).number_of_nodes() == 0
+    assert boundary.get_dual_graph().number_of_nodes() == 0
 
 
 def test_assert_topology_ready_blocks_unverified() -> None:
@@ -98,7 +98,7 @@ def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     with pytest.raises(ShiFlipInvariantError):
         verify_flip_shi_symmetry(cplx)
     # Rebuilding the dual graph with repair=True resyncs _shis
-    cplx.get_dual_graph(verbose=False, require_complete=False)
+    cplx.get_dual_graph(require_complete=False)
     verify_flip_shi_symmetry(cplx)
 
 
@@ -165,7 +165,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
-    graph = cplx.get_dual_graph(relabel=True, verbose=False)
+    graph = cplx.get_dual_graph(relabel=True)
     initial_ss = cplx.index2poly[0].ss_np
 
     reloaded = Complex(model)

@@ -177,7 +177,7 @@ def test_diamond_discover_finds_all_components(seeded: int):
     explore_for_topology(cplx, np.array([0.1, 0.2]))
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
-    ref_components = nx.number_connected_components(ref.get_dual_graph(verbose=False, require_complete=False))
+    ref_components = nx.number_connected_components(ref.get_dual_graph(require_complete=False))
     new, stats = Complex(model).discover_boundary_complex(
         shi,
         verbose=False,

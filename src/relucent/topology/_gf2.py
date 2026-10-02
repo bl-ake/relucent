@@ -12,8 +12,8 @@ CPU's feature flags: a shared install used from different CPUs builds one copy p
 Public API
 ----------
 available() -> bool
-gf2_rank_packed_c(packed, ncols, *, progress, progress_desc) -> int
-gf2_rank_boundary_c(packed, ncols, *, progress, progress_desc) -> int
+gf2_rank_packed_c(packed, ncols, *, show_bar, progress_desc) -> int
+gf2_rank_boundary_c(packed, ncols, *, show_bar, progress_desc) -> int
 """
 
 from __future__ import annotations
@@ -179,7 +179,7 @@ def gf2_rank_packed_c(
     packed: np.ndarray,
     ncols: int,
     *,
-    progress: bool = False,
+    show_bar: bool = False,
     progress_desc: str | None = None,
 ) -> int:
     """GF(2) rank via the C backend.  Raises RuntimeError if C is unavailable."""
@@ -195,18 +195,18 @@ def gf2_rank_packed_c(
 
     if _ProgressFn is None:
         raise RuntimeError("C GF(2) backend not available")
-    if not progress:
+    if not show_bar:
         return int(lib.gf2_rank_packed(ptr, nrows, ncols, _ProgressFn(), None, 0))
 
     # Progress bar via callback.  ctypes releases the GIL so the callback
     # thread runs concurrently with C.
-    from tqdm.auto import tqdm
+    from relucent._internal.logging import progress
 
     desc = progress_desc or "GF(2) rank [C]"
     # Use ~200 updates regardless of matrix size.
     cb_interval = max(1, ncols // 200)
 
-    pbar = tqdm(total=ncols, desc=desc, leave=False, unit="col")
+    pbar = progress(total=ncols, desc=desc, leave=False, unit="col")
 
     @_ProgressFn
     def _cb(col: int, _total: int, _ud: ctypes.c_void_p) -> int:
@@ -252,7 +252,7 @@ def gf2_rank_boundary_c(
     packed: np.ndarray,
     ncols: int,
     *,
-    progress: bool = False,
+    show_bar: bool = False,
     progress_desc: str | None = None,
 ) -> int:
     """Rank of a boundary matrix, transposing first when that reduces column count."""
@@ -260,5 +260,5 @@ def gf2_rank_boundary_c(
     if nrows > ncols and ncols > 0:
         desc = f"{progress_desc} (A^T)" if progress_desc else "GF(2) rank [C] (A^T)"
         transposed, ncols_t = gf2_transpose_packed_c(packed, ncols)
-        return gf2_rank_packed_c(transposed, ncols_t, progress=progress, progress_desc=desc)
-    return gf2_rank_packed_c(packed, ncols, progress=progress, progress_desc=progress_desc)
+        return gf2_rank_packed_c(transposed, ncols_t, show_bar=show_bar, progress_desc=desc)
+    return gf2_rank_packed_c(packed, ncols, show_bar=show_bar, progress_desc=progress_desc)
