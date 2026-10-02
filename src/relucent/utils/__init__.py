@@ -492,7 +492,7 @@ class BlockingQueue(Generic[T, Q]):
         """Remove and return the next element, waiting if empty; raises ``IndexError`` once closed and drained."""
         with self.lock:
             while len(self.deque) == 0 and not self.closed:
-                self.lock.wait(timeout=cfg.BLOCKING_QUEUE_WAIT_TIMEOUT)
+                self.lock.wait(timeout=cfg.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT)
             if self.closed and len(self.deque) == 0:
                 raise IndexError("Queue closed")
             return self._pop_element(self.deque)

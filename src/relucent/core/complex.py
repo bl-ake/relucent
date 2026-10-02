@@ -103,26 +103,19 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
-    def __init__(self, net: Any, *, auto_tolerances: bool = True) -> None:
+    def __init__(self, net: Any) -> None:
         """Initialize the complex for a given network.
 
         Args:
-            net: Any model convertible to relucent's canonical ``NN``.
-                is to be built and queried.
-            auto_tolerances: When True (default), set :mod:`relucent.config`
-                tolerance values for this network via
-                :func:`~relucent.config.numeric_tolerances.apply_tolerances`.
+            net: A :class:`~relucent.model.model.ReLUNetwork`, or any model
+                :func:`~relucent.model.convert_model.convert` accepts (e.g. a PyTorch
+                ``nn.Sequential``).
         """
         original_net = net
         if not isinstance(net, ReLUNetwork):
             net = convert(net)
         self.net = original_net
         self._net = net
-
-        if auto_tolerances:
-            from relucent.config.numeric_tolerances import apply_tolerances
-
-            apply_tolerances(net=self._net)
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
@@ -1979,7 +1972,7 @@ class Complex:
                     cells.append(p)
 
         out: dict[bytes, np.ndarray] = {}
-        match_box = float(cfg.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
+        match_box = float(cfg.advanced.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
 
         for tag, (shis_cube, cells) in vtx.items():
             if verify_cube:
@@ -2053,7 +2046,7 @@ class Complex:
         def vid(v: np.ndarray) -> int:
             vv = np.asarray(v, dtype=np.float64).reshape(-1)
             if intrinsic_coords:
-                thr = float(cfg.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
+                thr = float(cfg.advanced.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
                 for t, x in intrinsic_coords.items():
                     if float(np.max(np.abs(vv - x))) <= thr:
                         hit = intrinsic_tag2vid.get(t)

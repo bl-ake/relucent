@@ -351,7 +351,7 @@ def test_lp_cold_retry_uses_no_scaling_and_restores_settings(failures: int, stat
     m = _FlakyModel(failures)
     assert C._cold_retry(cast(Any, m)) == statuses
     assert m.seen == seen and m.resets == len(seen)  # one cold solve, under no scaling
-    assert m.params.ScaleFlag == cfg.GUROBI_SHI_SCALE_FLAG
+    assert m.params.ScaleFlag == cfg.advanced.GUROBI_SHI_SCALE_FLAG
 
 
 @pytest.mark.parametrize("exact_verdict", [True, False])

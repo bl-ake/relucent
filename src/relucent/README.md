@@ -14,7 +14,7 @@ The `relucent` package is organized into domain subpackages.
 | **`topology/`** | `betti`, `filtration`, `persistence`, `morse`, `_gf2` | Betti numbers, filtrations, persistent homology |
 | **`verify/`** | `certify` | Certification and arrangement verification |
 | **`vis/`** | (package `__init__`) | Plotly plotting |
-| **`config/`** | (package `__init__`), `numeric_tolerances` | Tunables and static float64 tolerance defaults |
+| **`config/`** | (package `__init__`), `advanced` | Settings; `advanced` holds unstable solver-tuning knobs |
 | **`utils/`** | (package `__init__`) | Gurobi env, `mlp`, queues, reproducibility helpers |
 | **`_internal/`** | `logging`, `torch_compat`, `network_scale`, `rounding`, `exact` | Private implementation details: float64 error bounds and exact rational fallbacks for geometric decisions |
 

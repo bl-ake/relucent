@@ -93,13 +93,17 @@ def test_network_definitions_snippets() -> None:
 
 
 def test_configuration_snippets() -> None:
-    snippets = extract_rst_literal_python_blocks(_rst("configuration.rst"))
-    assert len(snippets) == 2
-    exec_snippet(snippets[0])
-    ns = exec_snippet(snippets[1])
     import relucent.config as cfg
 
-    assert cfg.TOL_VERIFY_AB_ATOL == 1e-7
-    assert cfg.MAX_RADIUS == 500
-    assert cfg.DEFAULT_SEARCH_BOUND == 1e7
-    assert "update_settings" in ns
+    snippets = extract_rst_literal_python_blocks(_rst("configuration.rst"))
+    assert len(snippets) == 2
+    saved = {name: getattr(cfg, name) for name in ("VERBOSE", "MAX_RADIUS", "DEFAULT_SEARCH_BOUND")}
+    try:
+        exec_snippet(snippets[0])
+        ns = exec_snippet(snippets[1])
+        assert cfg.VERBOSE == 0
+        assert cfg.MAX_RADIUS == 500
+        assert cfg.DEFAULT_SEARCH_BOUND == 1e7
+        assert "update_settings" in ns
+    finally:
+        cfg.update_settings(**saved)

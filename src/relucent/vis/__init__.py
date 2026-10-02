@@ -28,6 +28,15 @@ if TYPE_CHECKING:
     from relucent.core.poly import Polyhedron
     from relucent.topology.persistence import PersistenceDiagram
 
+# Plotting tolerances, relative to Qhull's output (which carries far more than float64 roundoff).
+# A 3-D vertex cloud whose singular values are all below _TOL_POINT is drawn as a point.
+_TOL_POINT = 1e-12
+# Singular values below _TOL_RANK * the largest don't count toward a cell's drawn dimension;
+# hull facets whose unit normals agree to within _TOL_RANK are merged as coplanar.
+_TOL_RANK = 1e-6
+# A 2-D halfspace boundary with |w[1]| below this is drawn as a vertical line.
+_TOL_VERTICAL = 1e-10
+
 __all__ = [
     "get_colors",
     "plot_complex",
@@ -127,7 +136,7 @@ def _poly_traces_3d_complex(
     except Exception:
         s = np.array([])
         vh = np.zeros((0, 3))
-    if s.size == 0 or np.all(s < cfg.TOL_HALFSPACE_NORMAL):
+    if s.size == 0 or np.all(s < _TOL_POINT):
         point_kwargs = dict(base_kwargs)
         if line_color is not None:
             marker = dict(point_kwargs.get("marker", {}))
@@ -145,7 +154,7 @@ def _poly_traces_3d_complex(
         )
         return traces
 
-    tol = float(cfg.TOL_VERIFY_AB_ATOL) * s[0]
+    tol = _TOL_RANK * s[0]
     eff_dim = int(np.sum(s > tol))
     if eff_dim == 1:
         direction = vh[0]
@@ -237,7 +246,7 @@ def _poly_traces_3d_complex(
 
         def facets_coplanar(facet_indices: list[int], atol: float | None = None) -> bool:
             if atol is None:
-                atol = float(cfg.TOL_VERIFY_AB_ATOL)
+                atol = _TOL_RANK
             if not facet_indices:
                 return True
             f0 = facet_indices[0]
@@ -348,8 +357,8 @@ def _poly_traces_2d_complex(
         bounds = (-bound, bound)
         for i in range(W.shape[0]):
             w = W[i]
-            if np.abs(w[1]) < cfg.TOL_NEARLY_VERTICAL:
-                x_line = -b[i] / w[0] if np.abs(w[0]) >= cfg.TOL_NEARLY_VERTICAL else 0.0
+            if np.abs(w[1]) < _TOL_VERTICAL:
+                x_line = -b[i] / w[0] if np.abs(w[0]) >= _TOL_VERTICAL else 0.0
                 xs = [x_line, x_line]
                 ys = [bounds[0], bounds[1]]
                 halfspace_shade_this = False

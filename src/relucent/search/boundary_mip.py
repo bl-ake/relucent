@@ -16,7 +16,7 @@ from gurobipy import GRB, Env, Model, quicksum
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent._internal.network_scale import count_relu_units, estimate_input_bound, relu_linear_blocks
+from relucent._internal.network_scale import boundary_mip_eps, count_relu_units, estimate_input_bound, relu_linear_blocks
 from relucent.core.poly import Polyhedron
 from relucent.model.model import ReLUNetwork
 from relucent.utils import encode_ss, get_env, get_mp_context, process_aware_cpu_count
@@ -196,7 +196,7 @@ def _order_tags(tags: Iterable[bytes], *, n: int, boundary_shi: int, net: ReLUNe
             pairs.append((tag, indices))
     ordered = _order_tag_spec_pairs(
         pairs,
-        order=str(cfg.BOUNDARY_MIP_CUT_ORDER),
+        order=str(cfg.advanced.BOUNDARY_MIP_CUT_ORDER),
         n=n,
         boundary_shi=boundary_shi,
         net=net,
@@ -205,7 +205,7 @@ def _order_tags(tags: Iterable[bytes], *, n: int, boundary_shi: int, net: ReLUNe
 
 
 def _use_bulk_nogood_emit(n_specs: int) -> bool:
-    mode = str(cfg.BOUNDARY_MIP_BULK_NOGOOD_EMIT).strip().lower()
+    mode = str(cfg.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT).strip().lower()
     if mode == "on":
         return True
     if mode == "off":
@@ -253,7 +253,7 @@ def _bulk_add_nogood_constraints(
     constr_list: Any = constrs
     for i in range(n_c):
         constr_list[i].ConstrName = f"{name_prefix}{start_idx + i}"
-    if cfg.BOUNDARY_MIP_CUT_PRIORITY_ENABLED and trie_depths is not None:
+    if cfg.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED and trie_depths is not None:
         for i, depth in enumerate(trie_depths):
             constr_list[i].Priority = int(depth)
 
@@ -285,7 +285,7 @@ def _batch_add_nogood_constraints(
             y_mvar=y_mvar,
         )
 
-    chunk_size = int(chunk_size or cfg.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE)
+    chunk_size = int(chunk_size or cfg.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE)
     next_idx = start_idx
     batch_exprs: list[Any] = []
     batch_depths: list[int] = []
@@ -296,7 +296,7 @@ def _batch_add_nogood_constraints(
             return
         for i, expr in enumerate(batch_exprs):
             constr = model.addConstr(expr >= 1, name=f"{name_prefix}{next_idx + i}")
-            if cfg.BOUNDARY_MIP_CUT_PRIORITY_ENABLED and trie_depths is not None:
+            if cfg.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED and trie_depths is not None:
                 constr.Priority = int(batch_depths[i])
         next_idx += len(batch_exprs)
         batch_exprs.clear()
@@ -319,7 +319,7 @@ def _batch_add_nogood_constraints(
 
 
 def _exclusion_worker_count() -> int:
-    configured = int(cfg.BOUNDARY_MIP_EXCLUSION_WORKERS)
+    configured = int(cfg.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS)
     if configured == 1:
         return 1
     if configured > 1:
@@ -374,7 +374,7 @@ def _build_ordered_static_pairs(
             pairs.append((tag, indices))
     ordered = _order_tag_spec_pairs(
         pairs,
-        order=str(cfg.BOUNDARY_MIP_CUT_ORDER),
+        order=str(cfg.advanced.BOUNDARY_MIP_CUT_ORDER),
         n=n,
         boundary_shi=boundary_shi,
         net=net,
@@ -405,7 +405,7 @@ def _static_add_exclude_tags(
         _pricing_log(
             "boundary pricing MIP: built "
             + f"{len(specs)} static nogood specs from {len(tag_list)} tags "
-            + f"(order={cfg.BOUNDARY_MIP_CUT_ORDER})",
+            + f"(order={cfg.advanced.BOUNDARY_MIP_CUT_ORDER})",
             verbose=True,
         )
     next_idx = _batch_add_nogood_constraints(
@@ -448,12 +448,12 @@ def _compile_exclude_tags(
         result.fully_saturated = True
         return result
 
-    wave_size = int(cfg.BOUNDARY_MIP_STATIC_WAVE_SIZE)
-    skip_trie = len(exclude_tags) >= cfg.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS
+    wave_size = int(cfg.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE)
+    skip_trie = len(exclude_tags) >= cfg.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS
     trie = None
     trie_stats = None
 
-    if not skip_trie and len(exclude_tags) >= cfg.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS:
+    if not skip_trie and len(exclude_tags) >= cfg.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS:
         from relucent.search.boundary_exclusion_trie import ForbiddenPatternTrie
 
         _pricing_log(
@@ -487,7 +487,7 @@ def _compile_exclude_tags(
                 verbose=verbose,
             )
         compression_ratio = trie_stats.compression_ratio if trie_stats is not None else float(len(exclude_tags))
-        static_all = n_saturated == 0 or compression_ratio < cfg.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO
+        static_all = n_saturated == 0 or compression_ratio < cfg.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO
 
     if static_all:
         if wave_size > 0:
@@ -553,7 +553,7 @@ def _brute_force_boundary_witness(
     exclude_tags: set[bytes],
 ) -> Polyhedron | None:
     n = count_relu_units(net)
-    if n == 0 or boundary_shi >= n or n > cfg.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
+    if n == 0 or boundary_shi >= n or n > cfg.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
         return None
     indices = [j for j in range(n) if j != boundary_shi]
     for signs in itertools.product((-1, 1), repeat=len(indices)):
@@ -892,7 +892,7 @@ def _mip_boundary_witness(
     mip_optimize_s = 0.0
 
     try:
-        lazy_only = len(exclude_tags) >= int(cfg.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS)
+        lazy_only = len(exclude_tags) >= int(cfg.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS)
         if exclude_tags and not lazy_only:
             compile_result = _compile_exclude_tags(
                 model,
@@ -911,7 +911,7 @@ def _mip_boundary_witness(
                 )
                 return None
 
-            wave_size = int(cfg.BOUNDARY_MIP_STATIC_WAVE_SIZE)
+            wave_size = int(cfg.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE)
             if compile_result.pending_static_specs:
                 state.precompiled_exclusions = False
                 start_idx = compile_result.n_trie_constraints
@@ -943,7 +943,7 @@ def _mip_boundary_witness(
                         "boundary pricing MIP: precompiled exclusions "
                         + f"(trie={compile_result.n_trie_constraints}, "
                         + f"static={compile_result.n_static_constraints}, "
-                        + f"tags={compile_result.n_tags}, order={cfg.BOUNDARY_MIP_CUT_ORDER})",
+                        + f"tags={compile_result.n_tags}, order={cfg.advanced.BOUNDARY_MIP_CUT_ORDER})",
                         verbose=verbose,
                     )
                 else:
@@ -1039,7 +1039,9 @@ def price_boundary_witness(
     exclude_tags = exclude_tags or set()
     bound = estimate_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN)) if bound is None else float(bound)
     env = env or get_env()
-    eps = float(cfg.BOUNDARY_MIP_EPS if eps is None else eps)
+    if eps is None:
+        eps = cfg.BOUNDARY_MIP_EPS if cfg.BOUNDARY_MIP_EPS is not None else boundary_mip_eps(net)
+    eps = float(eps)
 
     witness = _brute_force_boundary_witness(net, boundary_shi, exclude_tags)
     if witness is not None:
@@ -1050,7 +1052,7 @@ def price_boundary_witness(
         return witness
 
     n = count_relu_units(net)
-    if n <= cfg.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
+    if n <= cfg.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
         _pricing_log(
             "boundary pricing: brute-force found no witness "
             + f"(all {2 ** max(0, n - 1)} sign patterns excluded or infeasible)",

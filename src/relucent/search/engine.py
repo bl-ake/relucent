@@ -378,7 +378,7 @@ def get_ip(
     try:
         n = Polyhedron(ctx.net, flip_ss_at_shi(p.ss_np, shi))
         # Neighbor may be skinny; try progressively larger bounding boxes until one works.
-        for max_radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
+        for max_radius in cfg.advanced.INTERIOR_POINT_RADIUS_SEQUENCE:
             with contextlib.suppress(ValueError):
                 n._interior_point = n.get_interior_point(env=ctx.env, max_radius=max_radius)
         return n, shi
@@ -884,7 +884,7 @@ def hamming_astar(
             raise ValueError("Interior point not found")
         dist = np.linalg.norm(p.interior_point - end_poly.interior_point).item()
         bias = -1 / (1 + dist)  # small nudge toward geometrically closer regions at equal Hamming
-        return hamming + cfg.ASTAR_BIAS_WEIGHT * bias
+        return hamming + cfg.advanced.ASTAR_BIAS_WEIGHT * bias
 
     pool = None
     with worker_context_scope(cx._net, get_volumes=False, num_threads=num_threads):
