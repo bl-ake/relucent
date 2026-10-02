@@ -270,7 +270,7 @@ class TestComplexAutoConversion:
             nn.Linear(8, 2),
         )
         cplx = Complex(sequential)
-        assert cplx.net is sequential
+        assert cplx.source_model is sequential
         assert isinstance(cplx._net, ReLUNetwork)
 
     def test_module_dict_is_accepted(self, seeded):
@@ -325,12 +325,15 @@ class TestComplexAutoConversion:
         ss_seq = cplx_seq.point2ss(x)
         assert torch.equal(torch.as_tensor(ss_nn), torch.as_tensor(ss_seq))
 
-    def test_nn_module_passed_directly_unchanged(self, seeded):
-        """An NN instance is not re-wrapped; cplx.net is the same object."""
+    def test_model_kept_as_source_model(self, seeded):
+        """The model passed in is kept as source_model; a ReLUNetwork is used as-is for net."""
         assert seeded is not None
         net = mlp(widths=[4, 8, 2])
         cplx = Complex(net)
-        assert cplx.net is net
+        assert cplx.source_model is net
+        assert isinstance(cplx.net, ReLUNetwork)
+        canonical = cplx.net
+        assert Complex(canonical).net is canonical
 
 
 def _exercise_complex_for_model(model: nn.Module | ReLUNetwork) -> None:

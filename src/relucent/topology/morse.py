@@ -660,7 +660,7 @@ def critical_points(
             nworkers=nworkers,
         )
 
-    vertex_complex = type(cplx)(cplx.net)
+    vertex_complex = cplx._empty_like()
     results: list[CriticalPoint] = []
     for vertex, (is_critical, index) in zip(vertices, flags, strict=True):
         if not is_critical:
