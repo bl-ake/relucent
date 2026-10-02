@@ -293,7 +293,7 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     assert not invalid_proof_warns
 
 
-def test_searcher_drops_deprecated_strict_and_marks_shis_certified(monkeypatch) -> None:
+def test_searcher_marks_shis_certified(monkeypatch) -> None:
     from relucent.core.poly import Polyhedron
     from relucent.search import searcher
     from relucent.utils import BlockingQueue
@@ -308,16 +308,14 @@ def test_searcher_drops_deprecated_strict_and_marks_shis_certified(monkeypatch) 
         return []
 
     monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
-    with pytest.warns(FutureWarning, match="strict"):
-        searcher(
-            cplx,
-            start=np.zeros((1, 2), dtype=np.float64),
-            queue=BlockingQueue(),
-            verify=True,
-            verbose=0,
-            strict=True,
-        )
-    assert seen and all("strict" not in kwargs for kwargs in seen)
+    searcher(
+        cplx,
+        start=np.zeros((1, 2), dtype=np.float64),
+        queue=BlockingQueue(),
+        verify=True,
+        verbose=0,
+    )
+    assert seen
     assert all(poly._shis_strict for poly in cplx if poly._shis is not None)
 
 

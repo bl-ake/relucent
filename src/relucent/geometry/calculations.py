@@ -680,7 +680,7 @@ def get_hs(
     *,
     get_all_Ab: Literal[False] = False,
     force_numpy: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 @overload
@@ -700,8 +700,8 @@ def get_hs(
     get_all_Ab: bool = False,
     force_numpy: bool = False,
 ) -> (
-    tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]
-    | tuple[np.ndarray, np.ndarray, np.ndarray, int]
+    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    | tuple[np.ndarray, np.ndarray, np.ndarray]
     | list[dict[str, object]]
 ):
     """Halfspace representation of ``poly`` from all neurons in the network.
@@ -715,7 +715,7 @@ def get_hs(
         force_numpy: If True, use the NumPy path even when ``ss`` is a tensor.
 
     Returns:
-        If ``get_all_Ab`` is False: ``(halfspaces, W, b, num_dead_relus)``.
+        If ``get_all_Ab`` is False: ``(halfspaces, W, b)``.
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
     if TORCH_AVAILABLE and isinstance(poly._ss, torch.Tensor) and not force_numpy:
@@ -729,7 +729,7 @@ def _get_hs_torch(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: Literal[False] = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int]: ...
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
 
 
 @overload
@@ -747,7 +747,7 @@ def _get_hs_torch(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, int] | list[dict[str, object]]:
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | list[dict[str, object]]:
     assert isinstance(poly._ss, torch.Tensor)
     constr_A, constr_b = None, None
     current_A, current_b = None, None
@@ -828,7 +828,6 @@ def _get_hs_torch(
     assert constr_A is not None
     assert constr_b is not None
 
-    num_dead_relus = int((constr_A == 0).all(dim=0).sum().item())
     halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
 
     if get_all_Ab:
@@ -839,7 +838,7 @@ def _get_hs_torch(
     assert isinstance(current_b, torch.Tensor)
 
     assert halfspaces.shape[0] == poly._ss.shape[1]
-    return halfspaces, current_A, current_b, num_dead_relus
+    return halfspaces, current_A, current_b
 
 
 @overload
@@ -848,7 +847,7 @@ def _get_hs_numpy(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: Literal[False] = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]: ...
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 @overload
@@ -866,7 +865,7 @@ def _get_hs_numpy(
     data: torch.Tensor | None = None,
     *,
     get_all_Ab: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, int] | list[dict[str, object]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, object]]:
     constr_A, constr_b = None, None
     current_A, current_b = None, None
     layer_W, layer_b = None, None
@@ -949,7 +948,6 @@ def _get_hs_numpy(
     assert constr_A is not None
     assert constr_b is not None
 
-    num_dead_relus = (constr_A == 0).all(axis=0).sum().item()
     halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
     if get_all_Ab:
         return all_Ab
@@ -958,25 +956,7 @@ def _get_hs_numpy(
     assert isinstance(current_b, np.ndarray)
 
     assert halfspaces.shape[0] == poly.ss_np.shape[1]
-    return halfspaces, current_A, current_b, num_dead_relus
-
-
-_STRICT_DEPRECATED = (
-    "the SHI option `strict` is deprecated and has no effect: every facet decision get_shis makes is "
-    + "certified or raises, so its results are always strict"
-)
-
-
-def without_deprecated_strict(shis_kwargs: Mapping[str, Any]) -> dict[str, Any]:
-    """``shis_kwargs`` (options for :func:`get_shis`) without the deprecated ``strict``, warning if given.
-
-    Search entry points call this once, so the warning is raised in the caller's process rather
-    than once per worker LP.
-    """
-    if "strict" not in shis_kwargs:
-        return dict(shis_kwargs)
-    warnings.warn(_STRICT_DEPRECATED, FutureWarning, stacklevel=3)
-    return {k: v for k, v in shis_kwargs.items() if k != "strict"}
+    return halfspaces, current_A, current_b
 
 
 def shis_are_certified(shis_kwargs: Mapping[str, Any]) -> bool:
@@ -1003,7 +983,6 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-    strict: bool | None = None,
     escalate_bound: bool = True,
 ) -> list[int]: ...
 
@@ -1018,7 +997,6 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-    strict: bool | None = None,
     escalate_bound: bool = True,
 ) -> tuple[list[int], list[dict[str, object]]]: ...
 
@@ -1032,7 +1010,6 @@ def get_shis(
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
-    strict: bool | None = None,
     escalate_bound: bool = True,
 ) -> list[int] | tuple[list[int], list[dict[str, object]]]:
     """Supporting halfspace indices (SHIs) for ``poly``.
@@ -1062,7 +1039,6 @@ def get_shis(
         env: Gurobi environment; default uses :func:`~relucent.utils.get_env`.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
-        strict: Deprecated, no effect: every facet decision is certified or raises.
         escalate_bound: If False, use only the requested ``bound`` (no automatic box-radius
             escalation when clipping is suspected).
 
@@ -1074,8 +1050,6 @@ def get_shis(
         :class:`~relucent.core.errors.AmbiguousGeometryError`: If a facet decision cannot be certified.
     """
 
-    if strict is not None:
-        warnings.warn(_STRICT_DEPRECATED, FutureWarning, stacklevel=2)
     hs_np = poly.halfspaces_np
     err_np = poly.halfspaces_err_np
     n_orig = int(hs_np.shape[0])

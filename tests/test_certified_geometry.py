@@ -491,7 +491,3 @@ def test_failed_lp_raises_without_exact_rows(env, monkeypatch: pytest.MonkeyPatc
     with pytest.raises(AmbiguousGeometryError, match="LP solver failure"):
         get_shis(cell, env=env)
 
-
-def test_get_shis_strict_is_deprecated(env) -> None:
-    with pytest.warns(FutureWarning, match="strict"):
-        assert set(get_shis(_cell(_rectangle()), env=env, strict=True)) == {0, 1, 2, 3}

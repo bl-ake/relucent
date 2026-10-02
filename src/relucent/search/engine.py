@@ -18,7 +18,7 @@ from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
-from relucent.geometry.calculations import get_shis, shis_are_certified, without_deprecated_strict
+from relucent.geometry.calculations import get_shis, shis_are_certified
 from relucent.search.exploration import (
     SearchResult,
     finalize_ambient_search,
@@ -62,7 +62,6 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "halfspaces",
     "W",
     "b",
-    "num_dead_relus",
     "finite",
     "center",
     "inradius",
@@ -462,7 +461,7 @@ def searcher(
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
 
-    shis_kwargs = without_deprecated_strict(kwargs)
+    shis_kwargs = dict(kwargs)
 
     if cube_mode not in {"unrestricted", "intersect", "clipped", "exclude"}:
         raise ValueError("cube_mode must be one of {'unrestricted', 'intersect', 'clipped', 'exclude'}")
@@ -789,7 +788,6 @@ def hamming_astar(
         ValueError: If the start point lies exactly on a neuron's boundary.
     """
     del verbose  # applied by @with_verbosity
-    kwargs = without_deprecated_strict(kwargs)
     if bound is None:
         bound = cfg.DEFAULT_SEARCH_BOUND
 
