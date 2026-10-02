@@ -36,8 +36,8 @@ def test_boundary_generic_diamond_dual_graph_connected(seeded: int) -> None:
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(80, 2)]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
 
-    db = cplx.get_boundary_complex(cplx.n - 1)
-    G = db.get_dual_graph()
+    db = cplx.boundary_complex(cplx.n - 1)
+    G = db.dual_graph()
     assert G.number_of_nodes() >= 2
     assert G.number_of_edges() >= 1
     assert nx.number_connected_components(G) == 1
@@ -66,7 +66,7 @@ def test_boundary_degenerate_v_raises_non_generic(
     with pytest.raises(NonGenericArrangementError):
         cplx.bfs(start=np.array([[0.5, -0.3]], dtype=np.float64), max_polys=32, verbose=False, verify=False)
         cplx.set_exploration_state(complete=True, verified=True)
-        for poly in cplx.get_boundary_cells(cplx.n - 1, verify=False):
+        for poly in cplx.boundary_cells(cplx.n - 1, verify=False):
             db.add_polyhedron(poly, check_exists=False)
         db.verify_arrangement_genericity()
 
@@ -81,8 +81,8 @@ def test_one_dim_dual_graph_edges_match_shared_endtags(seeded: int) -> None:
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, np.random.randn(80, 2)]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
 
-    db = cplx.get_boundary_complex(cplx.n - 1)
-    G = db.get_dual_graph()
+    db = cplx.boundary_complex(cplx.n - 1)
+    G = db.dual_graph()
     if G.number_of_edges() == 0:
         pytest.skip("boundary exploration produced no dual edges")
     from relucent.graph.incidence import certify_dual_graph

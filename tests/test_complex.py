@@ -11,7 +11,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from relucent import Complex, Polyhedron, set_seeds, torch_mlp
+from relucent import Complex, Polyhedron, mlp, set_seeds, torch_mlp
 from relucent.geometry.calculations import adjacent_polyhedra
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.model.builders import TorchMLP
@@ -28,12 +28,12 @@ def test_bfs_dfs_dual_graph_isomorphic(seed: int):
     cplx1 = Complex(model)
     start1 = _rand_batch(4)
     cplx1.bfs(start=start1)
-    G1 = cplx1.get_dual_graph()
+    G1 = cplx1.dual_graph()
 
     cplx2 = Complex(model)
     start2 = _rand_batch(4)
     cplx2.dfs(start=start2)
-    G2 = cplx2.get_dual_graph()
+    G2 = cplx2.dual_graph()
 
     p1 = cplx1.point2ss(start1)
     assert p1 in cplx2
@@ -49,12 +49,12 @@ def test_recover_from_dual_graph(seed: int):
     cplx1.bfs(start=start1)
     assert len(cplx1) > 0
 
-    G1 = cplx1.get_dual_graph(relabel=True)
+    G1 = cplx1.dual_graph(relabel=True)
     cplx2 = Complex(model)
     cplx2.recover_from_dual_graph(G1, initial_ss=cplx1.point2ss(start1), source=0)
     assert cplx2.complete is True and cplx2.verified is True
     cplx2.bfs(start=start1, max_polys=5000)
-    G2 = cplx2.get_dual_graph(relabel=True, require_complete=True)
+    G2 = cplx2.dual_graph(relabel=True, require_complete=True)
     assert all(p.feasible for p in cplx2)
     assert nx.is_isomorphic(G1, G2, edge_match=lambda u, v: u["shi"] == v["shi"])
 
@@ -142,7 +142,7 @@ def test_plot_and_dual_graph_smoke(seed: int):
         _ = p.interior_point
         _ = p.interior_point_norm
         _ = sum(len(p.shis) for p in cplx) / len(cplx)
-        G = cplx.get_dual_graph()
+        G = cplx.dual_graph()
         assert G.number_of_nodes() == len(cplx)
 
 
@@ -231,11 +231,20 @@ class TestComplexDualGraph:
         with pytest.raises(ComplexNotCompleteError):
             cplx.contract(verbose=False)
 
+    @pytest.mark.parametrize("dim", [2, 3])
+    def test_contract_returns_codimension_one_cells(self, dim):
+        set_seeds(0)
+        cplx = Complex(mlp([dim, 5, 1]))
+        cplx.bfs(start=np.zeros((1, dim)) + 0.05, nworkers=2, verbose=0)
+        cells = cplx.contract(verbose=0)
+        assert len(cells) > 0
+        assert {int(p.dim) for p in cells} == {dim - 1}
+
     def test_dual_graph_basic(self, small_mlp):
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=30)
-        G = cplx.get_dual_graph()
+        G = cplx.dual_graph()
         assert G.number_of_nodes() == len(cplx)
         for _, _, d in G.edges(data=True):
             assert "shi" in d
@@ -244,7 +253,7 @@ class TestComplexDualGraph:
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         cplx.bfs(start=start, max_polys=15)
-        G = cplx.get_dual_graph(relabel=True)
+        G = cplx.dual_graph(relabel=True)
         assert set(G.nodes()) == set(range(len(cplx)))
 
 

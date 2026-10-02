@@ -27,7 +27,7 @@ accept ``verify=True`` by default. After a **complete** search, relucent:
 
 1. Rebuilds combinatorial dual-graph edges and syncs top-cell ``_shis`` from them
    (:func:`~relucent.search.exploration.finalize_ambient_search` via
-   :meth:`~relucent.core.complex.Complex.get_dual_graph`).
+   :meth:`~relucent.core.complex.Complex.dual_graph`).
 2. Runs certification (:func:`~relucent.verify.certify.certify_complex` at
    :class:`~relucent.verify.certify.CertifyLevel.COMPLETE`).
 
@@ -79,17 +79,17 @@ Topology prerequisites
 ----------------------
 
 :meth:`~relucent.core.complex.Complex.contract` and
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` call
+:meth:`~relucent.core.complex.Complex.boundary_complex` call
 :meth:`~relucent.core.complex.Complex.assert_topology_ready`, which requires
 ``complete=True`` and ``verified=True``. Run BFS or
 :func:`~relucent.search.exploration.explore_for_topology` first. For trusted loads
 (deserialized complexes), call
 :meth:`~relucent.core.complex.Complex.set_exploration_state` explicitly.
 
-:meth:`~relucent.core.complex.Complex.get_chain_complex`,
-:meth:`~relucent.core.complex.Complex.get_meta_graph`,
-:meth:`~relucent.core.complex.Complex.get_betti_numbers`, and
-:meth:`~relucent.core.complex.Complex.get_persistent_homology` also go through
+:meth:`~relucent.core.complex.Complex.chain_complex`,
+:meth:`~relucent.core.complex.Complex.meta_graph`,
+:meth:`~relucent.core.complex.Complex.betti_numbers`, and
+:meth:`~relucent.core.complex.Complex.persistent_homology` also go through
 ``assert_topology_ready``. On an incomplete or unverified complex they raise
 :class:`~relucent.core.errors.ComplexNotCompleteError` or
 :class:`~relucent.core.errors.ComplexNotVerifiedError`.
@@ -101,7 +101,7 @@ Two paths build a decision-boundary complex:
 
 * **Full ambient complex first** — explore the input space (BFS or
   :func:`~relucent.search.exploration.explore_for_topology`), then
-  :meth:`~relucent.core.complex.Complex.get_boundary_complex(i)` extracts faces on
+  :meth:`~relucent.core.complex.Complex.boundary_complex(i)` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
 * **Direct boundary discovery** — :meth:`~relucent.core.complex.Complex.discover_boundary_complex(i)`
   uses MIP pricing plus slice-restricted BFS per connected component, then

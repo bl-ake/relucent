@@ -90,7 +90,7 @@ def certify_complex(
             checking anything. This is the only repair relucent performs.
         graph: A pre-built dual graph to certify against, e.g. one already
             constructed (and possibly repaired) by the caller. When omitted,
-            one is built via :meth:`~relucent.core.complex.Complex.get_dual_graph`.
+            one is built via :meth:`~relucent.core.complex.Complex.dual_graph`.
         record_state: When True, also update
             :meth:`~relucent.core.complex.Complex.set_exploration_state` so callers
             do not need a separate state write.
@@ -117,7 +117,7 @@ def certify_complex(
     top_dim = max(int(p.dim) for p in cplx)
     is_contracted_slice = top_dim != int(cplx.dim)
 
-    g = graph if graph is not None else cplx.get_dual_graph(repair=repair)
+    g = graph if graph is not None else cplx.dual_graph(repair=repair)
 
     logger.debug("certify_complex: flip-SHI symmetry ...")
     t_stage = time.perf_counter()

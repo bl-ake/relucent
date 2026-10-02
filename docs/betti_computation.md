@@ -1,6 +1,6 @@
 # How Relucent computes Betti numbers
 
-This page walks through what happens when you call `cplx.get_betti_numbers()` with
+This page walks through what happens when you call `cplx.betti_numbers()` with
 no extra arguments — the default path most users hit.
 
 **What you get back:** a dictionary `{k: β_k}` of Betti numbers computed over GF(2).
@@ -8,7 +8,7 @@ For example `{0: 1, 1: 2}` means one connected component, two independent 1-cycl
 and so on.
 
 **What you need first:** a complete, verified complex discovered by search (BFS, etc.;
-`get_chain_complex` calls `assert_topology_ready`). Faces are
+`chain_complex` calls `assert_topology_ready`). Faces are
 recovered algebraically from verified vertices' local stars (Masden 2022, Theorem
 20; see [`vertex_star`](../src/relucent/graph/vertex_star.py)), so no coverage
 heuristic is needed — every cell whose generating vertex is verified is
@@ -21,16 +21,16 @@ certification* below.
 
 ## The default pipeline
 
-When you call `get_betti_numbers()` with defaults (`compactify="truncate"`,
+When you call `betti_numbers()` with defaults (`compactify="truncate"`,
 `respect_finite=False`, no verification flags), the library runs these steps in order:
 
 ```mermaid
 flowchart TD
     search["BFS discovers top-dimensional cells"]
-    chain["get_chain_complex: seed + verify vertices, expand local stars"]
-    meta["get_meta_graph: face edges + bounded/unbounded labels"]
+    chain["chain_complex: seed + verify vertices, expand local stars"]
+    meta["meta_graph: face edges + bounded/unbounded labels"]
     trunc["truncate_meta_graph + close 1-cell boundaries"]
-    rank["topology.get_betti_numbers: rank boundary matrices"]
+    rank["topology.betti_numbers: rank boundary matrices"]
 
     search --> chain --> meta --> trunc --> rank
 ```
@@ -41,7 +41,7 @@ Each step is described below.
 
 ## Step 1: Build the chain complex
 
-**Entry point:** [`get_chain_complex()`](../src/relucent/core/complex.py)
+**Entry point:** [`chain_complex()`](../src/relucent/core/complex.py)
 
 The chain complex is a list of `Complex` objects, one per dimension, from the
 top-dimensional cells down to 0-cells (vertices). Lower-dimensional cells are
@@ -50,8 +50,8 @@ recovered directly from verified vertices' local stars by
 — not by iterative dual-edge contraction, and not by requiring the complete
 `2^c` cube of top-cell cofaces to already exist.
 
-`Complex.contract()` is a thin wrapper that returns
-`get_chain_complex(...)[self.dim - 1]`.
+`Complex.contract()` returns the complex of codimension-one cells
+(dimension `dim - 1`) from `chain_complex()`.
 
 ### How vertex-star recovery works
 
@@ -64,7 +64,7 @@ assignment on those zero entries — holding all other entries fixed — is a re
 present cell (Lemma 18's sign-product semigroup).
 
 1. Build the **dual graph** — combinatorial adjacency among top-dimensional cells
-   ([`get_dual_graph()`](../src/relucent/core/complex.py) →
+   ([`dual_graph()`](../src/relucent/core/complex.py) →
    [`dual_edges_top_dim()`](../src/relucent/graph/incidence.py)), then
    [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) so each cell's
    `_shis` list matches incident edge labels. Certify the labeled graph with
@@ -109,18 +109,18 @@ Then [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) overwri
 ``poly._shis`` from edge labels. The legacy 0-face pairing in
 [`_dual_edges_one_dim()`](../src/relucent/graph/incidence.py) remains for direct
 ``dual_edges_top_dim(..., top_dim=1)`` callers only, not for
-``Complex.get_dual_graph()``.
+``Complex.dual_graph()``.
 
 **Related (not the ambient chain complex):**
-[`get_boundary_cells`](../src/relucent/core/complex.py) /
-[`get_boundary_complex`](../src/relucent/core/complex.py) still create faces from
+[`boundary_cells`](../src/relucent/core/complex.py) /
+[`boundary_complex`](../src/relucent/core/complex.py) still create faces from
 dual edges via [`_codim_one_face_kwargs()`](../src/relucent/graph/boundary.py).
 
 ---
 
 ## Step 2: Build the meta-graph
 
-**Entry point:** [`get_meta_graph()`](../src/relucent/core/complex.py)
+**Entry point:** [`meta_graph()`](../src/relucent/core/complex.py)
 
 The meta-graph is a directed graph whose nodes are cells (at every dimension found
 in the chain complex) and whose edges record codimension-one face incidences. This
@@ -175,7 +175,7 @@ only, not used for boundedness or incidence.
 
 This runs automatically when `compactify="truncate"` (the default). Truncation is a single
 incidence pipeline: extend sign sequences, materialize cap cells, then rebuild all face
-edges with the same rule as [`get_meta_graph()`](../src/relucent/core/complex.py).
+edges with the same rule as [`meta_graph()`](../src/relucent/core/complex.py).
 
 **Phase A — extend SS:** every node’s sign sequence gains **two** trailing truncation
 bits. Bounded cells and rays use `[..., 1, 0]`; cells with two open ends use
@@ -222,7 +222,7 @@ built from the caps of its trunc-compatible unbounded facets.
 
 ## Step 4: Rank boundary matrices
 
-**Entry point:** [`topology.get_betti_numbers()`](../src/relucent/topology/betti.py)
+**Entry point:** [`topology.betti_numbers()`](../src/relucent/topology/betti.py)
 
 From the (possibly truncated) meta-graph:
 
@@ -246,7 +246,7 @@ When there are no 0-cells (e.g. a boundary complex with only 1- and 2-cells), th
 lowest key in the returned dictionary is `1`, not `0`.
 
 Zero entries are dropped from the result. With `verify_connected_components=True`
-(the default for `topology.get_betti_numbers`, `False` via `Complex`), β₀ is checked
+(the default for `topology.betti_numbers`, `False` via `Complex`), β₀ is checked
 against the number of connected components.
 
 ---
@@ -257,14 +257,14 @@ After a **complete** ambient BFS (`verify=True` by default), relucent:
 
 1. Rebuilds combinatorial dual-graph edges and syncs top-cell `_shis`
    ([`finalize_ambient_search()`](../src/relucent/search/exploration.py) via
-   [`Complex.get_dual_graph()`](../src/relucent/core/complex.py)).
+   [`Complex.dual_graph()`](../src/relucent/core/complex.py)).
 2. Runs certification ([`certify_complex()`](../src/relucent/verify/certify.py) at
    `CertifyLevel.COMPLETE`), including an LP facet completeness test when
    `cplx.complete is True`.
 
 Certification is skipped if `max_polys` is hit before the frontier empties. Check
 `cplx.complete` and `cplx.verified` before calling `contract()`,
-`get_chain_complex()`, or `get_boundary_complex()`. Re-run certification manually
+`chain_complex()`, or `boundary_complex()`. Re-run certification manually
 with `Complex.certify()`.
 
 See the Sphinx guide *Exploration and Verification* (`docs/exploration_verification.rst`)
@@ -274,8 +274,8 @@ for user-facing detail.
 
 ## Other options (non-default)
 
-These change behavior when you pass extra flags to `get_betti_numbers()` or
-`get_meta_graph()`:
+These change behavior when you pass extra flags to `betti_numbers()` or
+`meta_graph()`:
 
 - **`compactify="borel_moore"`** — Borel–Moore homology: no truncation; only faces with at least
   two cofaces contribute to boundary maps.
@@ -287,13 +287,13 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
   `ChainComplexInconsistent` if not. Bypasses the Betti cache.
 - **`verify_connected_components=True`** — check rank-formula β₀ against the
   connected-component count; raises `ConnectedComponentsMismatch` on mismatch.
-- **`method="dense"`** (`topology.get_betti_numbers` only) — bit-packed ranking
+- **`method="dense"`** (`topology.betti_numbers` only) — bit-packed ranking
   instead of sparse elimination; `nworkers` applies only here.
-- **`get_meta_graph(verify=True)`** — runs
+- **`meta_graph(verify=True)`** — runs
   [`verify_meta_graph_incidence()`](../src/relucent/graph/meta_graph.py) to assert
   assembled edges, node SHIs, and finite labels match the incidence engine (debugging).
 - **`verify_arrangement_genericity()`** — geometric transversality check on 1-cells,
-  run unconditionally in `get_boundary_complex`.
+  run unconditionally in `boundary_complex`.
 
 ---
 
@@ -303,12 +303,12 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 
 | Step | Main functions |
 |------|----------------|
-| Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.get_dual_graph`, `incidence.*` |
-| Chain complex | `get_chain_complex`, `vertex_star.find_vertices`, `vertex_star.expand_vertex_star`, `get_dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
-| Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
+| Search | `Complex.bfs`, `exploration.finalize_ambient_search`, `Complex.dual_graph`, `incidence.*` |
+| Chain complex | `chain_complex`, `vertex_star.find_vertices`, `vertex_star.expand_vertex_star`, `dual_graph`, `dual_edges_top_dim`, `set_contracted_shis` |
+| Meta-graph | `meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |
-| Ranks | `Complex.get_betti_numbers`, `topology.get_betti_numbers`, `_sparse_boundary_maps`, `gf2_rank_sparse_rowsets` (default); `_packed_boundary_matrix`, `gf2_rank_boundary` (`method="dense"`) |
+| Ranks | `Complex.betti_numbers`, `topology.betti_numbers`, `_sparse_boundary_maps`, `gf2_rank_sparse_rowsets` (default); `_packed_boundary_matrix`, `gf2_rank_boundary` (`method="dense"`) |
 
 ### 0-cells and 1-cells at a glance
 

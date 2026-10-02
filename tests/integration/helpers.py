@@ -197,7 +197,7 @@ def tag_set(cplx: Complex) -> set[bytes]:
 
 
 def truncated_betti(boundary: Complex) -> dict[int, int]:
-    raw = boundary.get_betti_numbers(compactify="truncate", verbose=False)
+    raw = boundary.betti_numbers(compactify="truncate", verbose=False)
     return {int(k): int(v) for k, v in raw.items()}
 
 
@@ -213,7 +213,7 @@ def restore_shis_by_tag(cplx: Complex, shis_by_tag: Mapping[bytes, list[int]]) -
 
 
 def export_dual_graph_payload(cplx: Complex) -> dict[str, Any]:
-    graph = cplx.get_dual_graph(relabel=True)
+    graph = cplx.dual_graph(relabel=True)
     source = 0
     initial_ss = np.asarray(cplx.index2poly[source].ss_np, dtype=np.int8)
     return {

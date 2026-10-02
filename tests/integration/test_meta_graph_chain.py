@@ -23,9 +23,9 @@ def test_meta_graph_chain_complex_non_negative_betti(
     model = load_witness_model(spec)
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
-    boundary = ambient.get_boundary_complex(shi, verbose=False)
+    boundary = ambient.boundary_complex(shi, verbose=False)
 
-    betti = boundary.get_betti_numbers(
+    betti = boundary.betti_numbers(
         compactify="truncate",
         verify_chain_complex=True,
         verbose=False,

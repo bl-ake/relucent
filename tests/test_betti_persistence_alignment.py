@@ -3,7 +3,7 @@
 When all cells share one filtration value (:class:`~relucent.topology.filtration.ConstantFiltration`
 with ``lower_star=False``), the sublevel complex at the end of the filtration is the
 full meta-graph complex. :func:`~relucent.topology.persistence.betti_at_filtration_end` must then
-match :meth:`~relucent.core.complex.Complex.get_betti_numbers` with the same ``compactify`` /
+match :meth:`~relucent.core.complex.Complex.betti_numbers` with the same ``compactify`` /
 ``respect_finite`` flags.
 """
 
@@ -19,7 +19,7 @@ import torch.nn as nn
 from relucent import Complex, set_seeds
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
-from relucent.topology import get_betti_numbers
+from relucent.topology import betti_numbers
 from relucent.topology.filtration import ConstantFiltration
 from relucent.topology.persistence import betti_at_filtration_end, compute_persistent_homology
 
@@ -49,7 +49,7 @@ def assert_betti_match_topology(
     respect_finite: bool = False,
     filtration: ConstantFiltration | None = None,
 ) -> None:
-    """``betti_at_filtration_end`` must agree with ``get_betti_numbers`` on ``cplx``."""
+    """``betti_at_filtration_end`` must agree with ``betti_numbers`` on ``cplx``."""
     fil = filtration or ConstantFiltration(0.0)
     diagram = compute_persistent_homology(
         cplx,
@@ -59,7 +59,7 @@ def assert_betti_match_topology(
         lower_star=False,
     )
     betti_ph = betti_at_filtration_end(diagram)
-    betti_topo = cplx.get_betti_numbers(
+    betti_topo = cplx.betti_numbers(
         compactify=compactify,
         respect_finite=respect_finite,
     )
@@ -117,7 +117,7 @@ def _populate_line_boundary(cplx: Complex, *, seed: int) -> Complex:
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, rng.standard_normal((200, 2))]))
     explore_for_topology(cplx, np.array([0.5, 0.0]))
-    return cplx.get_boundary_complex(cplx.n - 1)
+    return cplx.boundary_complex(cplx.n - 1)
 
 
 def _populate_diamond_boundary(cplx: Complex, *, seed: int) -> Complex:
@@ -126,7 +126,7 @@ def _populate_diamond_boundary(cplx: Complex, *, seed: int) -> Complex:
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, rng.standard_normal((100, 2))]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    return cplx.get_boundary_complex(cplx.n - 1)
+    return cplx.boundary_complex(cplx.n - 1)
 
 
 @pytest.mark.parametrize("compactify", ["truncate", "borel_moore"])
@@ -157,7 +157,7 @@ def test_line_boundary_beta0_matches_components(seeded: int) -> None:
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
-    betti = db.get_betti_numbers(compactify="truncate", verify_connected_components=True)
+    betti = db.betti_numbers(compactify="truncate", verify_connected_components=True)
     assert betti.get(0, 0) == 1, f"single truncated line segment should have β₀=1, got {betti}"
 
 
@@ -167,9 +167,9 @@ def test_line_boundary_truncated_chain_complex_is_consistent(seeded: int) -> Non
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
-    meta = db.get_meta_graph(verbose=False)
+    meta = db.meta_graph(verbose=False)
     truncate_meta_graph(meta)
-    get_betti_numbers(meta, verify_chain_complex=True)
+    betti_numbers(meta, verify_chain_complex=True)
 
 
 def test_constant_filtration_matches_betti_on_small_relu_complex(seeded: int):

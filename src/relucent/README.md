@@ -26,7 +26,7 @@ The `relucent` package is organized into domain subpackages.
 
 ### Import conventions
 
-- Prefer **`Complex` methods** for common workflows (`bfs`, `get_betti_numbers`, `plot`, `certify`). They are thin wrappers; the algorithms live in the subpackage modules (e.g. `graph.meta_graph.build_meta_graph`, `graph.vertex_star.build_chain_complex`), which take the complex as their first argument.
+- Prefer **`Complex` methods** for common workflows (`bfs`, `betti_numbers`, `plot`, `certify`). They are thin wrappers; the algorithms live in the subpackage modules (e.g. `graph.meta_graph.build_meta_graph`, `graph.vertex_star.build_chain_complex`), which take the complex as their first argument.
 - Import from subpackages directly, e.g. `relucent.core.complex`, `relucent.graph.incidence`, `relucent.topology.betti`.
 - Search workers read **`relucent.search.worker_context.get_worker_context()`**; they do not import `complex` for module globals.
 

@@ -611,7 +611,7 @@ def critical_points(
     if len(cplx) == 0:
         return []
     # Criticality needs only each vertex's sign sequence, so find the verified vertices
-    # (the 0-cells of get_chain_complex) without building the rest of the chain complex.
+    # (the 0-cells of chain_complex) without building the rest of the chain complex.
     _, found = verified_vertices(cplx)
     if not found:
         return []
@@ -619,7 +619,7 @@ def critical_points(
 
     flags: list[tuple[bool, int | None]]
     if require_complete:
-        meta = cplx.get_meta_graph(verbose=verbose)
+        meta = cplx.meta_graph(verbose=verbose)
         one_cell_tags = {tag for tag, attrs in meta.nodes(data=True) if int(attrs.get("dim", -1)) == 1}
 
         # The completeness check reads `cplx`/`meta` per vertex, so this path stays
@@ -651,7 +651,7 @@ def critical_points(
             )
     else:
         # Each vertex's criticality check is independent (like candidate verification in
-        # get_chain_complex), so use a worker pool once there's enough work.
+        # chain_complex), so use a worker pool once there's enough work.
         nworkers = process_aware_cpu_count() or 1
         flags = critical_flags_for_vertices(
             [vertex.ss for vertex in vertices],

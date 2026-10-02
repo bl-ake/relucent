@@ -46,9 +46,9 @@ def test_shi_bound_dual_graph_rejects_empty_shared_faces(integration_nworkers: i
     spec = witness_by_id("shi_bound_5303")
     model = load_witness_model(spec)
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
-    boundary = ambient.get_boundary_complex(boundary_shi_for_spec(ambient, spec), verbose=False)
+    boundary = ambient.boundary_complex(boundary_shi_for_spec(ambient, spec), verbose=False)
 
-    graph = boundary.get_dual_graph()
+    graph = boundary.dual_graph()
     # True phantoms are empty for both endpoints (halfspaces can disagree one-sided).
     phantom_edges = sum(
         1

@@ -40,7 +40,7 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
             )
         return
     # Build dual graph and resync top-cell _shis from it (repair=True, the default).
-    graph = cx.get_dual_graph(require_complete=False)
+    graph = cx.dual_graph(require_complete=False)
     if verify:
         top_dim = max(int(p.dim) for p in cx)
         if top_dim == int(cx.dim):
@@ -97,7 +97,7 @@ def finalize_boundary_complex(
         poly._finite_computed = False
     t2 = time.perf_counter()
     logger.debug("discover finalize: building dual graph ...")
-    cx._dual_graph = cx.get_dual_graph(require_complete=verify)
+    cx._dual_graph = cx.dual_graph(require_complete=verify)
     logger.debug(
         "discover finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
     )

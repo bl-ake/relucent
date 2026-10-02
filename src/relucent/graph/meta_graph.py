@@ -3,11 +3,11 @@
 Face incidence, dual-graph adjacency, and boundedness classification live in
 :mod:`relucent.graph.incidence`; certification lives in :mod:`relucent.verify.certify`.
 
-- Construction: :func:`build_meta_graph` (behind ``Complex.get_meta_graph``).
+- Construction: :func:`build_meta_graph` (behind ``Complex.meta_graph``).
 - Truncation / compactification: :func:`truncate_meta_graph`,
   :func:`one_point_compactify_meta_graph`, :func:`finite_cells_subgraph`.
 - Audits: :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`
-  (run when ``get_meta_graph`` gets ``verify=True``).
+  (run when ``meta_graph`` gets ``verify=True``).
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ __all__ = [
 def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
     """Return the subcomplex induced by nodes with ``finite is True``.
 
-    Used by :func:`relucent.topology.get_betti_numbers` when
+    Used by :func:`relucent.topology.betti_numbers` when
     ``respect_finite=True`` to compute homology on bounded cells only (no truncation).
     """
     finite = [n for n, a in meta.nodes(data=True) if a.get("finite", None) is True]
@@ -428,8 +428,8 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     without a matching sphere-cut breaks ``∂²=0``. Those cofaces receive a trunc-cap
     instead (see :func:`_open_cap_count`).
 
-    Called by :func:`relucent.topology.get_betti_numbers` when ``compactify="truncate"``
-    (the default for :meth:`~relucent.core.complex.Complex.get_betti_numbers`), and by persistent-homology code in
+    Called by :func:`relucent.topology.betti_numbers` when ``compactify="truncate"``
+    (the default for :meth:`~relucent.core.complex.Complex.betti_numbers`), and by persistent-homology code in
     :mod:`relucent.topology.persistence` for the same link-at-infinity convention.
     """
     if meta.number_of_nodes() == 0:
@@ -503,7 +503,7 @@ def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
     second incidence to one new 0-cell representing infinity.  Returns whether the
     infinity node was added.
 
-    Called by :func:`relucent.topology.get_betti_numbers` when ``compactify="one_point"``.
+    Called by :func:`relucent.topology.betti_numbers` when ``compactify="one_point"``.
     """
     if meta.number_of_nodes() == 0:
         return False
@@ -548,7 +548,7 @@ def verify_meta_graph_one_cells(meta: nx.MultiDiGraph[Any], *, truncated: bool =
     flip SHIs when its only crossings are truncation bits.
 
     Called at the end of :func:`truncate_meta_graph` (``truncated=True``) and from
-    :func:`verify_meta_graph_incidence` during :meth:`~relucent.core.complex.Complex.get_meta_graph`
+    :func:`verify_meta_graph_incidence` during :meth:`~relucent.core.complex.Complex.meta_graph`
     debug verification.
     """
     min_bounded_shis = 0 if truncated else 2
@@ -592,7 +592,7 @@ def verify_meta_graph_incidence(
       labels of verified 0-face incidences.
     - ``finite`` on chain cells matches combinatorial classification from face edges.
 
-    Invoked when :meth:`~relucent.core.complex.Complex.get_meta_graph` is called with
+    Invoked when :meth:`~relucent.core.complex.Complex.meta_graph` is called with
     ``verify=True`` (debugging only; too expensive for routine topology).
     """
     valid_face_tags = set(lookup.keys())
@@ -619,7 +619,7 @@ def verify_meta_graph_incidence(
             missing = len(expected_edges - actual_edges)
             extra = len(actual_edges - expected_edges)
             raise AssertionError(
-                f"get_meta_graph verify: dim-{int(k)} face edges mismatch " + f"(missing={missing}, extra={extra})"
+                f"meta_graph verify: dim-{int(k)} face edges mismatch " + f"(missing={missing}, extra={extra})"
             )
 
     for c_k in by_dim.values():
@@ -638,7 +638,7 @@ def verify_meta_graph_incidence(
                 )
             actual_shis = sorted(int(s) for s in meta.nodes[poly.tag].get("shis", []))
             if actual_shis != expected_shis:
-                raise AssertionError(f"get_meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}")
+                raise AssertionError(f"meta_graph verify: node shis mismatch dim-{int(poly.dim)} tag={poly.tag!r}")
 
     for c_k in by_dim.values():
         for poly in c_k:
@@ -647,8 +647,7 @@ def verify_meta_graph_incidence(
             node_finite = meta.nodes[poly.tag].get("finite")
             if node_finite != poly._finite:
                 raise AssertionError(
-                    f"get_meta_graph verify: finite mismatch tag={poly.tag!r} "
-                    + f"expected={poly._finite!r} got={node_finite!r}"
+                    f"meta_graph verify: finite mismatch tag={poly.tag!r} " + f"expected={poly._finite!r} got={node_finite!r}"
                 )
 
     verify_meta_graph_one_cells(meta)
@@ -678,32 +677,32 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     ``verify=True`` runs :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`
     to check edges, node SHIs, and finite labels against the incidence code.
 
-    To compute homology from it, pass it to :func:`relucent.topology.get_betti_numbers`
+    To compute homology from it, pass it to :func:`relucent.topology.betti_numbers`
     with a ``compactify`` mode (which modifies the graph in place for ``"truncate"`` and
     ``"one_point"``).
 
     Note:
-        This encodes the face relations in :meth:`~relucent.core.complex.Complex.get_chain_complex`'s chain
+        This encodes the face relations in :meth:`~relucent.core.complex.Complex.chain_complex`'s chain
         (see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex in their
         closure aren't represented; one-point compactification in
-        :func:`relucent.topology.get_betti_numbers` handles them.
+        :func:`relucent.topology.betti_numbers` handles them.
 
     Raises:
         IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
-            :meth:`~relucent.core.complex.Complex.get_chain_complex`.
+            :meth:`~relucent.core.complex.Complex.chain_complex`.
     """
     if len(cplx) == 0:
-        logger.debug("get_meta_graph: empty complex, returning empty graph")
+        logger.debug("meta_graph: empty complex, returning empty graph")
         return nx.MultiDiGraph()
 
     nworkers = process_aware_cpu_count() or 1
     logger.debug(
-        "get_meta_graph: starting (verify=%s, nworkers=%d)",
+        "meta_graph: starting (verify=%s, nworkers=%d)",
         verify,
         nworkers,
     )
 
-    chain = cplx.get_chain_complex(verbose=verbose)
+    chain = cplx.chain_complex(verbose=verbose)
     # Dimension -> complex in the chain (there is at most one per dimension).
     by_dim: dict[int, Complex] = {}
     for c in chain:
@@ -717,7 +716,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     # Collect the recovered cells once for boundedness classification.
     all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
     logger.debug(
-        "get_meta_graph: chain complex has %d dimensions, %d cells",
+        "meta_graph: chain complex has %d dimensions, %d cells",
         len(by_dim),
         len(all_chain_polys),
     )
@@ -742,7 +741,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
         use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
         if use_parallel:
             logger.debug(
-                "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
+                "meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
                 int(k),
                 nworkers,
                 len(cells),
@@ -760,7 +759,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
             else:
                 face_mode = "sequential"
             logger.debug(
-                "get_meta_graph: k=%d face edges %s (%d cells)",
+                "meta_graph: k=%d face edges %s (%d cells)",
                 int(k),
                 face_mode,
                 len(cells),
@@ -792,12 +791,12 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     )
     if infeasible_one_cells:
         logger.debug(
-            "get_meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
+            "meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
             len(infeasible_one_cells),
         )
     if n_from_faces:
         logger.debug(
-            "get_meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
+            "meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
             n_from_faces,
         )
 
@@ -805,7 +804,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
     if n_ascending:
         logger.debug(
-            "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
+            "meta_graph: ascending sweep classified %d contracted cells (no LP)",
             n_ascending,
         )
 
@@ -814,16 +813,16 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
     if pending_finite:
         logger.debug(
-            "get_meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
+            "meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
             pending_finite,
         )
         n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
         if n_lp:
-            logger.debug("get_meta_graph: LP fallback classified %d cells", n_lp)
+            logger.debug("meta_graph: LP fallback classified %d cells", n_lp)
         n_ascending2 = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
         if n_ascending2:
             logger.debug(
-                "get_meta_graph: post-LP ascending sweep classified %d cells",
+                "meta_graph: post-LP ascending sweep classified %d cells",
                 n_ascending2,
             )
 
@@ -831,7 +830,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     if pending_finite:
         detail = incidence.format_pending_finite_polys(all_chain_polys)
         msg = (
-            f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
+            f"meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
             + "still unclassified after combinatorial passes and LP fallback. "
             + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
             + detail
@@ -841,7 +840,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
         logger.warning(msg)
     else:
         logger.debug(
-            "get_meta_graph: all %d chain cells classified",
+            "meta_graph: all %d chain cells classified",
             len(all_chain_polys),
         )
 
@@ -856,7 +855,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
         if has_unbounded_chain:
             excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
         logger.debug(
-            "get_meta_graph: excluding %d infeasible cells (%d total excluded)",
+            "meta_graph: excluding %d infeasible cells (%d total excluded)",
             len(infeasible_tags),
             len(excluded_tags),
         )
@@ -903,11 +902,11 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
         meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges if u not in excluded_tags and v not in excluded_tags)
 
     if verify:
-        logger.debug("get_meta_graph: verify pass (incidence engine consistency)")
+        logger.debug("meta_graph: verify pass (incidence engine consistency)")
         verify_meta_graph_incidence(meta, by_dim, lookup)
 
     logger.debug(
-        "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
+        "meta_graph: done (%d nodes, %d edges, verify=%s)",
         meta.number_of_nodes(),
         meta.number_of_edges(),
         verify,

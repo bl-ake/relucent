@@ -1,4 +1,4 @@
-"""``get_betti_numbers`` must agree when GF(2) rank uses the C vs Python backends.
+"""``betti_numbers`` must agree when GF(2) rank uses the C vs Python backends.
 
 The C path is selected inside :func:`~relucent.topology.gf2_rank_boundary` when
 ``topology._c_backend`` is true (see :data:`~relucent.topology.C_BACKEND_AVAILABLE`).
@@ -22,7 +22,7 @@ from relucent import Complex, set_seeds
 from relucent.core.ss import encode_ss
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
-from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
+from relucent.topology import C_BACKEND_AVAILABLE, betti_numbers
 
 
 def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
@@ -30,7 +30,7 @@ def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:
 
     Nodes are (dim, id) pairs with a ``dim`` attribute; edges go from k-cells to
     (k-1)-cells to represent face incidences, matching the convention expected by
-    :func:`get_betti_numbers`.
+    :func:`betti_numbers`.
     """
     g: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
     for src_dim, src_id, tgt_id in dim_edges:
@@ -103,7 +103,7 @@ def _betti_for_backend(
     **kwargs: Any,
 ) -> dict[int, int]:
     _set_gf2_backend(monkeypatch, use_c=use_c)
-    return cplx.get_betti_numbers(**kwargs)
+    return cplx.betti_numbers(**kwargs)
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -149,7 +149,7 @@ def _populate_diamond_boundary(seed: int) -> Complex:
     dirs = np.stack([np.cos(thetas), np.sin(thetas)], axis=1)
     _add_points(cplx, np.vstack([0.9 * dirs, 1.1 * dirs, rng.standard_normal((80, 2))]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    return cplx.get_boundary_complex(cplx.n - 1)
+    return cplx.boundary_complex(cplx.n - 1)
 
 
 def _populate_line_boundary(seed: int) -> Complex:
@@ -167,7 +167,7 @@ def _populate_line_boundary(seed: int) -> Complex:
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, rng.standard_normal((80, 2))]))
     explore_for_topology(cplx, np.array([0.5, 0.0]))
-    return cplx.get_boundary_complex(cplx.n - 1)
+    return cplx.boundary_complex(cplx.n - 1)
 
 
 def _populate_small_1d_complex(seed: int) -> Complex:
@@ -190,7 +190,7 @@ def test_get_betti_numbers_python_backend_smoke(seeded: int, monkeypatch: pytest
 @pytest.mark.requires_c_gf2
 def test_c_gf2_backend_available() -> None:
     """CI on Linux must compile and load ``_gf2_rank.c`` (see workflow job ``gf2-backend``)."""
-    assert C_BACKEND_AVAILABLE, "C GF(2) backend failed to compile or load; get_betti_numbers would use slow Python rank only"
+    assert C_BACKEND_AVAILABLE, "C GF(2) backend failed to compile or load; betti_numbers would use slow Python rank only"
 
 
 @pytest.mark.requires_c_gf2
@@ -222,13 +222,13 @@ def test_get_betti_numbers_c_matches_python(
 
 
 def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Public :meth:`~relucent.core.complex.Complex.get_betti_numbers`` matches topology module."""
+    """Public :meth:`~relucent.core.complex.Complex.betti_numbers`` matches topology module."""
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
-    meta = db.get_meta_graph(verbose=False)
+    meta = db.meta_graph(verbose=False)
     truncate_meta_graph(meta)
-    via_topology = get_betti_numbers(meta)
-    via_complex = db.get_betti_numbers(compactify="truncate")
+    via_topology = betti_numbers(meta)
+    via_complex = db.betti_numbers(compactify="truncate")
     assert via_topology == via_complex
 
 
@@ -253,8 +253,8 @@ def test_get_betti_numbers_parallel_matches_sequential(
     _set_gf2_backend(monkeypatch, use_c=True)
     cplx = build_cplx(seeded)
     assert len(cplx) > 0
-    betti_seq = cplx.get_betti_numbers(nworkers=1, **kwargs)
-    betti_par = cplx.get_betti_numbers(nworkers=4, **kwargs)
+    betti_seq = cplx.betti_numbers(nworkers=1, **kwargs)
+    betti_par = cplx.betti_numbers(nworkers=4, **kwargs)
     assert betti_seq == betti_par, f"sequential {betti_seq} != parallel {betti_par} (kwargs={kwargs})"
 
 
@@ -271,7 +271,7 @@ def test_get_betti_numbers_kmin1_two_isolated_1cells() -> None:
     The result must NOT be an empty dict.
     """
     meta = _isolated_meta(dim=1, n=2)
-    betti = get_betti_numbers(meta)
+    betti = betti_numbers(meta)
     assert betti.get(1) == 2, f"expected {{1: 2}}, got {betti}"
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
@@ -297,7 +297,7 @@ def test_get_betti_numbers_kmin1_two_components_via_2cells() -> None:
     meta.add_edge((2, 1), (1, 2), shi=0)
     meta.add_edge((2, 1), (1, 3), shi=1)
 
-    betti = get_betti_numbers(meta)
+    betti = betti_numbers(meta)
     assert betti.get(1) == 2, f"expected β₁=2 (two disconnected groups of 1-cells), got {betti}"
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
@@ -317,7 +317,7 @@ def test_get_betti_numbers_kmin1_single_component() -> None:
     meta.add_edge((2, 2), (1, 2), shi=0)
     meta.add_edge((2, 2), (1, 3), shi=1)
 
-    betti = get_betti_numbers(meta)
+    betti = betti_numbers(meta)
     assert betti.get(1) == 1, f"expected β₁=1 (one component), got {betti}"
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
@@ -328,7 +328,7 @@ def test_get_betti_numbers_kmin0_unaffected() -> None:
     Two isolated 0-cells → β₀ = 2 (standard connected-components formula).
     """
     meta = _isolated_meta(dim=0, n=2)
-    betti = get_betti_numbers(meta)
+    betti = betti_numbers(meta)
     assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"
 
 
@@ -341,7 +341,7 @@ def test_beta0_truncated_two_components() -> None:
     """
     meta = _make_unbounded_two_component_meta()
     truncate_meta_graph(meta)
-    betti = get_betti_numbers(meta, verify_chain_complex=True)
+    betti = betti_numbers(meta, verify_chain_complex=True)
     assert betti.get(0) == 2, f"expected β₀=2 after truncation, got {betti}"
 
 
@@ -349,12 +349,12 @@ def test_verify_connected_components_passes_truncated_meta() -> None:
     """After truncation, rank β₀ matches path components."""
     meta = _make_unbounded_two_component_meta()
     truncate_meta_graph(meta)
-    betti = get_betti_numbers(meta, verify_connected_components=True)
+    betti = betti_numbers(meta, verify_connected_components=True)
     assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"
 
 
 def test_verify_connected_components_passes_for_proper_complex() -> None:
     """Proper CW complex: rank formula and graph connectivity agree for β₀."""
     meta = _isolated_meta(dim=0, n=2)
-    betti = get_betti_numbers(meta, verify_connected_components=True)
+    betti = betti_numbers(meta, verify_connected_components=True)
     assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"

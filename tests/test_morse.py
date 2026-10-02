@@ -36,7 +36,7 @@ class TestPartialDerivativeOn1Cell:
         net = torch_mlp(widths=[2, 4, 1])
         cplx = Complex(net)
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=100)
-        chain = cplx.get_chain_complex()
+        chain = cplx.chain_complex()
         if len(chain) < 2 or chain[-1].index2poly[0].dim != 0:
             pytest.skip("exploration did not produce a 1-skeleton")
 
@@ -80,7 +80,7 @@ class TestCriticalPoints:
         set_seeds(0)
         cplx = Complex(torch_mlp(widths=[2, 4, 2]))
         with pytest.raises(ValueError, match="scalar output"):
-            cplx.get_critical_points()
+            cplx.critical_points()
         with pytest.raises(ValueError, match="scalar output"):
             assert_scalar_output(cplx._net)
 
@@ -90,7 +90,7 @@ class TestCriticalPoints:
         cplx = Complex(net)
         cplx.add_point(np.array([[0.3]], dtype=np.float64))
         cplx.bfs(start=np.array([[0.3]], dtype=np.float64), max_polys=50)
-        critical = cplx.get_critical_points()
+        critical = cplx.critical_points()
         assert isinstance(critical, list)
         for cp in critical:
             assert cp.is_critical
@@ -103,7 +103,7 @@ class TestCriticalPoints:
         cplx = Complex(net)
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=150)
         # Lemma 10 / Jacobians must run; many random nets have only regular vertices.
-        critical = cplx.get_critical_points(include_degenerate=True)
+        critical = cplx.critical_points(include_degenerate=True)
         assert isinstance(critical, list)
         for cp in critical:
             assert cp.is_critical
@@ -118,7 +118,7 @@ class TestCriticalPoints:
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=100)
         # Trailing output ReLU must not break Jacobian / critical-point code.
         # Morse uses the logit (pre-output-ReLU).
-        critical = cplx.get_critical_points(include_degenerate=True)
+        critical = cplx.critical_points(include_degenerate=True)
         assert isinstance(critical, list)
         for cp in critical:
             assert cp.is_critical
@@ -248,20 +248,20 @@ class TestTheorem4Consistency:
 
 @pytest.mark.parametrize(("widths", "seed"), [([2, 8, 8, 1], 0), ([2, 8, 8, 1], 1), ([3, 6, 6, 1], 2)])
 def test_critical_points_match_the_chain_complex_route(widths: list[int], seed: int) -> None:
-    """get_critical_points finds vertices without the chain complex; same records as through it."""
+    """critical_points finds vertices without the chain complex; same records as through it."""
     from relucent.topology.morse import is_pl_critical_vertex
 
     set_seeds(seed)
     cplx = Complex(torch_mlp(widths=widths))
     cplx.bfs(start=np.zeros(widths[0], dtype=np.float64))
-    chain = cplx.get_chain_complex()
+    chain = cplx.chain_complex()
     assert int(chain[-1].index2poly[0].dim) == 0
     expected = {}
     for v in chain[-1]:
         crit, index = is_pl_critical_vertex(v.ss_np, cplx._net, ssi2maski=cplx.ssi2maski, ss_layers=cplx.ss_layers)
         if crit and index is not None:
             expected[v.tag] = (index, np.asarray(v.interior_point).reshape(-1))
-    got = {cp.tag: cp for cp in cplx.get_critical_points(include_degenerate=True)}
+    got = {cp.tag: cp for cp in cplx.critical_points(include_degenerate=True)}
     assert set(got) == set(expected)
     for tag, cp in got.items():
         assert cp.index == expected[tag][0]
@@ -281,7 +281,7 @@ def test_vertex_screen_drops_only_non_vertices(seed: int, nworkers: int, monkeyp
     cplx = Complex(torch_mlp(widths=[3, 8, 8, 1]))
     cplx.bfs(start=np.zeros(3, dtype=np.float64))
     top = [p for p in cplx if int(p.dim) == 3]
-    graph = cplx.get_dual_graph(require_complete=False)
+    graph = cplx.dual_graph(require_complete=False)
     runs = [
         vertex_star.find_vertices(
             top,

@@ -370,7 +370,7 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
     p_unbounded._finite_computed = True
 
     c2 = _complex_with_polys(2, [p_bounded, p_unbounded])
-    c2.get_dual_graph = MethodType(  # type: ignore[method-assign]
+    c2.dual_graph = MethodType(  # type: ignore[method-assign]
         lambda _self, **_kwargs: nx.Graph([(p_bounded, p_unbounded)]),
         c2,
     )
@@ -420,11 +420,11 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
     )
     c2 = _complex_with_polys(2, [p1, p2])
     # Make the dual graph deterministic and independent of expensive adjacency logic.
-    c2.get_dual_graph = MethodType(  # type: ignore[method-assign]
+    c2.dual_graph = MethodType(  # type: ignore[method-assign]
         lambda _self, **_kwargs: nx.Graph([(p1, p2)]),
         c2,
     )
-    c2_graph = c2.get_dual_graph()
+    c2_graph = c2.dual_graph()
     with warnings.catch_warnings(record=True) as rec2:
         warnings.simplefilter("always")
         fig2 = vis._complex_figure_2d_cells(c2, label_regions=True, highlight_regions={p1})
@@ -443,11 +443,11 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
         net=_tiny_nn(3),
     )
     c3 = _complex_with_polys(3, [p3])
-    c3.get_dual_graph = MethodType(  # type: ignore[method-assign]
+    c3.dual_graph = MethodType(  # type: ignore[method-assign]
         lambda _self, **_kwargs: nx.Graph([(p3, p3)]),
         c3,
     )
-    c3_graph = c3.get_dual_graph()
+    c3_graph = c3.dual_graph()
     with warnings.catch_warnings(record=True) as rec3:
         warnings.simplefilter("always")
         fig3 = vis._complex_figure_3d_cells(c3, label_regions=True, fill_mode="filled")

@@ -70,7 +70,7 @@ sum(len(p.shis) for p in cplx) / len(cplx)
 ```
 Or, get the adjacency graph of top-dimensional cells in the complex with:
 ```python
-print(cplx.get_dual_graph())
+print(cplx.dual_graph())
 ```
 
 You can view the full documentation for this library at https://bl-ake.github.io/relucent/

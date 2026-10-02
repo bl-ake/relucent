@@ -22,7 +22,7 @@ from relucent.graph.incidence import (
 )
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
-from relucent.topology import ChainComplexInconsistent, get_betti_numbers
+from relucent.topology import ChainComplexInconsistent, betti_numbers
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -59,16 +59,16 @@ def test_meta_graph_has_all_dims_and_face_edges(seeded: int):
 
     # Ensure we have both sides so the boundary complex has a nontrivial 1D decomposition.
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    db = cplx.get_boundary_complex(cplx.n - 1)
+    db = cplx.boundary_complex(cplx.n - 1)
 
-    chain = db.get_chain_complex(verbose=False)
+    chain = db.chain_complex(verbose=False)
     assert len(chain) >= 1
 
-    meta = db.get_meta_graph(verbose=False)
+    meta = db.meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
 
     # Meta-graph omits cells with finite is None; nonempty cofaces of covector-virtual
-    # edges are kept (those edges are skipped in get_chain_complex). Chebyshev phantoms
+    # edges are kept (those edges are skipped in chain_complex). Chebyshev phantoms
     # may still trigger coface wipe via propagate_infeasible_exclusion when unbounded.
     meta_tags = set(meta.nodes)
     for cc in chain:
@@ -122,9 +122,9 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
 
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    db = cplx.get_boundary_complex(cplx.n - 1)
+    db = cplx.boundary_complex(cplx.n - 1)
 
-    meta_plain = db.get_meta_graph(verbose=False)
+    meta_plain = db.meta_graph(verbose=False)
     meta_tr = meta_plain.copy()
     truncate_meta_graph(meta_tr)
 
@@ -180,7 +180,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
     explore_for_topology(cplx, np.array([0.5, 0.0]))
 
-    meta_plain = cplx.get_meta_graph(verbose=False)
+    meta_plain = cplx.meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta_plain)
     meta_tr = meta_plain.copy()
     truncate_meta_graph(meta_tr)
@@ -233,7 +233,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
             f"1-cell {n!r} should have 1 or 2 0-face endpoints after truncation, got {zero_faces!r}"
         )
 
-    get_betti_numbers(meta_tr, verify_chain_complex=True, verify_connected_components=False)
+    betti_numbers(meta_tr, verify_chain_complex=True, verify_connected_components=False)
 
 
 def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
@@ -256,11 +256,11 @@ def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
     explore_for_topology(cplx, np.array([0.5, 0.0]))
-    db = cplx.get_boundary_complex(cplx.n - 1)
+    db = cplx.boundary_complex(cplx.n - 1)
 
-    meta = db.get_meta_graph(verbose=False)
+    meta = db.meta_graph(verbose=False)
     truncate_meta_graph(meta)
-    get_betti_numbers(meta, verify_chain_complex=True)
+    betti_numbers(meta, verify_chain_complex=True)
 
 
 def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
@@ -536,7 +536,7 @@ def test_truncate_closes_mixed_boundary_cell_into_a_disk() -> None:
     assert not unbounded_after, f"truncation should leave no unbounded cells, got {unbounded_after!r}"
 
     try:
-        betti = get_betti_numbers(meta, verify_chain_complex=True, verify_connected_components=False)
+        betti = betti_numbers(meta, verify_chain_complex=True, verify_connected_components=False)
     except ChainComplexInconsistent as exc:
         pytest.fail(f"truncated meta-graph is not a valid chain complex (∂²≠0): {exc}")
 
@@ -546,10 +546,10 @@ def test_truncate_closes_mixed_boundary_cell_into_a_disk() -> None:
 def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]:
     """Map tag -> polyhedron for every cell in the contraction chain.
 
-    Each contraction step calls :meth:`Complex.get_dual_graph` and propagates
+    Each contraction step calls :meth:`Complex.dual_graph` and propagates
     SHIs downward via :meth:`Complex.contract` (intersecting coface SHIs).
     """
-    chain = cplx.get_chain_complex(verbose=False)
+    chain = cplx.chain_complex(verbose=False)
     return {p.tag: p for cc in chain for p in cc}
 
 
@@ -765,11 +765,11 @@ def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    chain = cplx.get_chain_complex(verbose=False)
+    chain = cplx.chain_complex(verbose=False)
     by_dim = {int(cc.index2poly[0].dim): cc for cc in chain if len(cc)}
     dim_neighbor_tags = {k: {p.tag for p in cc} for k, cc in by_dim.items()}
 
-    meta = cplx.get_meta_graph(verbose=False)
+    meta = cplx.meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
     mismatches: list[str] = []
 
@@ -833,7 +833,7 @@ def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    meta = cplx.get_meta_graph(verbose=False)
+    meta = cplx.meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
     dual_cells = _cells_from_dual_graph_propagation(cplx)
     top_dim = max(int(a["dim"]) for _, a in meta.nodes(data=True))
@@ -868,6 +868,6 @@ def test_meta_graph_verify_incidence(seeded: int) -> None:
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
 
-    meta = cplx.get_meta_graph(verify=True, verbose=False)
+    meta = cplx.meta_graph(verify=True, verbose=False)
     assert meta.number_of_nodes() > 0
     assert meta.number_of_edges() > 0
