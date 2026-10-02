@@ -289,7 +289,6 @@ def without_last_layer_neuron(cplx: Complex, neuron_idx: int) -> Complex:
     deleted_shi = _deleted_shi_for_last_layer_neuron(cplx, neuron_idx)
     new_net = net_without_last_ss_layer_neuron(cplx._net, last_ss_layer, neuron_idx)
     out = type(cplx)(new_net)
-    out.net = new_net if isinstance(cplx.net, ReLUNetwork) else cplx.net
 
     dual = cplx.get_dual_graph(relabel=True)
     if dual.number_of_nodes() == 0:

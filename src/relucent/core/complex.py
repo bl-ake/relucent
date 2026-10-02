@@ -100,11 +100,8 @@ class Complex:
                 :func:`~relucent.model.convert_model.convert` accepts (e.g. a PyTorch
                 ``nn.Sequential``).
         """
-        original_net = net
-        if not isinstance(net, ReLUNetwork):
-            net = convert(net)
-        self.net = original_net
-        self._net = net
+        self.source_model: Any = net
+        self._net: ReLUNetwork = net if isinstance(net, ReLUNetwork) else convert(net)
 
         self.ssm = SSManager()
         self.index2poly: list[Polyhedron] = []
@@ -295,15 +292,14 @@ class Complex:
     def __getstate__(self) -> dict[str, Any]:
         return {
             "index2poly": self.index2poly,
-            "net": self.net,
-            "_net": self._net,
+            "net": self._net,
+            "source_model": self.source_model,
             "_betti_cache": self._betti_cache,
         }
 
     def __setstate__(self, state: dict[str, Any]) -> None:
-        self.__init__(state.get("net", state["_net"]))
-        if "_net" in state:
-            self._net = state["_net"]
+        self.__init__(state["net"])
+        self.source_model = state.get("source_model", self._net)
         self.index2poly = state["index2poly"]
         if "ssm" in state:
             self.ssm = state["ssm"]
@@ -314,6 +310,21 @@ class Complex:
             p._net = self._net
             self.tag2poly[p.tag] = p
         self._betti_cache = state.get("_betti_cache", {})
+
+    @property
+    def net(self) -> ReLUNetwork:
+        """The network as relucent's canonical :class:`~relucent.model.model.ReLUNetwork`.
+
+        The model passed to the constructor (e.g. a PyTorch module) is kept as
+        :attr:`source_model`.
+        """
+        return self._net
+
+    def _empty_like(self) -> Self:
+        """A new, empty complex over the same network."""
+        out = type(self)(self._net)
+        out.source_model = self.source_model
+        return out
 
     @property
     def dim(self) -> int:

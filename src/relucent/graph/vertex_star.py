@@ -560,7 +560,7 @@ def build_chain_complex(source: Complex, verbose: int | None = None) -> list[Com
         recovered = cells_by_dim.get(dim, {})
         if not recovered:
             continue
-        cplx = type(source)(source.net)
+        cplx = source._empty_like()
         ordered_tags = sorted(recovered)
         if dim == 1:
             ordered_tags.sort(
