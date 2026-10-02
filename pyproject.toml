@@ -9,14 +9,10 @@ version = "0.9.8"
 requires-python = ">= 3.11"
 
 dependencies = [
-    "pandas>=2.3",
     "gurobipy>=12,<14",
     "networkx>=2.0",
-    "matplotlib>=3.10",
     "numpy>=2.4.1",
-    "Pillow>=2.0.0",
     "plotly>=5.20",
-    "scikit_learn>=1.8.0",
     "scipy>=1.17.0",
     "tqdm>=4.67.0",
 ]
@@ -26,7 +22,6 @@ readme = "README.md"
 
 [project.optional-dependencies]
 torch = ["torch>=2.5.0"]
-vis = ["pyvis>=0.3", "kaleido"]
 dev = ["pytest>=9.0.2", "ruff", "basedpyright>=1.39.0"]
 docs = ["sphinx>=9.0.4", "sphinx-rtd-theme"]
 

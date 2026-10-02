@@ -9,13 +9,12 @@ from __future__ import annotations
 # pyright: reportExplicitAny=false
 import warnings
 from collections.abc import Iterable, Sequence
-from importlib import import_module
 from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 import networkx as nx
 import numpy as np
-import plotly.express as px
+import plotly.colors as pc
 import plotly.graph_objects as go
 from scipy.spatial import ConvexHull
 from tqdm.auto import tqdm
@@ -29,11 +28,6 @@ if TYPE_CHECKING:
     from relucent.core.poly import Polyhedron
     from relucent.topology.persistence import PersistenceDiagram
 
-try:
-    mpl_colormaps = import_module("matplotlib").colormaps
-except ImportError:
-    mpl_colormaps = None
-
 __all__ = [
     "get_colors",
     "plot_complex",
@@ -43,18 +37,15 @@ __all__ = [
 
 
 def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
-    """Map numeric values to hex color strings via a colormap."""
+    """Map numeric values to hex color strings via a Plotly colorscale (e.g. ``"viridis"``)."""
     if not data:
         return []
-    a = np.asarray(data)
+    a = np.asarray(data, dtype=float)
     a = a - np.min(a)
     am = np.max(a)
     a = a / (am if am > 0 else 1)
-    if mpl_colormaps is not None:
-        rgba = mpl_colormaps[cmap](a)
-        rgba = (rgba * 255).astype(int)
-        return [f"#{x[0]:02x}{x[1]:02x}{x[2]:02x}" for x in rgba]
-    return cast(list[str], px.colors.sample_colorscale(cmap, a.tolist()))
+    rgb = cast(list[str], pc.sample_colorscale(cmap, a.tolist()))
+    return ["#{:02x}{:02x}{:02x}".format(*(round(float(c)) for c in pc.unlabel_rgb(x))) for x in rgb]
 
 
 # --- Polyhedron geometry & traces (used by ``Polyhedron`` methods) -----------------
@@ -567,11 +558,11 @@ def _equitable_colors(
 
     max_degree = max((deg for _, deg in dual.degree()), default=0)
     if max_degree <= 10:
-        color_scheme = list(px.colors.qualitative.Plotly)
+        color_scheme = list(pc.qualitative.Plotly)
     elif max_degree <= 23:
-        color_scheme = list(px.colors.qualitative.Light24[1:])
+        color_scheme = list(pc.qualitative.Light24[1:])
     else:
-        color_scheme = list(px.colors.qualitative.Plotly)
+        color_scheme = list(pc.qualitative.Plotly)
 
     try:
         coloring = nx.algorithms.coloring.equitable_color(dual, min(len(color_scheme), n))
@@ -1146,7 +1137,7 @@ def plot_persistence_diagram(
     dims = sorted({p.dimension for p in diagram.pairs})
     if not dims:
         dims = [0]
-    palette = getattr(px.colors.qualitative, dim_cmap, px.colors.qualitative.Plotly)
+    palette = getattr(pc.qualitative, dim_cmap, pc.qualitative.Plotly)
     dim_to_color = {d: palette[i % len(palette)] for i, d in enumerate(dims)}
 
     fig = go.Figure()
