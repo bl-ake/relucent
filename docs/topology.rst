@@ -193,9 +193,15 @@ It is not exposed through :class:`~relucent.core.complex.Complex`; call
 :func:`relucent.topology.get_betti_numbers` on a meta-graph to use it.
 
 Bit-packed ranking uses an optional **C extension** (``relucent.topology._gf2``),
-JIT-compiled from ``_gf2_rank.c`` when a C compiler is available. The public flag
+JIT-compiled from ``_gf2_rank.c`` with ``gcc`` on first import. The public flag
 :data:`relucent.topology.C_BACKEND_AVAILABLE` reports whether the fast path is loaded;
-otherwise relucent falls back to pure Python.
+otherwise relucent logs a warning and falls back to pure Python.
+
+The compiled library is cached in ``$RELUCENT_CACHE_DIR`` if set, else the user cache
+directory (``~/.cache/relucent`` on Linux, ``~/Library/Caches/relucent`` on macOS), else
+the system temp directory. It is built with ``-march=native``, and the cached file is keyed
+by the CPU's feature flags, so an install shared between machines with different CPUs keeps
+one build per CPU type.
 
 Set ``verbose=True`` on topology and persistence calls for progress on stderr.
 Package-wide search logging is controlled by :data:`relucent.config.VERBOSE`.
