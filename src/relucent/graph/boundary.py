@@ -46,11 +46,11 @@ def _codim_one_face_kwargs(p1: Polyhedron, shi: int) -> dict[str, Any]:
     face_dim = ambient - codim
     shi_i = int(shi)
     face_ss = p1.ss_np.copy()
-    face_ss[0, shi_i] = 0
+    face_ss[shi_i] = 0
     candidate_shis = list(incidence.ss_nonzero_indices(face_ss))
     if face_dim == 1 and p1.halfspaces is not None:
         new_ss = p1.ss_np.copy()
-        new_ss[0, shi_i] = 0
+        new_ss[shi_i] = 0
         probe = Polyhedron(
             p1._net,
             new_ss,
@@ -90,7 +90,7 @@ def boundary_cells(cplx: Complex, i: int, *, verify: bool = True, verbose: int |
         if verify and (shi not in p1.shis or shi not in p2.shis):
             raise DualGraphAsymmetricEdgeError(f"Boundary edge shi={shi} on ({p1!r}, {p2!r}) lacks bidirectional SHI support.")
         new_ss = p1.ss_np.copy()
-        new_ss[0, shi] = 0
+        new_ss[shi] = 0
         p = cplx.ss2poly(
             new_ss,
             check_exists=False,

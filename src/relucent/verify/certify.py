@@ -197,7 +197,7 @@ def _missing_lp_neighbors_for_shis(
     ss = np.asarray(poly.ss_np, dtype=np.int8)
     for shi in shis:
         shi_i = int(shi)
-        if int(ss.ravel()[shi_i]) == 0:
+        if int(ss[shi_i]) == 0:
             continue  # inactive hyperplane on this cell
         neighbor_ss = flip_ss_at_shi(ss, shi_i)
         if encode_ss(neighbor_ss) not in top_tags:

@@ -543,10 +543,8 @@ def _brute_force_boundary_witness(
         return None
     indices = [j for j in range(n) if j != boundary_shi]
     for signs in itertools.product((-1, 1), repeat=len(indices)):
-        ss = np.zeros((1, n), dtype=np.int8)
-        ss[0, boundary_shi] = 0
-        for idx, sign in zip(indices, signs, strict=True):
-            ss[0, idx] = int(sign)
+        ss = np.zeros(n, dtype=np.int8)
+        ss[indices] = signs
         witness = _witness_from_ss(net, ss, exclude_tags=exclude_tags, boundary_shi=boundary_shi)
         if witness is not None:
             return witness
@@ -594,7 +592,7 @@ def _ss_from_y_values(
             ss_parts.append(0)
         else:
             ss_parts.append(1 if y_val >= 0.5 else -1)
-    return np.asarray(ss_parts, dtype=np.int8).reshape(1, -1)
+    return np.asarray(ss_parts, dtype=np.int8)
 
 
 def _is_mip_proven_infeasible(status: int) -> bool:
@@ -621,7 +619,7 @@ def _unique_sign_patterns(patterns: Iterable[np.ndarray]) -> list[np.ndarray]:
         if tag in seen:
             continue
         seen.add(tag)
-        unique.append(np.asarray(ss, dtype=np.int8).reshape(1, -1))
+        unique.append(np.asarray(ss, dtype=np.int8).reshape(-1))
     return unique
 
 
@@ -639,7 +637,7 @@ def _patterns_from_final_solution(
     y_vals = [float(np.asarray(yj.X).item()) for yj in y_vars]
     ss = _ss_from_y_values(y_vals, boundary_shi=boundary_shi)
     cx = Complex(net)
-    ss_fwd = np.sign(np.asarray(cx.point2ss(x_val), dtype=np.int8)).reshape(1, -1)
+    ss_fwd = np.sign(np.asarray(cx.point2ss(x_val), dtype=np.int8)).reshape(-1)
     return _unique_sign_patterns([ss, ss_fwd])
 
 
@@ -693,7 +691,7 @@ def _collect_callback_patterns(
     ss = _ss_from_y_values(y_vals, boundary_shi=state.boundary_shi)
     x_val = np.asarray(model.cbGetSolution(state.x), dtype=np.float64).reshape(1, -1)
     cx = Complex(state.net)
-    ss_fwd = np.sign(np.asarray(cx.point2ss(x_val), dtype=np.int8)).reshape(1, -1)
+    ss_fwd = np.sign(np.asarray(cx.point2ss(x_val), dtype=np.int8)).reshape(-1)
     return _unique_sign_patterns([ss, ss_fwd])
 
 

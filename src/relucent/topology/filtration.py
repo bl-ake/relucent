@@ -206,8 +206,7 @@ class NeuronActivationFiltration(Filtration):
         ss = attrs.get("ss")
         if ss is None:
             return self.inactive_value
-        arr = np.asarray(ss)
-        sign = int(arr[0, self.shi])
+        sign = int(np.asarray(ss).reshape(-1)[self.shi])
         return self.active_value if sign == self.target else self.inactive_value
 
 

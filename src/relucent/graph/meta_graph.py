@@ -74,10 +74,10 @@ def _truncation_bit_indices(ss: np.ndarray) -> tuple[int, int]:
 
 
 def _ss_with_truncation_bits(ss: np.ndarray, t1: int, t2: int) -> np.ndarray:
-    """Append two truncation halfspace bits to a sign sequence."""
-    a = np.asarray(ss)
+    """Append two truncation halfspace bits to a (1-D) sign sequence."""
+    a = np.asarray(ss).reshape(-1)
     dt = np.int8 if np.issubdtype(a.dtype, np.integer) else a.dtype
-    return np.hstack([a, np.full((a.shape[0], 2), [t1, t2], dtype=dt)])
+    return np.concatenate([a.astype(dt, copy=False), np.array([t1, t2], dtype=dt)])
 
 
 def _facet_participates_in_truncation_sidedness(facet: Any, meta: nx.MultiDiGraph[Any]) -> bool:

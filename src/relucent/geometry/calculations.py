@@ -668,7 +668,7 @@ def adjacent_polyhedra(
     """
     ps: set[Polyhedron] = set()
     for shi in poly.shis:
-        if poly.ss_np.ravel()[shi] == 0:
+        if poly.ss_np[shi] == 0:
             continue
         ps.add(ss2poly(flip_ss_at_shi(poly.ss_np, shi)))
     return ps
@@ -781,7 +781,7 @@ def _get_hs_torch(
             assert current_A is not None
             assert current_b is not None
 
-            mask = poly._ss[0, current_mask_index : current_mask_index + current_A.shape[1]]
+            mask = poly._ss[current_mask_index : current_mask_index + current_A.shape[1]]
 
             # Treat mask 0s as 1 so their halfspaces are included as equalities.
             nonzero_mask = torch.where(mask == 0, torch.ones_like(mask), mask)
@@ -834,7 +834,7 @@ def _get_hs_torch(
     assert isinstance(current_A, torch.Tensor)
     assert isinstance(current_b, torch.Tensor)
 
-    assert halfspaces.shape[0] == poly._ss.shape[1]
+    assert halfspaces.shape[0] == poly._ss.shape[0]
     return halfspaces, current_A, current_b
 
 
@@ -898,7 +898,7 @@ def _get_hs_numpy(
         elif isinstance(layer, ReLULayer):
             if current_A is None:
                 raise ValueError("ReLU layer must follow a linear layer")
-            mask = poly.ss_np[0, current_mask_index : current_mask_index + current_A.shape[1]]
+            mask = poly.ss_np[current_mask_index : current_mask_index + current_A.shape[1]]
 
             nonzero_mask = np.where(mask == 0, 1, mask)
 
@@ -952,7 +952,7 @@ def _get_hs_numpy(
     assert isinstance(current_A, np.ndarray)
     assert isinstance(current_b, np.ndarray)
 
-    assert halfspaces.shape[0] == poly.ss_np.shape[1]
+    assert halfspaces.shape[0] == poly.ss_np.shape[0]
     return halfspaces, current_A, current_b
 
 
@@ -1197,7 +1197,7 @@ def get_shis(
         box_clipping_suspected = False
         while subset:
             i = subset.pop()
-            if i >= poly.ss_np.shape[1] or poly.ss_np[0, i] == 0:
+            if i >= poly.ss_np.shape[0] or poly.ss_np[i] == 0:
                 continue
             wi = int(old_to_new[i])
             if wi < 0:
