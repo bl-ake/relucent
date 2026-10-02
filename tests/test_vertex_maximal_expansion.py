@@ -111,11 +111,9 @@ def test_tolerance_sweep_does_not_revive_encoding_phantom() -> None:
     explore_for_topology(cplx, np.zeros((1, 2), dtype=np.float64), max_polys=10000)
 
     defaults = {
-        "TOL_HALFSPACE_NORMAL": 1e-12,
         "MAX_RADIUS": 100.0,
     }
     sweeps: dict[str, Iterable[float]] = {
-        "TOL_HALFSPACE_NORMAL": (1e-12, 1e-8, 1e-4),
         "MAX_RADIUS": (100.0, 1e6, 1e8),
     }
 

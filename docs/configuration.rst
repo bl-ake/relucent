@@ -1,32 +1,20 @@
 Configuration
 =============
 
-Relucent exposes numeric defaults and tolerances as **module-level attributes** on
+Relucent exposes numeric defaults as **module-level attributes** on
 :mod:`relucent.config`. Library code reads these values when routines run, so you
 can tune behavior for your model or hardware without editing source files.
 
-Automatic tolerance defaults
-----------------------------
+Nothing in relucent writes to these settings: importing the package and creating a
+:class:`~relucent.core.complex.Complex` leave them as you set them. Settings that depend
+on the network (the boundary MIP margin ``BOUNDARY_MIP_EPS``, the default SHI LP box) are
+``None`` or omitted by default and computed per network where they are used.
 
-``import relucent`` computes float64-safe defaults for the tolerance settings
-(``TOL_*``, ``BOUNDARY_MIP_EPS``) with
-:func:`~relucent.config.numeric_tolerances.apply_tolerances` and writes them to
-:mod:`relucent.config`. Per-key ``RELUCENT_<SETTING_NAME>`` environment variables are
-not overwritten. Set ``RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1`` before import to keep the
-literals in :mod:`relucent.config`.
-
-:class:`~relucent.core.complex.Complex` calls ``apply_tolerances`` again for its
-network by default (``auto_tolerances=True``). Pass ``auto_tolerances=False`` to skip
-that step.
-
-These values are static: they depend on the ambient dimension (and, for the
-``boundary_bfs`` MIP margin ``BOUNDARY_MIP_EPS``, the network's layerwise scale), not on a
-per-network scan of the halfspace magnitudes. The topology path does not use them for
-its decisions. Facets, emptiness, vertices, genericity, membership, and Morse signs are
-each checked against a float64 error bound computed from the rows involved, decided
-exactly when that bound can't settle them, and otherwise raise
-:class:`~relucent.core.errors.AmbiguousGeometryError`. See
-:mod:`relucent._internal.rounding` and :mod:`relucent._internal.exact`.
+The topology path does not rely on tolerance settings for its decisions. Facets,
+emptiness, vertices, genericity, membership, and Morse signs are each checked against a
+float64 error bound computed from the rows involved, decided exactly when that bound
+can't settle them, and otherwise raise :class:`~relucent.core.errors.AmbiguousGeometryError`.
+See :mod:`relucent._internal.rounding` and :mod:`relucent._internal.exact`.
 
 Changing settings
 -----------------
@@ -34,37 +22,34 @@ Changing settings
 Import the module (or the package namespace) and assign new values::
 
    import relucent
-   relucent.config.TOL_VERIFY_AB_ATOL = 1e-7
+   relucent.config.VERBOSE = 0
    relucent.config.MAX_RADIUS = 500
 
 To set several attributes at once, use :func:`relucent.config.update_settings`::
 
    from relucent.config import update_settings
    update_settings(
-       TOL_VERIFY_AB_ATOL=1e-7,
+       VERBOSE=0,
        DEFAULT_SEARCH_BOUND=1e7,
    )
 
-``update_settings`` only accepts names listed under :data:`relucent.config.__all__`
-(excluding the helper itself). Unknown keys raise ``TypeError``.
+``update_settings`` accepts the names in :data:`relucent.config.__all__` and
+:data:`relucent.config.advanced.__all__`. Unknown keys raise ``TypeError``, and a string
+setting given a value outside its allowed set raises ``ValueError``.
 
 Environment variables
 ---------------------
 
-All public config settings can also be controlled with environment variables.
-The naming convention is:
-
-``RELUCENT_<SETTING_NAME>``
-
-For example, to override ``MAX_RADIUS`` and ``TOL_VERIFY_AB_ATOL``:
+Every setting, including the advanced ones, can also be set with an environment variable
+named ``RELUCENT_<SETTING_NAME>``:
 
 .. code-block:: bash
 
    export RELUCENT_MAX_RADIUS=500
-   export RELUCENT_TOL_VERIFY_AB_ATOL=1e-7
+   export RELUCENT_VERBOSE=0
 
-Read values are parsed at import time of :mod:`relucent.config`, so set
-environment variables before importing :mod:`relucent`.
+Values are read when :mod:`relucent.config` is imported, so set environment variables
+before importing :mod:`relucent`.
 
 ``INTERIOR_POINT_RADIUS_SEQUENCE`` accepts either comma-separated values or a
 bracketed comma-separated form:
@@ -83,11 +68,8 @@ overrides the module setting for that call.
 Settings reference
 ------------------
 
-The following tables summarize each public setting. Types and defaults match the
-shipped :mod:`relucent.config` module.
-
-Polyhedron and halfspace geometry
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Geometry
+~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -97,45 +79,21 @@ Polyhedron and halfspace geometry
      - Type
      - Default
      - Role
-   * - ``QHULL_MODE``
-     - ``str``
-     - ``"IGNORE"``
-     - How Qhull warnings from ``HalfspaceIntersection`` are handled: ``"IGNORE"``, ``"WARN_ALL"``, ``"HIGH_PRECISION"``, or ``"JITTERED"`` (retry with QJ).
    * - ``CAREFUL_MODE``
      - ``bool``
      - ``False``
      - When True, run extra consistency checks (Chebyshev vs. propagated boundedness, forward-pass vs. affine reconstruction, conversion spot-checks, graph invariants). The test suite and CI enable this (see ``tests/conftest.py`` and ``RELUCENT_CAREFUL_MODE``).
+   * - ``QHULL_MODE``
+     - ``str``
+     - ``"IGNORE"``
+     - How Qhull warnings from ``HalfspaceIntersection`` are handled: ``"IGNORE"``, ``"WARN_ALL"``, ``"HIGH_PRECISION"``, or ``"JITTERED"`` (retry with QJ).
    * - ``MAX_RADIUS``
      - ``float``
      - ``100``
      - Maximum Chebyshev / interior-point search radius when solving with Gurobi.
-   * - ``TOL_HALFSPACE_NORMAL``
-     - ``float``
-     - ``1e-12``
-     - Norms below this are treated as degenerate halfspace normals (used when plotting).
-   * - ``GUROBI_SHI_OPTIMALITY_TOL``
-     - ``float``
-     - ``1e-9``
-     - Gurobi ``OptimalityTol`` for the SHI LP (Gurobi's minimum is ``1e-9``). At the Gurobi default of ``1e-6`` the final basis can have a slightly negative exact multiplier, which the exact facet check rejects.
-   * - ``GUROBI_SHI_SCALE_FLAG``
-     - ``int``
-     - ``2``
-     - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling. If an SHI LP still fails, it is re-solved from scratch with no scaling (``0``), and if that fails too, decided in exact arithmetic; see :doc:`search_shi_and_graphs`.
-   * - ``TOL_NEARLY_VERTICAL``
-     - ``float``
-     - ``1e-10``
-     - 2D plotting: halfspace normals with small ``w[1]`` are treated as vertical.
-   * - ``DEFAULT_PLOT_BOUND``
-     - ``float``
-     - ``10``
-     - Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.
-   * - ``TOL_VERIFY_AB_ATOL``
-     - ``float``
-     - ``1e-6``
-     - ``allclose`` atol when verifying halfspace ``(A, b)`` against network outputs (used in :mod:`relucent.vis` checks).
 
-Complex search and parallel add
---------------------------------
+Search and boundary discovery
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
    :header-rows: 1
@@ -145,58 +103,22 @@ Complex search and parallel add
      - Type
      - Default
      - Role
-   * - ``INTERIOR_POINT_RADIUS_SEQUENCE``
-     - ``list[float]``
-     - ``[0.01, 0.1, 1, 10, 100]``
-     - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.get_ip`.
    * - ``DEFAULT_PARALLEL_ADD_BOUND``
      - ``float``
      - ``1e8``
-     - Default halfspace bound for :func:`~relucent.search.parallel_add` and :meth:`~relucent.core.complex.Complex.parallel_add`.
+     - Default halfspace bound for :meth:`~relucent.core.complex.Complex.parallel_add`.
    * - ``DEFAULT_SEARCH_BOUND``
      - ``float``
      - ``1e8``
-     - Fallback halfspace bound for :func:`~relucent.search.hamming_astar` when ``bound`` is omitted. Ambient BFS / :func:`~relucent.search.searcher` instead use a network-scaled bound from :func:`~relucent._internal.network_scale.default_polyhedron_bound` (``estimate_input_bound`` × ``BOUNDARY_MIP_BOUND_MARGIN``) when ``bound`` is ``None``.
-   * - ``ASTAR_BIAS_WEIGHT``
-     - ``float``
-     - ``0.9``
-     - Weight on Euclidean-distance bias in the A* heuristic.
-   * - ``PLOT_MARGIN_FACTOR``
-     - ``float``
-     - ``1.1``
-     - Axis margin multiplier when deriving plot extent from interior points.
-   * - ``PLOT_DEFAULT_MAXCOORD``
-     - ``float``
-     - ``10``
-     - Fallback axis half-extent when no interior points exist (2D complex plots).
-   * - ``DEFAULT_COMPLEX_PLOT_BOUND``
-     - ``float``
-     - ``10000``
-     - Default bound for :meth:`~relucent.core.complex.Complex.plot` of a 2D complex when ``bound`` is omitted.
+     - Fallback halfspace bound for :meth:`~relucent.core.complex.Complex.hamming_astar` when ``bound`` is omitted. BFS / :meth:`~relucent.core.complex.Complex.searcher` instead use a network-scaled bound (layerwise ``|W|_1`` propagation × ``BOUNDARY_MIP_BOUND_MARGIN``) when ``bound`` is ``None``.
    * - ``BOUNDARY_MIP_BOUND_MARGIN``
      - ``float``
      - ``5.0``
-     - Multiplier applied to layerwise bound propagation when estimating network scale for SHI LPs, boundary MIPs, and automatic tolerance selection.
-
-Boundary discovery (MIP pricing)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-   :widths: 22 28 12 50
-
-   * - Name
-     - Type
-     - Default
-     - Role
+     - Multiplier on the layerwise preactivation bound, used as the default SHI LP box radius and as the boundary MIP big-M.
    * - ``BOUNDARY_MIP_EPS``
-     - ``float``
-     - ``1e-4``
-     - Strict-margin tolerance for boundary MIP witness pricing (``z_j = 0`` at the boundary SHI; ``|z_j| >= eps`` elsewhere).
-   * - ``BOUNDARY_PRICING_BRUTE_FORCE_MAX_N``
-     - ``int``
-     - ``18``
-     - When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.
+     - ``float | None``
+     - ``None``
+     - Strict margin for boundary MIP witness pricing (``z_j = 0`` at the boundary SHI; ``|z_j| >= eps`` elsewhere). ``None`` computes ``2 · max(1e-4, 1e-6 · max preactivation)`` for each network, which stays above Gurobi's feasibility tolerance at that network's scale.
    * - ``BOUNDARY_MIP_TIME_LIMIT``
      - ``float``
      - ``0.0``
@@ -205,6 +127,95 @@ Boundary discovery (MIP pricing)
      - ``bool``
      - ``False``
      - Emit full Gurobi solver logs during boundary pricing (independent of ``VERBOSE``).
+
+Plotting
+~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 28 12 50
+
+   * - Name
+     - Type
+     - Default
+     - Role
+   * - ``DEFAULT_PLOT_BOUND``
+     - ``float``
+     - ``10``
+     - Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.
+   * - ``DEFAULT_COMPLEX_PLOT_BOUND``
+     - ``float``
+     - ``10000``
+     - Default bound for :meth:`~relucent.core.complex.Complex.plot` of a 2D complex when ``bound`` is omitted.
+   * - ``PLOT_MARGIN_FACTOR``
+     - ``float``
+     - ``1.1``
+     - Axis margin multiplier when deriving plot extent from interior points.
+   * - ``PLOT_DEFAULT_MAXCOORD``
+     - ``float``
+     - ``10``
+     - Fallback axis half-extent when no interior points exist (2D complex plots).
+
+Logging
+~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 28 12 50
+
+   * - Name
+     - Type
+     - Default
+     - Role
+   * - ``VERBOSE``
+     - ``int``
+     - ``1``
+     - Default for every ``verbose=None`` argument, and the ``"relucent"`` logger level: ``0`` → warnings only; ``1`` → progress bars and one-line summaries; ``2`` → per-stage debug detail. Also adjustable at runtime via :func:`~relucent.config.update_settings`.
+
+Advanced settings (unstable)
+----------------------------
+
+:mod:`relucent.config.advanced` holds solver-tuning knobs. They change performance or
+solver details rather than what relucent computes, and **may change or disappear in any
+release**. Set them the same ways as the settings above, e.g.
+``relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS = 4``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 28 12 50
+
+   * - Name
+     - Type
+     - Default
+     - Role
+   * - ``GUROBI_SHI_OPTIMALITY_TOL``
+     - ``float``
+     - ``1e-9``
+     - Gurobi ``OptimalityTol`` for the SHI LP (Gurobi's minimum is ``1e-9``). At the Gurobi default of ``1e-6`` the final basis can have a slightly negative exact multiplier, which the exact facet check rejects.
+   * - ``GUROBI_SHI_SCALE_FLAG``
+     - ``int``
+     - ``2``
+     - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling. If an SHI LP still fails, it is re-solved from scratch with no scaling (``0``), and if that fails too, decided in exact arithmetic; see :doc:`search_shi_and_graphs`.
+   * - ``INTERIOR_POINT_RADIUS_SEQUENCE``
+     - ``list[float]``
+     - ``[0.01, 0.1, 1, 10, 100]``
+     - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.get_ip`.
+   * - ``ASTAR_BIAS_WEIGHT``
+     - ``float``
+     - ``0.9``
+     - Weight on Euclidean-distance bias in the A* heuristic.
+   * - ``BLOCKING_QUEUE_WAIT_TIMEOUT``
+     - ``float``
+     - ``0.5``
+     - Seconds to wait on ``Condition.wait`` when polling a :class:`~relucent.utils.BlockingQueue`.
+   * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
+     - ``float``
+     - ``2.0``
+     - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.
+   * - ``BOUNDARY_PRICING_BRUTE_FORCE_MAX_N``
+     - ``int``
+     - ``18``
+     - When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.
    * - ``BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS``
      - ``int``
      - ``1000``
@@ -228,7 +239,7 @@ Boundary discovery (MIP pricing)
    * - ``BOUNDARY_MIP_CUT_ORDER``
      - ``str``
      - ``"tag_lex"``
-     - Cut ordering for static/lazy nogoods (``as_is``, ``tag_lex``, ``layer_major``, …).
+     - Cut ordering for static/lazy nogoods: ``as_is``, ``tag_lex``, ``layer_major``, ``hamming_median``, ``literal_count_asc``, ``trie_depth_desc``, or ``random``.
    * - ``BOUNDARY_MIP_BULK_NOGOOD_EMIT``
      - ``str``
      - ``"auto"``
@@ -246,46 +257,7 @@ Boundary discovery (MIP pricing)
      - ``50000``
      - Skip trie/static precompilation and rely on lazy MIPSOL cuts when this many tags are excluded.
 
-Topology and logging
-~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-   :widths: 22 28 12 50
-
-   * - Name
-     - Type
-     - Default
-     - Role
-   * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
-     - ``float``
-     - ``2.0``
-     - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.
-   * - ``VERBOSE``
-     - ``int``
-     - ``1``
-     - Package logging level during search and parallel work: ``0`` → WARNING only; ``1`` → INFO (worker counts, meta-graph progress, …). Also adjustable at runtime via :func:`~relucent.config.update_settings`.
-
-Utilities and visualization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-   :widths: 22 28 12 50
-
-   * - Name
-     - Type
-     - Default
-     - Role
-   * - ``BLOCKING_QUEUE_WAIT_TIMEOUT``
-     - ``float``
-     - ``0.5``
-     - Seconds to wait on ``Condition.wait`` when polling a :class:`~relucent.utils.BlockingQueue`.
-
 API
 ---
 
 .. autofunction:: relucent.config.update_settings
-
-Valid keys for :func:`~relucent.config.update_settings` are the names listed in
-``relucent.config.__all__``, except ``update_settings`` itself.

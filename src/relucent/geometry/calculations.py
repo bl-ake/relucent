@@ -47,7 +47,7 @@ def _shi_variable_bounds_to_try(bound: float) -> list[float]:
     if bound == inf or not np.isfinite(bound):
         return [inf]
     candidates = [float(bound)]
-    for radius in cfg.INTERIOR_POINT_RADIUS_SEQUENCE:
+    for radius in cfg.advanced.INTERIOR_POINT_RADIUS_SEQUENCE:
         radius_f = float(radius)
         if radius_f > bound:
             candidates.append(radius_f)
@@ -1207,8 +1207,8 @@ def get_shis(
         if model is not None:
             model.close()
         model = Model("SHIS", env)
-        model.params.OptimalityTol = cfg.GUROBI_SHI_OPTIMALITY_TOL
-        model.params.ScaleFlag = cfg.GUROBI_SHI_SCALE_FLAG
+        model.params.OptimalityTol = cfg.advanced.GUROBI_SHI_OPTIMALITY_TOL
+        model.params.ScaleFlag = cfg.advanced.GUROBI_SHI_SCALE_FLAG
         z = model.addMVar((k, 1), lb=-attempt_bound, ub=attempt_bound, vtype=GRB.CONTINUOUS, name="z")
         constrs = model.addConstr(a_red @ z <= -b_red, name="hyperplanes")
         model.optimize()
@@ -1410,7 +1410,7 @@ _SHI_LP_RETRY_SCALE_FLAGS: tuple[int, ...] = (0,)
 def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]:
     """Re-solve a failed SHI LP ``model`` from scratch under each of :data:`_SHI_LP_RETRY_SCALE_FLAGS`.
 
-    Warm starts and the configured scaling (:data:`relucent.config.GUROBI_SHI_SCALE_FLAG`) are
+    Warm starts and the configured scaling (:data:`relucent.config.advanced.GUROBI_SHI_SCALE_FLAG`) are
     what typically fail on a badly conditioned cell; every answer is certified afterwards, so the
     setting only changes what is proposed. Stops at the first status in ``ok``. Returns every
     status seen (the failed one first); the configured scaling is restored.
@@ -1425,7 +1425,7 @@ def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]
             if model.status in ok:
                 break
     finally:
-        model.params.ScaleFlag = cfg.GUROBI_SHI_SCALE_FLAG
+        model.params.ScaleFlag = cfg.advanced.GUROBI_SHI_SCALE_FLAG
     return tried
 
 

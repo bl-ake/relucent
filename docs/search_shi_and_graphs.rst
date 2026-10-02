@@ -219,7 +219,7 @@ or are nearly parallel, Gurobi does report ``NUMERIC``, ``UNBOUNDED``, ``INFEASI
 
 When that happens, ``get_shis`` re-solves the LP once from scratch with no scaling
 (``ScaleFlag=0``), discarding the warm-start basis. The configured
-:data:`~relucent.config.GUROBI_SHI_SCALE_FLAG` is restored afterwards. The setting only
+:data:`~relucent.config.advanced.GUROBI_SHI_SCALE_FLAG` is restored afterwards. The setting only
 changes which answer the LP proposes: every answer is still certified.
 
 **Deciding without the LP.** If the re-solve fails too, the question the LP was asking, whether
