@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from relucent._internal.logging import with_verbosity
 from relucent.model.model import LinearLayer, ReLULayer, ReLUNetwork
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ __all__ = [
     "assert_scalar_output",
     "coface_sign_sequence",
     "critical_flags_for_vertices",
+    "critical_points",
     "get_layer_jacobians",
     "gradient_on_cell",
     "is_pl_critical_vertex",
@@ -573,3 +575,107 @@ def partial_derivative_on_1cell(
         ssi2maski=complex.ssi2maski,
         ss_layers=complex.ss_layers,
     )
+
+
+@with_verbosity
+def critical_points(
+    cplx: Complex,
+    *,
+    require_complete: bool = False,
+    include_degenerate: bool = False,
+    verbose: int | None = None,
+) -> list[CriticalPoint]:
+    """Return PL Morse critical vertices and their indices in the discovered complex.
+
+    Uses combinatorial edge data (Brooks & Masden, arXiv:2412.18005) and requires a
+    scalar-output network.
+
+    Args:
+        require_complete: If True, require every combinatorial 1-cell incident to
+            each tested vertex to appear in the complex.
+        include_degenerate: If True, include flat / degenerate critical vertices
+            (index ``-1``).
+        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+            detail. ``None`` uses :data:`relucent.config.VERBOSE`.
+
+    Returns:
+        List of :class:`~relucent.topology.morse.CriticalPoint` records.
+    """
+    from relucent.graph import incidence
+    from relucent.graph.vertex_star import verified_vertices, vertex_polyhedron
+    from relucent.utils import encode_ss, process_aware_cpu_count
+
+    assert_scalar_output(cplx._net)
+    cplx.assert_topology_ready()
+    if len(cplx) == 0:
+        return []
+    # Criticality needs only each vertex's sign sequence, so find the verified vertices
+    # (the 0-cells of get_chain_complex) without building the rest of the chain complex.
+    _, found = verified_vertices(cplx)
+    if not found:
+        return []
+    vertices = [found[tag] for tag in sorted(found)]
+
+    flags: list[tuple[bool, int | None]]
+    if require_complete:
+        meta = cplx.get_meta_graph(verbose=verbose)
+        one_cell_tags = {tag for tag, attrs in meta.nodes(data=True) if int(attrs.get("dim", -1)) == 1}
+
+        # The completeness check reads `cplx`/`meta` per vertex, so this path stays
+        # sequential; only the common `require_complete=False` case below (every
+        # caller in this codebase) is farmed out across a worker pool.
+        from relucent.utils import encode_ss
+
+        flags = []
+        for vertex in vertices:
+            # Incident edges are inferred combinatorially; this checks they were discovered.
+            v_ss = vertex.ss.ravel()
+            for shi in np.flatnonzero(v_ss == 0):
+                for sign in (-1, 1):
+                    edge_ss = v_ss.copy()
+                    edge_ss[int(shi)] = sign
+                    tag = encode_ss(edge_ss.reshape(1, -1))
+                    if tag not in one_cell_tags:
+                        raise ValueError(
+                            f"combinatorial 1-cell {tag!r} incident to vertex {vertex.tag!r} "
+                            + "is missing from the discovered complex"
+                        )
+            flags.append(
+                is_pl_critical_vertex(
+                    vertex.ss,
+                    cplx._net,
+                    ssi2maski=cplx.ssi2maski,
+                    ss_layers=cplx.ss_layers,
+                )
+            )
+    else:
+        # Each vertex's criticality check is independent (like candidate verification in
+        # get_chain_complex), so use a worker pool once there's enough work.
+        nworkers = process_aware_cpu_count() or 1
+        flags = critical_flags_for_vertices(
+            [vertex.ss for vertex in vertices],
+            cplx._net,
+            ssi2maski=cplx.ssi2maski,
+            ss_layers=cplx.ss_layers,
+            nworkers=nworkers,
+        )
+
+    vertex_complex = type(cplx)(cplx.net)
+    results: list[CriticalPoint] = []
+    for vertex, (is_critical, index) in zip(vertices, flags, strict=True):
+        if not is_critical:
+            continue
+        if index is None or (index < 0 and not include_degenerate):
+            continue
+        results.append(
+            CriticalPoint(
+                polyhedron=vertex_polyhedron(cplx, vertex_complex, vertex),
+                tag=vertex.tag,
+                ss=np.asarray(vertex.ss, dtype=np.int8).copy(),
+                point=np.asarray(vertex.point, dtype=np.float64).reshape(-1),
+                index=int(index),
+            )
+        )
+    if len(vertex_complex):
+        incidence.set_contracted_shis(vertex_complex)
+    return results

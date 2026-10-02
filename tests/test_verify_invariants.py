@@ -7,6 +7,7 @@ import pytest
 
 from relucent import Complex, mlp, set_seeds
 from relucent.core.errors import ComplexNotCompleteError, IncompleteDualGraphError
+from relucent.graph.boundary import boundary_edges
 from relucent.graph.incidence import verify_flip_shi_symmetry
 from relucent.search.exploration import finalize_ambient_search
 from relucent.verify.certify import verify_lp_flip_neighbors_in_complex
@@ -49,7 +50,7 @@ def test_empty_boundary_complex_verifies() -> None:
     model = mlp(widths=[2, 4, 1], add_last_relu=True, init="uniform")
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False)
-    assert len(cplx.get_boundary_edges(cplx.n - 1)) == 0
+    assert len(boundary_edges(cplx, cplx.n - 1)) == 0
     boundary = cplx.get_boundary_complex(cplx.n - 1)
     assert len(boundary) == 0
     assert boundary.complete is True

@@ -16,19 +16,32 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import combinations, product
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from relucent.utils import encode_ss, get_mp_context
+import relucent.config as cfg
+from relucent._internal.logging import logger, with_verbosity
+from relucent.graph import incidence
+from relucent.utils import encode_ss, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     import networkx as nx
 
+    from relucent.core.complex import Complex
     from relucent.core.poly import Polyhedron
     from relucent.model.model import ReLUNetwork
 
-__all__ = ["VertexRecord", "cells_from_vertices", "expand_vertex_star", "find_vertices", "recover_cells_from_vertices"]
+__all__ = [
+    "VertexRecord",
+    "build_chain_complex",
+    "cells_from_vertices",
+    "expand_vertex_star",
+    "find_vertices",
+    "recover_cells_from_vertices",
+    "verified_vertices",
+    "vertex_polyhedron",
+]
 
 # Each worker needs at least this many candidates to be worth its startup cost.
 # Below this, verification runs serially. Above it, the worker count scales with the
@@ -462,3 +475,140 @@ def cells_from_vertices(vertices: dict[bytes, VertexRecord], *, top_dim: int) ->
             dim = top_dim - zero_count
             cells_by_dim[dim][encode_ss(ss)] = ss
     return cells_by_dim
+
+
+def vertex_polyhedron(source: Complex, cplx: Complex, vertex: VertexRecord) -> Polyhedron:
+    """Add a verified vertex to ``cplx`` as a 0-cell carrying its witness's rows and its point."""
+    ambient_dim = int(source.dim)
+    witness = source.tag2poly[vertex.witness_tag]
+    poly = cplx.add_ss(
+        vertex.ss,
+        codim=ambient_dim,
+        dim=0,
+        _ambient_dim=ambient_dim,
+        halfspaces=witness.halfspaces,
+        halfspaces_err=witness.halfspaces_err_np,
+        halfspaces_ss=witness.halfspaces_rows_ss,
+        _rows_data=witness._rows_data,
+        finite=True,
+    )
+    poly._interior_point = vertex.point
+    return poly
+
+
+def verified_vertices(cplx: Complex) -> tuple[int, dict[bytes, VertexRecord]]:
+    """``(top_dim, vertices)``: every verified vertex of this complete, verified complex.
+
+    The vertices of :func:`build_chain_complex` (its 0-cells), without the rest of the chain.
+    """
+    from relucent.core.poly import Polyhedron
+
+    top_dim = max(int(p.dim) for p in cplx)
+    top_cells = [p for p in cplx if int(p.dim) == top_dim]
+    graph = cast(Any, cplx.get_dual_graph(require_complete=False))
+    incidence.certify_dual_graph(graph, cplx, top_dim=top_dim)
+
+    # Candidate-vertex verification dominates runtime on large complexes (see
+    # find_vertices). Passing net lets it run across a worker pool.
+    vertices = find_vertices(
+        top_cells,
+        graph,
+        net=cplx._net,
+        nworkers=process_aware_cpu_count() or 1,
+        ambient_dim=int(cplx.dim),
+        top_dim=top_dim,
+        verify_vertex=Polyhedron.verify_vertex_covector,
+        screen=True,
+    )
+    return top_dim, vertices
+
+
+@with_verbosity
+def build_chain_complex(source: Complex, verbose: int | None = None) -> list[Complex]:
+    """Recover the chain complex directly from verified vertices' local stars.
+
+    Masden (2022), Theorem 20: the sign-sequence complex is a pure,
+    ambient-dimensional cubical complex, so once a vertex (exactly
+    ``ambient_dim`` zero sign entries, Lemma 16) is verified, *every* cell
+    in its local star is algebraically guaranteed to be present (Lemma
+    18's sign-product semigroup) — no independent rediscovery of
+    neighboring top-dimensional cells, dual-graph cube verification, or
+    coverage heuristic is required. See this module's docstring.
+
+    Candidate vertices receive one float64 equality solve followed by a
+    check against every other row of their witness cell
+    (:meth:`Polyhedron.verify_vertex_covector`);
+    no facet or boundedness LP is used here. Every recovered cell of
+    dimension ``k >= 1`` has, by construction, at least one verified
+    vertex among its own faces (its generating vertex), so a cell can
+    never end up with every endpoint unverifiable.
+
+    Raises:
+        CubicalConsistencyError: If the labeled top-cell graph is not cubical.
+    """
+    del verbose  # applied by @with_verbosity
+    source.assert_topology_ready()
+    if len(source) == 0:
+        return [source]
+    ambient_dim = int(source.dim)
+    top_dim, vertices = verified_vertices(source)
+    cells_by_dim = cells_from_vertices(vertices, top_dim=top_dim)
+    vertex_points = {tag: v.point for tag, v in vertices.items()}
+
+    chain: list[Complex] = [source]
+    for dim in range(top_dim - 1, -1, -1):
+        recovered = cells_by_dim.get(dim, {})
+        if not recovered:
+            continue
+        cplx = type(source)(source.net)
+        ordered_tags = sorted(recovered)
+        if dim == 1:
+            ordered_tags.sort(
+                key=lambda tag: (
+                    -sum(
+                        incidence.face_tag(recovered[tag], shi) in vertex_points
+                        for shi in incidence.ss_nonzero_indices(recovered[tag])
+                    ),
+                    tag,
+                )
+            )
+        elif dim == 0 and chain and len(chain[-1]) > 0 and int(chain[-1].index2poly[0].dim) == 1:
+            endpoint_order: list[bytes] = []
+            seen_endpoints: set[bytes] = set()
+            for one_cell in chain[-1]:
+                for shi in one_cell._covector_endpoint_shis or []:
+                    endpoint_tag = incidence.face_tag(one_cell.ss_np, shi)
+                    if endpoint_tag in recovered and endpoint_tag not in seen_endpoints:
+                        endpoint_order.append(endpoint_tag)
+                        seen_endpoints.add(endpoint_tag)
+            ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in seen_endpoints]
+        for tag in ordered_tags:
+            ss = recovered[tag]
+            kwargs: dict[str, Any] = {
+                "codim": ambient_dim - dim,
+                "dim": dim,
+                "_ambient_dim": ambient_dim,
+            }
+            point = vertex_points.get(tag)
+            if dim == 0:
+                vertex_polyhedron(source, cplx, vertices[tag])
+                continue
+            if dim == 1:
+                candidate_by_shi = {shi: incidence.face_tag(ss, shi) for shi in incidence.ss_nonzero_indices(ss)}
+                kwargs["_covector_endpoint_shis"] = sorted(
+                    shi for shi, face in candidate_by_shi.items() if face in vertex_points
+                )
+            poly = cplx.add_ss(ss, **kwargs)
+            if point is not None:
+                poly._interior_point = point
+
+        if len(cplx) == 0:
+            continue
+        incidence.set_contracted_shis(cplx)
+        if cfg.CAREFUL_MODE:
+            incidence.verify_contracted_shis(cplx)
+        cplx.set_exploration_state(complete=True, verified=True)
+        chain.append(cplx)
+
+    logger.debug("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
+    return chain
