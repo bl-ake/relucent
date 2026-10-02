@@ -137,7 +137,7 @@ Role 1 — Boundary faces and lower-dimensional slices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When creating faces for a boundary complex via
-:meth:`~relucent.core.complex.Complex.get_boundary_cells`, each codimension-one face
+:meth:`~relucent.core.complex.Complex.boundary_cells`, each codimension-one face
 seeds SHI candidates from its sign sequence::
 
    SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
@@ -149,7 +149,7 @@ creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
 
 The ambient **chain complex**
-(:meth:`~relucent.core.complex.Complex.get_chain_complex`) recovers faces differently —
+(:meth:`~relucent.core.complex.Complex.chain_complex`) recovers faces differently —
 by seeding and verifying vertices, then expanding each verified vertex's local
 cubical star (:mod:`relucent.graph.vertex_star`) — but still finalizes slice
 ``_shis`` the same way: after the full slice is known,
@@ -179,7 +179,7 @@ Role 3 — Meta-graph node metadata
 :func:`~relucent.graph.incidence.meta_node_attrs` derives ``shis`` (flip-neighbor
 crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
 sequence and same-dimension slice. For **1-cells**,
-:meth:`~relucent.core.complex.Complex.get_meta_graph` replaces node ``shis`` with
+:meth:`~relucent.core.complex.Complex.meta_graph` replaces node ``shis`` with
 the SHI labels of verified 0-face incidences from role-2 face edges (same rule as
 :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`).
 1-cell boundedness uses 0-face incidence in meta face edges
@@ -259,7 +259,7 @@ After complete ambient search (authoritative top cells)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.search.exploration.finalize_ambient_search` calls
-:meth:`~relucent.core.complex.Complex.get_dual_graph`, which:
+:meth:`~relucent.core.complex.Complex.dual_graph`, which:
 
 1. Builds combinatorial edges with
    :func:`~relucent.graph.incidence.dual_edges_top_dim` (flip neighbors for all
@@ -276,8 +276,8 @@ recovery and topology.
 On lower-dimensional slices (boundary, chain complex)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After :meth:`~relucent.core.complex.Complex.get_chain_complex` or
-:meth:`~relucent.core.complex.Complex.get_boundary_cells` materializes faces, SHIs are
+After :meth:`~relucent.core.complex.Complex.chain_complex` or
+:meth:`~relucent.core.complex.Complex.boundary_cells` materializes faces, SHIs are
 finalized by :func:`~relucent.graph.incidence.set_contracted_shis` to
 :func:`~relucent.graph.incidence.cubical_cell_shis`. Lower-dimensional 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
@@ -353,7 +353,7 @@ Dual graph
 
 **Purpose:** adjacency among **top-dimensional** cells only.
 
-**Entry point:** :meth:`~relucent.core.complex.Complex.get_dual_graph`
+**Entry point:** :meth:`~relucent.core.complex.Complex.dual_graph`
 
 .. list-table::
    :header-rows: 1
@@ -395,9 +395,9 @@ Uses
 ~~~~
 
 * Finalize after ambient BFS (``finalize_ambient_search``)
-* :meth:`~relucent.core.complex.Complex.get_chain_complex` /
+* :meth:`~relucent.core.complex.Complex.chain_complex` /
   :meth:`~relucent.core.complex.Complex.contract` and
-  :meth:`~relucent.core.complex.Complex.get_boundary_complex`
+  :meth:`~relucent.core.complex.Complex.boundary_complex`
 * :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` — reconstruct from
   stored graph + SHI edge labels
 * Visualization (:func:`relucent.vis.pyvis_dual_graph` returns a copy styled for PyVis)
@@ -408,7 +408,7 @@ Meta-graph
 **Purpose:** the full **face poset** across all dimensions — the combinatorial
 input to Betti numbers and persistent homology.
 
-**Entry point:** :meth:`~relucent.core.complex.Complex.get_meta_graph`
+**Entry point:** :meth:`~relucent.core.complex.Complex.meta_graph`
 
 .. list-table::
    :header-rows: 1
@@ -429,7 +429,7 @@ input to Betti numbers and persistent homology.
 Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
 
-1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces by
+1. :meth:`~relucent.core.complex.Complex.chain_complex` — recover faces by
    seeding and verifying vertices, then expanding each verified vertex's local
    cubical star, via :mod:`relucent.graph.vertex_star` (Masden 2022, Theorem 20).
    Every materialized cell has a verified vertex among its own faces by
@@ -443,12 +443,12 @@ Construction pipeline
 4. **Node assembly** — :func:`~relucent.graph.incidence.meta_node_attrs` derives
    ``crossings`` and flip-neighbor ``shis`` per dimension slice.
 5. **Optional truncation** — applied later by
-   :meth:`~relucent.core.complex.Complex.get_betti_numbers` via
+   :meth:`~relucent.core.complex.Complex.betti_numbers` via
    :func:`~relucent.graph.meta_graph.truncate_meta_graph` or
    :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph` (not by
-   ``get_meta_graph`` itself).
+   ``meta_graph`` itself).
 
-Pass ``verify=True`` to ``get_meta_graph`` only for debugging:
+Pass ``verify=True`` to ``meta_graph`` only for debugging:
 :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence` checks edges, SHIs, and
 finite labels match the incidence engine.
 
@@ -459,11 +459,11 @@ Dual graph vs meta-graph
 
    BFS / finalize  →  dual graph (top-cell adjacency, edge shi)
                          ↓
-                    get_chain_complex()  (covector face recovery)
+                    chain_complex()  (covector face recovery)
                          ↓
                     meta-graph (all dims, face incidences)
                          ↓
-                    get_betti_numbers()
+                    betti_numbers()
 
 .. list-table::
    :header-rows: 1
@@ -511,7 +511,7 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    dual graph, genericity check, ``certify_complex``.
 
 Alternatively, explore the full ambient complex first, then
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` (requires
+:meth:`~relucent.core.complex.Complex.boundary_complex` (requires
 ``assert_topology_ready``).
 
 Related reading

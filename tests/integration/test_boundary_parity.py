@@ -1,4 +1,4 @@
-"""Strict parity between full BFS + get_boundary_complex vs discover_boundary_complex."""
+"""Strict parity between full BFS + boundary_complex vs discover_boundary_complex."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def test_boundary_method_parity(spec, integration_nworkers: int, integration_out
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
 
-    boundary_full = ambient.get_boundary_complex(shi, verbose=False)
+    boundary_full = ambient.boundary_complex(shi, verbose=False)
     boundary_disc = Complex(model).discover_boundary_complex(
         shi,
         verbose=False,

@@ -504,7 +504,7 @@ def verified_vertices(cplx: Complex) -> tuple[int, dict[bytes, VertexRecord]]:
 
     top_dim = max(int(p.dim) for p in cplx)
     top_cells = [p for p in cplx if int(p.dim) == top_dim]
-    graph = cast(Any, cplx.get_dual_graph(require_complete=False))
+    graph = cast(Any, cplx.dual_graph(require_complete=False))
     incidence.certify_dual_graph(graph, cplx, top_dim=top_dim)
 
     # Candidate-vertex verification dominates runtime on large complexes (see

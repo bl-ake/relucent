@@ -1,6 +1,6 @@
 """Regression tests for meta-graph SHI / face-incidence fixes.
 
-Face **edges** in :meth:`~relucent.core.complex.Complex.get_meta_graph` must use every
+Face **edges** in :meth:`~relucent.core.complex.Complex.meta_graph` must use every
 nonzero sign-sequence entry (:func:`~relucent.graph.incidence.ss_nonzero_indices`),
 not propagated ``_shis`` lists that can be a strict subset of SS crossings.
 
@@ -41,7 +41,7 @@ from relucent.search.exploration import explore_for_topology
             "deep_3431_seed51",
             [3, 4, 3, 1],
             51,
-            # Cascade-drop pre-pass (get_chain_complex) now also skips dim-2 cells
+            # Cascade-drop pre-pass (chain_complex) now also skips dim-2 cells
             # whose every recovered dim-1 face was itself a dropped phantom vertex,
             # not just dim-1 cells with dropped endpoints. That drops 8 phantom
             # dim-2 cells (159 -> 151), collapsing the spurious β₂=15 into a single
@@ -67,15 +67,15 @@ def test_meta_graph_chain_complex_regression(
     start = torch.randn(architecture[0], dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=10000, nworkers=1)
 
-    chain = cplx.get_chain_complex(verbose=False)
+    chain = cplx.chain_complex(verbose=False)
     sizes = [(len(cc), int(cc.index2poly[0].dim)) for cc in chain if len(cc)]
     assert sizes == chain_sizes, f"{name}: unexpected chain sizes {sizes!r}"
 
-    meta = cplx.get_meta_graph(verbose=False)
+    meta = cplx.meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta)
     assert meta.number_of_edges() == meta_edges, f"{name}: edge count"
 
-    got = cplx.get_betti_numbers(
+    got = cplx.betti_numbers(
         compactify="one_point",
         reduced=False,
         verify_chain_complex=True,
@@ -102,9 +102,9 @@ def test_truncated_homology_chain_complex_regression(
     cplx = Complex(net)
     start = torch.randn(architecture[0], dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=10000, nworkers=1)
-    boundary = cplx.get_boundary_complex(cplx.n - 1)
+    boundary = cplx.boundary_complex(cplx.n - 1)
 
-    got = boundary.get_betti_numbers(
+    got = boundary.betti_numbers(
         compactify="truncate",
         reduced=False,
         verify_chain_complex=True,

@@ -583,7 +583,7 @@ def _equitable_colors(
 def _per_poly_colors(cpx: Complex, polys: list[Polyhedron], color: str | None, *, remap_equitable: bool) -> list[str]:
     if color == "Wl2":
         return get_colors([poly.Wl2 for poly in polys])
-    return _equitable_colors(cpx.get_dual_graph(), polys, remap=remap_equitable)
+    return _equitable_colors(cpx.dual_graph(), polys, remap=remap_equitable)
 
 
 def _highlight(c: str, poly: object, highlight_regions: Iterable[object] | None) -> str:
@@ -726,7 +726,7 @@ def _complex_figure_1_skeleton(
     if bound is None:
         bound = cfg.DEFAULT_COMPLEX_PLOT_BOUND if cpx.dim == 2 else cfg.DEFAULT_PLOT_BOUND
 
-    chain = cpx.get_chain_complex()
+    chain = cpx.chain_complex()
     skeleton_complex: Complex | None = None
     for level in chain:
         if len(level) > 0 and level.index2poly[0].dim == 1:
@@ -1057,7 +1057,7 @@ def plot_complex(
     * ``cells`` — cells in input space; 2D vs 3D layout is chosen from ``cpx.dim`` (network input
       dimension), which must be 2 or 3.
     * ``graph`` — 2D cells with third coordinate from the network (optional projected copy).
-    * ``1-skeleton`` — 1-cells obtained from ``Complex.get_chain_complex()``; each trace hover
+    * ``1-skeleton`` — 1-cells obtained from ``Complex.chain_complex()``; each trace hover
       label reports adjacent top-dimensional sign sequences.
     * ``hide_unbounded`` — if True, skip unbounded cells/regions in all modes.
     """
@@ -1139,7 +1139,7 @@ def pyvis_dual_graph(
     Raises:
         ValueError: If ``match_locations`` is True and the complex is not 2-D.
     """
-    graph = cplx.get_dual_graph()
+    graph = cplx.dual_graph()
     plot_graph = cast(Any, graph)
     if match_locations:
         if cplx.dim != 2:

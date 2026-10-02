@@ -113,7 +113,7 @@ def boundary_complex(cplx: Complex, i: int, *, verbose: int | None = None) -> Co
     """
     del verbose  # applied by @with_verbosity
     cplx.assert_topology_ready()
-    cplx._dual_graph = cplx.get_dual_graph(require_complete=True)
+    cplx._dual_graph = cplx.dual_graph(require_complete=True)
     out = cplx._empty_like()
     for poly in progress(
         boundary_cells(cplx, i, verify=True),

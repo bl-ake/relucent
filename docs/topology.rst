@@ -16,17 +16,17 @@ Prerequisites
 **Complete exploration.** Local search methods like BFS are sufficient for computing
 topology *only if they run to completion*. Missing neighbors can leave the meta-graph
 short of a closed cellular complex, which breaks ``∂² = 0`` for the GF(2) boundary maps.
-:meth:`~relucent.core.complex.Complex.get_chain_complex` recovers faces algebraically
+:meth:`~relucent.core.complex.Complex.chain_complex` recovers faces algebraically
 from verified vertices' local stars (Masden 2022, Theorem 20; see
 :mod:`relucent.graph.vertex_star`), so every cell whose generating vertex is verified
 is guaranteed present — no coverage heuristic is required. A partial BFS still means
 fewer top cells to seed vertices from, so completeness of the underlying exploration
 still matters for how much of the true arrangement is recovered.
 
-:meth:`~relucent.core.complex.Complex.get_chain_complex`,
-:meth:`~relucent.core.complex.Complex.get_meta_graph`, and therefore
-:meth:`~relucent.core.complex.Complex.get_betti_numbers` and
-:meth:`~relucent.core.complex.Complex.get_persistent_homology` all call
+:meth:`~relucent.core.complex.Complex.chain_complex`,
+:meth:`~relucent.core.complex.Complex.meta_graph`, and therefore
+:meth:`~relucent.core.complex.Complex.betti_numbers` and
+:meth:`~relucent.core.complex.Complex.persistent_homology` all call
 :meth:`~relucent.core.complex.Complex.assert_topology_ready`, so they raise
 :class:`~relucent.core.errors.ComplexNotCompleteError` or
 :class:`~relucent.core.errors.ComplexNotVerifiedError` unless the complex is complete and
@@ -35,7 +35,7 @@ verified.
 After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :attr:`~relucent.core.complex.Complex.verified` (see :doc:`exploration_verification`).
 :meth:`~relucent.core.complex.Complex.contract` and
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` require a complete, verified
+:meth:`~relucent.core.complex.Complex.boundary_complex` require a complete, verified
 ambient complex via :meth:`~relucent.core.complex.Complex.assert_topology_ready`.
 For boundary components not covered by ambient exploration, use
 :meth:`~relucent.core.complex.Complex.discover_boundary_complex`.
@@ -53,19 +53,19 @@ Graph representations
 
 The :class:`~relucent.core.complex.Complex` class exposes three related graph views:
 
-* **Dual graph** (:meth:`~relucent.core.complex.Complex.get_dual_graph`): adjacency of
+* **Dual graph** (:meth:`~relucent.core.complex.Complex.dual_graph`): adjacency of
   top-dimensional cells only.
-* **Chain complex** (:meth:`~relucent.core.complex.Complex.get_chain_complex`): lower-
+* **Chain complex** (:meth:`~relucent.core.complex.Complex.chain_complex`): lower-
   dimensional faces recovered by seeding and verifying vertices, then expanding each
   verified vertex's local cubical star, via :mod:`relucent.graph.vertex_star`
   (``Complex.contract()`` returns the codimension-one slice).
-* **Meta-graph** (:meth:`~relucent.core.complex.Complex.get_meta_graph`): face poset
+* **Meta-graph** (:meth:`~relucent.core.complex.Complex.meta_graph`): face poset
   over all cell dimensions, used by Betti and persistence code.
 
 Betti numbers
 -------------
 
-:meth:`~relucent.core.complex.Complex.get_betti_numbers` builds a meta-graph, applies
+:meth:`~relucent.core.complex.Complex.betti_numbers` builds a meta-graph, applies
 the chosen homology convention, and returns ``{dimension: β_k}``.
 
 **``compactify``** selects how unbounded cells are handled:
@@ -78,7 +78,7 @@ the chosen homology convention, and returns ``{dimension: β_k}``.
   :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph`.
 
 To rank a meta-graph you built or edited yourself, call
-:func:`relucent.topology.get_betti_numbers` on it with the same ``compactify`` values
+:func:`relucent.topology.betti_numbers` on it with the same ``compactify`` values
 (``None``, its default, ranks the graph exactly as given).
 
 **``respect_finite``**: restrict to the subcomplex of cells with ``finite is True``
@@ -92,12 +92,12 @@ inconsistent. Passing it bypasses the per-complex Betti cache.
 agrees with the number of connected components, raising
 :class:`~relucent.topology.ConnectedComponentsMismatch` otherwise (default ``False`` on
 :class:`~relucent.core.complex.Complex`; ``True`` when calling
-:func:`relucent.topology.get_betti_numbers` directly).
+:func:`relucent.topology.betti_numbers` directly).
 
 **``reduced``**: return reduced homology (β̃₀ = β₀ − 1).
 
 **``nworkers``**: thread count for ranking boundary maps concurrently. It only applies to
-the ``method="dense"`` ranking in :func:`relucent.topology.get_betti_numbers` (see
+the ``method="dense"`` ranking in :func:`relucent.topology.betti_numbers` (see
 *Performance*), so it has no effect on the default path.
 
 Example:
@@ -116,9 +116,9 @@ Example:
    cplx.bfs(max_polys=500)
 
    # Decision boundary of the last ReLU neuron (requires complete ambient complex)
-   db = cplx.get_boundary_complex(cplx.n - 1)
+   db = cplx.boundary_complex(cplx.n - 1)
 
-   betti = db.get_betti_numbers()
+   betti = db.betti_numbers()
    print(betti)  # e.g. {0: 1}
 
    # Or discover the boundary directly without a full ambient BFS:
@@ -137,7 +137,7 @@ Example:
 Persistent homology workflow
 ----------------------------
 
-:meth:`~relucent.core.complex.Complex.get_persistent_homology` accepts any
+:meth:`~relucent.core.complex.Complex.persistent_homology` accepts any
 :class:`~relucent.topology.filtration.Filtration` and returns a
 :class:`~relucent.topology.persistence.PersistenceDiagram`.
 
@@ -170,10 +170,10 @@ Example:
    model = nn.Sequential(nn.Linear(1, 2), nn.ReLU(), nn.Linear(2, 1), nn.ReLU())
    cplx = relucent.Complex(model)
    cplx.bfs(start=np.array([[0.0]]), max_polys=5000)
-   cplx.get_dual_graph(require_complete=True)
+   cplx.dual_graph(require_complete=True)
    cplx.compute_geometric_properties(properties=["interior_point", "finite", "W", "b"])
 
-   diagram = cplx.get_persistent_homology(LogitSublevelFiltration())
+   diagram = cplx.persistent_homology(LogitSublevelFiltration())
    fig = diagram.plot()
    fig.show()
 
@@ -184,7 +184,7 @@ Betti numbers after all cells have entered.
 Performance
 -----------
 
-:func:`relucent.topology.get_betti_numbers` ranks each GF(2) boundary map with
+:func:`relucent.topology.betti_numbers` ranks each GF(2) boundary map with
 ``method="sparse"`` by default: Gaussian elimination on the incidence sets with low-fill
 pivots (:func:`relucent.topology.gf2_rank_sparse_rowsets`), so cost and memory follow the
 number of incidences rather than ``rows × columns``. If fill-in makes the remainder dense,
@@ -193,7 +193,7 @@ that remainder is ranked bit-packed.
 ``method="dense"`` ranks the full bit-packed matrices and needs ``rows × columns / 8``
 bytes per map (about 59 GB for a 688k × 688k ∂₂), so it is only kept for cross-checking.
 It is not exposed through :class:`~relucent.core.complex.Complex`; call
-:func:`relucent.topology.get_betti_numbers` on a meta-graph to use it.
+:func:`relucent.topology.betti_numbers` on a meta-graph to use it.
 
 Bit-packed ranking uses an optional **C extension** (``relucent.topology._gf2``),
 JIT-compiled from ``_gf2_rank.c`` with ``gcc`` on first import. The public flag

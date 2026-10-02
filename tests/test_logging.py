@@ -64,7 +64,7 @@ def _bfs_messages(verbose: int) -> list[tuple[int, str]]:
     logger.addHandler(handler)
     try:
         cplx.bfs(start=np.zeros((1, 2)) + 0.123, verbose=verbose, nworkers=2)
-        cplx.get_betti_numbers(verbose=verbose)
+        cplx.betti_numbers(verbose=verbose)
     finally:
         logger.removeHandler(handler)
     return handler.messages

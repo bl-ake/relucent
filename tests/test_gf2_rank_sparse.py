@@ -216,14 +216,14 @@ def _random_meta(rng: np.random.Generator, counts: tuple[int, ...], faces_per_ce
 @pytest.mark.parametrize("compactify", [None, "borel_moore"])
 def test_sparse_and_dense_betti_agree(compactify: Compactify | None) -> None:
     """Both rank methods give the same Betti numbers, including repeated (mod-2 cancelling) edges."""
-    from relucent.topology import get_betti_numbers
+    from relucent.topology import betti_numbers
 
     rng = np.random.default_rng(11)
     for _ in range(20):
         counts = tuple(int(v) for v in rng.integers(5, 40, size=int(rng.integers(2, 5))))
         meta = _random_meta(rng, counts, int(rng.integers(1, 5)), repeat=True)
-        sparse = get_betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="sparse")
-        dense = get_betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="dense")
+        sparse = betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="sparse")
+        dense = betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="dense")
         assert sparse == dense
 
 
@@ -246,7 +246,7 @@ def test_chain_square_violation_counts_product_nonzeros() -> None:
     """A 2-cell whose boundary is an open path breaks ∂∂=0; the count matches the dense product."""
     import networkx as nx
 
-    from relucent.topology import ChainComplexInconsistent, get_betti_numbers
+    from relucent.topology import ChainComplexInconsistent, betti_numbers
 
     meta = nx.MultiDiGraph()
     meta.add_nodes_from([(0, i) for i in range(3)], dim=0)
@@ -256,5 +256,5 @@ def test_chain_square_violation_counts_product_nonzeros() -> None:
     meta.add_edges_from([((2, 0), (1, 0)), ((2, 0), (1, 1))])
     for method in ("sparse", "dense"):
         with pytest.raises(ChainComplexInconsistent) as info:
-            get_betti_numbers(meta, verify_chain_complex=True, method=method)
+            betti_numbers(meta, verify_chain_complex=True, method=method)
         assert info.value.violations == [{"k": 1, "nnz": 2, "shape": [3, 1]}]

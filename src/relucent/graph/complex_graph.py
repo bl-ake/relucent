@@ -61,7 +61,7 @@ def contract_dual_graph_for_shi(
     """Quotient a relabeled dual graph by edges with ``shi == deleted_shi``.
 
     Used by :func:`without_last_layer_neuron` after
-    :meth:`~relucent.core.complex.Complex.get_dual_graph` to merge top cells that shared the
+    :meth:`~relucent.core.complex.Complex.dual_graph` to merge top cells that shared the
     removed neuron's facet. Returns the contracted graph (nodes ``0 .. n-1``) and a map from
     each new node to a representative old node id.
     """
@@ -290,7 +290,7 @@ def without_last_layer_neuron(cplx: Complex, neuron_idx: int) -> Complex:
     new_net = net_without_last_ss_layer_neuron(cplx._net, last_ss_layer, neuron_idx)
     out = type(cplx)(new_net)
 
-    dual = cplx.get_dual_graph(relabel=True)
+    dual = cplx.dual_graph(relabel=True)
     if dual.number_of_nodes() == 0:
         return out
 

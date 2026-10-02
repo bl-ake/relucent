@@ -15,7 +15,7 @@ def _mlp_small_model():
 
 
 def _dual_components(cplx: Complex) -> int:
-    dual = cplx.get_dual_graph(require_complete=False)
+    dual = cplx.dual_graph(require_complete=False)
     if dual.number_of_nodes() == 0:
         return 0
     return nx.number_connected_components(dual)
@@ -24,7 +24,7 @@ def _dual_components(cplx: Complex) -> int:
 def _assert_boundary_parity(ref: Complex, new: Complex) -> None:
     assert {p.tag for p in ref} == {p.tag for p in new}
     assert _dual_components(ref) == _dual_components(new)
-    assert ref.get_betti_numbers() == new.get_betti_numbers()
+    assert ref.betti_numbers() == new.betti_numbers()
 
 
 def test_discover_boundary_complex_mlp_small(seeded: int, integration_nworkers: int) -> None:
@@ -44,7 +44,7 @@ def test_discover_boundary_complex_mlp_small(seeded: int, integration_nworkers: 
         raise
     assert stats["n_components"] >= 1
     assert len(new) > 0
-    _ = new.get_betti_numbers()
+    _ = new.betti_numbers()
 
 
 def test_discover_boundary_complex_mlp_medium_parity(seeded: int, integration_nworkers: int) -> None:
@@ -53,7 +53,7 @@ def test_discover_boundary_complex_mlp_medium_parity(seeded: int, integration_nw
     cplx = Complex(model)
     cplx.bfs(verbose=0, nworkers=integration_nworkers)
     shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
+    ref = cplx.boundary_complex(shi, verbose=False)
     new, stats = Complex(model).discover_boundary_complex(
         shi,
         verbose=False,

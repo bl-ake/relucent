@@ -29,7 +29,7 @@ def test_dual_graph_recovery_matches_direct_bfs(
 
     direct = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(direct, spec)
-    direct_boundary = direct.get_boundary_complex(shi, verbose=False)
+    direct_boundary = direct.boundary_complex(shi, verbose=False)
     direct_betti = truncated_betti(direct_boundary)
 
     payload = export_dual_graph_payload(direct)
@@ -37,7 +37,7 @@ def test_dual_graph_recovery_matches_direct_bfs(
     finalize_ambient_search(recovered, complete=True, verify=True)
     verify_flip_shi_symmetry(recovered)
 
-    recovered_boundary = recovered.get_boundary_complex(shi, verbose=False)
+    recovered_boundary = recovered.boundary_complex(shi, verbose=False)
     recovered_betti = truncated_betti(recovered_boundary)
 
     if direct_betti != recovered_betti:

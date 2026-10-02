@@ -78,7 +78,7 @@ Two additional quick checks:
    sum(len(p.shis) for p in cplx) / len(cplx)
 
    # Adjacency graph of top-dimensional cells in the complex
-   print(cplx.get_dual_graph())
+   print(cplx.dual_graph())
 
 Gurobi License Note
 -------------------

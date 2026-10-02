@@ -74,7 +74,7 @@ def _ambient_coface_shis_for_boundary_cell(
     _bound: float | None = None,
     **_shis_kwargs: Any,
 ) -> list[int]:
-    """``_shis`` for a boundary top cell, matching :meth:`Complex.get_boundary_cells`.
+    """``_shis`` for a boundary top cell, matching :meth:`Complex.boundary_cells`.
 
     Returns all nonzero sign-sequence crossings on the slice (finalized by
     :func:`~relucent.graph.incidence.set_contracted_shis`).
@@ -93,7 +93,7 @@ def _ambient_boundary_metadata_for_cell(
     bound: float | None = None,
     **shis_kwargs: Any,
 ) -> tuple[list[int], Any, np.ndarray, np.ndarray | None]:
-    """Return ``(_shis, halfspaces, halfspaces_err, halfspaces_ss)`` matching :meth:`Complex.get_boundary_cells`."""
+    """Return ``(_shis, halfspaces, halfspaces_err, halfspaces_ss)`` matching :meth:`Complex.boundary_cells`."""
     bshi = int(boundary_shi)
     net = poly._net
     if bound is None:

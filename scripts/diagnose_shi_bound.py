@@ -42,7 +42,7 @@ def main() -> None:
     model = load_witness_model(spec)
     ambient = run_bfs_ambient(model, spec, nworkers=args.nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
-    boundary = ambient.get_boundary_complex(shi, verbose=False)
+    boundary = ambient.boundary_complex(shi, verbose=False)
     net_bound = default_bound(model)
 
     hits = []

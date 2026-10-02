@@ -50,11 +50,11 @@ def test_empty_boundary_complex_verifies() -> None:
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False)
     assert len(boundary_edges(cplx, cplx.n - 1)) == 0
-    boundary = cplx.get_boundary_complex(cplx.n - 1)
+    boundary = cplx.boundary_complex(cplx.n - 1)
     assert len(boundary) == 0
     assert boundary.complete is True
     assert boundary.verified is True
-    assert boundary.get_dual_graph().number_of_nodes() == 0
+    assert boundary.dual_graph().number_of_nodes() == 0
 
 
 def test_assert_topology_ready_blocks_unverified() -> None:
@@ -63,11 +63,11 @@ def test_assert_topology_ready_blocks_unverified() -> None:
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3)
     assert cplx.complete is False
     with pytest.raises(ComplexNotCompleteError):
-        cplx.get_boundary_complex(cplx.n - 1)
+        cplx.boundary_complex(cplx.n - 1)
 
 
 def test_assert_topology_ready_blocks_add_point_only() -> None:
-    """Point sampling without BFS does not satisfy get_boundary_complex prerequisites."""
+    """Point sampling without BFS does not satisfy boundary_complex prerequisites."""
     import torch
     import torch.nn as nn
 
@@ -78,7 +78,7 @@ def test_assert_topology_ready_blocks_add_point_only() -> None:
     for x in np.array([[-0.1, 0.0], [0.1, 0.0], [-0.1, 1.0], [0.1, -1.0]]):
         cplx.add_point(x.reshape(1, -1), check_exists=True)
     with pytest.raises(ComplexNotCompleteError, match="explore_for_topology|BFS"):
-        cplx.get_boundary_complex(cplx.n - 1)
+        cplx.boundary_complex(cplx.n - 1)
 
 
 def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
@@ -98,7 +98,7 @@ def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     with pytest.raises(ShiFlipInvariantError):
         verify_flip_shi_symmetry(cplx)
     # Rebuilding the dual graph with repair=True resyncs _shis
-    cplx.get_dual_graph(require_complete=False)
+    cplx.dual_graph(require_complete=False)
     verify_flip_shi_symmetry(cplx)
 
 
@@ -107,14 +107,14 @@ def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPat
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
 
-    orig_get_dual_graph = cplx.get_dual_graph
+    orig_get_dual_graph = cplx.dual_graph
     calls = {"count": 0}
 
     def _counting_get_dual_graph(*args, **kwargs):
         calls["count"] += 1
         return orig_get_dual_graph(*args, **kwargs)
 
-    monkeypatch.setattr(cplx, "get_dual_graph", _counting_get_dual_graph)
+    monkeypatch.setattr(cplx, "dual_graph", _counting_get_dual_graph)
 
     finalize_ambient_search(cplx, complete=True, verify=True)
 
@@ -155,7 +155,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
 
     monkeypatch.setattr(calc, "get_shis", _boom)
 
-    boundary = cplx.get_boundary_complex(cplx.n - 1)
+    boundary = cplx.boundary_complex(cplx.n - 1)
     assert boundary.verified is True
 
 
@@ -165,7 +165,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
     model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
-    graph = cplx.get_dual_graph(relabel=True)
+    graph = cplx.dual_graph(relabel=True)
     initial_ss = cplx.index2poly[0].ss_np
 
     reloaded = Complex(model)
@@ -183,7 +183,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
 
     monkeypatch.setattr(calc, "get_shis", _boom)
 
-    boundary = reloaded.get_boundary_complex(reloaded.n - 1)
+    boundary = reloaded.boundary_complex(reloaded.n - 1)
     assert boundary.verified is True
 
 

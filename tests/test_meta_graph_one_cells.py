@@ -94,5 +94,5 @@ def test_explored_complex_meta_graph_one_cells(seeded: int) -> None:
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
-    meta = cplx.get_meta_graph(verify=True, verbose=False)
+    meta = cplx.meta_graph(verify=True, verbose=False)
     mg.verify_meta_graph_one_cells(meta)

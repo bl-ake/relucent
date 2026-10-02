@@ -5,7 +5,7 @@ GF(2), and reads Betti numbers off their ranks.
 
 * GF(2) coefficients, so orientations don't matter.
 * A codimension-1 facet of a cell comes from setting one nonzero sign entry to 0.
-* :func:`get_betti_numbers` uses every codimension-one incidence in ``meta``.
+* :func:`betti_numbers` uses every codimension-one incidence in ``meta``.
   Truncation and Borel–Moore boundaries live on :class:`~relucent.core.complex.Complex`.
 * ``verify_chain_complex=True`` checks ``∂²=0`` with sparse GF(2) products (nonzero
   pattern only, no dense matmuls).
@@ -45,7 +45,7 @@ __all__ = [
     "Compactify",
     "ConnectedComponentsMismatch",
     "C_BACKEND_AVAILABLE",
-    "get_betti_numbers",
+    "betti_numbers",
     "gf2_matmul_packed_stacked_rows",
     "gf2_rank_boundary",
     "gf2_rank_packed",
@@ -563,7 +563,7 @@ def _chain_square_violations(
 
 
 @with_verbosity
-def get_betti_numbers(
+def betti_numbers(
     meta: Any,
     *,
     compactify: Compactify | None = None,
@@ -579,7 +579,7 @@ def get_betti_numbers(
 
     Args:
         meta: Face poset as a NetworkX ``MultiDiGraph``, e.g. from
-            :meth:`~relucent.core.complex.Complex.get_meta_graph`.
+            :meth:`~relucent.core.complex.Complex.meta_graph`.
         compactify: How to treat unbounded cells (see :data:`Compactify`). ``None``
             (default) ranks ``meta`` exactly as given. ``"truncate"`` and ``"one_point"``
             first add the truncation or point-at-infinity cells to ``meta`` **in place**
@@ -633,7 +633,7 @@ def get_betti_numbers(
     require_shared_faces = compactify == "borel_moore"
 
     logger.debug(
-        f"get_betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
+        f"betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
         + f"compactify={compactify} reduced={reduced} "
         + f"verify_chain_complex={verify_chain_complex} "
         + f"verify_connected_components={verify_connected_components}",
@@ -652,7 +652,7 @@ def get_betti_numbers(
     kmin = min(nodes_by_dim.keys())
     kmax = max(nodes_by_dim.keys())
     counts = ", ".join(f"{k}d:{len(nodes_by_dim[k])}" for k in sorted(nodes_by_dim))
-    logger.debug(f"get_betti_numbers: cells by dim kmin={kmin} kmax={kmax} ({counts})")
+    logger.debug(f"betti_numbers: cells by dim kmin={kmin} kmax={kmax} ({counts})")
 
     boundary_rank: dict[int, int] = {k: 0 for k in range(kmin, kmax + 2)}
     sparse_by_k: dict[int, list[list[int]]] = {}
@@ -668,7 +668,7 @@ def get_betti_numbers(
             if verify_chain_complex and ncols:
                 sparse_by_k[k] = [list(s) for s in row_sets]  # ranking consumes the sets
             boundary_rank[k] = gf2_rank_sparse_rowsets(row_sets, ncols, progress_desc=f"GF(2) rank ∂_{k}")
-            logger.debug(f"get_betti_numbers: ∂_{k} shape ({len(row_sets)},{ncols}) rank={boundary_rank[k]}")
+            logger.debug(f"betti_numbers: ∂_{k} shape ({len(row_sets)},{ncols}) rank={boundary_rank[k]}")
             del row_sets
         return _finish_betti_numbers(
             meta,
@@ -705,7 +705,7 @@ def get_betti_numbers(
         ncols_by_k[k] = ncols
         if ncols == 0:
             boundary_rank[k] = 0
-            logger.debug(f"get_betti_numbers: ∂_{k} skipped (no columns)")
+            logger.debug(f"betti_numbers: ∂_{k} skipped (no columns)")
         else:
             if sparse_rows is not None:
                 sparse_by_k[k] = sparse_rows
@@ -737,7 +737,7 @@ def get_betti_numbers(
             ratio = ncols / max(nrows, 1)
             if 0.5 <= ratio <= 2.0:
                 logger.info(
-                    f"get_betti_numbers: ∂_{k} is large and nearly square ({nrows}×{ncols}); "
+                    f"betti_numbers: ∂_{k} is large and nearly square ({nrows}×{ncols}); "
                     + "C backend unavailable—pure-Python GF(2) rank may take hours.",
                 )
         rank = int(
@@ -751,7 +751,7 @@ def get_betti_numbers(
                 progress_desc=f"GF(2) rank ∂_{k}",
             )
         )
-        logger.debug(f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={rank}")
+        logger.debug(f"betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={rank}")
         return k, rank
 
     if _parallel:
@@ -801,14 +801,14 @@ def _finish_betti_numbers(
 ) -> dict[int, int]:
     """Check ∂²=0 if asked, then Betti numbers from the boundary ranks (zeros trimmed)."""
     if verify_chain_complex:
-        logger.debug("get_betti_numbers: verifying ∂²=0 (chain_square) …")
+        logger.debug("betti_numbers: verifying ∂²=0 (chain_square) …")
         viol = _chain_square_violations(
             sparse_by_k=sparse_by_k,
             ncols_by_k=ncols_by_k,
             kmin=kmin,
             kmax=kmax,
         )
-        logger.debug("get_betti_numbers: chain_square checks finished")
+        logger.debug("betti_numbers: chain_square checks finished")
         if viol:
             raise ChainComplexInconsistent(viol)
 
@@ -834,7 +834,7 @@ def _finish_betti_numbers(
             beta[0] = b0
 
     trimmed = {k: v for k, v in beta.items() if v != 0}
-    logger.debug(f"get_betti_numbers: done (nonzero Betti entries: {trimmed})")
+    logger.debug(f"betti_numbers: done (nonzero Betti entries: {trimmed})")
 
     # Trim zeros for cleanliness.
     return trimmed

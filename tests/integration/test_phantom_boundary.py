@@ -38,7 +38,7 @@ def test_discover_boundary_matches_reference_without_phantom(integration_nworker
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
 
-    ref = ambient.get_boundary_complex(shi, verbose=False)
+    ref = ambient.boundary_complex(shi, verbose=False)
     new = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=integration_nworkers)
 
     assert tag_set(ref) == tag_set(new)

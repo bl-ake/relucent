@@ -40,7 +40,7 @@ def _diamond_boundary_model_l1_ball(radius: float = 1.0) -> nn.Sequential:
     #
     # The extra ReLU units are "topology-only": their outgoing weights are 0, so they
     # do not affect g(x), but they *do* subdivide the decision boundary into multiple
-    # cells so `get_boundary_complex()` has a meaningful cell decomposition.
+    # cells so `boundary_complex()` has a meaningful cell decomposition.
     #
     # Small noise is added to fc0 weights so that no two neurons share an identical
     # halfspace direction (genericity condition required by the SHI count heuristic).
@@ -106,10 +106,10 @@ def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    db_cplx = cplx.get_boundary_complex(cplx.n - 1)
+    db_cplx = cplx.boundary_complex(cplx.n - 1)
 
-    betti_std = db_cplx.get_betti_numbers()
-    betti_bm = db_cplx.get_betti_numbers(compactify="borel_moore", reduced=True)
+    betti_std = db_cplx.betti_numbers()
+    betti_bm = db_cplx.betti_numbers(compactify="borel_moore", reduced=True)
 
     # These are different conventions; just sanity-check both run and that the
     # boundary has a nontrivial 1-cycle over GF(2).
@@ -130,11 +130,11 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     outside = 1.1 * dirs
     _add_points(cplx, np.vstack([inside, outside, np.random.randn(200, 2)]))
     explore_for_topology(cplx, np.array([0.1, 0.2]))
-    db = cplx.get_boundary_complex(cplx.n - 1)
-    betti_std = db.get_betti_numbers()
-    assert db.get_betti_numbers(verify_chain_complex=True) == betti_std
-    betti_bm = db.get_betti_numbers(compactify="borel_moore", reduced=True)
-    assert db.get_betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True) == betti_bm
+    db = cplx.boundary_complex(cplx.n - 1)
+    betti_std = db.betti_numbers()
+    assert db.betti_numbers(verify_chain_complex=True) == betti_std
+    betti_bm = db.betti_numbers(compactify="borel_moore", reduced=True)
+    assert db.betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True) == betti_bm
 
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
@@ -150,10 +150,10 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     right[:, 0] = eps
     _add_points(cplx2, np.vstack([left, right, np.random.randn(200, 2)]))
     explore_for_topology(cplx2, np.array([0.5, 0.0]))
-    db2 = cplx2.get_boundary_complex(cplx2.n - 1)
-    _ = db2.get_betti_numbers(verify_chain_complex=True)
-    _ = db2.get_betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True)
-    _ = db2.get_betti_numbers(respect_finite=True, verify_chain_complex=True)
+    db2 = cplx2.boundary_complex(cplx2.n - 1)
+    _ = db2.betti_numbers(verify_chain_complex=True)
+    _ = db2.betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True)
+    _ = db2.betti_numbers(respect_finite=True, verify_chain_complex=True)
 
 
 def test_decision_boundary_line_differs_between_homologies(seeded: int):
@@ -175,12 +175,12 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
     right[:, 0] = eps
     _add_points(cplx, np.vstack([left, right, np.random.randn(200, 2)]))
     explore_for_topology(cplx, np.array([0.5, 0.0]))
-    db_cplx = cplx.get_boundary_complex(cplx.n - 1)
+    db_cplx = cplx.boundary_complex(cplx.n - 1)
 
-    betti_std = db_cplx.get_betti_numbers()
-    betti_bm = db_cplx.get_betti_numbers(compactify="borel_moore", reduced=True)
-    betti_trad = db_cplx.get_betti_numbers()
-    betti_embedded = db_cplx.get_betti_numbers(respect_finite=True)
+    betti_std = db_cplx.betti_numbers()
+    betti_bm = db_cplx.betti_numbers(compactify="borel_moore", reduced=True)
+    betti_trad = db_cplx.betti_numbers()
+    betti_embedded = db_cplx.betti_numbers(respect_finite=True)
 
     assert isinstance(betti_std, dict)
     assert isinstance(betti_bm, dict)

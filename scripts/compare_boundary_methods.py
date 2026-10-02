@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare get_boundary_complex vs discover_boundary_complex for one witness."""
+"""Compare boundary_complex vs discover_boundary_complex for one witness."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def main() -> None:
     shi = boundary_shi_for_spec(ambient, spec)
     print(f"ambient regions: {len(ambient)}", flush=True)
 
-    boundary_full = ambient.get_boundary_complex(shi, verbose=False)
+    boundary_full = ambient.boundary_complex(shi, verbose=False)
     boundary_disc = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=args.nworkers)
 
     tags_full = tag_set(boundary_full)
@@ -59,13 +59,13 @@ def main() -> None:
     print(f"methods_agree: {tags_full == tags_disc and betti_full == betti_disc}", flush=True)
 
     try:
-        boundary_full.get_betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
+        boundary_full.betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
         print("chain_complex full: OK", flush=True)
     except ChainComplexInconsistent as exc:
         print(f"chain_complex full: FAIL {exc}", flush=True)
 
     try:
-        boundary_disc.get_betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
+        boundary_disc.betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
         print("chain_complex discover: OK", flush=True)
     except ChainComplexInconsistent as exc:
         print(f"chain_complex discover: FAIL {exc}", flush=True)

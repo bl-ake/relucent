@@ -141,7 +141,7 @@ def test_price_boundary_witness_proven_none_via_saturated_trie(seeded: int):
 
     explore_for_topology(cplx, np.array([0.5, 0.0]))
     shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
+    ref = cplx.boundary_complex(shi, verbose=False)
     tags = {p.tag for p in ref}
     witness = price_boundary_witness(cplx._net, shi, tags)
     assert witness is None

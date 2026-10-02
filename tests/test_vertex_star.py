@@ -89,8 +89,8 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     monkeypatch.setattr("relucent.verify.certify.verify_lp_flip_neighbors_in_complex", fail)
     # Chebyshev may run for zero-face 1-cells in geometric_infeasible_one_cells; SHI LPs must not.
 
-    chain = cplx.get_chain_complex()
-    meta = cplx.get_meta_graph()
+    chain = cplx.chain_complex()
+    meta = cplx.meta_graph()
     assert chain
     assert meta.number_of_nodes() > 0
 
@@ -102,7 +102,7 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
     set_seeds(4)
     cplx = Complex(torch_mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
     explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
-    cplx.get_chain_complex()
+    cplx.chain_complex()
 
     calls: list[int] = []
     real = incidence.geometric_infeasible_one_cells
@@ -115,8 +115,8 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
         return real(by_dim, edges_by_dim)
 
     monkeypatch.setattr(incidence, "geometric_infeasible_one_cells", wrapped)
-    meta = cplx.get_meta_graph(verbose=False)
-    assert calls, "get_meta_graph must still run Chebyshev phantom scan"
+    meta = cplx.meta_graph(verbose=False)
+    assert calls, "meta_graph must still run Chebyshev phantom scan"
     assert meta.number_of_nodes() > 0
 
 

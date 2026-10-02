@@ -83,7 +83,7 @@ def _populate_line(cplx: Complex) -> None:
 
 
 def _dual_components(cplx: Complex) -> int:
-    dual = cplx.get_dual_graph(require_complete=False)
+    dual = cplx.dual_graph(require_complete=False)
     if dual.number_of_nodes() == 0:
         return 0
     return nx.number_connected_components(dual)
@@ -92,7 +92,7 @@ def _dual_components(cplx: Complex) -> int:
 def _assert_boundary_parity(ref: Complex, new: Complex) -> None:
     assert {p.tag for p in ref} == {p.tag for p in new}
     assert _dual_components(ref) == _dual_components(new)
-    assert ref.get_betti_numbers() == new.get_betti_numbers()
+    assert ref.betti_numbers() == new.betti_numbers()
 
 
 @pytest.mark.parametrize("nworkers", [1])
@@ -103,7 +103,7 @@ def test_discover_boundary_complex_diamond_matches_reference(seeded: int, nworke
     _populate_diamond(cplx)
     explore_for_topology(cplx, np.array([0.1, 0.2]))
     shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
+    ref = cplx.boundary_complex(shi, verbose=False)
     discover_out = Complex(model).discover_boundary_complex(
         shi,
         verbose=False,
@@ -113,7 +113,7 @@ def test_discover_boundary_complex_diamond_matches_reference(seeded: int, nworke
     new, stats = discover_out
     assert stats["n_components"] >= 1
     _assert_boundary_parity(ref, new)
-    assert ref.get_betti_numbers(verify_chain_complex=True) == new.get_betti_numbers(verify_chain_complex=True)
+    assert ref.betti_numbers(verify_chain_complex=True) == new.betti_numbers(verify_chain_complex=True)
 
 
 @pytest.mark.parametrize("nworkers", [1])
@@ -124,7 +124,7 @@ def test_discover_boundary_complex_line_matches_reference(seeded: int, nworkers:
     _populate_line(cplx)
     explore_for_topology(cplx, np.array([0.5, 0.0]))
     shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
+    ref = cplx.boundary_complex(shi, verbose=False)
     new, _stats = Complex(model).discover_boundary_complex(
         shi,
         verbose=False,
@@ -142,10 +142,10 @@ def test_discover_boundary_complex_bm_mode_line(seeded: int, nworkers: int):
     _populate_line(cplx)
     explore_for_topology(cplx, np.array([0.5, 0.0]))
     shi = cplx.n - 1
-    ref = cplx.get_boundary_complex(shi, verbose=False)
+    ref = cplx.boundary_complex(shi, verbose=False)
     new = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
-    ref_bm = ref.get_betti_numbers(compactify="borel_moore", reduced=True)
-    new_bm = new.get_betti_numbers(compactify="borel_moore", reduced=True)
+    ref_bm = ref.betti_numbers(compactify="borel_moore", reduced=True)
+    new_bm = new.betti_numbers(compactify="borel_moore", reduced=True)
     assert ref_bm == new_bm
 
 
@@ -173,5 +173,5 @@ def test_discover_boundary_complex_mlp_tiny(seeded: int, nworkers: int):
         raise
     assert stats["n_components"] >= 1
     assert len(new) > 0
-    _ = new.get_betti_numbers()
-    _ = new.get_betti_numbers(compactify="borel_moore", reduced=True)
+    _ = new.betti_numbers()
+    _ = new.betti_numbers(compactify="borel_moore", reduced=True)

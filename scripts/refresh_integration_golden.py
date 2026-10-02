@@ -53,7 +53,7 @@ def _compute_golden(
     os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
     ambient = run_bfs_ambient(model, spec, nworkers=nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
-    boundary_full = ambient.get_boundary_complex(shi, verbose=False)
+    boundary_full = ambient.boundary_complex(shi, verbose=False)
     tags_full = tag_set(boundary_full)
     betti_full = truncated_betti(boundary_full)
     tags_disc: set[bytes] = set()

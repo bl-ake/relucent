@@ -70,7 +70,7 @@ def test_contract_vertices_expand_to_maximal_cells(
     seed: int,
     populate: str,
 ) -> None:
-    """Each 0-cell from ``get_chain_complex`` yields ``2^d`` feasible maximal cells."""
+    """Each 0-cell from ``chain_complex`` yields ``2^d`` feasible maximal cells."""
     set_seeds(seed)
     net = torch_mlp(widths=widths, add_last_relu=True, init="uniform")
     cplx = Complex(net)
@@ -84,7 +84,7 @@ def test_contract_vertices_expand_to_maximal_cells(
 
     top_dim = cplx.dim
     top_cells = {_ss_tuple(p.ss_np) for p in cplx if int(p.dim) == top_dim}
-    chain = cplx.get_chain_complex(verbose=False)
+    chain = cplx.chain_complex(verbose=False)
     vertices = list(chain[-1])
     assert vertices and int(vertices[0].dim) == 0
 

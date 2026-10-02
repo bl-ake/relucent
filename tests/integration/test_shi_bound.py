@@ -27,7 +27,7 @@ def test_small_bound_refuses_instead_of_missing_output_shi(integration_nworkers:
     model = load_witness_model(spec)
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
-    boundary = ambient.get_boundary_complex(shi, verbose=False)
+    boundary = ambient.boundary_complex(shi, verbose=False)
 
     n_cofaces = 0
     refused = 0

@@ -194,14 +194,14 @@ def compute_persistent_homology(
 
     Cells are ordered by ``(filtration value, dimension, stable node key)``. Boundary
     columns are built from meta-graph face incidences (same convention as
-    :func:`relucent.topology.get_betti_numbers`).
+    :func:`relucent.topology.betti_numbers`).
 
     Args:
         cplx: Polyhedral complex from breadth-first search / exploration.
         filtration: Filtration assigning a real value to each cell.
         compactify: ``"truncate"`` (default) caps unbounded cells by combinatorial
             truncation; ``"borel_moore"`` drops face incidences with fewer than two cofaces.
-            Same conventions as :func:`~relucent.topology.get_betti_numbers`
+            Same conventions as :func:`~relucent.topology.betti_numbers`
             (``"one_point"`` is not supported here).
         respect_finite: Restrict to cells with ``finite is True`` on the meta-graph.
         lower_star: If True, extend values to higher cells by
@@ -220,7 +220,7 @@ def compute_persistent_homology(
         return PersistenceDiagram(pairs=(), cell_filtration={})
 
     logger.debug("building meta-graph …")
-    meta = cplx.get_meta_graph()
+    meta = cplx.meta_graph()
     borel_moore = compactify == "borel_moore"
     if not borel_moore and not respect_finite:
         from relucent.graph.meta_graph import truncate_meta_graph

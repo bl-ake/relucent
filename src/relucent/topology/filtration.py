@@ -59,7 +59,7 @@ class ConstantFiltration(Filtration):
     """Every cell enters the filtration at the same value.
 
     Use with ``lower_star=False`` so :func:`~relucent.topology.persistence.betti_at_filtration_end`
-    matches :meth:`~relucent.core.complex.Complex.get_betti_numbers` on the same complex.
+    matches :meth:`~relucent.core.complex.Complex.betti_numbers` on the same complex.
     """
 
     lower_star: bool = False

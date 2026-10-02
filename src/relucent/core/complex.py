@@ -873,13 +873,13 @@ class Complex:
             **kwargs,
         )
 
-    def get_boundary_cells(self, i: int, *, verify: bool = True, verbose: int | None = None) -> set[Polyhedron]:
+    def boundary_cells(self, i: int, *, verify: bool = True, verbose: int | None = None) -> set[Polyhedron]:
         """The (d-1)-cells on neuron ``i``'s bent hyperplane. See :func:`relucent.graph.boundary.boundary_cells`."""
         from relucent.graph.boundary import boundary_cells
 
         return boundary_cells(self, i, verify=verify, verbose=verbose)
 
-    def get_boundary_complex(self, i: int, *, verbose: int | None = None) -> Complex:
+    def boundary_complex(self, i: int, *, verbose: int | None = None) -> Complex:
         """The certified complex on neuron ``i``'s bent hyperplane, from this explored complex.
 
         See :func:`relucent.graph.boundary.boundary_complex`. To find it without exploring
@@ -959,7 +959,7 @@ class Complex:
             return boundary, stats
         return boundary
 
-    def get_chain_complex(self, verbose: int | None = None) -> list[Complex]:
+    def chain_complex(self, verbose: int | None = None) -> list[Complex]:
         """Recover every cell of every dimension from verified vertices' local stars.
 
         Returns ``[self, (d-1)-cells, ..., 0-cells]`` as complexes. See
@@ -973,16 +973,21 @@ class Complex:
         return vertex_star.build_chain_complex(self, verbose=verbose)
 
     def contract(self, verbose: int | None = None) -> Complex:
-        """Return ``get_chain_complex(...)[self.dim - 1]``.
+        """The complex of codimension-one cells (dimension ``self.dim - 1``) from :meth:`chain_complex`.
+
+        Empty if there are none.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
             ComplexNotCompleteError: If this complex is not complete.
             ComplexNotVerifiedError: If this complex is not verified.
         """
-        return self.get_chain_complex(verbose=verbose)[self.dim - 1]
+        for cells in self.chain_complex(verbose=verbose):
+            if len(cells) and int(cells.index2poly[0].dim) == self.dim - 1:
+                return cells
+        return self._empty_like()
 
-    def get_critical_points(
+    def critical_points(
         self,
         *,
         require_complete: bool = False,
@@ -997,7 +1002,7 @@ class Complex:
 
         return critical_points(self, require_complete=require_complete, include_degenerate=include_degenerate, verbose=verbose)
 
-    def get_meta_graph(self, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
+    def meta_graph(self, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
         """Return the face poset of every cell, all dimensions, as a meta-graph.
 
         Nodes are cells keyed by ``tag``; edges go from each k-cell to its (k-1)-faces.
@@ -1005,12 +1010,12 @@ class Complex:
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
-                :meth:`get_chain_complex`.
+                :meth:`chain_complex`.
         """
         return mg.build_meta_graph(self, verify=verify, verbose=verbose)
 
     @with_verbosity
-    def get_betti_numbers(
+    def betti_numbers(
         self,
         *,
         compactify: Compactify = "truncate",
@@ -1023,8 +1028,8 @@ class Complex:
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
-        Builds the meta-graph (:meth:`get_meta_graph`) and ranks it with
-        :func:`relucent.topology.get_betti_numbers`.
+        Builds the meta-graph (:meth:`meta_graph`) and ranks it with
+        :func:`relucent.topology.betti_numbers`.
 
         Results are cached per ``(reduced, compactify, respect_finite)`` and survive
         :meth:`save` / :meth:`load`. The cache is cleared when polyhedra are added or
@@ -1037,14 +1042,14 @@ class Complex:
                 Borel–Moore homology, and ``"one_point"`` adds a single 0-cell at infinity.
             respect_finite: If True, use the subcomplex of bounded cells instead.
             reduced: If True, return reduced homology.
-            verify_chain_complex: Check ``∂² = 0`` (see :func:`relucent.topology.get_betti_numbers`).
+            verify_chain_complex: Check ``∂² = 0`` (see :func:`relucent.topology.betti_numbers`).
             verify_connected_components: Check β₀ against the path-component count.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             nworkers: Threads for ranking independent boundary maps concurrently
-                (``method="dense"`` only; see :func:`relucent.topology.get_betti_numbers`).
+                (``method="dense"`` only; see :func:`relucent.topology.betti_numbers`).
         """
-        from relucent.topology.betti import get_betti_numbers
+        from relucent.topology.betti import betti_numbers
 
         del verbose  # applied by @with_verbosity
         if len(self) == 0:
@@ -1053,8 +1058,8 @@ class Complex:
         use_cache = not verify_chain_complex and not verify_connected_components
         if use_cache and cache_key in self._betti_cache:
             return dict(self._betti_cache[cache_key])
-        betti = get_betti_numbers(
-            self.get_meta_graph(),
+        betti = betti_numbers(
+            self.meta_graph(),
             compactify=compactify,
             respect_finite=respect_finite,
             reduced=reduced,
@@ -1066,7 +1071,7 @@ class Complex:
             self._betti_cache[cache_key] = dict(betti)
         return betti
 
-    def get_persistent_homology(
+    def persistent_homology(
         self,
         filtration: Filtration,
         *,
@@ -1109,11 +1114,11 @@ class Complex:
     def G(self) -> nx.Graph[Polyhedron]:
         """The adjacency graph of top-dimensional cells in the complex."""
         if self._dual_graph is None:
-            self._dual_graph = self.get_dual_graph()
+            self._dual_graph = self.dual_graph()
         return self._dual_graph
 
     @overload
-    def get_dual_graph(
+    def dual_graph(
         self,
         *,
         relabel: Literal[False] = False,
@@ -1122,7 +1127,7 @@ class Complex:
     ) -> nx.Graph[Polyhedron]: ...
 
     @overload
-    def get_dual_graph(
+    def dual_graph(
         self,
         *,
         relabel: Literal[True],
@@ -1130,7 +1135,7 @@ class Complex:
         repair: bool = True,
     ) -> nx.Graph[int]: ...
 
-    def get_dual_graph(
+    def dual_graph(
         self,
         *,
         relabel: bool = False,
@@ -1215,7 +1220,7 @@ class Complex:
             plot_mode: Visualization type:
                 - ``"cells"``: top-dimensional cells in input space.
                 - ``"graph"``: lifted 2D cells in graph/output space.
-                - ``"1-skeleton"``: 1-cells from ``get_chain_complex()``.
+                - ``"1-skeleton"``: 1-cells from ``chain_complex()``.
             label_regions: If True, annotate region centers with ``str(poly)`` when
                 supported by the selected mode.
             color: Coloring strategy or explicit color accepted by plotting backends.

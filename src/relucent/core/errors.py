@@ -33,8 +33,8 @@ class ComplexNotVerifiedError(RuntimeError):
 class IncompleteDualGraphError(ValueError):
     """The dual graph has missing boundary neighbors (partially explored complex).
 
-    :meth:`~relucent.core.complex.Complex.contract`, :meth:`~relucent.core.complex.Complex.get_chain_complex`,
-    and :meth:`~relucent.core.complex.Complex.get_meta_graph` require a complete adjacency
+    :meth:`~relucent.core.complex.Complex.contract`, :meth:`~relucent.core.complex.Complex.chain_complex`,
+    and :meth:`~relucent.core.complex.Complex.meta_graph` require a complete adjacency
     structure among top-dimensional cells. Explore the complex further (e.g. BFS/DFS)
     before building the chain complex or running topology routines.
     """
