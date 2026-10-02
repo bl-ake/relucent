@@ -16,16 +16,12 @@ incorrect WIP.
 
 from __future__ import annotations
 
-import os
-
 import pytest
 import torch
 
 from relucent import Complex, mlp, set_seeds
 from relucent.graph import meta_graph as mg
 from relucent.search.exploration import explore_for_topology
-
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 @pytest.mark.parametrize(

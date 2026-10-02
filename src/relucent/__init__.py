@@ -26,26 +26,35 @@ __version__ = _read_version()
 
 if TYPE_CHECKING:
     from .core.complex import Complex
-    from .core.errors import AmbiguousGeometryError, NonGenericArrangementError
+    from .core.errors import (
+        AmbiguousGeometryError,
+        ComplexNotCompleteError,
+        ComplexNotVerifiedError,
+        IncompleteDualGraphError,
+        NonGenericArrangementError,
+    )
     from .core.poly import Polyhedron
-    from .core.ss import SSManager
     from .model.convert_model import convert
-    from .search.exploration import explore_for_topology, generic_topology_start
-    from .utils import add_output_relu, get_env, mlp, set_seeds, split_sequential
+    from .search.exploration import SearchResult, explore_for_topology, generic_topology_start
+    from .utils import add_output_relu, mlp, set_seeds, split_sequential
+    from .verify.certify import CertifyLevel
     from .vis import get_colors, plot_complex, plot_polyhedron
 
 __all__ = [
     "__version__",
     "AmbiguousGeometryError",
+    "CertifyLevel",
     "Complex",
+    "ComplexNotCompleteError",
+    "ComplexNotVerifiedError",
+    "IncompleteDualGraphError",
     "NonGenericArrangementError",
     "Polyhedron",
-    "SSManager",
+    "SearchResult",
     "config",
     "update_settings",
     "convert",
     "get_colors",
-    "get_env",
     "add_output_relu",
     "explore_for_topology",
     "generic_topology_start",
@@ -59,12 +68,15 @@ __all__ = [
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Complex": ("relucent.core.complex", "Complex"),
     "AmbiguousGeometryError": ("relucent.core.errors", "AmbiguousGeometryError"),
+    "CertifyLevel": ("relucent.verify.certify", "CertifyLevel"),
+    "ComplexNotCompleteError": ("relucent.core.errors", "ComplexNotCompleteError"),
+    "ComplexNotVerifiedError": ("relucent.core.errors", "ComplexNotVerifiedError"),
+    "IncompleteDualGraphError": ("relucent.core.errors", "IncompleteDualGraphError"),
     "NonGenericArrangementError": ("relucent.core.errors", "NonGenericArrangementError"),
     "Polyhedron": ("relucent.core.poly", "Polyhedron"),
-    "SSManager": ("relucent.core.ss", "SSManager"),
+    "SearchResult": ("relucent.search.exploration", "SearchResult"),
     "convert": ("relucent.model.convert_model", "convert"),
     "get_colors": ("relucent.vis", "get_colors"),
-    "get_env": ("relucent.utils", "get_env"),
     "add_output_relu": ("relucent.utils", "add_output_relu"),
     "explore_for_topology": ("relucent.search.exploration", "explore_for_topology"),
     "generic_topology_start": ("relucent.search.exploration", "generic_topology_start"),

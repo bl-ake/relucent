@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 
 import networkx as nx
@@ -17,8 +16,6 @@ from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,
 )
-
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 def test_face_tag_and_flip_tag_roundtrip() -> None:

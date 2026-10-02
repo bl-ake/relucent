@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 
 import relucent.graph.incidence as incidence
-import relucent.topology as topology
+import relucent.topology.betti as topology
 from relucent import Complex, set_seeds
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology

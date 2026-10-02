@@ -13,7 +13,6 @@ from relucent.search.exploration import finalize_ambient_search
 from relucent.verify.certify import verify_lp_flip_neighbors_in_complex
 
 os_environ = __import__("os").environ
-os_environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 def test_bfs_sets_verified_on_small_network() -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -17,8 +16,6 @@ from tests.doc_snippets import (
     extract_rst_python_blocks,
     run_snippet_sequence,
 )
-
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 def _rst(name: str) -> Path:

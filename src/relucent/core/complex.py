@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 import pickle
 import random
-import warnings
 from collections.abc import Generator, Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
@@ -81,8 +80,6 @@ __all__ = [
     "ComplexNotVerifiedError",
     "DualGraphAsymmetricEdgeError",
 ]
-
-RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
 
 
 class Complex:
@@ -828,22 +825,6 @@ class Complex:
         """
         return _greedy_path_fn(self, start, end)
 
-    @staticmethod
-    def _warn_research_use(method_name: str) -> None:
-        """Emit a collaboration warning unless disabled by environment variable."""
-        disable_warning = os.getenv(RESEARCH_WARNING_DISABLE_ENV_VAR, "").strip().lower()
-        if disable_warning in {"1", "true", "yes", "on"}:
-            return
-        warnings.warn(
-            (
-                f"Complex.{method_name}() is actively used by the package author in ongoing research. "
-                + "If you'd like to collaborate, please reach out! My email is blake@uconn.edu. "
-                + f"Set {RESEARCH_WARNING_DISABLE_ENV_VAR}=1 to silence this warning."
-            ),
-            UserWarning,
-            stacklevel=2,
-        )
-
     def hamming_astar(
         self,
         start: torch.Tensor | np.ndarray | Polyhedron,
@@ -881,7 +862,6 @@ class Complex:
         Raises:
             ValueError: If the start point lies exactly on a neuron's boundary.
         """
-        self._warn_research_use("hamming_astar")
         if bound is None:
             bound = cfg.DEFAULT_SEARCH_BOUND
         return _hamming_astar_fn(
@@ -1070,7 +1050,6 @@ class Complex:
         from relucent.topology.betti import get_betti_numbers
 
         del verbose  # applied by @with_verbosity
-        self._warn_research_use("get_betti_numbers")
         if len(self) == 0:
             return {}
         cache_key = (reduced, compactify, respect_finite)
@@ -1103,7 +1082,6 @@ class Complex:
 
         See :func:`relucent.topology.persistence.compute_persistent_homology`.
         """
-        self._warn_research_use("get_persistent_homology")
         from relucent.topology.filtration import Filtration
         from relucent.topology.persistence import compute_persistent_homology
 

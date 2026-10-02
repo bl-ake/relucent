@@ -8,8 +8,6 @@ import pytest
 
 INTEGRATION_ENV = "RELUCENT_RUN_INTEGRATION"
 
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
-
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     if os.environ.get(INTEGRATION_ENV, "0") == "1":
