@@ -83,7 +83,7 @@ def test_bfs_incomplete_when_a_neighbor_comes_back_empty(monkeypatch: pytest.Mon
     _patch_first_worker(monkeypatch, ValueError("Polyhedron is infeasible (empty)."))
     cplx = Complex(mlp(widths=[2, 6, 1], add_last_relu=True))
     stats = cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1, verify=False)
-    assert len(stats["Bad SHI Computations"]) >= 1
+    assert len(stats.bad_shi_computations) >= 1
     assert cplx.complete is not True
 
 

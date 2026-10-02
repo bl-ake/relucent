@@ -62,6 +62,8 @@ from relucent.utils import (
 from relucent.verify.certify import CertifyLevel
 
 if TYPE_CHECKING:
+    from relucent.search.engine import CubeMode
+    from relucent.search.exploration import SearchResult
     from relucent.topology.betti import Compactify
     from relucent.topology.filtration import Filtration
     from relucent.topology.morse import CriticalPoint
@@ -575,18 +577,19 @@ class Complex:
     def searcher(
         self,
         start: torch.Tensor | np.ndarray | Polyhedron | None = None,
+        *,
+        queue: Any = None,
         max_depth: float = float("inf"),
         max_polys: float = float("inf"),
-        queue: Any = None,
         bound: float | None = None,
         nworkers: int | None = None,
-        verbose: int | None = None,
         cube_radius: float | None = None,
-        cube_mode: str = "unrestricted",
+        cube_mode: CubeMode = "unrestricted",
         geometry_properties: Iterable[str] | None = None,
         verify: bool = True,
+        verbose: int | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> SearchResult:
         """Search for polyhedra in the complex by discovering neighbors.
 
         This is a generic search method that can be configured for different
@@ -611,8 +614,10 @@ class Complex:
                 :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
-            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
-                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
+            cube_radius: Half-width of the cube ``[-r, r]^d`` that ``cube_mode`` refers to.
+            cube_mode: ``"unrestricted"`` (default) ignores the cube. ``"intersect"`` only
+                explores cells that meet it, ``"clipped"`` also clips their halfspaces to it,
+                and ``"exclude"`` only explores cells that don't meet it.
             geometry_properties: Iterable of polyhedron cache/property names to
                 compute and retain for each discovered polyhedron during search.
                 ``None`` (default) performs topology-only search. Pass
@@ -626,16 +631,12 @@ class Complex:
                 ``verify=True`` that raises :class:`~relucent.core.complex.IncompleteDualGraphError`
                 unless the cap was hit. Frontier SHIs are certified facets, so certification
                 reuses them after dual-graph sync.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
 
         Returns:
-            dict: Search information dictionary containing:
-                - "Search Depth": Maximum depth reached
-                - "Avg # Facets Uncorrected": Average number of facets per polyhedron
-                - "Search Time": Elapsed time in seconds
-                - "Bad SHI Computations": List of failed computations
-                - "Complete": Whether search completed (no unprocessed items)
-                - "Verified": Whether certification passed (``None`` if not run)
+            A :class:`~relucent.search.exploration.SearchResult`.
 
         Raises:
             ValueError: If the start point lies on a hyperplane (has zero in SS).
@@ -686,52 +687,112 @@ class Complex:
             verbose=verbose,
         )
 
-    def bfs(self, **kwargs: Any) -> dict[str, Any]:
-        """Perform breadth-first search of the complex.
+    def bfs(
+        self,
+        start: torch.Tensor | np.ndarray | Polyhedron | None = None,
+        *,
+        max_depth: float = float("inf"),
+        max_polys: float = float("inf"),
+        bound: float | None = None,
+        nworkers: int | None = None,
+        cube_radius: float | None = None,
+        cube_mode: CubeMode = "unrestricted",
+        geometry_properties: Iterable[str] | None = None,
+        verify: bool = True,
+        verbose: int | None = None,
+        **kwargs: Any,
+    ) -> SearchResult:
+        """Breadth-first search: every cell at depth ``d`` before any at ``d + 1``.
 
-        Explores the complex using a breadth-first strategy, discovering all
-        polyhedra at depth d before moving to depth d+1. Uses a FIFO queue.
-
-        Args:
-            **kwargs: All arguments accepted by searcher().
-
-        Returns:
-            dict: Search information dictionary (see searcher() documentation).
+        Takes the same arguments as :meth:`searcher`, except ``queue``.
         """
-        return self.searcher(**kwargs)
-
-    def dfs(self, **kwargs: Any) -> dict[str, Any]:
-        """Perform depth-first search of the complex.
-
-        Explores the complex using a depth-first strategy, following paths as
-        deeply as possible before backtracking. Uses a LIFO queue.
-
-        Args:
-            **kwargs: All arguments accepted by searcher().
-
-        Returns:
-            dict: Search information dictionary (see searcher() documentation).
-        """
-        return self.searcher(queue=BlockingQueue(pop=lambda x: x.pop()), **kwargs)
-
-    def random_walk(self, **kwargs: Any) -> dict[str, Any]:
-        """Perform random walk search of the complex.
-
-        Explores the complex by randomly selecting which polyhedron to explore
-        next from the queue.
-
-        Args:
-            **kwargs: All arguments accepted by searcher().
-
-        Returns:
-            dict: Search information dictionary (see searcher() documentation).
-        """
+        queue = None
         return self.searcher(
-            queue=BlockingQueue(
-                queue_class=list,
-                pop=lambda x: x.pop(random.randrange(0, len(x))),
-                push=lambda x, y: x.append(y),
-            ),
+            start,
+            queue=queue,
+            max_depth=max_depth,
+            max_polys=max_polys,
+            bound=bound,
+            nworkers=nworkers,
+            cube_radius=cube_radius,
+            cube_mode=cube_mode,
+            geometry_properties=geometry_properties,
+            verify=verify,
+            verbose=verbose,
+            **kwargs,
+        )
+
+    def dfs(
+        self,
+        start: torch.Tensor | np.ndarray | Polyhedron | None = None,
+        *,
+        max_depth: float = float("inf"),
+        max_polys: float = float("inf"),
+        bound: float | None = None,
+        nworkers: int | None = None,
+        cube_radius: float | None = None,
+        cube_mode: CubeMode = "unrestricted",
+        geometry_properties: Iterable[str] | None = None,
+        verify: bool = True,
+        verbose: int | None = None,
+        **kwargs: Any,
+    ) -> SearchResult:
+        """Depth-first search: follow each path as deep as it goes before backtracking.
+
+        Takes the same arguments as :meth:`searcher`, except ``queue``.
+        """
+        queue = BlockingQueue(pop=lambda x: x.pop())
+        return self.searcher(
+            start,
+            queue=queue,
+            max_depth=max_depth,
+            max_polys=max_polys,
+            bound=bound,
+            nworkers=nworkers,
+            cube_radius=cube_radius,
+            cube_mode=cube_mode,
+            geometry_properties=geometry_properties,
+            verify=verify,
+            verbose=verbose,
+            **kwargs,
+        )
+
+    def random_walk(
+        self,
+        start: torch.Tensor | np.ndarray | Polyhedron | None = None,
+        *,
+        max_depth: float = float("inf"),
+        max_polys: float = float("inf"),
+        bound: float | None = None,
+        nworkers: int | None = None,
+        cube_radius: float | None = None,
+        cube_mode: CubeMode = "unrestricted",
+        geometry_properties: Iterable[str] | None = None,
+        verify: bool = True,
+        verbose: int | None = None,
+        **kwargs: Any,
+    ) -> SearchResult:
+        """Search that expands a uniformly random frontier cell at each step.
+
+        Takes the same arguments as :meth:`searcher`, except ``queue``.
+        """
+        queue = BlockingQueue(
+            queue_class=list,
+            pop=lambda x: x.pop(random.randrange(0, len(x))),
+            push=lambda x, y: x.append(y),
+        )
+        return self.searcher(
+            start,
+            queue=queue,
+            max_depth=max_depth,
+            max_polys=max_polys,
+            bound=bound,
+            nworkers=nworkers,
+            cube_radius=cube_radius,
+            cube_mode=cube_mode,
+            geometry_properties=geometry_properties,
+            verify=verify,
+            verbose=verbose,
             **kwargs,
         )
 

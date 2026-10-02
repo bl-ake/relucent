@@ -25,7 +25,7 @@ from relucent.search.engine import (
     retain_geometry_caches,
     search_calculations,
 )
-from relucent.search.exploration import finalize_boundary_complex, search_stats_dict
+from relucent.search.exploration import SearchResult, finalize_boundary_complex
 from relucent.search.worker_context import set_worker_context
 from relucent.utils import BlockingQueue, encode_ss, flip_ss_at_shi, get_mp_context, process_aware_cpu_count
 
@@ -200,7 +200,7 @@ def boundary_searcher(
     geometry_properties: Iterable[str] | None = None,
     verify: bool = True,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> SearchResult:
     """BFS on a bent hyperplane slice with ``ss[boundary_shi] = 0`` fixed.
 
     Args:
@@ -219,9 +219,9 @@ def boundary_searcher(
         **kwargs: Forwarded to :func:`~relucent.geometry.calculations.get_shis`.
 
     Returns:
-        Search statistics dict (same keys as :func:`~relucent.search.searcher`,
-        including ``"Complete"``; ``"Verified"`` is omitted here because certification
-        runs later in :func:`~relucent.search.exploration.finalize_boundary_complex`).
+        :class:`~relucent.search.exploration.SearchResult`. ``verified`` is ``None`` (or
+        ``False`` if the search stopped early) because certification runs later, in
+        :func:`~relucent.search.exploration.finalize_boundary_complex`.
 
     Raises:
         ValueError: If ``start`` is not a top-dimensional boundary cell.
@@ -407,9 +407,9 @@ def boundary_searcher(
     if not complete:
         # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
         cx.set_exploration_state(complete=False, verified=False)
-        return search_stats_dict(
+        return SearchResult(
             depth=depth,
-            rolling_average=rolling_average,
+            mean_facets=rolling_average,
             search_time=search_time,
             bad_shi_computations=bad_shi_computations,
             complete=False,
@@ -419,9 +419,9 @@ def boundary_searcher(
     for poly in cx:
         poly._finite = None
         poly._finite_computed = False
-    return search_stats_dict(
+    return SearchResult(
         depth=depth,
-        rolling_average=rolling_average,
+        mean_facets=rolling_average,
         search_time=search_time,
         bad_shi_computations=bad_shi_computations,
         complete=True,
@@ -513,7 +513,7 @@ def discover_boundary_complex(
             **kwargs,
         )
         n_components += 1
-        search_time += float(search_info.get("Search Time", 0.0))
+        search_time += search_info.search_time
         for poly in cx:
             merged.add_polyhedron(poly, check_exists=True)
             visited.add(poly.tag)

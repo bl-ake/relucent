@@ -84,7 +84,7 @@ def test_dfs_max_depth_and_shis(seed: int):
     model = mlp(widths=[6, 8, 10])
     cplx = Complex(model)
     result = cplx.dfs(max_depth=2, nworkers=1, verify=False)
-    assert result["Search Depth"] == 2
+    assert result.depth == 2
     assert all(poly.shis is not None for poly in cplx)
 
 
@@ -445,7 +445,7 @@ class TestComplexMisc:
         cplx = Complex(small_mlp)
         start = _rand_batch(4)
         result = cplx.random_walk(start=start, max_polys=15, nworkers=1)
-        assert "Search Depth" in result
+        assert result.depth >= 1
         assert len(cplx) <= 15
 
     def test_clean_data(self, small_mlp):
