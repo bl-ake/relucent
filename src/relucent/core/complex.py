@@ -15,11 +15,9 @@ import plotly.graph_objects as go
 
 import relucent.config as cfg
 import relucent.verify.certify as certify
-from relucent._internal import rounding
-from relucent._internal.logging import logger, progress, with_verbosity
+from relucent._internal.logging import with_verbosity
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 from relucent.core.errors import (
-    AmbiguousGeometryError,
     ComplexNotCompleteError,
     ComplexNotVerifiedError,
     DualGraphAsymmetricEdgeError,
@@ -30,11 +28,7 @@ from relucent.core.poly import Polyhedron
 from relucent.core.ss import SSManager
 from relucent.graph import incidence, vertex_star
 from relucent.graph import meta_graph as mg
-from relucent.graph.complex_graph import (
-    contract_dual_graph_for_shi,
-    delete_ss_columns,
-    net_without_last_ss_layer_neuron,
-)
+from relucent.graph.complex_graph import recover_from_dual_graph
 from relucent.graph.meta_graph import (
     INFINITY_POINT_META_NODE,
     INFINITY_POINT_META_SHI,
@@ -64,8 +58,6 @@ from relucent.search.engine import (
 from relucent.utils import (
     BlockingQueue,
     encode_ss,
-    flip_ss_at_shi,
-    process_aware_cpu_count,
 )
 from relucent.verify.certify import CertifyLevel
 
@@ -330,69 +322,6 @@ class Complex:
     def n(self) -> int:
         """The number of bent hyperplanes/neurons in the network."""
         return len(self.ssi2maski)
-
-    def _deleted_shi_for_last_layer_neuron(self, neuron_idx: int) -> int:
-        last_ss_layer = max(self.ss_layers)
-        for shi, (layer_idx, (_, idx)) in enumerate(self.ssi2maski):
-            if layer_idx == last_ss_layer and idx == neuron_idx:
-                return shi
-        raise RuntimeError(f"neuron_idx {neuron_idx} is not in the last ReLU hidden layer.")
-
-    def without_last_layer_neuron(self, neuron_idx: int) -> Complex:
-        """Return the complex obtained by deleting a neuron from the last ReLU layer.
-
-        The last ReLU layer is the final :class:`~relucent.model.model.LinearLayer` that is
-        immediately followed by a ReLU in the canonical network (the same layer used
-        by output-neuron boundary analysis).  Top-dimensional cells that shared a
-        facet on the removed neuron are merged; recovered SHIs are the union of the
-        two sides' facet indices, minus the removed neuron (see :meth:`contract`).
-
-        If that layer has only one neuron, the linear layer and its following ReLU are
-        removed from the network entirely.
-
-        Implementation: contract dual-graph edges for the removed SHI, then rebuild
-        cells with :meth:`recover_from_dual_graph` on the smaller network.
-
-        Args:
-            neuron_idx: Index of the neuron within that last hidden linear layer
-                (not the global supporting-hyperplane index).  Must be ``0`` when the
-                layer has width ``1``.
-
-        Returns:
-            A new :class:`Complex` over the smaller network.  The dual graph is not
-            copied.
-
-        Raises:
-            ValueError: If there is no ReLU hidden layer or ``neuron_idx`` is out of
-                range for the last one.
-        """
-        if not self.ss_layers:
-            raise ValueError("Network has no ReLU layers; cannot delete a neuron.")
-        last_ss_layer = max(self.ss_layers)
-        layer = list(self._net.layers.values())[last_ss_layer]
-        if not isinstance(layer, LinearLayer):
-            raise ValueError("Last sign-sequence layer is not a LinearLayer.")
-        n_neurons = int(layer.weight.shape[0])
-        if not (0 <= neuron_idx < n_neurons):
-            raise ValueError(f"neuron_idx must be in [0, {n_neurons}), got {neuron_idx} for the last ReLU layer.")
-
-        deleted_shi = self._deleted_shi_for_last_layer_neuron(neuron_idx)
-        new_net = net_without_last_ss_layer_neuron(self._net, last_ss_layer, neuron_idx)
-        out = Complex(new_net)
-        out.net = new_net if isinstance(self.net, ReLUNetwork) else self.net
-
-        dual = self.get_dual_graph(relabel=True)
-        if dual.number_of_nodes() == 0:
-            return out
-
-        contracted, old_rep = contract_dual_graph_for_shi(dual, deleted_shi)
-        for component in nx.connected_components(contracted):
-            sub = contracted.subgraph(component).copy()
-            source = min(component)
-            initial_ss = delete_ss_columns(self.index2poly[old_rep[source]].ss_np, [deleted_shi])
-            out.recover_from_dual_graph(sub, initial_ss, source=source, copy=True)
-
-        return out
 
     @torch.no_grad()
     def preactivation_iterator(
@@ -895,231 +824,35 @@ class Complex:
             **kwargs,
         )
 
-    def slice_affine(
-        self,
-        x0: np.ndarray,
-        V: np.ndarray,
-        tol: float | None = None,
-    ) -> Complex:
-        """Return the non-empty intersections of each cell with an affine subspace.
+    def get_boundary_cells(self, i: int, *, verify: bool = True, verbose: int | None = None) -> set[Polyhedron]:
+        """The (d-1)-cells on neuron ``i``'s bent hyperplane. See :func:`relucent.graph.boundary.boundary_cells`."""
+        from relucent.graph.boundary import boundary_cells
 
-        The affine subspace is given in the parametric form ``{x0 + V @ t : t in R^k}``,
-        where ``x0`` is a base point in input space and the columns of ``V`` span the
-        subspace direction. ``k = V.shape[1]`` is the intrinsic dimension of the subspace.
+        return boundary_cells(self, i, verify=verify, verbose=verbose)
 
-        For a cell with halfspace representation ``Ax + b <= 0``, the intersection in
-        parameter space is ``{t : (A @ V) t + (A @ x0 + b) <= 0}``, a polyhedron in ``R^k``.
+    def get_boundary_complex(self, i: int, *, verbose: int | None = None) -> Complex:
+        """The certified complex on neuron ``i``'s bent hyperplane, from this explored complex.
 
-        Feasibility is tested with :func:`~relucent.geometry.calculations.solve_radius` on the
-        sliced rows, whose float64 error is carried from the cell's. An intersection is included
-        when it has a verified interior point (or an unbounded radius, meaning the subspace lies
-        entirely inside that cell).
-
-        The returned :class:`Complex` is backed by a stub :class:`~relucent.model.model.ReLUNetwork`
-        with ``input_shape=(k,)`` and no ReLU layers, so ``cpx.dim == k`` and
-        ``cpx.plot(plot_mode="cells")`` works for ``k`` in ``{2, 3}``.  Each
-        :class:`~relucent.core.poly.Polyhedron` in the result carries ``halfspaces = H_slice``
-        (shape ``(m, k+1)``) and inherits the sign sequence of its parent cell, which
-        keeps tags unique across cells and carries correct codimension information.
-
-        Note:
-            This method triggers halfspace computation for any cell that has not yet been
-            computed. Pre-populate with :meth:`compute_geometric_properties` to avoid
-            on-demand Gurobi calls.
-
-        Args:
-            x0: Base point of the affine subspace, shape ``(d,)``.
-            V: Direction matrix, shape ``(d, k)``. Columns need not be orthonormal.
-                Pass a 1-D array of shape ``(d,)`` for a line (``k=1``).
-            tol: Ignored (kept for API compatibility): every row is judged against its own
-                float64 error, and an undecidable intersection raises
-                :class:`~relucent.core.errors.AmbiguousGeometryError`.
-
-        Returns:
-            A new :class:`Complex` in ``k``-dimensional parameter space, containing
-            one :class:`~relucent.core.poly.Polyhedron` per non-empty intersection.
-            The complex can be plotted directly with :meth:`plot` for ``k`` in ``{2, 3}``.
-        """
-        from relucent.geometry.calculations import solve_radius
-        from relucent.model.model import LinearLayer, ReLUNetwork
-        from relucent.utils import get_env
-
-        del tol  # each row is judged against its own float64 error instead
-        env = get_env()
-
-        x0_arr = np.asarray(x0, dtype=np.float64).reshape(-1)
-        # Ensure V is 2-D: a 1-D vector becomes a (d, 1) column
-        V_arr = np.asarray(V, dtype=np.float64).reshape(len(x0_arr), -1)
-        k = V_arr.shape[1]
-
-        # Stub network: gives out.dim = k with no ReLU layers (no halfspace LPs needed).
-        stub_net = ReLUNetwork(
-            {"linear": LinearLayer(np.eye(k, dtype=np.float64), np.zeros(k, dtype=np.float64))},
-            input_shape=(k,),
-        )
-        out = Complex(stub_net)
-
-        def _slice_poly_kwargs(parent: Polyhedron, halfspaces: np.ndarray) -> dict[str, Any]:
-            err = rounding.slice_error(parent.halfspaces_np, parent.halfspaces_err_np, V_arr, x0_arr)
-            kwargs: dict[str, Any] = {"halfspaces": halfspaces, "halfspaces_err": err, "_ambient_dim": k}
-            if parent._shis is not None:
-                kwargs["shis"] = list(parent._shis)
-            for attr in ("_codim", "_dim", "_finite"):
-                val = getattr(parent, attr, None)
-                if val is not None:
-                    kwargs[attr.lstrip("_")] = val
-            return kwargs
-
-        for poly in self:
-            H = poly.halfspaces_np  # (m, d+1)
-            A = H[:, :-1]  # (m, d)
-            b_col = H[:, -1]  # (m,)
-
-            # Substitute x = x0 + V t into each constraint a_i^T x + b_i <= 0
-            A_v = A @ V_arr  # (m, k)
-            b_v = A @ x0_arr + b_col  # (m,)
-
-            if k == 0:
-                # Subspace is a single point; just check containment of x0
-                b_err = rounding.slice_error(H, poly.halfspaces_err_np, V_arr, x0_arr)[:, -1]
-                if np.any(b_v > b_err):
-                    continue
-                if not np.all(b_v < -b_err):
-                    raise AmbiguousGeometryError(f"the slice point lies on a row of {poly!r} to within float64 error")
-                out.add_polyhedron(
-                    Polyhedron(
-                        stub_net,
-                        poly.ss_np,
-                        **_slice_poly_kwargs(poly, b_v.reshape(-1, 1)),
-                    ),
-                    check_exists=False,
-                )
-                continue
-
-            H_slice = np.column_stack([A_v, b_v])  # (m, k+1)
-
-            # Chebyshev-center LP on the sliced rows, certified against their own error:
-            # a verified interior point or an unbounded radius means the slice is nonempty.
-            kwargs = _slice_poly_kwargs(poly, H_slice)
-            center, radius = solve_radius(env, H_slice, errors=kwargs["halfspaces_err"])
-            if center is not None or radius == float("inf"):
-                out.add_polyhedron(
-                    Polyhedron(stub_net, poly.ss_np, **kwargs),
-                    check_exists=False,
-                )
-        if len(out) > 0:
-            incidence.set_contracted_shis(out)
-            if cfg.CAREFUL_MODE:
-                incidence.verify_contracted_shis(out)
-        return out
-
-    @with_verbosity
-    def get_boundary_edges(self, i: int, verbose: int | None = None) -> set[tuple[Polyhedron, Polyhedron]]:
-        """Get the boundary of neuron i by returning the set of edges in the dual graph with label i."""
-        del verbose  # applied by @with_verbosity
-        assert 0 <= i < self.n, f"Neuron index out of range: {i} not in [0, {self.n})"
-        return {(a, b) for a, b, shi in progress(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1) if shi == i}
-
-    def _codim_one_face_kwargs(self, p1: Polyhedron, _p2: Polyhedron, shi: int) -> dict[str, Any]:
-        """Shared kwargs for :meth:`get_boundary_cells` faces.
-
-        Candidate SHIs are all nonzero sign-sequence crossings on the face (role 1);
-        :func:`~relucent.graph.incidence.set_contracted_shis` keeps flip neighbors in the slice.
-        Infeasible 1-cell faces are dropped at construction time via
-        :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
-
-        Meta-graph **face edges** always use :func:`~relucent.graph.incidence.ss_nonzero_indices`.
-        The ambient chain complex uses :mod:`relucent.graph.vertex_star` instead of this helper.
-        """
-        ambient = p1.ambient_dim
-        codim = p1.codim + 1
-        face_dim = ambient - codim
-        shi_i = int(shi)
-        face_ss = p1.ss_np.copy()
-        face_ss[0, shi_i] = 0
-        candidate_shis = list(incidence.ss_nonzero_indices(face_ss))
-        if face_dim == 1 and p1.halfspaces is not None:
-            new_ss = p1.ss_np.copy()
-            new_ss[0, shi_i] = 0
-            probe = Polyhedron(
-                p1._net,
-                new_ss,
-                halfspaces=p1.halfspaces,
-                halfspaces_err=p1.halfspaces_err_np,
-                halfspaces_ss=p1.halfspaces_rows_ss,
-                _rows_data=p1._rows_data,
-                codim=codim,
-                dim=face_dim,
-                _ambient_dim=ambient,
-            )
-            candidate_shis = [s for s in candidate_shis if probe.is_shi_face_feasible(int(s))]
-        poly_kwargs: dict[str, Any] = {
-            "halfspaces": p1.halfspaces,
-            "halfspaces_err": p1.halfspaces_err_np,
-            "halfspaces_ss": p1.halfspaces_rows_ss,
-            "_rows_data": p1._rows_data,
-            "shis": candidate_shis,
-            "codim": codim,
-            "dim": face_dim,
-            "_ambient_dim": ambient,
-        }
-        return poly_kwargs
-
-    @with_verbosity
-    def get_boundary_cells(self, i: int, verbose: int | None = None, *, verify: bool = True) -> set[Polyhedron]:
-        """Get all (d-1)-cells in neuron i's BH."""
-        from relucent.search.boundary_search import _both_ambient_cofaces_feasible
-
-        faces = set()
-        edges = list(self.get_boundary_edges(i, verbose=verbose))
-        for edge in progress(edges, desc="Getting Boundary Cells", delay=1):
-            p1, p2 = edge[0], edge[1]
-            shi = int(self.G.edges[edge]["shi"])
-            if verify and (shi not in p1.shis or shi not in p2.shis):
-                raise DualGraphAsymmetricEdgeError(
-                    f"Boundary edge shi={shi} on ({p1!r}, {p2!r}) lacks bidirectional SHI support."
-                )
-            new_ss = p1.ss_np.copy()
-            new_ss[0, shi] = 0
-            p = self.ss2poly(
-                new_ss,
-                check_exists=False,
-                **self._codim_one_face_kwargs(p1, p2, shi),
-            )
-            if verify and not _both_ambient_cofaces_feasible(p, i):
-                raise ValueError(f"Boundary face {p!r} fails ambient coface feasibility for neuron {i}.")
-            faces.add(p)
-        return faces
-
-    @with_verbosity
-    def get_boundary_complex(self, i: int, verbose: int | None = None) -> Complex:
-        """Get the boundary complex of neuron i.
+        See :func:`relucent.graph.boundary.boundary_complex`. To find it without exploring
+        the whole input space, use :meth:`discover_boundary_complex`.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
-            ComplexNotCompleteError: If the input complex is not complete.
-            ComplexNotVerifiedError: If the input complex is not verified.
+            ComplexNotCompleteError: If this complex is not complete.
+            ComplexNotVerifiedError: If this complex is not verified.
         """
-        self.assert_topology_ready()
-        self._dual_graph = self.get_dual_graph(require_complete=True)
-        cplx = Complex(self.net)
-        for poly in progress(
-            self.get_boundary_cells(i, verbose=verbose, verify=True),
-            desc="Getting Boundary Complex",
-            delay=1,
-        ):
-            cplx.add_polyhedron(poly, check_exists=False)
-        incidence.set_contracted_shis(cplx)
-        if cfg.CAREFUL_MODE:
-            incidence.verify_contracted_shis(cplx)
-        cplx.verify_arrangement_genericity()
+        from relucent.graph.boundary import boundary_complex
 
-        if len(cplx) == 0:
-            cplx.set_exploration_state(complete=True, verified=True)
-            return cplx
-        cplx.set_exploration_state(complete=True, verified=False)
-        certify.certify_complex(cplx, level=CertifyLevel.COMPLETE, record_state=True)
-        return cplx
+        return boundary_complex(self, i, verbose=verbose)
+
+    def slice_affine(self, x0: np.ndarray, V: np.ndarray) -> Complex:
+        """Intersect every cell with the affine subspace ``{x0 + V @ t}``, as a complex in ``t``.
+
+        See :func:`relucent.geometry.slicing.slice_complex`.
+        """
+        from relucent.geometry.slicing import slice_complex
+
+        return slice_complex(self, x0, V)
 
     @overload
     def discover_boundary_complex(
@@ -1177,6 +910,19 @@ class Complex:
             return boundary, stats
         return boundary
 
+    def get_chain_complex(self, verbose: int | None = None) -> list[Complex]:
+        """Recover every cell of every dimension from verified vertices' local stars.
+
+        Returns ``[self, (d-1)-cells, ..., 0-cells]`` as complexes. See
+        :func:`relucent.graph.vertex_star.build_chain_complex`.
+
+        Raises:
+            ComplexNotCompleteError, ComplexNotVerifiedError: If this complex is not
+                complete and verified.
+            CubicalConsistencyError: If the labeled top-cell graph is not cubical.
+        """
+        return vertex_star.build_chain_complex(self, verbose=verbose)
+
     def contract(self, verbose: int | None = None) -> Complex:
         """Return ``get_chain_complex(...)[self.dim - 1]``.
 
@@ -1187,154 +933,6 @@ class Complex:
         """
         return self.get_chain_complex(verbose=verbose)[self.dim - 1]
 
-    def _verified_vertices(self) -> tuple[int, dict[bytes, vertex_star.VertexRecord]]:
-        """``(top_dim, vertices)``: every verified vertex of this complete, verified complex.
-
-        The vertices of :meth:`get_chain_complex` (its 0-cells), without the rest of the chain.
-        """
-        top_dim = max(int(p.dim) for p in self)
-        top_cells = [p for p in self if int(p.dim) == top_dim]
-        graph = cast(Any, self.get_dual_graph(require_complete=False))
-        incidence.certify_dual_graph(graph, self, top_dim=top_dim)
-
-        # Candidate-vertex verification dominates runtime on large complexes (see
-        # vertex_star.find_vertices). Passing net lets it run across a worker pool.
-        vertices = vertex_star.find_vertices(
-            top_cells,
-            graph,
-            net=self._net,
-            nworkers=process_aware_cpu_count() or 1,
-            ambient_dim=int(self.dim),
-            top_dim=top_dim,
-            verify_vertex=Polyhedron.verify_vertex_covector,
-            screen=True,
-        )
-        return top_dim, vertices
-
-    def _vertex_polyhedron(self, cplx: Complex, vertex: vertex_star.VertexRecord) -> Polyhedron:
-        """Add a verified vertex to ``cplx`` as a 0-cell carrying its witness's rows and its point."""
-        ambient_dim = int(self.dim)
-        witness = self.tag2poly[vertex.witness_tag]
-        poly = cplx.add_ss(
-            vertex.ss,
-            codim=ambient_dim,
-            dim=0,
-            _ambient_dim=ambient_dim,
-            halfspaces=witness.halfspaces,
-            halfspaces_err=witness.halfspaces_err_np,
-            halfspaces_ss=witness.halfspaces_rows_ss,
-            _rows_data=witness._rows_data,
-            finite=True,
-        )
-        poly._interior_point = vertex.point
-        return poly
-
-    @with_verbosity
-    def get_chain_complex(self, verbose: int | None = None) -> list[Complex]:
-        """Recover the chain complex directly from verified vertices' local stars.
-
-        Masden (2022), Theorem 20: the sign-sequence complex is a pure,
-        ambient-dimensional cubical complex, so once a vertex (exactly
-        ``ambient_dim`` zero sign entries, Lemma 16) is verified, *every* cell
-        in its local star is algebraically guaranteed to be present (Lemma
-        18's sign-product semigroup) — no independent rediscovery of
-        neighboring top-dimensional cells, dual-graph cube verification, or
-        coverage heuristic is required. See :mod:`relucent.graph.vertex_star`.
-
-        Candidate vertices receive one float64 equality solve followed by a
-        check against every other row of their witness cell
-        (:meth:`Polyhedron.verify_vertex_covector`);
-        no facet or boundedness LP is used here. Every recovered cell of
-        dimension ``k >= 1`` has, by construction, at least one verified
-        vertex among its own faces (its generating vertex), so a cell can
-        never end up with every endpoint unverifiable.
-
-        Raises:
-            CubicalConsistencyError: If the labeled top-cell graph is not cubical.
-        """
-        del verbose  # applied by @with_verbosity
-        self.assert_topology_ready()
-        if len(self) == 0:
-            return [self]
-        ambient_dim = int(self.dim)
-        top_dim, vertices = self._verified_vertices()
-        cells_by_dim = vertex_star.cells_from_vertices(vertices, top_dim=top_dim)
-        vertex_points = {tag: v.point for tag, v in vertices.items()}
-
-        chain: list[Complex] = [self]
-        for dim in range(top_dim - 1, -1, -1):
-            recovered = cells_by_dim.get(dim, {})
-            if not recovered:
-                continue
-            cplx = Complex(self.net)
-            ordered_tags = sorted(recovered)
-            if dim == 1:
-                ordered_tags.sort(
-                    key=lambda tag: (
-                        -sum(
-                            incidence.face_tag(recovered[tag], shi) in vertex_points
-                            for shi in incidence.ss_nonzero_indices(recovered[tag])
-                        ),
-                        tag,
-                    )
-                )
-            elif dim == 0 and chain and len(chain[-1]) > 0 and int(chain[-1].index2poly[0].dim) == 1:
-                endpoint_order: list[bytes] = []
-                seen_endpoints: set[bytes] = set()
-                for one_cell in chain[-1]:
-                    for shi in one_cell._covector_endpoint_shis or []:
-                        endpoint_tag = incidence.face_tag(one_cell.ss_np, shi)
-                        if endpoint_tag in recovered and endpoint_tag not in seen_endpoints:
-                            endpoint_order.append(endpoint_tag)
-                            seen_endpoints.add(endpoint_tag)
-                ordered_tags = endpoint_order + [tag for tag in ordered_tags if tag not in seen_endpoints]
-            for tag in ordered_tags:
-                ss = recovered[tag]
-                kwargs: dict[str, Any] = {
-                    "codim": ambient_dim - dim,
-                    "dim": dim,
-                    "_ambient_dim": ambient_dim,
-                }
-                point = vertex_points.get(tag)
-                if dim == 0:
-                    self._vertex_polyhedron(cplx, vertices[tag])
-                    continue
-                if dim == 1:
-                    candidate_by_shi = {shi: incidence.face_tag(ss, shi) for shi in incidence.ss_nonzero_indices(ss)}
-                    kwargs["_covector_endpoint_shis"] = sorted(
-                        shi for shi, face in candidate_by_shi.items() if face in vertex_points
-                    )
-                poly = cplx.add_ss(ss, **kwargs)
-                if point is not None:
-                    poly._interior_point = point
-
-            if len(cplx) == 0:
-                continue
-            incidence.set_contracted_shis(cplx)
-            if cfg.CAREFUL_MODE:
-                incidence.verify_contracted_shis(cplx)
-            cplx.set_exploration_state(complete=True, verified=True)
-            chain.append(cplx)
-
-        logger.debug("Chain: %s", ", ".join([f"{len(c)} {c.index2poly[0].dim}-cells" for c in chain]))
-        return chain
-
-    def partial_derivative_on_1cell(
-        self,
-        one_cell: Polyhedron,
-        from_vertex: Polyhedron,
-        *,
-        value: bool = False,
-    ) -> int | float:
-        """Partial derivative of the network along a 1-cell from a vertex endpoint.
-
-        See :func:`relucent.topology.morse.partial_derivative_on_1cell`.
-        """
-        from relucent.topology.morse import partial_derivative_on_1cell as _pd_1cell
-
-        return _pd_1cell(one_cell, from_vertex, self, value=value)
-
-    @with_verbosity
     def get_critical_points(
         self,
         *,
@@ -1342,365 +940,25 @@ class Complex:
         include_degenerate: bool = False,
         verbose: int | None = None,
     ) -> list[CriticalPoint]:
-        """Return PL Morse critical vertices and their indices in the discovered complex.
+        """Return PL Morse critical vertices and their indices (scalar-output networks only).
 
-        Uses combinatorial edge data (Brooks & Masden, arXiv:2412.18005) and requires a
-        scalar-output network.
-
-        Args:
-            require_complete: If True, require every combinatorial 1-cell incident to
-                each tested vertex to appear in the complex.
-            include_degenerate: If True, include flat / degenerate critical vertices
-                (index ``-1``).
-            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
-                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-
-        Returns:
-            List of :class:`~relucent.topology.morse.CriticalPoint` records.
+        See :func:`relucent.topology.morse.critical_points`.
         """
-        from relucent.topology.morse import (
-            CriticalPoint,
-            assert_scalar_output,
-            critical_flags_for_vertices,
-            is_pl_critical_vertex,
-        )
+        from relucent.topology.morse import critical_points
 
-        assert_scalar_output(self._net)
-        self.assert_topology_ready()
-        if len(self) == 0:
-            return []
-        # Criticality needs only each vertex's sign sequence, so find the verified vertices
-        # (the 0-cells of get_chain_complex) without building the rest of the chain complex.
-        _, found = self._verified_vertices()
-        if not found:
-            return []
-        vertices = [found[tag] for tag in sorted(found)]
+        return critical_points(self, require_complete=require_complete, include_degenerate=include_degenerate, verbose=verbose)
 
-        flags: list[tuple[bool, int | None]]
-        if require_complete:
-            meta = self.get_meta_graph(verbose=verbose)
-            one_cell_tags = {tag for tag, attrs in meta.nodes(data=True) if int(attrs.get("dim", -1)) == 1}
-
-            # The completeness check reads `self`/`meta` per vertex, so this path stays
-            # sequential; only the common `require_complete=False` case below (every
-            # caller in this codebase) is farmed out across a worker pool.
-            from relucent.utils import encode_ss
-
-            flags = []
-            for vertex in vertices:
-                # Incident edges are inferred combinatorially; this checks they were discovered.
-                v_ss = vertex.ss.ravel()
-                for shi in np.flatnonzero(v_ss == 0):
-                    for sign in (-1, 1):
-                        edge_ss = v_ss.copy()
-                        edge_ss[int(shi)] = sign
-                        tag = encode_ss(edge_ss.reshape(1, -1))
-                        if tag not in one_cell_tags:
-                            raise ValueError(
-                                f"combinatorial 1-cell {tag!r} incident to vertex {vertex.tag!r} "
-                                + "is missing from the discovered complex"
-                            )
-                flags.append(
-                    is_pl_critical_vertex(
-                        vertex.ss,
-                        self._net,
-                        ssi2maski=self.ssi2maski,
-                        ss_layers=self.ss_layers,
-                    )
-                )
-        else:
-            # Each vertex's criticality check is independent (like candidate verification in
-            # get_chain_complex), so use a worker pool once there's enough work.
-            nworkers = process_aware_cpu_count() or 1
-            flags = critical_flags_for_vertices(
-                [vertex.ss for vertex in vertices],
-                self._net,
-                ssi2maski=self.ssi2maski,
-                ss_layers=self.ss_layers,
-                nworkers=nworkers,
-            )
-
-        vertex_complex = Complex(self.net)
-        results: list[CriticalPoint] = []
-        for vertex, (is_critical, index) in zip(vertices, flags, strict=True):
-            if not is_critical:
-                continue
-            if index is None or (index < 0 and not include_degenerate):
-                continue
-            results.append(
-                CriticalPoint(
-                    polyhedron=self._vertex_polyhedron(vertex_complex, vertex),
-                    tag=vertex.tag,
-                    ss=np.asarray(vertex.ss, dtype=np.int8).copy(),
-                    point=np.asarray(vertex.point, dtype=np.float64).reshape(-1),
-                    index=int(index),
-                )
-            )
-        if len(vertex_complex):
-            incidence.set_contracted_shis(vertex_complex)
-        return results
-
-    @with_verbosity
     def get_meta_graph(self, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
-        """Return a meta-graph encoding cells across all dimensions and face relations.
+        """Return the face poset of every cell, all dimensions, as a meta-graph.
 
-        This method mirrors the face-encoding convention used by relucent's chain
-        complex and topology routines: a codimension-1 face of a k-cell is
-        obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
-
-        Nodes are cells of every dimension k=0..d, keyed by the polyhedron's ``tag``.
-        Each stores ``poly``, ``dim``, and ``ss`` (sign sequence as numpy).
-
-        Directed edges go from a k-cell to each of its (k-1)-faces under the SHI-zeroing
-        rule, and store ``shi``, the hyperplane index that was zeroed.
-
-        How things are derived (details in the :mod:`relucent.graph.incidence` docstring):
-
-        - Face edges: :func:`~relucent.graph.incidence.ss_nonzero_indices` + lookup.
-        - Node metadata (``shis``, ``crossings``): :func:`~relucent.graph.incidence.cubical_cell_shis`
-          per dimension slice, at node creation.
-        - Boundedness: classified from face edges only.
-
-        ``verify=True`` runs :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`
-        to check edges, node SHIs, and finite labels against the incidence code.
-
-        To compute homology from it, pass it to :func:`relucent.topology.get_betti_numbers`
-        with a ``compactify`` mode (which modifies the graph in place for ``"truncate"`` and
-        ``"one_point"``).
-
-        Note:
-            This encodes the face relations in :meth:`get_chain_complex`'s chain
-            (see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex in their
-            closure aren't represented; one-point compactification in
-            :func:`relucent.topology.get_betti_numbers` handles them.
+        Nodes are cells keyed by ``tag``; edges go from each k-cell to its (k-1)-faces.
+        See :func:`relucent.graph.meta_graph.build_meta_graph`.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
                 :meth:`get_chain_complex`.
         """
-        if len(self) == 0:
-            logger.debug("get_meta_graph: empty complex, returning empty graph")
-            return nx.MultiDiGraph()
-
-        nworkers = process_aware_cpu_count() or 1
-        logger.debug(
-            "get_meta_graph: starting (verify=%s, nworkers=%d)",
-            verify,
-            nworkers,
-        )
-
-        chain = self.get_chain_complex(verbose=verbose)
-        # Dimension -> complex in the chain (there is at most one per dimension).
-        by_dim: dict[int, Complex] = {}
-        for c in chain:
-            if len(c) == 0:
-                continue
-            by_dim[int(c.index2poly[0].dim)] = c
-
-        meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
-
-        # Add all cells as nodes, keyed by stable poly.tag (bytes).
-        # Collect the recovered cells once for boundedness classification.
-        all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
-        logger.debug(
-            "get_meta_graph: chain complex has %d dimensions, %d cells",
-            len(by_dim),
-            len(all_chain_polys),
-        )
-
-        lookup: dict[bytes, Polyhedron] = dict(self.tag2poly)
-        for c_k in by_dim.values():
-            lookup.update(c_k.tag2poly)
-
-        dim_neighbor_tags: dict[int, set[bytes]] = {int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()}
-
-        # Role 2: face edges from SS crossings (see module comment).
-        cells_by_dim: dict[int, list[tuple[bytes, np.ndarray, tuple[int, ...]]]] = {}
-        for k, c_k in sorted(by_dim.items(), reverse=True):
-            if int(k) <= 0:
-                continue
-            cells = [(p.tag, np.asarray(p.ss_np), incidence.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
-            cells_by_dim[int(k)] = cells
-
-        edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
-        for k, cells in cells_by_dim.items():
-            valid_face_tags = set(lookup.keys())
-            use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
-            if use_parallel:
-                logger.debug(
-                    "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
-                    int(k),
-                    nworkers,
-                    len(cells),
-                )
-                edges, extra_tags = incidence.parallel_collect_meta_face_edges(
-                    cells,
-                    valid_face_tags,
-                    nworkers=nworkers,
-                )
-            else:
-                if len(cells) < incidence.META_FACE_PARALLEL_MIN_CELLS:
-                    face_mode = f"sequential (cells < {incidence.META_FACE_PARALLEL_MIN_CELLS})"
-                elif nworkers <= 1:
-                    face_mode = "sequential (nworkers <= 1)"
-                else:
-                    face_mode = "sequential"
-                logger.debug(
-                    "get_meta_graph: k=%d face edges %s (%d cells)",
-                    int(k),
-                    face_mode,
-                    len(cells),
-                )
-                edges, extra_tags = incidence.collect_meta_face_edges(
-                    list(progress(cells, desc=f"Building meta-graph faces (k={k})", leave=False)),
-                    valid_face_tags,
-                )
-            edges_by_dim[int(k)] = (edges, extra_tags)
-            for face_tag_key in set(extra_tags):
-                if face_tag_key not in lookup and face_tag_key in self.tag2poly:
-                    lookup[face_tag_key] = self.tag2poly[face_tag_key]
-
-        # Recompute boundedness solely from the recovered face lattice.
-        for p in all_chain_polys:
-            if p.dim > 0:
-                p._finite_computed = False
-                p._finite = None
-
-        # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
-        # Union leftover covector flags with Chebyshev-empty phantoms (passing only the
-        # covector set would disable geometric_infeasible_one_cells).
-        covector_infeasible = {p.tag for p in by_dim.get(1, ()) if bool(getattr(p, "_covector_infeasible", False))}
-        geometric_infeasible = covector_infeasible | incidence.geometric_infeasible_one_cells(by_dim, edges_by_dim)
-        n_from_faces, infeasible_one_cells = incidence.classify_one_cells_finite_from_face_edges(
-            by_dim,
-            edges_by_dim,
-            geometric_infeasible=geometric_infeasible,
-        )
-        if infeasible_one_cells:
-            logger.debug(
-                "get_meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
-                len(infeasible_one_cells),
-            )
-        if n_from_faces:
-            logger.debug(
-                "get_meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
-                n_from_faces,
-            )
-
-        # Step 2: propagate boundedness upward from the 1-skeleton.
-        n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
-        if n_ascending:
-            logger.debug(
-                "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
-                n_ascending,
-            )
-
-        # Skipping virtual 1-cells (rejected endpoints) can leave higher cells with
-        # incomplete combinatorial faces; resolve those via Chebyshev then re-ascend.
-        pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
-        if pending_finite:
-            logger.debug(
-                "get_meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
-                pending_finite,
-            )
-            n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
-            if n_lp:
-                logger.debug("get_meta_graph: LP fallback classified %d cells", n_lp)
-            n_ascending2 = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
-            if n_ascending2:
-                logger.debug(
-                    "get_meta_graph: post-LP ascending sweep classified %d cells",
-                    n_ascending2,
-                )
-
-        pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
-        if pending_finite:
-            detail = incidence.format_pending_finite_polys(all_chain_polys)
-            msg = (
-                f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
-                + "still unclassified after combinatorial passes and LP fallback. "
-                + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
-                + detail
-            )
-            if cfg.CAREFUL_MODE:
-                raise AssertionError(msg)
-            logger.warning(msg)
-        else:
-            logger.debug(
-                "get_meta_graph: all %d chain cells classified",
-                len(all_chain_polys),
-            )
-
-        excluded_tags: set[bytes] = set()
-        infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
-        if infeasible_tags:
-            excluded_tags = set(infeasible_tags)
-            # Propagate exclusion only if the complex has genuinely unbounded cells. On closed
-            # bounded surfaces (e.g. a torus), phantom 1-cells are spurious faces; dropping
-            # just those (not their cofaces) keeps homology [1, 2, 1] and filters bad edges.
-            has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
-            if has_unbounded_chain:
-                excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
-            logger.debug(
-                "get_meta_graph: excluding %d infeasible cells (%d total excluded)",
-                len(infeasible_tags),
-                len(excluded_tags),
-            )
-
-        comb_zero_by_tag = incidence.combinatorial_zero_faces_by_one_cell(by_dim, edges_by_dim)
-        one_face_shis: dict[bytes, set[int]] = {}
-        for one_tag, _zero_tag, shi in edges_by_dim.get(1, ([], []))[0]:
-            one_face_shis.setdefault(one_tag, set()).add(int(shi))
-
-        for k, c_k in sorted(by_dim.items(), reverse=True):
-            neighbor_tags = dim_neighbor_tags[int(k)]
-            for p in c_k:
-                if p.tag in excluded_tags:
-                    continue
-                node_attrs = incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags)
-                if int(p.dim) == 1:
-                    node_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(p.tag, 0)
-                    node_attrs["shis"] = sorted(one_face_shis.get(p.tag, set()))
-                meta.add_node(p.tag, **node_attrs)
-
-        # Add cached face edges k -> k-1.
-        for k in sorted(by_dim.keys(), reverse=True):
-            if int(k) <= 0:
-                continue
-            edges, extra_tags = edges_by_dim[int(k)]
-
-            known_nodes = set(meta.nodes)
-            new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
-            if new_face_tags:
-                incidence.classify_lazy_face_polys(new_face_tags, lookup, edges_by_dim)
-            face_dim = int(k) - 1
-            face_neighbors = dim_neighbor_tags.get(face_dim, set())
-            for face_tag_key in new_face_tags:
-                face_attrs = incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors)
-                if int(lookup[face_tag_key].dim) == 1:
-                    face_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(face_tag_key, 0)
-                    face_attrs["shis"] = sorted(one_face_shis.get(face_tag_key, set()))
-                meta.add_node(
-                    face_tag_key,
-                    **face_attrs,
-                )
-            known_nodes.update(new_face_tags)
-
-            meta.add_edges_from(
-                (u, v, {"shi": shi}) for u, v, shi in edges if u not in excluded_tags and v not in excluded_tags
-            )
-
-        if verify:
-            logger.debug("get_meta_graph: verify pass (incidence engine consistency)")
-            mg.verify_meta_graph_incidence(meta, by_dim, lookup)
-
-        logger.debug(
-            "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
-            meta.number_of_nodes(),
-            meta.number_of_edges(),
-            verify,
-        )
-        return meta
+        return mg.build_meta_graph(self, verify=verify, verbose=verbose)
 
     @with_verbosity
     def get_betti_numbers(
@@ -1812,13 +1070,6 @@ class Complex:
         self,
         *,
         relabel: Literal[False] = False,
-        plot: bool = False,
-        node_color: str | None = None,
-        node_size: str | None = None,
-        cmap: str = "viridis",
-        match_locations: bool = False,
-        show_node_labels: bool = False,
-        show_edge_labels: bool = False,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[Polyhedron]: ...
@@ -1828,13 +1079,6 @@ class Complex:
         self,
         *,
         relabel: Literal[True],
-        plot: bool = False,
-        node_color: str | None = None,
-        node_size: str | None = None,
-        cmap: str = "viridis",
-        match_locations: bool = False,
-        show_node_labels: bool = False,
-        show_edge_labels: bool = False,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[int]: ...
@@ -1843,13 +1087,6 @@ class Complex:
         self,
         *,
         relabel: bool = False,
-        plot: bool = False,
-        node_color: str | None = None,
-        node_size: str | None = None,
-        cmap: str = "viridis",
-        match_locations: bool = False,
-        show_node_labels: bool = False,
-        show_edge_labels: bool = False,
         require_complete: bool = False,
         repair: bool = True,
     ) -> nx.Graph[Polyhedron] | nx.Graph[int]:
@@ -1857,7 +1094,8 @@ class Complex:
 
         The dual graph represents the connectivity structure of the complex,
         where nodes are polyhedra and edges connect adjacent polyhedra (those
-        sharing a supporting hyperplane).
+        sharing a supporting hyperplane). For a PyVis-ready copy, see
+        :func:`relucent.vis.pyvis_dual_graph`.
 
         Edges use combinatorial cubical adjacency via :func:`~relucent.graph.incidence.dual_edges_top_dim`
         (0-face sharing when ``max_dim == 1``, flip neighbors when ``max_dim >= 2``).
@@ -1865,21 +1103,9 @@ class Complex:
         Args:
             relabel: If True, nodes are indexed by integers matching self.index2poly
                 indices. If False, nodes are Polyhedron objects. Defaults to False.
-            plot: If True, prepare the graph for visualization with pyvis by
-                adding layout and styling attributes. Defaults to False.
-            node_color: If "Wl2", color nodes by their Wl2 (weight norm) value.
-                If "volume", color by volume. If None, no special coloring.
-                Defaults to None.
-            node_size: If "volume", size nodes proportionally to their volume.
-                If None, use default size. Defaults to None.
-            cmap: Colormap to use when node_color is specified. Defaults to "viridis".
-            match_locations: If True, position graph nodes at the center points
-                of their polyhedra (only works for 2D complexes). Defaults to False.
-            show_node_labels: If True, show node labels in the graph. Defaults to False.
-            show_edge_labels: If True, show edge labels (SHI) in the graph. Defaults to False.
             require_complete: If True, raise :class:`IncompleteDualGraphError` when
                 boundary neighbors are missing (checked via an LP facet recompute on
-                full ambient top cells). Defaults to False. Used by :meth:`contract`.
+                full ambient top cells). Defaults to False.
             repair: If True (default), overwrite each top cell's ``_shis`` from the
                 freshly built combinatorial dual graph (see
                 :func:`~relucent.graph.incidence.sync_shis_from_dual_graph`). This is the
@@ -1892,7 +1118,6 @@ class Complex:
                 they cross.
 
         Raises:
-            ValueError: If match_locations is True and the complex is not 2D.
             IncompleteDualGraphError: If ``require_complete`` is True and boundary
                 neighbors are missing.
         """
@@ -1904,50 +1129,7 @@ class Complex:
         for poly in top_cells:
             graph.nodes[poly]["label"] = str(poly)
 
-        if plot:
-            from relucent.vis import get_colors
-
-            plot_graph = cast(Any, graph)
-            if match_locations:
-                if self.dim != 2:
-                    raise ValueError("Polyhedra must be 2D to match locations")
-
-                nx.set_node_attributes(plot_graph, {node: False for node in plot_graph.nodes}, "physics")
-                nx.set_node_attributes(
-                    plot_graph,
-                    {poly: pt[0].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
-                    "x",
-                )
-                nx.set_node_attributes(
-                    plot_graph,
-                    {poly: pt[1].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
-                    "y",
-                )
-
-            if node_color == "Wl2":
-                colors = get_colors([poly.Wl2 for poly in plot_graph.nodes], cmap=cmap)
-                for c, poly in zip(colors, plot_graph.nodes, strict=True):
-                    plot_graph.nodes[poly]["color"] = c
-            elif node_color == "volume":
-                colors = get_colors([poly.volume for poly in plot_graph.nodes], cmap=cmap)
-                for c, poly in zip(colors, plot_graph.nodes, strict=True):
-                    plot_graph.nodes[poly]["color"] = c
-
-            if node_size == "volume":
-                sizes = [poly.volume for poly in plot_graph.nodes]
-                maxsize = max(sizes)
-                for size, poly in zip(sizes, plot_graph.nodes, strict=True):
-                    plot_graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
-            else:
-                nx.set_node_attributes(plot_graph, {node: 4 for node in plot_graph.nodes}, "size")
-
-            for node in plot_graph.nodes:
-                plot_graph.nodes[node]["label"] = str(node) if show_node_labels else ""
-                plot_graph.nodes[node]["title"] = str(node)
-            for edge in plot_graph.edges:
-                plot_graph.edges[edge]["label"] = str(plot_graph.edges[edge]["shi"]) if show_edge_labels else ""
-                plot_graph.edges[edge]["title"] = str(plot_graph.edges[edge]["shi"])
-        if plot or relabel:
+        if relabel:
             graph = nx.relabel_nodes(graph, {poly: i for i, poly in enumerate(self)})
         if require_complete and int(max_dim) == int(self.dim) and top_cells:
             # LP completeness check for full ambient top cells only.
@@ -1961,62 +1143,11 @@ class Complex:
         source: int,
         copy: bool = False,
     ) -> None:
-        """Recover a complex from its connectivity graph.
+        """Fill this complex from a stored dual graph (top cells plus ``shi`` edge labels).
 
-        Reconstructs polyhedra in the complex by traversing the adjacency graph
-        of top-dimensional cells, using the supporting hyperplane indices stored
-        on edges to determine how to flip sign sequence elements. This is useful
-        for storing large complexes efficiently, as you only need to store the
-        graph structure and SHI indices on edges rather than full polyhedron data.
-
-        Args:
-            G: A networkx.Graph representing the dual graph. Edges must have
-                a "shi" attribute indicating the supporting hyperplane index.
-            initial_ss: The sign sequence of the starting polyhedron as
-                torch.Tensor or np.ndarray.
-            source: The node key in G for the polyhedron with sign sequence initial_ss.
-            copy: If True, operate on a copy of G; otherwise modify G in place.
-                Defaults to False.
-
-        Notes:
-            Runs combinatorial certification (:class:`~relucent.verify.certify.CertifyLevel.COMBINATORIAL`)
-            on the reconstructed complex and sets exploration state accordingly. Only
-            recover graphs that were built from a complete, verified ambient search.
+        See :func:`relucent.graph.complex_graph.recover_from_dual_graph`.
         """
-        if copy:
-            graph = graph.copy()
-        initial_p = self.add_ss(initial_ss)
-        graph.nodes[source]["poly"] = initial_p
-        # ``nx.bfs_edges`` yields only the N-1 tree edges, so the progress bar
-        # total must be in terms of nodes, not the total number of dual edges.
-        for edge in progress(
-            nx.bfs_edges(graph, source=source),
-            desc="Recovering Polyhedra",
-            total=graph.number_of_nodes() - 1,
-        ):
-            poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
-            if cfg.CAREFUL_MODE:
-                assert poly1.ss_np.ravel()[shi] != 0
-            poly2 = self.add_ss(flip_ss_at_shi(poly1.ss_np, shi), check_exists=False)
-            graph.nodes[edge[1]]["poly"] = poly2
-
-        # Populate each polyhedron's ``_shis`` from the full dual graph in a
-        # single pass: iterating ``graph.edges(node)`` per-node would visit each
-        # edge twice and also force a redundant ``self[...]`` SSManager lookup.
-        shis_per_node: dict[Any, list[int]] = {n: [] for n in graph}
-        for u, v, data in graph.edges(data=True):
-            shi = data["shi"]
-            shis_per_node[u].append(shi)
-            shis_per_node[v].append(shi)
-        for node, shis in shis_per_node.items():
-            graph.nodes[node]["poly"]._shis = shis
-            # Caches are written only for complete+verified complexes; trust SHIs on reload.
-            graph.nodes[node]["poly"]._shis_strict = True
-        # Dual-graph recovery reconstructs a previously explored complex, but still
-        # certifies combinatorially (rebuilding + repairing the dual graph) rather
-        # than blindly trusting the reconstruction.
-        self.set_exploration_state(complete=True, verified=False)
-        certify.certify_complex(self, level=CertifyLevel.COMBINATORIAL, repair=True, record_state=True)
+        recover_from_dual_graph(self, graph, initial_ss, source, copy=copy)
 
     def plot(
         self,

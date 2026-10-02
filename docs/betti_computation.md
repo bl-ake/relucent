@@ -114,7 +114,7 @@ Then [`sync_shis_from_dual_graph()`](../src/relucent/graph/incidence.py) overwri
 **Related (not the ambient chain complex):**
 [`get_boundary_cells`](../src/relucent/core/complex.py) /
 [`get_boundary_complex`](../src/relucent/core/complex.py) still create faces from
-dual edges via [`_codim_one_face_kwargs()`](../src/relucent/core/complex.py).
+dual edges via [`_codim_one_face_kwargs()`](../src/relucent/graph/boundary.py).
 
 ---
 

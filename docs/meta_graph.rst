@@ -10,3 +10,7 @@ Meta-graph and Network Surgery
 .. automodule:: relucent.graph.complex_graph
    :members:
    :show-inheritance:
+
+.. automodule:: relucent.graph.boundary
+   :members:
+   :show-inheritance:

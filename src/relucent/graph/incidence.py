@@ -96,7 +96,7 @@ def ss_nonzero_indices(ss: np.ndarray) -> tuple[int, ...]:
     cells.
 
     Not used when building the contraction chain
-    (:meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` seeds candidates
+    (:func:`relucent.graph.boundary._codim_one_face_kwargs` seeds candidates
     from this, then :func:`set_contracted_shis` finalizes). Propagated
     ``poly._shis`` can be a strict subset after coface intersection; using it
     for edge discovery omits valid faces and breaks ``∂² = 0``.

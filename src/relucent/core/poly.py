@@ -293,11 +293,11 @@ class Polyhedron:
         of k-cells with k > 1 are themselves polytopes; checking their feasibility
         requires finding an interior point via LP.  In practice the dual-graph /
         covector recovery path and construction-time
-        :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` checks (boundary
+        :func:`relucent.graph.boundary._codim_one_face_kwargs` checks (boundary
         faces) prevent phantom cells at dimensions > 0, so this check is not needed there.
 
         **Invariant**: every 1-cell that passes through boundary-face construction
-        (via :meth:`~relucent.core.complex.Complex._codim_one_face_kwargs`) is constructed
+        (via :func:`relucent.graph.boundary._codim_one_face_kwargs`) is constructed
         with ``halfspaces`` set from its coface, so halfspaces are always available.
         A ``ValueError`` is raised when this invariant is violated (i.e. a 1-cell is
         encountered without cached halfspaces), which indicates the cell was

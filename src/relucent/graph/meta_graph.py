@@ -1,9 +1,9 @@
-"""Meta-graph transforms: truncation, compactification, and audits.
+"""Meta-graph construction, transforms (truncation, compactification), and audits.
 
 Face incidence, dual-graph adjacency, and boundedness classification live in
 :mod:`relucent.graph.incidence`; certification lives in :mod:`relucent.verify.certify`.
-This module works on an already-built meta-graph:
 
+- Construction: :func:`build_meta_graph` (behind ``Complex.get_meta_graph``).
 - Truncation / compactification: :func:`truncate_meta_graph`,
   :func:`one_point_compactify_meta_graph`, :func:`finite_cells_subgraph`.
 - Audits: :func:`verify_meta_graph_incidence`, :func:`verify_meta_graph_one_cells`
@@ -13,16 +13,21 @@ This module works on an already-built meta-graph:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import networkx as nx
 import numpy as np
 
 import relucent.config as cfg
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent.core.errors import CubicalConsistencyError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
+from relucent.graph import incidence
 from relucent.graph.incidence import assemble_face_edges_by_dim, cubical_cell_shis, face_tag, ss_nonzero_indices
-from relucent.utils import encode_ss
+from relucent.utils import encode_ss, process_aware_cpu_count
+
+if TYPE_CHECKING:
+    from relucent.core.complex import Complex
 
 # ``shi`` edge attribute for truncation incidences (not a network SHI).
 TRUNCATION_META_SHI: int = -1
@@ -34,6 +39,7 @@ __all__ = [
     "INFINITY_POINT_META_NODE",
     "INFINITY_POINT_META_SHI",
     "TRUNCATION_META_SHI",
+    "build_meta_graph",
     "finite_cells_subgraph",
     "one_point_compactify_meta_graph",
     "truncate_meta_graph",
@@ -645,3 +651,264 @@ def verify_meta_graph_incidence(
                 )
 
     verify_meta_graph_one_cells(meta)
+
+
+@with_verbosity
+def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
+    """Return a meta-graph encoding cells across all dimensions and face relations.
+
+    This method mirrors the face-encoding convention used by relucent's chain
+    complex and topology routines: a codimension-1 face of a k-cell is
+    obtained by setting one supporting-hyperplane sign entry (a SHI) to 0.
+
+    Nodes are cells of every dimension k=0..d, keyed by the polyhedron's ``tag``.
+    Each stores ``poly``, ``dim``, and ``ss`` (sign sequence as numpy).
+
+    Directed edges go from a k-cell to each of its (k-1)-faces under the SHI-zeroing
+    rule, and store ``shi``, the hyperplane index that was zeroed.
+
+    How things are derived (details in the :mod:`relucent.graph.incidence` docstring):
+
+    - Face edges: :func:`~relucent.graph.incidence.ss_nonzero_indices` + lookup.
+    - Node metadata (``shis``, ``crossings``): :func:`~relucent.graph.incidence.cubical_cell_shis`
+      per dimension slice, at node creation.
+    - Boundedness: classified from face edges only.
+
+    ``verify=True`` runs :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`
+    to check edges, node SHIs, and finite labels against the incidence code.
+
+    To compute homology from it, pass it to :func:`relucent.topology.get_betti_numbers`
+    with a ``compactify`` mode (which modifies the graph in place for ``"truncate"`` and
+    ``"one_point"``).
+
+    Note:
+        This encodes the face relations in :meth:`~relucent.core.complex.Complex.get_chain_complex`'s chain
+        (see :mod:`relucent.graph.vertex_star`). Cells with no finite vertex in their
+        closure aren't represented; one-point compactification in
+        :func:`relucent.topology.get_betti_numbers` handles them.
+
+    Raises:
+        IncompleteDualGraphError: If top-dimensional adjacency is incomplete; see
+            :meth:`~relucent.core.complex.Complex.get_chain_complex`.
+    """
+    if len(cplx) == 0:
+        logger.debug("get_meta_graph: empty complex, returning empty graph")
+        return nx.MultiDiGraph()
+
+    nworkers = process_aware_cpu_count() or 1
+    logger.debug(
+        "get_meta_graph: starting (verify=%s, nworkers=%d)",
+        verify,
+        nworkers,
+    )
+
+    chain = cplx.get_chain_complex(verbose=verbose)
+    # Dimension -> complex in the chain (there is at most one per dimension).
+    by_dim: dict[int, Complex] = {}
+    for c in chain:
+        if len(c) == 0:
+            continue
+        by_dim[int(c.index2poly[0].dim)] = c
+
+    meta: nx.MultiDiGraph[Any] = nx.MultiDiGraph()
+
+    # Add all cells as nodes, keyed by stable poly.tag (bytes).
+    # Collect the recovered cells once for boundedness classification.
+    all_chain_polys = [p for c_k in by_dim.values() for p in c_k]
+    logger.debug(
+        "get_meta_graph: chain complex has %d dimensions, %d cells",
+        len(by_dim),
+        len(all_chain_polys),
+    )
+
+    lookup: dict[bytes, Polyhedron] = dict(cplx.tag2poly)
+    for c_k in by_dim.values():
+        lookup.update(c_k.tag2poly)
+
+    dim_neighbor_tags: dict[int, set[bytes]] = {int(k): {p.tag for p in c_k} for k, c_k in by_dim.items()}
+
+    # Role 2: face edges from SS crossings (see module comment).
+    cells_by_dim: dict[int, list[tuple[bytes, np.ndarray, tuple[int, ...]]]] = {}
+    for k, c_k in sorted(by_dim.items(), reverse=True):
+        if int(k) <= 0:
+            continue
+        cells = [(p.tag, np.asarray(p.ss_np), incidence.ss_nonzero_indices(np.asarray(p.ss_np))) for p in c_k]
+        cells_by_dim[int(k)] = cells
+
+    edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {}
+    for k, cells in cells_by_dim.items():
+        valid_face_tags = set(lookup.keys())
+        use_parallel = len(cells) >= incidence.META_FACE_PARALLEL_MIN_CELLS and nworkers > 1
+        if use_parallel:
+            logger.debug(
+                "get_meta_graph: k=%d face edges via multiprocessing Pool (%d workers, %d cells)",
+                int(k),
+                nworkers,
+                len(cells),
+            )
+            edges, extra_tags = incidence.parallel_collect_meta_face_edges(
+                cells,
+                valid_face_tags,
+                nworkers=nworkers,
+            )
+        else:
+            if len(cells) < incidence.META_FACE_PARALLEL_MIN_CELLS:
+                face_mode = f"sequential (cells < {incidence.META_FACE_PARALLEL_MIN_CELLS})"
+            elif nworkers <= 1:
+                face_mode = "sequential (nworkers <= 1)"
+            else:
+                face_mode = "sequential"
+            logger.debug(
+                "get_meta_graph: k=%d face edges %s (%d cells)",
+                int(k),
+                face_mode,
+                len(cells),
+            )
+            edges, extra_tags = incidence.collect_meta_face_edges(
+                list(progress(cells, desc=f"Building meta-graph faces (k={k})", leave=False)),
+                valid_face_tags,
+            )
+        edges_by_dim[int(k)] = (edges, extra_tags)
+        for face_tag_key in set(extra_tags):
+            if face_tag_key not in lookup and face_tag_key in cplx.tag2poly:
+                lookup[face_tag_key] = cplx.tag2poly[face_tag_key]
+
+    # Recompute boundedness solely from the recovered face lattice.
+    for p in all_chain_polys:
+        if p.dim > 0:
+            p._finite_computed = False
+            p._finite = None
+
+    # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
+    # Union leftover covector flags with Chebyshev-empty phantoms (passing only the
+    # covector set would disable geometric_infeasible_one_cells).
+    covector_infeasible = {p.tag for p in by_dim.get(1, ()) if bool(getattr(p, "_covector_infeasible", False))}
+    geometric_infeasible = covector_infeasible | incidence.geometric_infeasible_one_cells(by_dim, edges_by_dim)
+    n_from_faces, infeasible_one_cells = incidence.classify_one_cells_finite_from_face_edges(
+        by_dim,
+        edges_by_dim,
+        geometric_infeasible=geometric_infeasible,
+    )
+    if infeasible_one_cells:
+        logger.debug(
+            "get_meta_graph: %d 1-cells excluded as geometrically or covector-infeasible",
+            len(infeasible_one_cells),
+        )
+    if n_from_faces:
+        logger.debug(
+            "get_meta_graph: classified %d 1-cells from 0-face incidence (no LP)",
+            n_from_faces,
+        )
+
+    # Step 2: propagate boundedness upward from the 1-skeleton.
+    n_ascending = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
+    if n_ascending:
+        logger.debug(
+            "get_meta_graph: ascending sweep classified %d contracted cells (no LP)",
+            n_ascending,
+        )
+
+    # Skipping virtual 1-cells (rejected endpoints) can leave higher cells with
+    # incomplete combinatorial faces; resolve those via Chebyshev then re-ascend.
+    pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+    if pending_finite:
+        logger.debug(
+            "get_meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
+            pending_finite,
+        )
+        n_lp = incidence.classify_finite_lp_fallback(all_chain_polys)
+        if n_lp:
+            logger.debug("get_meta_graph: LP fallback classified %d cells", n_lp)
+        n_ascending2 = incidence.classify_finite_combinatorial(by_dim, lookup, edges_by_dim)
+        if n_ascending2:
+            logger.debug(
+                "get_meta_graph: post-LP ascending sweep classified %d cells",
+                n_ascending2,
+            )
+
+    pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+    if pending_finite:
+        detail = incidence.format_pending_finite_polys(all_chain_polys)
+        msg = (
+            f"get_meta_graph: {pending_finite}/{len(all_chain_polys)} chain cells "
+            + "still unclassified after combinatorial passes and LP fallback. "
+            + "This may indicate an incomplete BFS, missing edges, or a non-generic network."
+            + detail
+        )
+        if cfg.CAREFUL_MODE:
+            raise AssertionError(msg)
+        logger.warning(msg)
+    else:
+        logger.debug(
+            "get_meta_graph: all %d chain cells classified",
+            len(all_chain_polys),
+        )
+
+    excluded_tags: set[bytes] = set()
+    infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
+    if infeasible_tags:
+        excluded_tags = set(infeasible_tags)
+        # Propagate exclusion only if the complex has genuinely unbounded cells. On closed
+        # bounded surfaces (e.g. a torus), phantom 1-cells are spurious faces; dropping
+        # just those (not their cofaces) keeps homology [1, 2, 1] and filters bad edges.
+        has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
+        if has_unbounded_chain:
+            excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
+        logger.debug(
+            "get_meta_graph: excluding %d infeasible cells (%d total excluded)",
+            len(infeasible_tags),
+            len(excluded_tags),
+        )
+
+    comb_zero_by_tag = incidence.combinatorial_zero_faces_by_one_cell(by_dim, edges_by_dim)
+    one_face_shis: dict[bytes, set[int]] = {}
+    for one_tag, _zero_tag, shi in edges_by_dim.get(1, ([], []))[0]:
+        one_face_shis.setdefault(one_tag, set()).add(int(shi))
+
+    for k, c_k in sorted(by_dim.items(), reverse=True):
+        neighbor_tags = dim_neighbor_tags[int(k)]
+        for p in c_k:
+            if p.tag in excluded_tags:
+                continue
+            node_attrs = incidence.meta_node_attrs(p, neighbor_tags=neighbor_tags)
+            if int(p.dim) == 1:
+                node_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(p.tag, 0)
+                node_attrs["shis"] = sorted(one_face_shis.get(p.tag, set()))
+            meta.add_node(p.tag, **node_attrs)
+
+    # Add cached face edges k -> k-1.
+    for k in sorted(by_dim.keys(), reverse=True):
+        if int(k) <= 0:
+            continue
+        edges, extra_tags = edges_by_dim[int(k)]
+
+        known_nodes = set(meta.nodes)
+        new_face_tags = [tag for tag in set(extra_tags) if tag not in known_nodes and tag not in excluded_tags]
+        if new_face_tags:
+            incidence.classify_lazy_face_polys(new_face_tags, lookup, edges_by_dim)
+        face_dim = int(k) - 1
+        face_neighbors = dim_neighbor_tags.get(face_dim, set())
+        for face_tag_key in new_face_tags:
+            face_attrs = incidence.meta_node_attrs(lookup[face_tag_key], neighbor_tags=face_neighbors)
+            if int(lookup[face_tag_key].dim) == 1:
+                face_attrs["comb_n_zero_faces"] = comb_zero_by_tag.get(face_tag_key, 0)
+                face_attrs["shis"] = sorted(one_face_shis.get(face_tag_key, set()))
+            meta.add_node(
+                face_tag_key,
+                **face_attrs,
+            )
+        known_nodes.update(new_face_tags)
+
+        meta.add_edges_from((u, v, {"shi": shi}) for u, v, shi in edges if u not in excluded_tags and v not in excluded_tags)
+
+    if verify:
+        logger.debug("get_meta_graph: verify pass (incidence engine consistency)")
+        verify_meta_graph_incidence(meta, by_dim, lookup)
+
+    logger.debug(
+        "get_meta_graph: done (%d nodes, %d edges, verify=%s)",
+        meta.number_of_nodes(),
+        meta.number_of_edges(),
+        verify,
+    )
+    return meta

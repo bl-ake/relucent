@@ -11,6 +11,7 @@ from relucent.topology.morse import (
     coface_sign_sequence,
     gradient_on_cell,
     is_pl_critical_vertex,
+    partial_derivative_on_1cell,
     partial_derivative_sign,
     partial_derivative_value,
 )
@@ -45,14 +46,14 @@ class TestPartialDerivativeOn1Cell:
         v0 = verts.index2poly[0]
         v1 = verts.index2poly[1]
 
-        sign0 = cplx.partial_derivative_on_1cell(edge, v0)
-        sign1 = cplx.partial_derivative_on_1cell(edge, v1)
+        sign0 = partial_derivative_on_1cell(edge, v0, cplx)
+        sign1 = partial_derivative_on_1cell(edge, v1, cplx)
         assert sign0 in (-1, 0, 1)
         assert sign1 in (-1, 0, 1)
         if sign0 != 0 and sign1 != 0:
             assert sign0 == -sign1
 
-        val0 = cplx.partial_derivative_on_1cell(edge, v0, value=True)
+        val0 = partial_derivative_on_1cell(edge, v0, cplx, value=True)
         eps = 1e-6
         x0 = np.asarray(v0.interior_point, dtype=np.float64).reshape(-1)
         x1 = np.asarray(v1.interior_point, dtype=np.float64).reshape(-1)

@@ -38,6 +38,7 @@ _TOL_VERTICAL = 1e-10
 
 __all__ = [
     "get_colors",
+    "pyvis_dual_graph",
     "plot_complex",
     "plot_persistence_diagram",
     "plot_polyhedron",
@@ -1108,6 +1109,77 @@ def _persistence_plot_extent(
     pad_x = 0.03 * (xmax - xmin) if xmax > xmin else 0.1
     pad_y = 0.03 * (ymax - ymin) if ymax > ymin else 0.1
     return xmin - pad_x, xmax + pad_x, ymin - pad_y, ymax + pad_y
+
+
+def pyvis_dual_graph(
+    cplx: Complex,
+    *,
+    node_color: Literal["Wl2", "volume"] | None = None,
+    node_size: Literal["volume"] | None = None,
+    cmap: str = "viridis",
+    match_locations: bool = False,
+    show_node_labels: bool = False,
+    show_edge_labels: bool = False,
+) -> nx.Graph[int]:
+    """The dual graph with PyVis styling attributes, nodes relabeled ``0..len(cplx)-1``.
+
+    Pass the result to ``pyvis.network.Network.from_nx`` (PyVis is not a relucent dependency).
+
+    Args:
+        cplx: The complex.
+        node_color: Color nodes by ``"Wl2"`` (weight norm) or ``"volume"``; ``None`` leaves
+            PyVis's default.
+        node_size: ``"volume"`` sizes nodes by volume; ``None`` uses a fixed size.
+        cmap: Plotly colorscale for ``node_color``.
+        match_locations: Place nodes at their cells' interior points (2-D complexes only).
+        show_node_labels: Label nodes with their cell names.
+        show_edge_labels: Label edges with their SHI.
+
+    Raises:
+        ValueError: If ``match_locations`` is True and the complex is not 2-D.
+    """
+    graph = cplx.get_dual_graph()
+    plot_graph = cast(Any, graph)
+    if match_locations:
+        if cplx.dim != 2:
+            raise ValueError("Polyhedra must be 2D to match locations")
+
+        nx.set_node_attributes(plot_graph, {node: False for node in plot_graph.nodes}, "physics")
+        nx.set_node_attributes(
+            plot_graph,
+            {poly: pt[0].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
+            "x",
+        )
+        nx.set_node_attributes(
+            plot_graph,
+            {poly: pt[1].item() * 10 for poly in plot_graph.nodes if (pt := poly.interior_point) is not None},
+            "y",
+        )
+
+    if node_color == "Wl2":
+        colors = get_colors([poly.Wl2 for poly in plot_graph.nodes], cmap=cmap)
+        for c, poly in zip(colors, plot_graph.nodes, strict=True):
+            plot_graph.nodes[poly]["color"] = c
+    elif node_color == "volume":
+        colors = get_colors([poly.volume for poly in plot_graph.nodes], cmap=cmap)
+        for c, poly in zip(colors, plot_graph.nodes, strict=True):
+            plot_graph.nodes[poly]["color"] = c
+
+    if node_size == "volume":
+        sizes = [poly.volume for poly in plot_graph.nodes]
+        maxsize = max(sizes)
+        for size, poly in zip(sizes, plot_graph.nodes, strict=True):
+            plot_graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
+    else:
+        nx.set_node_attributes(plot_graph, {node: 4 for node in plot_graph.nodes}, "size")
+
+    for node in plot_graph.nodes:
+        plot_graph.nodes[node]["label"] = str(node) if show_node_labels else ""
+        plot_graph.nodes[node]["title"] = str(node)
+    for edge in plot_graph.edges:
+        plot_graph.edges[edge]["label"] = str(plot_graph.edges[edge]["shi"]) if show_edge_labels else ""
+        plot_graph.edges[edge]["title"] = str(plot_graph.edges[edge]["shi"])
+    return nx.relabel_nodes(plot_graph, {poly: i for i, poly in enumerate(cplx)})
 
 
 def plot_persistence_diagram(
