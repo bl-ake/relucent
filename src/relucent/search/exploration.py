@@ -118,25 +118,21 @@ def finalize_boundary_complex(
 
 @dataclass(frozen=True)
 class SearchResult:
-    """What :meth:`~relucent.core.complex.Complex.searcher` (and ``bfs``/``dfs``/``random_walk``) report.
+    """What :meth:`~relucent.core.complex.Complex.searcher` (and ``bfs``/``dfs``/``random_walk``) report."""
 
-    Attributes:
-        depth: Largest number of hyperplane crossings from the start cell that was reached.
-        mean_facets: Running mean of the number of facets (SHIs) per discovered cell.
-        search_time: Wall-clock seconds spent searching.
-        bad_shi_computations: Neighbor computations that failed, as ``(polyhedron, error)``
-            records. True phantom neighbors (empty flip patterns) are included but don't
-            make the search incomplete.
-        complete: Whether the search ran until no unexplored neighbors were left (not
-            stopped by ``max_polys``, ``max_depth``, or a failed neighbor computation).
-        verified: Whether certification passed; ``None`` if it didn't run.
-    """
-
+    #: Largest number of hyperplane crossings from the start cell that was reached.
     depth: int
+    #: Running mean of the number of facets (SHIs) per discovered cell.
     mean_facets: float
+    #: Wall-clock seconds spent searching.
     search_time: float
+    #: Neighbor computations that failed, as ``(polyhedron, error)`` records. True phantom
+    #: neighbors (empty flip patterns) are included but don't make the search incomplete.
     bad_shi_computations: list[Any] = field(default_factory=list)
+    #: Whether the search ran until no unexplored neighbors were left (not stopped by
+    #: ``max_polys``, ``max_depth``, or a failed neighbor computation).
     complete: bool = False
+    #: Whether certification passed; ``None`` if it didn't run.
     verified: bool | None = None
 
 

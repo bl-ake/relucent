@@ -38,7 +38,7 @@ __all__ = [
 def delete_ss_columns(ss: np.ndarray | torch.Tensor, deleted_shis: Iterable[int]) -> np.ndarray | torch.Tensor:
     """Drop sign-sequence columns for deleted supporting-hyperplane indices.
 
-    Called from :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` when seeding
+    Called from :func:`without_last_layer_neuron` when seeding
     :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` with the representative cell
     of each contracted dual-graph component.
     """
@@ -60,7 +60,7 @@ def contract_dual_graph_for_shi(
 ) -> tuple[nx.Graph[int], dict[int, int]]:
     """Quotient a relabeled dual graph by edges with ``shi == deleted_shi``.
 
-    Used by :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` after
+    Used by :func:`without_last_layer_neuron` after
     :meth:`~relucent.core.complex.Complex.get_dual_graph` to merge top cells that shared the
     removed neuron's facet. Returns the contracted graph (nodes ``0 .. n-1``) and a map from
     each new node to a representative old node id.
@@ -147,7 +147,7 @@ def net_without_last_ss_layer_neuron(
 ) -> ReLUNetwork:
     """Return a copy of ``net`` with one neuron removed from the given ReLU hidden layer.
 
-    Called from :meth:`~relucent.core.complex.Complex.without_last_layer_neuron` to build the
+    Called from :func:`without_last_layer_neuron` to build the
     smaller :class:`~relucent.core.complex.Complex` before dual-graph recovery.
     """
     layer = list(net.layers.values())[ss_layer_idx]
