@@ -19,6 +19,7 @@ import torch.nn as nn
 import relucent.graph.incidence as incidence
 import relucent.topology as topology
 from relucent import Complex, set_seeds
+from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
 from relucent.utils import encode_ss
@@ -197,13 +198,13 @@ def test_c_gf2_backend_available() -> None:
     "build_cplx,kwargs",
     [
         (_populate_diamond_boundary, {}),
-        (_populate_diamond_boundary, {"compactify": True, "reduced": True}),
+        (_populate_diamond_boundary, {"compactify": "borel_moore", "reduced": True}),
         (_populate_diamond_boundary, {"verify_chain_complex": True}),
         (_populate_line_boundary, {}),
-        (_populate_line_boundary, {"compactify": True}),
+        (_populate_line_boundary, {"compactify": "borel_moore"}),
         (_populate_line_boundary, {"respect_finite": True}),
         (_populate_small_1d_complex, {}),
-        (_populate_small_1d_complex, {"compactify": True}),
+        (_populate_small_1d_complex, {"compactify": "borel_moore"}),
     ],
 )
 def test_get_betti_numbers_c_matches_python(
@@ -225,9 +226,9 @@ def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatc
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
     meta = db.get_meta_graph(verbose=False)
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
     via_topology = get_betti_numbers(meta)
-    via_complex = db.get_betti_numbers(compactify=False)
+    via_complex = db.get_betti_numbers(compactify="truncate")
     assert via_topology == via_complex
 
 
@@ -236,7 +237,7 @@ def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatc
     "build_cplx,kwargs",
     [
         (_populate_diamond_boundary, {}),
-        (_populate_diamond_boundary, {"compactify": True, "reduced": True}),
+        (_populate_diamond_boundary, {"compactify": "borel_moore", "reduced": True}),
         (_populate_diamond_boundary, {"verify_chain_complex": True}),
         (_populate_line_boundary, {}),
         (_populate_small_1d_complex, {}),
@@ -339,7 +340,7 @@ def test_beta0_truncated_two_components() -> None:
     ``face_tag`` rebuild closes each component.
     """
     meta = _make_unbounded_two_component_meta()
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
     betti = get_betti_numbers(meta, verify_chain_complex=True)
     assert betti.get(0) == 2, f"expected β₀=2 after truncation, got {betti}"
 
@@ -347,7 +348,7 @@ def test_beta0_truncated_two_components() -> None:
 def test_verify_connected_components_passes_truncated_meta() -> None:
     """After truncation, rank β₀ matches path components."""
     meta = _make_unbounded_two_component_meta()
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
     betti = get_betti_numbers(meta, verify_connected_components=True)
     assert betti.get(0) == 2, f"expected {{0: 2}}, got {betti}"
 

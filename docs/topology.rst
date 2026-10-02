@@ -71,12 +71,16 @@ the chosen homology convention, and returns ``{dimension: β_k}``.
 
 **``compactify``** selects how unbounded cells are handled:
 
-* ``False`` (default): **combinatorial truncation** at infinity via
-  :meth:`~relucent.core.complex.Complex.truncate_meta_graph`.
-* ``True``: **Borel–Moore** style boundaries (only faces with at least two
+* ``"truncate"`` (default): **combinatorial truncation** at infinity via
+  :func:`~relucent.graph.meta_graph.truncate_meta_graph`.
+* ``"borel_moore"``: **Borel–Moore** homology (only faces with at least two
   cofaces contribute to incidence).
 * ``"one_point"``: **one-point compactification** via
-  :meth:`~relucent.core.complex.Complex.one_point_compactify_meta_graph`.
+  :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph`.
+
+To rank a meta-graph you built or edited yourself, call
+:func:`relucent.topology.get_betti_numbers` on it with the same ``compactify`` values
+(``None``, its default, ranks the graph exactly as given).
 
 **``respect_finite``**: restrict to the subcomplex of cells with ``finite is True``
 (no truncation).

@@ -59,13 +59,13 @@ def main() -> None:
     print(f"methods_agree: {tags_full == tags_disc and betti_full == betti_disc}", flush=True)
 
     try:
-        boundary_full.get_betti_numbers(compactify=False, verify_chain_complex=True, verbose=False)
+        boundary_full.get_betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
         print("chain_complex full: OK", flush=True)
     except ChainComplexInconsistent as exc:
         print(f"chain_complex full: FAIL {exc}", flush=True)
 
     try:
-        boundary_disc.get_betti_numbers(compactify=False, verify_chain_complex=True, verbose=False)
+        boundary_disc.get_betti_numbers(compactify="truncate", verify_chain_complex=True, verbose=False)
         print("chain_complex discover: OK", flush=True)
     except ChainComplexInconsistent as exc:
         print(f"chain_complex discover: FAIL {exc}", flush=True)

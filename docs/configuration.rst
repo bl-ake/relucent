@@ -208,10 +208,6 @@ release**. Set them the same ways as the settings above, e.g.
      - ``float``
      - ``0.5``
      - Seconds to wait on ``Condition.wait`` when polling a :class:`~relucent.utils.BlockingQueue`.
-   * - ``TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR``
-     - ``float``
-     - ``2.0``
-     - When merging geometric vertices with combinatorial intrinsic vertices, accept a match if :math:`\|x - x_\mathrm{intrinsic}\|_\infty \le` this factor times the containment tolerance.
    * - ``BOUNDARY_PRICING_BRUTE_FORCE_MAX_N``
      - ``int``
      - ``18``

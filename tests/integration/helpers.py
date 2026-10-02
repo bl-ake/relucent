@@ -197,7 +197,7 @@ def tag_set(cplx: Complex) -> set[bytes]:
 
 
 def truncated_betti(boundary: Complex) -> dict[int, int]:
-    raw = boundary.get_betti_numbers(compactify=False, verbose=False)
+    raw = boundary.get_betti_numbers(compactify="truncate", verbose=False)
     return {int(k): int(v) for k, v in raw.items()}
 
 

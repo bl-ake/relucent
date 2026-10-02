@@ -248,17 +248,6 @@ class TestComplexDualGraph:
         assert set(G.nodes()) == set(range(len(cplx)))
 
 
-class TestComplexGetPolyAttrs:
-    def test_get_poly_attrs(self, small_mlp):
-        cplx = Complex(small_mlp)
-        start = _rand_batch(4)
-        cplx.bfs(start=start, max_polys=10)
-        attrs = cplx.get_poly_attrs(["finite", "Wl2"])
-        assert "finite" in attrs
-        assert "Wl2" in attrs
-        assert len(attrs["finite"]) == len(attrs["Wl2"]) == len(cplx)
-
-
 class TestComplexAdjacent:
     def test_adjacent_polyhedra(self, small_mlp):
         cplx = Complex(small_mlp)

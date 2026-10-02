@@ -21,7 +21,7 @@ certification* below.
 
 ## The default pipeline
 
-When you call `get_betti_numbers()` with defaults (`compactify=False`,
+When you call `get_betti_numbers()` with defaults (`compactify="truncate"`,
 `respect_finite=False`, no verification flags), the library runs these steps in order:
 
 ```mermaid
@@ -173,7 +173,7 @@ only, not used for boundedness or incidence.
 
 **Entry point:** [`truncate_meta_graph()`](../src/relucent/graph/meta_graph.py)
 
-This runs automatically when `compactify=False` (the default). Truncation is a single
+This runs automatically when `compactify="truncate"` (the default). Truncation is a single
 incidence pipeline: extend sign sequences, materialize cap cells, then rebuild all face
 edges with the same rule as [`get_meta_graph()`](../src/relucent/core/complex.py).
 
@@ -277,7 +277,7 @@ for user-facing detail.
 These change behavior when you pass extra flags to `get_betti_numbers()` or
 `get_meta_graph()`:
 
-- **`compactify=True`** — Borel–Moore style: no truncation; only faces with at least
+- **`compactify="borel_moore"`** — Borel–Moore homology: no truncation; only faces with at least
   two cofaces contribute to boundary maps.
 - **`compactify="one_point"`** — adds a single 0-cell at infinity for unbounded
   1-cell ends ([`one_point_compactify_meta_graph()`](../src/relucent/graph/meta_graph.py)).
@@ -308,7 +308,7 @@ These change behavior when you pass extra flags to `get_betti_numbers()` or
 | Meta-graph | `get_meta_graph`, `meta_graph.truncate_meta_graph`, `incidence.cubical_cell_shis`, `incidence.ss_nonzero_indices`, `incidence.face_tag`, `incidence.collect_meta_face_edges`, `incidence.classify_finite_ascending`, `incidence.meta_node_attrs`, `meta_graph.verify_meta_graph_incidence` |
 | Certification | `certify.certify_complex`, `Complex.certify`, `Complex.complete`, `Complex.verified` |
 | Truncation | `truncate_meta_graph` |
-| Ranks | `get_betti_numbers`, `get_betti_numbers_from_meta`, `_sparse_boundary_maps`, `gf2_rank_sparse_rowsets` (default); `_packed_boundary_matrix`, `gf2_rank_boundary` (`method="dense"`) |
+| Ranks | `Complex.get_betti_numbers`, `topology.get_betti_numbers`, `_sparse_boundary_maps`, `gf2_rank_sparse_rowsets` (default); `_packed_boundary_matrix`, `gf2_rank_boundary` (`method="dense"`) |
 
 ### 0-cells and 1-cells at a glance
 

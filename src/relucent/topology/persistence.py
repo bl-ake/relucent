@@ -8,7 +8,7 @@ filtration boundary matrix (algebraic), matching the incidence convention in
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
@@ -148,10 +148,10 @@ def _face_incidence_counts(
     meta: Any,
     index_of: dict[Any, int],
     *,
-    compactify: bool,
+    borel_moore: bool,
 ) -> dict[Any, int]:
-    """Count cofaces for each (k-1)-cell when ``compactify`` is enabled."""
-    if not compactify:
+    """Count cofaces for each (k-1)-cell (Borel–Moore only)."""
+    if not borel_moore:
         return {}
     inc: dict[Any, int] = {}
     for _u, v, _ in meta.edges(data=True):
@@ -166,7 +166,7 @@ def _cell_boundary_faces(
     cell_key: Any,
     index_of: dict[Any, int],
     *,
-    compactify: bool,
+    borel_moore: bool,
     inc_count: dict[Any, int],
 ) -> set[int]:
     """Indices of codimension-one faces of ``cell_key`` in the filtration ordering."""
@@ -174,7 +174,7 @@ def _cell_boundary_faces(
     for _u, v, _ in meta.out_edges(cell_key, data=True):
         if v not in index_of:
             continue
-        if compactify and inc_count.get(v, 2) < 2:
+        if borel_moore and inc_count.get(v, 2) < 2:
             continue
         faces.add(index_of[v])
     return faces
@@ -185,7 +185,7 @@ def compute_persistent_homology(
     cplx: Complex,
     filtration: Filtration,
     *,
-    compactify: bool = False,
+    compactify: Literal["truncate", "borel_moore"] = "truncate",
     respect_finite: bool = False,
     lower_star: bool | None = None,
     verbose: int | None = None,
@@ -199,8 +199,10 @@ def compute_persistent_homology(
     Args:
         cplx: Polyhedral complex from breadth-first search / exploration.
         filtration: Filtration assigning a real value to each cell.
-        compactify: If True, drop face incidences with fewer than two cofaces (Borel–Moore
-            style), matching :func:`~relucent.topology.get_betti_numbers`.
+        compactify: ``"truncate"`` (default) caps unbounded cells by combinatorial
+            truncation; ``"borel_moore"`` drops face incidences with fewer than two cofaces.
+            Same conventions as :func:`~relucent.topology.get_betti_numbers`
+            (``"one_point"`` is not supported here).
         respect_finite: Restrict to cells with ``finite is True`` on the meta-graph.
         lower_star: If True, extend values to higher cells by
             ``f(σ) = max_{τ ≤ σ} f(τ)`` (sublevel-set convention). If None, use
@@ -212,12 +214,15 @@ def compute_persistent_homology(
         :class:`PersistenceDiagram` with finite and essential pairs over GF(2).
     """
     del verbose  # applied by @with_verbosity
+    if compactify not in ("truncate", "borel_moore"):
+        raise ValueError(f"compactify must be 'truncate' or 'borel_moore', got {compactify!r}")
     if len(cplx) == 0:
         return PersistenceDiagram(pairs=(), cell_filtration={})
 
     logger.debug("building meta-graph …")
     meta = cplx.get_meta_graph()
-    if not compactify and not respect_finite:
+    borel_moore = compactify == "borel_moore"
+    if not borel_moore and not respect_finite:
         from relucent.graph.meta_graph import truncate_meta_graph
 
         truncate_meta_graph(meta)
@@ -251,7 +256,7 @@ def compute_persistent_homology(
     filt = [t[2] for t in nodes]
     index_of = {key: i for i, key in enumerate(cell_keys)}
 
-    inc_count = _face_incidence_counts(meta, index_of, compactify=compactify)
+    inc_count = _face_incidence_counts(meta, index_of, borel_moore=borel_moore)
 
     boundaries: list[set[int]] = []
     for key in cell_keys:
@@ -260,7 +265,7 @@ def compute_persistent_homology(
                 meta,
                 key,
                 index_of,
-                compactify=compactify,
+                borel_moore=borel_moore,
                 inc_count=inc_count,
             )
         )

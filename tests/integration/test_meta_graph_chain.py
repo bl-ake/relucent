@@ -26,7 +26,7 @@ def test_meta_graph_chain_complex_non_negative_betti(
     boundary = ambient.get_boundary_complex(shi, verbose=False)
 
     betti = boundary.get_betti_numbers(
-        compactify=False,
+        compactify="truncate",
         verify_chain_complex=True,
         verbose=False,
     )
