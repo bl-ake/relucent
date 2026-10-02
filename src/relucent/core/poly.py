@@ -111,7 +111,6 @@ class Polyhedron:
         self._interior_point_norm: float | None = None
         self._center: np.ndarray | None = None
         self._inradius: float | None = None
-        self._num_dead_relus: int | None = None
         self.bound = bound
 
         self._shis: list[int] | None = shis
@@ -913,7 +912,7 @@ class Polyhedron:
         Args:
             properties: Iterable of cache/property names to ensure are computed.
                 Supported names include ``"halfspaces"``, ``"W"``, ``"b"``,
-                ``"num_dead_relus"``, ``"finite"``, ``"center"``,
+                ``"finite"``, ``"center"``,
                 ``"inradius"``, ``"interior_point"``, ``"interior_point_norm"``,
                 ``"Wl2"``, ``"volume"``, ``"vertices"``, ``"ch"``, and ``"hs"``.
             env: Optional Gurobi environment used for interior-point/feasibility
@@ -929,7 +928,7 @@ class Polyhedron:
         if requested & geometry_aliases:
             requested.add("interior_point")
 
-        if requested & {"halfspaces", "W", "b", "num_dead_relus"}:
+        if requested & {"halfspaces", "W", "b"}:
             _ = self.halfspaces
         if "finite" in requested or "center" in requested or "inradius" in requested:
             _ = self.finite
@@ -955,7 +954,7 @@ class Polyhedron:
 
     def _ensure_affine_data(self, *, force_numpy: bool = False) -> None:
         """Populate halfspace and affine-map caches via :func:`~relucent.geometry.calculations.get_hs`."""
-        halfspaces, w, b, num_dead_relus = get_hs(self, force_numpy=force_numpy)
+        halfspaces, w, b = get_hs(self, force_numpy=force_numpy)
         self._halfspaces = halfspaces
         self._w = w
         self._b = b
@@ -964,7 +963,6 @@ class Polyhedron:
         self._halfspaces_own = True
         self._halfspaces_user = False
         self._rows_data = False
-        self._num_dead_relus = num_dead_relus
 
     @property
     def vertices(self) -> np.ndarray | None:
@@ -1114,18 +1112,6 @@ class Polyhedron:
             self._ensure_affine_data()
         assert isinstance(self._b, (torch.Tensor, np.ndarray))
         return self._b
-
-    @property
-    def num_dead_relus(self) -> int:
-        """Number of dead ReLU neurons (neurons always outputting zero).
-
-        Returns:
-            int: Count of ReLU neurons that are always inactive for this polyhedron.
-        """
-        if self._num_dead_relus is None:
-            self._ensure_affine_data(force_numpy=isinstance(self._halfspaces, np.ndarray))
-        assert self._num_dead_relus is not None
-        return self._num_dead_relus
 
     @property
     def Wl2(self) -> float:
@@ -1335,7 +1321,6 @@ class Polyhedron:
             "_shis_strict": self._shis_strict,
             "_Wl2": self._Wl2,
             "_volume": self._volume,
-            "_num_dead_relus": self._num_dead_relus,
             "_interior_point": self._interior_point,
             "_attempted_compute_properties": self._attempted_compute_properties,
             "_covector_infeasible": self._covector_infeasible,

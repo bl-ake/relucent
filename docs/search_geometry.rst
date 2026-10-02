@@ -108,7 +108,7 @@ Useful property names
 Examples of valid names for ``geometry_properties`` / ``properties``:
 
 - :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` — every supported property
-- ``"halfspaces"``, ``"halfspaces_np"``, ``"W"``, ``"b"``, ``"num_dead_relus"``
+- ``"halfspaces"``, ``"halfspaces_np"``, ``"W"``, ``"b"``
 - ``"interior_point"``, ``"interior_point_norm"``
 - ``"Wl2"``, ``"vertices"``, ``"hs"`` (SciPy's HalfspaceIntersection), ``"ch"`` (SciPy's ConvexHull), ``"volume"``
 - Always computed during search: ``"finite"``, ``"center"``, ``"inradius"``

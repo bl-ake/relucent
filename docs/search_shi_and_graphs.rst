@@ -143,7 +143,7 @@ seeds SHI candidates from its sign sequence::
    SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
 
 The crossing hyperplane is already zeroed, so it is not included.
-:meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` applies this at face
+:func:`relucent.graph.boundary._codim_one_face_kwargs` applies this at face
 creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
 :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
@@ -400,7 +400,7 @@ Uses
   :meth:`~relucent.core.complex.Complex.get_boundary_complex`
 * :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` — reconstruct from
   stored graph + SHI edge labels
-* Visualization (``plot=True`` prepares a PyVis layout)
+* Visualization (:func:`relucent.vis.pyvis_dual_graph` returns a copy styled for PyVis)
 
 Meta-graph
 ----------

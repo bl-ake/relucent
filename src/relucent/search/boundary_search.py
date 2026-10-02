@@ -15,7 +15,7 @@ from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
-from relucent.geometry.calculations import get_shis, shis_are_certified, without_deprecated_strict
+from relucent.geometry.calculations import get_shis, shis_are_certified
 from relucent.graph.incidence import ss_nonzero_indices
 from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.search.engine import (
@@ -229,7 +229,7 @@ def boundary_searcher(
     del verbose  # applied by @with_verbosity
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
-    shis_kwargs = without_deprecated_strict(kwargs)
+    shis_kwargs = dict(kwargs)
     if not _is_top_boundary_ss(start.ss_np, boundary_shi):
         raise ValueError(f"Start sign sequence must have ss[{boundary_shi}]=0 as its only zero entry; got {start.ss_np!r}")
 
