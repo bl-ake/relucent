@@ -13,8 +13,10 @@ import numpy as np
 import relucent.config as cfg
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
+from relucent._internal.parallel import BlockingQueue, get_mp_context, process_aware_cpu_count
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry.calculations import get_shis, shis_are_certified
 from relucent.graph.incidence import ss_nonzero_indices
 from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
@@ -27,7 +29,6 @@ from relucent.search.engine import (
 )
 from relucent.search.exploration import SearchResult, finalize_boundary_complex
 from relucent.search.worker_context import set_worker_context
-from relucent.utils import BlockingQueue, encode_ss, flip_ss_at_shi, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex
@@ -142,8 +143,8 @@ def _apply_ambient_boundary_shis(
             _set_coface_rows(poly, halfspaces, halfspaces_err, halfspaces_ss)
         return
 
+    from relucent._internal.parallel import get_mp_context
     from relucent.search.worker_context import set_worker_context
-    from relucent.utils import get_mp_context
 
     tasks = [(poly.ss_np, poly.tag) for poly in polys]
     tag_to_poly = {poly.tag: poly for poly in polys}

@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 import relucent.config as cfg
 import relucent.verify.certify as certify
 from relucent._internal.logging import with_verbosity
+from relucent._internal.parallel import BlockingQueue
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 from relucent.core.errors import (
     ComplexNotCompleteError,
@@ -24,7 +25,7 @@ from relucent.core.errors import (
     NonGenericArrangementError,
 )
 from relucent.core.poly import Polyhedron
-from relucent.core.ss import SSManager
+from relucent.core.ss import SSManager, encode_ss
 from relucent.graph import incidence, vertex_star
 from relucent.graph import meta_graph as mg
 from relucent.graph.complex_graph import recover_from_dual_graph
@@ -53,10 +54,6 @@ from relucent.search.engine import (
 )
 from relucent.search.engine import (
     searcher as _searcher_fn,
-)
-from relucent.utils import (
-    BlockingQueue,
-    encode_ss,
 )
 from relucent.verify.certify import CertifyLevel
 

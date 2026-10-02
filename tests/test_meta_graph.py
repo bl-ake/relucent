@@ -7,8 +7,10 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import Complex, Polyhedron, mlp, set_seeds
+from relucent import Complex, Polyhedron, set_seeds, torch_mlp
+from relucent._internal.gurobi import get_env
 from relucent.core.errors import NonGenericArrangementError
+from relucent.core.ss import encode_ss
 from relucent.geometry.calculations import get_shis
 from relucent.graph import meta_graph as mg
 from relucent.graph.incidence import (
@@ -21,7 +23,6 @@ from relucent.graph.incidence import (
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import ChainComplexInconsistent, get_betti_numbers
-from relucent.utils import encode_ss, get_env
 
 
 def _add_points(cplx: Complex, pts: np.ndarray) -> None:
@@ -759,7 +760,7 @@ def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeyp
 def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
     """Meta-graph node ``shis`` match :func:`~relucent.graph.incidence.cubical_cell_shis` per slice."""
     set_seeds(seeded)
-    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    net = torch_mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
@@ -798,7 +799,7 @@ def test_meta_graph_shis_match_cubical_derivation(seeded: int) -> None:
 def test_top_dim_lp_shis_subset_of_cubical_derivation(seeded: int) -> None:
     """LP SHI facets on top-dimensional cells lie in the cubical flip-neighbor set."""
     set_seeds(seeded)
-    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    net = torch_mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
@@ -827,7 +828,7 @@ def test_top_dim_lp_shis_subset_of_cubical_derivation(seeded: int) -> None:
 def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
     """Meta-graph ``finite`` matches upward propagation from 1-cells on the dual graph."""
     set_seeds(seeded)
-    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    net = torch_mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)
@@ -862,7 +863,7 @@ def test_meta_graph_finite_matches_dual_graph_propagation(seeded: int) -> None:
 def test_meta_graph_verify_incidence(seeded: int) -> None:
     """``verify=True`` checks incidence-engine consistency without mutating the graph."""
     set_seeds(seeded)
-    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    net = torch_mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)

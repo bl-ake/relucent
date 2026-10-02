@@ -12,8 +12,10 @@ from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 import relucent.config as cfg
 from relucent._internal import rounding
+from relucent._internal.gurobi import get_env
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry.calculations import (
     DegenerateHalfspaceInfeasibility,
     _affine_null_basis,
@@ -25,7 +27,6 @@ from relucent.geometry.calculations import (
     solve_radius,
 )
 from relucent.model.model import ReLUNetwork
-from relucent.utils import encode_ss, flip_ss_at_shi, get_env
 
 __all__ = ["Polyhedron"]
 

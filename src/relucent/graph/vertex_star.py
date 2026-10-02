@@ -22,8 +22,9 @@ import numpy as np
 
 import relucent.config as cfg
 from relucent._internal.logging import logger, with_verbosity
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
+from relucent.core.ss import encode_ss
 from relucent.graph import incidence
-from relucent.utils import encode_ss, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     import networkx as nx

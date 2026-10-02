@@ -7,7 +7,7 @@ import logging
 import numpy as np
 
 import relucent.config as cfg
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent._internal.logging import logger, show_progress, verbosity, with_verbosity
 
 
@@ -59,7 +59,7 @@ class _Records(logging.Handler):
 
 def _bfs_messages(verbose: int) -> list[tuple[int, str]]:
     set_seeds(0)
-    cplx = Complex(mlp([2, 6, 1]))
+    cplx = Complex(torch_mlp([2, 6, 1]))
     handler = _Records()
     logger.addHandler(handler)
     try:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent.graph.complex_graph import without_last_layer_neuron
 
 
@@ -13,7 +13,7 @@ from relucent.graph.complex_graph import without_last_layer_neuron
 def test_without_last_layer_neuron_matches_fresh_search(neuron_idx: int) -> None:
     """Deleting a neuron from an explored complex gives the cells a fresh search of the smaller net finds."""
     set_seeds(3)
-    cplx = Complex(mlp([2, 5, 4, 1]))
+    cplx = Complex(torch_mlp([2, 5, 4, 1]))
     start = np.zeros((1, 2)) + 0.1
     cplx.bfs(start=start, nworkers=2, verbose=0)
 

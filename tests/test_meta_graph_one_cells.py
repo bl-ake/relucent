@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import Complex, Polyhedron, mlp, set_seeds
+from relucent import Complex, Polyhedron, set_seeds, torch_mlp
 from relucent.core.errors import CubicalConsistencyError
 from relucent.graph import incidence
 from relucent.graph import meta_graph as mg
@@ -90,7 +90,7 @@ def test_classify_one_cells_finite_one_zero_face_is_unbounded() -> None:
 def test_explored_complex_meta_graph_one_cells(seeded: int) -> None:
     """Explored complexes satisfy 1-cell SHI / boundedness invariants."""
     set_seeds(seeded)
-    net = mlp(widths=[4, 5, 5, 1], add_last_relu=True)
+    net = torch_mlp(widths=[4, 5, 5, 1], add_last_relu=True)
     cplx = Complex(net)
     start = torch.randn(4, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=5000)

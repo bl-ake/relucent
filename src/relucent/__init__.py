@@ -34,9 +34,9 @@ if TYPE_CHECKING:
         NonGenericArrangementError,
     )
     from .core.poly import Polyhedron
+    from .model.builders import add_output_relu, mlp, set_seeds, split_sequential, torch_mlp
     from .model.convert_model import convert
     from .search.exploration import SearchResult, explore_for_topology, generic_topology_start
-    from .utils import add_output_relu, mlp, set_seeds, split_sequential
     from .verify.certify import CertifyLevel
     from .vis import get_colors, plot_complex, plot_polyhedron
 
@@ -59,6 +59,7 @@ __all__ = [
     "explore_for_topology",
     "generic_topology_start",
     "mlp",
+    "torch_mlp",
     "plot_complex",
     "plot_polyhedron",
     "set_seeds",
@@ -77,14 +78,15 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SearchResult": ("relucent.search.exploration", "SearchResult"),
     "convert": ("relucent.model.convert_model", "convert"),
     "get_colors": ("relucent.vis", "get_colors"),
-    "add_output_relu": ("relucent.utils", "add_output_relu"),
+    "add_output_relu": ("relucent.model.builders", "add_output_relu"),
     "explore_for_topology": ("relucent.search.exploration", "explore_for_topology"),
     "generic_topology_start": ("relucent.search.exploration", "generic_topology_start"),
-    "mlp": ("relucent.utils", "mlp"),
+    "mlp": ("relucent.model.builders", "mlp"),
+    "torch_mlp": ("relucent.model.builders", "torch_mlp"),
     "plot_complex": ("relucent.vis", "plot_complex"),
     "plot_polyhedron": ("relucent.vis", "plot_polyhedron"),
-    "set_seeds": ("relucent.utils", "set_seeds"),
-    "split_sequential": ("relucent.utils", "split_sequential"),
+    "set_seeds": ("relucent.model.builders", "set_seeds"),
+    "split_sequential": ("relucent.model.builders", "split_sequential"),
 }
 
 

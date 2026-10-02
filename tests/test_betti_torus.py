@@ -8,8 +8,8 @@ import torch
 import torch.nn as nn
 from torch import optim
 
-from relucent import Complex, mlp, set_seeds
-from relucent.utils import TorchMLP
+from relucent import Complex, set_seeds, torch_mlp
+from relucent.model.builders import TorchMLP
 
 BUNDLED_TORUS_CHECKPOINT = Path(__file__).parent / "data" / "torus_boundary_model_seed2.pt"
 
@@ -64,7 +64,7 @@ def _make_torus(
 
 def _train_torus_model(steps: int = 40_000) -> TorchMLP:
     """Train the torus classifier from canonicalpoly2.0's notebook recipe."""
-    model = mlp(widths=[3, 15, 15, 1], add_last_relu=False)
+    model = torch_mlp(widths=[3, 15, 15, 1], add_last_relu=False)
     assert isinstance(model, TorchMLP)
     model.to("cpu")
     criterion = nn.BCELoss()
@@ -98,7 +98,7 @@ def _train_torus_model(steps: int = 40_000) -> TorchMLP:
 
 def _model_with_db_relu(model: TorchMLP) -> TorchMLP:
     """Create a topology model with final ReLU so DB is represented as a BH."""
-    topo_model = mlp(widths=[3, 15, 15, 1], add_last_relu=True)
+    topo_model = torch_mlp(widths=[3, 15, 15, 1], add_last_relu=True)
     assert isinstance(topo_model, TorchMLP)
     src_state = model.state_dict()
     dst_state = topo_model.state_dict()
@@ -122,7 +122,7 @@ def test_torus_decision_boundary_betti_numbers(seeded):
     model: TorchMLP
 
     if checkpoint_path.exists():
-        _net = mlp(widths=[3, 15, 15, 1], add_last_relu=False)
+        _net = torch_mlp(widths=[3, 15, 15, 1], add_last_relu=False)
         assert isinstance(_net, TorchMLP)
         model = _net
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)

@@ -6,13 +6,13 @@ import contextlib
 
 import numpy as np
 
-from relucent import AmbiguousGeometryError, Complex, Polyhedron, mlp, set_seeds
+from relucent import AmbiguousGeometryError, Complex, Polyhedron, set_seeds, torch_mlp
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.geometry.calculations import get_shis
 
 
 def test_default_polyhedron_bound_used_by_lazy_shis() -> None:
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False)
     top = next(p for p in cplx if p.dim == cplx.dim)
@@ -29,7 +29,7 @@ def test_get_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
     set_seeds(seeded)
     from relucent import convert
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=False)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=False)
     relu_net = convert(model)
     bound = default_polyhedron_bound(relu_net)
     ss = np.array([[1, -1, -1, 1]], dtype=np.int8)
@@ -43,7 +43,7 @@ def test_get_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
 def test_get_shis_escalates_bound_for_unbounded_arrangement_cell(seeded: int) -> None:
     """Unbounded hyperplane cells must not fail SHI LPs at the network-scaled box."""
     set_seeds(seeded)
-    model = mlp(widths=[2, 4, 1], add_last_relu=False)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=False)
     cplx = Complex(model)
     net = cplx._net
     bound = default_polyhedron_bound(net)

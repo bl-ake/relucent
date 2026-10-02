@@ -19,10 +19,10 @@ import torch.nn as nn
 import relucent.graph.incidence as incidence
 import relucent.topology.betti as topology
 from relucent import Complex, set_seeds
+from relucent.core.ss import encode_ss
 from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import C_BACKEND_AVAILABLE, get_betti_numbers
-from relucent.utils import encode_ss
 
 
 def _make_meta(dim_edges: list[tuple[int, int, int]]) -> nx.MultiDiGraph[Any]:

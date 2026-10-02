@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent import AmbiguousGeometryError, Complex, mlp
+from relucent import AmbiguousGeometryError, Complex, torch_mlp
 from relucent.search.engine import blocking_bad_shi_computations, true_phantom_neighbor_error
 
 
@@ -81,7 +81,7 @@ def _patch_first_worker(monkeypatch: pytest.MonkeyPatch, error: Exception) -> No
 
 def test_bfs_incomplete_when_a_neighbor_comes_back_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_first_worker(monkeypatch, ValueError("Polyhedron is infeasible (empty)."))
-    cplx = Complex(mlp(widths=[2, 6, 1], add_last_relu=True))
+    cplx = Complex(torch_mlp(widths=[2, 6, 1], add_last_relu=True))
     stats = cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1, verify=False)
     assert len(stats.bad_shi_computations) >= 1
     assert cplx.complete is not True
@@ -89,6 +89,6 @@ def test_bfs_incomplete_when_a_neighbor_comes_back_empty(monkeypatch: pytest.Mon
 
 def test_bfs_raises_on_ambiguous_neighbor(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_first_worker(monkeypatch, AmbiguousGeometryError("cannot decide"))
-    cplx = Complex(mlp(widths=[2, 6, 1], add_last_relu=True))
+    cplx = Complex(torch_mlp(widths=[2, 6, 1], add_last_relu=True))
     with pytest.raises(AmbiguousGeometryError):
         cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, nworkers=1)

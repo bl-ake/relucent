@@ -1,4 +1,4 @@
-"""Tests for relucent.utils."""
+"""Tests for relucent.core.ss, relucent.model.builders, and relucent._internal helpers."""
 
 import copy
 
@@ -6,22 +6,12 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import mlp
+from relucent import torch_mlp
+from relucent._internal.gurobi import get_env
+from relucent._internal.parallel import BlockingQueue, NonBlockingQueue, UpdatablePriorityQueue
+from relucent.core.ss import encode_ss, flip_ss_at_shi, flip_ss_at_shi_inplace
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
-from relucent.utils import (
-    BlockingQueue,
-    NonBlockingQueue,
-    TorchMLP,
-    UpdatablePriorityQueue,
-    add_output_relu,
-    encode_ss,
-    flip_ss_at_shi,
-    flip_ss_at_shi_inplace,
-    get_env,
-    normalize_weights,
-    set_seeds,
-    split_sequential,
-)
+from relucent.model.builders import TorchMLP, add_output_relu, normalize_weights, set_seeds, split_sequential
 from relucent.vis import get_colors
 
 
@@ -190,7 +180,7 @@ class TestGetColors:
 class TestSplitSequential:
     def test_split(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[4, 8, 6, 2])
+        net = torch_mlp(widths=[4, 8, 6, 2])
         assert isinstance(net, TorchMLP)
         nn1, nn2 = split_sequential(net, "relu0")
         x = torch.zeros((1, 4), device=net.device, dtype=net.dtype)
@@ -201,7 +191,7 @@ class TestSplitSequential:
 
     def test_split_layer_in_first(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 2])
+        net = torch_mlp(widths=[2, 4, 2])
         assert isinstance(net, TorchMLP)
         nn1, nn2 = split_sequential(net, "fc0")
         assert "fc0" in nn1.layers
@@ -211,7 +201,7 @@ class TestSplitSequential:
 class TestAddOutputRelu:
     def test_torch_mlp_appends_relu(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1], add_last_relu=False)
+        net = torch_mlp(widths=[2, 4, 1], add_last_relu=False)
         assert isinstance(net, TorchMLP)
         topo = add_output_relu(net)
         assert isinstance(topo, TorchMLP)
@@ -221,7 +211,7 @@ class TestAddOutputRelu:
 
     def test_preserves_linear_outputs_before_relu(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[3, 5, 1], add_last_relu=False)
+        net = torch_mlp(widths=[3, 5, 1], add_last_relu=False)
         assert isinstance(net, TorchMLP)
         topo = add_output_relu(net)
         x = torch.randn(4, 3, device=net.device, dtype=net.dtype)
@@ -231,7 +221,7 @@ class TestAddOutputRelu:
 
     def test_already_has_output_relu_raises(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
         assert isinstance(net, TorchMLP)
         with pytest.raises(ValueError, match="already ends with a ReLU"):
             add_output_relu(net)
@@ -260,7 +250,7 @@ class TestNormalizeWeights:
     @pytest.mark.parametrize("widths", ([2, 4, 2], [4, 8, 6, 2]))
     def test_function_invariant(self, seeded, widths):
         assert seeded is not None
-        net = mlp(widths=widths)
+        net = torch_mlp(widths=widths)
         assert isinstance(net, TorchMLP)
         original = copy.deepcopy(net)
 

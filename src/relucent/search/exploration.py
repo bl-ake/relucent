@@ -11,9 +11,9 @@ import numpy as np
 
 from relucent._internal.logging import logger
 from relucent._internal.network_scale import default_polyhedron_bound
+from relucent._internal.parallel import process_aware_cpu_count
 from relucent.core.errors import IncompleteDualGraphError
 from relucent.graph.incidence import set_contracted_shis, verify_contracted_shis
-from relucent.utils import process_aware_cpu_count
 from relucent.verify.certify import CertifyLevel, certify_complex, verify_boundary_cell
 
 if TYPE_CHECKING:

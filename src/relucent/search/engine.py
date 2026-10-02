@@ -15,24 +15,23 @@ from tqdm.auto import tqdm
 import relucent.config as cfg
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
+from relucent._internal.parallel import (
+    BlockingQueue,
+    NonBlockingQueue,
+    UpdatablePriorityQueue,
+    get_mp_context,
+    process_aware_cpu_count,
+)
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry.calculations import get_shis, shis_are_certified
 from relucent.search.exploration import (
     SearchResult,
     finalize_ambient_search,
 )
 from relucent.search.worker_context import get_worker_context, set_worker_context, worker_context_scope
-from relucent.utils import (
-    BlockingQueue,
-    NonBlockingQueue,
-    UpdatablePriorityQueue,
-    encode_ss,
-    flip_ss_at_shi,
-    get_mp_context,
-    process_aware_cpu_count,
-)
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex

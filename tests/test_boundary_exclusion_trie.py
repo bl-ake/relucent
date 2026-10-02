@@ -8,11 +8,13 @@ import torch.nn as nn
 from gurobipy import GRB, Model
 
 from relucent import Complex, set_seeds
+from relucent._internal.gurobi import get_env
 from relucent.config import update_settings
+from relucent.core.ss import encode_ss
+from relucent.model.builders import add_output_relu, torch_mlp
 from relucent.search.boundary_exclusion_trie import ForbiddenPatternTrie
 from relucent.search.boundary_mip import price_boundary_witness
 from relucent.search.exploration import explore_for_topology
-from relucent.utils import add_output_relu, encode_ss, get_env, mlp
 
 update_settings(VERBOSE=0)
 
@@ -96,7 +98,7 @@ def test_price_boundary_witness_with_compiled_exclusions(seeded: int):
     """MIP pricing with trie-compiled exclusions still finds an unvisited witness."""
     update_settings(BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS=0)
     set_seeds(seeded)
-    model = add_output_relu(mlp(widths=[2, 20, 1]))
+    model = add_output_relu(torch_mlp(widths=[2, 20, 1]))
     cplx = Complex(model)
     shi = cplx.n - 1
 

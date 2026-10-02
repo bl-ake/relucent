@@ -7,6 +7,8 @@ Utility Functions
 
 .. autofunction:: relucent.mlp
 
+.. autofunction:: relucent.torch_mlp
+
 .. autofunction:: relucent.split_sequential
 
 .. autofunction:: relucent.add_output_relu

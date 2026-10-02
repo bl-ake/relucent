@@ -3,13 +3,14 @@
 import numpy as np
 import pytest
 
+from relucent._internal.gurobi import get_env
 from relucent.core.complex import Complex
 from relucent.geometry.calculations import (
     _drop_degenerate_halfspaces_tracked,
     _remap_zero_indices,
     solve_radius,
 )
-from relucent.utils import get_env, mlp
+from relucent.model.builders import torch_mlp
 
 
 def test_drop_degenerate_halfspaces_tracked_filters_and_maps():
@@ -128,7 +129,7 @@ def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
     from relucent.search.engine import retain_geometry_caches
 
     assert seeded is not None
-    net = mlp(widths=[2, 4, 1])
+    net = torch_mlp(widths=[2, 4, 1])
     cplx = Complex(net)
     p = cplx.add_point(np.zeros((1, 2)))
     p.get_geometry(["halfspaces", "W", "b", "interior_point"])
@@ -148,7 +149,7 @@ def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
 def test_default_search_is_topology_only(seeded):
     """Default search skips optional geometry caches."""
     assert seeded is not None
-    net = mlp(widths=[2, 4, 1])
+    net = torch_mlp(widths=[2, 4, 1])
     cplx = Complex(net)
     cplx.bfs(max_polys=3, nworkers=1, verbose=0)
     for poly in cplx:
@@ -163,7 +164,7 @@ def test_search_all_geometry_properties_retains_caches(seeded):
     from relucent.search import ALL_GEOMETRY_PROPERTIES
 
     assert seeded is not None
-    net = mlp(widths=[2, 4, 1])
+    net = torch_mlp(widths=[2, 4, 1])
     cplx = Complex(net)
     cplx.bfs(max_polys=3, nworkers=1, verbose=0, geometry_properties=ALL_GEOMETRY_PROPERTIES)
     for poly in cplx:
