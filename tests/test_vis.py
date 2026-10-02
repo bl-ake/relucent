@@ -378,11 +378,11 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
     # Keep this test isolated from bound-intersection internals and expensive plotting.
     monkeypatch.setattr(vis, "_poly_intersects_plot_bound", lambda *_args, **_kwargs: True)
 
-    def fake_plot_cells(_self: Polyhedron, **_kwargs: object) -> list[go.Scatter]:
+    def fake_plot(_self: Polyhedron, _plot_mode: str = "cells", **_kwargs: object) -> list[go.Scatter]:
         return [go.Scatter(x=[0.0, 1.0], y=[0.0, 1.0], mode="lines")]
 
-    p_bounded.plot_cells = MethodType(fake_plot_cells, p_bounded)  # type: ignore[method-assign]
-    p_unbounded.plot_cells = MethodType(fake_plot_cells, p_unbounded)  # type: ignore[method-assign]
+    p_bounded.plot = MethodType(fake_plot, p_bounded)  # type: ignore[method-assign]
+    p_unbounded.plot = MethodType(fake_plot, p_unbounded)  # type: ignore[method-assign]
 
     fig_default = cast(go.Figure, vis.plot_complex(c2, plot_mode="cells", bound=10.0))
     fig_hidden = cast(go.Figure, vis.plot_complex(c2, plot_mode="cells", hide_unbounded=True, bound=10.0))
@@ -457,13 +457,17 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
     assert isinstance(data3, tuple)
     assert len(data3) >= 1
 
-    p1.plot_graph = MethodType(  # type: ignore[method-assign]
-        lambda _self, **_kwargs: {"outline": go.Scatter3d(x=[0, 1], y=[0, 1], z=[0, 1], mode="lines")},
-        p1,
+    def _fake_graph(result: dict[str, Any]) -> Any:
+        def _plot(self: Polyhedron, plot_mode: str = "cells", **kwargs: Any) -> Any:
+            return result if plot_mode == "graph" else Polyhedron.plot(self, plot_mode, **kwargs)  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+        return _plot
+
+    p1.plot = MethodType(  # type: ignore[method-assign]
+        _fake_graph({"outline": go.Scatter3d(x=[0, 1], y=[0, 1], z=[0, 1], mode="lines")}), p1
     )
-    p2.plot_graph = MethodType(  # type: ignore[method-assign]
-        lambda _self, **_kwargs: {"mesh": go.Mesh3d(x=[0, 1, 0], y=[0, 0, 1], z=[0, 0, 0], i=[0], j=[1], k=[2])},
-        p2,
+    p2.plot = MethodType(  # type: ignore[method-assign]
+        _fake_graph({"mesh": go.Mesh3d(x=[0, 1, 0], y=[0, 0, 1], z=[0, 0, 0], i=[0], j=[1], k=[2])}), p2
     )
     with warnings.catch_warnings(record=True) as recg:
         warnings.simplefilter("always")

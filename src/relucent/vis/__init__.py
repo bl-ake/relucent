@@ -537,9 +537,9 @@ def plot_polyhedron(
 _CELLS_3D_ONLY_KEYS = frozenset({"fill_mode", "show_axes", "filled"})
 _CELLS_2D_ONLY_KEYS = frozenset({"ss_name"})
 
-# Polyhedron.plot_cells forwards both 2D- and 3D-only kwargs; strip before each trace builder.
+# Polyhedron.plot forwards both 2D- and 3D-only kwargs; strip before each trace builder.
 _POLY_CELLS_2D_EXCLUDE = frozenset()
-# 2D go.Scatter only; invalid on go.Scatter3d / go.Mesh3d (see Polyhedron.plot_cells default fill=...).
+# 2D go.Scatter only; invalid on go.Scatter3d / go.Mesh3d (dropped for 3D cells by Polyhedron.plot).
 _POLY_CELLS_3D_EXCLUDE = frozenset({"plot_halfspaces", "halfspace_shade", "fill", "fillcolor", "ss_name"})
 
 
@@ -748,7 +748,7 @@ def _complex_figure_1_skeleton(
         eligible_polys += 1
         name = _boundary_label(poly, cpx)
         try:
-            traces = poly.plot_cells(color=color, line_color=color, bound=bound, **poly_plot_kwargs)
+            traces = poly.plot("cells", color=color, line_color=color, bound=bound, **poly_plot_kwargs)
         except Exception as e:
             warnings.warn(f"Error while plotting 1-cell {poly}: {e}", stacklevel=2)
             continue
@@ -830,7 +830,8 @@ def _complex_figure_2d_cells(
         c = _highlight(c, poly, highlight_regions)
         name = _poly_trace_name(poly)
         try:
-            traces = poly.plot_cells(
+            traces = poly.plot(
+                "cells",
                 name=name,
                 fillcolor=c,
                 line_color="black",
@@ -909,7 +910,7 @@ def _complex_figure_3d_cells(
         c = "red" if is_highlighted else c
         filled = is_highlighted or fill_mode == "filled"
         try:
-            traces = poly.plot_cells(showlegend=False, color=c, filled=filled, **kwargs)
+            traces = poly.plot("cells", showlegend=False, color=c, filled=filled, **kwargs)
         except Exception as e:
             warnings.warn(f"Error while plotting polyhedron {poly}: {e}", stacklevel=2)
             continue
@@ -970,7 +971,7 @@ def _complex_figure_graph(
         c = _highlight(c, poly, highlight_regions)
         poly_plotted = False
         try:
-            p_plot = poly.plot_graph(name=_poly_trace_name(poly), color=c, **kwargs)
+            p_plot = poly.plot("graph", name=_poly_trace_name(poly), color=c, **kwargs)
             if p_plot is not None:
                 if isinstance(p_plot, dict):
                     if "mesh" in p_plot:
@@ -986,7 +987,7 @@ def _complex_figure_graph(
                     fig.add_trace(p_plot)
                     poly_plotted = True
             if project is not None:
-                p_plot = poly.plot_graph(name=_poly_trace_name(poly), color=c, project=project, **kwargs)
+                p_plot = poly.plot("graph", name=_poly_trace_name(poly), color=c, project=project, **kwargs)
                 if p_plot is not None:
                     if isinstance(p_plot, dict):
                         if "mesh" in p_plot:
