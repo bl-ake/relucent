@@ -490,4 +490,3 @@ def test_failed_lp_raises_without_exact_rows(env, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(Polyhedron, "_exact_rows", lambda self: None)  # as for a network too large
     with pytest.raises(AmbiguousGeometryError, match="LP solver failure"):
         get_shis(cell, env=env)
-

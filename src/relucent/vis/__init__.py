@@ -1047,7 +1047,7 @@ def _complex_figure_graph(
 def plot_complex(
     cpx: Complex,
     *,
-    plot_mode: str,
+    plot_mode: Literal["cells", "graph", "1-skeleton"],
     hide_unbounded: bool = False,
     **kwargs: Any,
 ) -> go.Figure:

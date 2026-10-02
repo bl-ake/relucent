@@ -699,11 +699,7 @@ def get_hs(
     *,
     get_all_Ab: bool = False,
     force_numpy: bool = False,
-) -> (
-    tuple[torch.Tensor, torch.Tensor, torch.Tensor]
-    | tuple[np.ndarray, np.ndarray, np.ndarray]
-    | list[dict[str, object]]
-):
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, object]]:
     """Halfspace representation of ``poly`` from all neurons in the network.
 
     Includes constraints from every neuron, not only supporting hyperplanes.

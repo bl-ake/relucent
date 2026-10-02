@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from relucent import AmbiguousGeometryError, Complex, mlp
-from relucent.search import blocking_bad_shi_computations, true_phantom_neighbor_error
+from relucent.search.engine import blocking_bad_shi_computations, true_phantom_neighbor_error
 
 
 def test_no_error_is_a_phantom() -> None:

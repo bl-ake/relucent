@@ -125,7 +125,7 @@ def test_solve_radius_equalities_only_unique_point():
 
 def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
     """Requested geometry properties are kept; unrequested heavy caches are dropped."""
-    from relucent.search import retain_geometry_caches
+    from relucent.search.engine import retain_geometry_caches
 
     assert seeded is not None
     net = mlp(widths=[2, 4, 1])

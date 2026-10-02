@@ -94,7 +94,7 @@ Search loop
    task per SHI: ``(neighbor_ss, crossed_shi, depth, parent_index)``.
 2. **Workers** — Each task builds a :class:`~relucent.core.poly.Polyhedron`, runs
    Chebyshev geometry (``finite``, ``center``, ``inradius``), then
-   ``get_shis()``. See :func:`~relucent.search.search_calculations` and
+   ``get_shis()``. See :func:`~relucent.search.engine.search_calculations` and
    ``_worker_prepare_poly`` in :mod:`relucent.search`.
 3. **Main process** — On success, add the polyhedron and enqueue new neighbors
    for every SHI except the one just crossed. Failed flips are recorded so the

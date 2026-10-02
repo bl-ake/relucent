@@ -8,17 +8,11 @@ if TYPE_CHECKING:
         ALL_GEOMETRY_PROPERTIES,
         SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
         CubeMode,
-        astar_calculations,
-        blocking_bad_shi_computations,
-        get_ip,
         greedy_path,
         hamming_astar,
         parallel_add,
         parallel_compute_geometric_properties,
-        retain_geometry_caches,
-        search_calculations,
         searcher,
-        true_phantom_neighbor_error,
     )
     from .exploration import SearchResult
 
@@ -27,23 +21,21 @@ __all__ = [
     "SEARCH_REQUIRED_GEOMETRY_PROPERTIES",
     "CubeMode",
     "SearchResult",
-    "astar_calculations",
-    "blocking_bad_shi_computations",
-    "get_ip",
     "greedy_path",
     "hamming_astar",
-    "parallel_compute_geometric_properties",
     "parallel_add",
-    "retain_geometry_caches",
-    "search_calculations",
+    "parallel_compute_geometric_properties",
     "searcher",
-    "true_phantom_neighbor_error",
 ]
+
+_MODULE_OF: dict[str, str] = {name: ".engine" for name in __all__} | {"SearchResult": ".exploration"}
 
 
 def __getattr__(name: str) -> Any:
-    return getattr(import_module(".engine", __name__), name)
+    if name in _MODULE_OF:
+        return getattr(import_module(_MODULE_OF[name], __name__), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__() -> list[str]:
-    return sorted(set(globals()) | set(dir(import_module(".engine", __name__))))
+    return sorted(set(globals()) | set(__all__))
