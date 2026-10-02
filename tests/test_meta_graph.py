@@ -144,7 +144,7 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
         ext_tag = encode_ss(np.asarray(ss_ext, dtype=np.int8))
         assert ext_tag in meta_tr.nodes(), f"extended node for {n!r} missing from truncated graph"
         sst = np.asarray(meta_tr.nodes[ext_tag]["ss"])
-        assert sst.shape == (ss0.shape[0], ss0.shape[1] + 2)
+        assert sst.shape == (ss0.size + 2,)
         assert int(sst.flat[-2]) == 1
 
     for n in unbounded:

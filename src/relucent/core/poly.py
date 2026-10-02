@@ -346,7 +346,15 @@ class Polyhedron:
         return self._halfspace_point(hs, active, self.halfspaces_err_np, self._exact_rows) is not None
 
     def _coerce_ss_to_int(self, value: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
-        """Return an integer-typed sign sequence (values in {-1, 0, 1})."""
+        """Return a 1-D integer-typed sign sequence (values in {-1, 0, 1}).
+
+        Accepts shape ``(n,)`` or a single row ``(1, n)`` (e.g. one point's output of
+        :meth:`~relucent.core.complex.Complex.point2ss`).
+        """
+        if value.ndim != 1:
+            if value.ndim != 2 or value.shape[0] != 1:
+                raise ValueError(f"a sign sequence must have shape (n,) or (1, n), got {tuple(value.shape)}")
+            value = value.reshape(-1)
         if isinstance(value, np.ndarray):
             # ``dtype.kind in "iu"`` is ~50x faster than ``np.issubdtype`` and
             # this path is hit once per Polyhedron construction (hot in e.g.
@@ -384,7 +392,7 @@ class Polyhedron:
 
     @property
     def ss(self) -> np.ndarray | torch.Tensor:
-        """My sign sequence (entries in {-1, 0, 1}, one per ReLU unit). Assigning it clears derived caches."""
+        """The sign sequence: a 1-D array with one entry in {-1, 0, 1} per ReLU unit. Assigning it clears derived caches."""
         return self._ss
 
     @ss.setter
@@ -603,7 +611,7 @@ class Polyhedron:
         Returns:
             Polyhedron: The neighbor polyhedron.
         """
-        if self.ss_np.ravel()[shi] == 0:
+        if self.ss_np[shi] == 0:
             raise ValueError(f"SHI {shi} contains the polyhedron, cannot get neighbor")
         ss = flip_ss_at_shi(self.ss_np, shi)
         # If this Polyhedron was constructed directly from explicit halfspaces (no net),
@@ -623,7 +631,7 @@ class Polyhedron:
             Polyhedron: The face polyhedron.
         """
         ss = self.ss_np.copy()
-        ss[0, shi] = 0
+        ss[shi] = 0
         # Don't reuse cached geometry (halfspaces/W/b/shis) from the parent: zeroing a sign
         # changes which constraints are active, and stale caches can give an inconsistent
         # complex (and wrong Betti numbers).
@@ -639,12 +647,12 @@ class Polyhedron:
         """Get a (possibly higher-codimension) face by zeroing multiple SHIs.
 
         This is a purely combinatorial operation on the sign sequence: for each
-        ``shi`` in ``shis``, we set ``ss[0, shi] = 0`` and construct the resulting
+        ``shi`` in ``shis``, we set ``ss[shi] = 0`` and construct the resulting
         Polyhedron. No cached geometry is reused (same rationale as :meth:`get_face`).
         """
         ss = self.ss_np.copy()
         for shi in shis:
-            ss[0, int(shi)] = 0
+            ss[int(shi)] = 0
         if self._net is None and self._halfspaces is not None:
             return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss, bound=self.bound)

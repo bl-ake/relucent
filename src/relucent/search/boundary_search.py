@@ -53,8 +53,8 @@ def _ambient_lift_polyhedra(
     bshi = int(boundary_shi)
     ss_pos = ss.copy()
     ss_neg = ss.copy()
-    ss_pos.ravel()[bshi] = 1
-    ss_neg.ravel()[bshi] = -1
+    ss_pos[bshi] = 1
+    ss_neg[bshi] = -1
     net = poly._net
     if net is None:
         raise ValueError("boundary cell missing network reference for ambient lift")
@@ -81,7 +81,7 @@ def _ambient_coface_shis_for_boundary_cell(
     """
     ss = np.asarray(poly.ss_np, dtype=np.int8).copy()
     bshi = int(boundary_shi)
-    if int(ss.ravel()[bshi]) != 0:
+    if int(ss[bshi]) != 0:
         raise ValueError(f"Expected ss[{bshi}]=0 on boundary cell, got {ss!r}")
     return sorted(int(s) for s in ss_nonzero_indices(ss))
 

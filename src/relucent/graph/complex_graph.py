@@ -217,7 +217,7 @@ def recover_from_dual_graph(
     ):
         poly1, shi = graph.nodes[edge[0]]["poly"], graph.edges[edge]["shi"]
         if cfg.CAREFUL_MODE:
-            assert poly1.ss_np.ravel()[shi] != 0
+            assert poly1.ss_np[shi] != 0
         poly2 = cplx.add_ss(flip_ss_at_shi(poly1.ss_np, shi), check_exists=False)
         graph.nodes[edge[1]]["poly"] = poly2
 

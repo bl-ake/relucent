@@ -39,7 +39,7 @@ class TestPolyhedronBasics:
         ss = cplx.point2ss(x)
         p = Polyhedron(net, ss)
         assert p._net is not None
-        assert np.array_equal(ss_to_numpy(p.ss), ss_to_numpy(ss))
+        assert np.array_equal(ss_to_numpy(p.ss), ss_to_numpy(ss).ravel())
 
     def test_affine_map_matches_forward(self, seeded):
         assert seeded is not None

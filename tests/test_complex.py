@@ -186,7 +186,7 @@ class TestComplexCreationAndIndexing:
         x = _rand_batch(4)
         p = cplx.add_point(x)
         bad_ss = p.ss_np.copy()
-        bad_ss[0, 0] = -bad_ss[0, 0]  # flip one sign; neighbor not in complex yet
+        bad_ss[0] = -bad_ss[0]  # flip one sign; neighbor not in complex yet
         with pytest.raises(KeyError):
             _ = cplx[bad_ss]
 
