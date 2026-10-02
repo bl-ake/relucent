@@ -31,18 +31,14 @@ def _asymmetric_one_cell_fixture() -> tuple[Complex, Polyhedron, Polyhedron]:
         ss_a,
         halfspaces=halfspaces,
         shis=[0, 1],
-        codim=3,
-        dim=1,
-        _ambient_dim=2,
+        ambient_dim=2,
     )
     b = Polyhedron(
         net,
         ss_b,
         halfspaces=halfspaces,
         shis=[1],
-        codim=3,
-        dim=1,
-        _ambient_dim=2,
+        ambient_dim=2,
     )
     cplx.add_polyhedron(a, check_exists=False)
     cplx.add_polyhedron(b, check_exists=False)
@@ -77,8 +73,8 @@ def test_verify_shis_from_dual_graph_matches_edge_labels() -> None:
     cplx = Complex(net)
     ss_a = np.array([[1, -1, 1, -1, 1, -1, 1, -1, 1]], dtype=np.int8)
     ss_b = flip_ss_at_shi(ss_a, 0)
-    a = Polyhedron(net, ss_a, shis=[0], codim=2, dim=1, _ambient_dim=2)
-    b = Polyhedron(net, ss_b, shis=[0], codim=2, dim=1, _ambient_dim=2)
+    a = Polyhedron(net, ss_a, shis=[0], ambient_dim=2)
+    b = Polyhedron(net, ss_b, shis=[0], ambient_dim=2)
     cplx.add_polyhedron(a, check_exists=False)
     cplx.add_polyhedron(b, check_exists=False)
     graph = nx.Graph()

@@ -483,13 +483,11 @@ def vertex_polyhedron(source: Complex, cplx: Complex, vertex: VertexRecord) -> P
     witness = source.tag2poly[vertex.witness_tag]
     poly = cplx.add_ss(
         vertex.ss,
-        codim=ambient_dim,
-        dim=0,
-        _ambient_dim=ambient_dim,
+        ambient_dim=ambient_dim,
         halfspaces=witness.halfspaces,
         halfspaces_err=witness.halfspaces_err_np,
         halfspaces_ss=witness.halfspaces_rows_ss,
-        _rows_data=witness._rows_data,
+        rows_data=witness._rows_data,
         finite=True,
     )
     poly._interior_point = vertex.point
@@ -585,9 +583,7 @@ def build_chain_complex(source: Complex, verbose: int | None = None) -> list[Com
         for tag in ordered_tags:
             ss = recovered[tag]
             kwargs: dict[str, Any] = {
-                "codim": ambient_dim - dim,
-                "dim": dim,
-                "_ambient_dim": ambient_dim,
+                "ambient_dim": ambient_dim,
             }
             point = vertex_points.get(tag)
             if dim == 0:
@@ -595,7 +591,7 @@ def build_chain_complex(source: Complex, verbose: int | None = None) -> list[Com
                 continue
             if dim == 1:
                 candidate_by_shi = {shi: incidence.face_tag(ss, shi) for shi in incidence.ss_nonzero_indices(ss)}
-                kwargs["_covector_endpoint_shis"] = sorted(
+                kwargs["covector_endpoint_shis"] = sorted(
                     shi for shi, face in candidate_by_shi.items() if face in vertex_points
                 )
             poly = cplx.add_ss(ss, **kwargs)

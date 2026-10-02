@@ -174,7 +174,7 @@ def test_face_contains_its_own_interior_point(seed: int) -> None:
     # Face {normal . x + offset = 0} of the cell {normal . x + offset <= 0} cut by the box |x_i| <= 1.
     box = [[0.0, -1.0, -1.0], [0.0, 1.0, -1.0], [-1.0, 0.0, -1.0], [1.0, 0.0, -1.0]]
     rows = np.array([[normal[0], normal[1], offset], *box])
-    face = Polyhedron(None, np.array([[0, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, dim=1, _ambient_dim=2)
+    face = Polyhedron(None, np.array([[0, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, ambient_dim=2)
     point = np.asarray(face.get_interior_point()).reshape(-1)
     assert point in face
     assert (point + 1e-3 * normal) not in face  # clearly off the face, on the outside
@@ -261,7 +261,7 @@ def test_row_constant_on_a_face_is_decided_exactly(env, monkeypatch: pytest.Monk
             [0.0, -1.0, 0.0, -1.0],
         ]
     )
-    face = Polyhedron(None, np.array([[0, 1, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, dim=2, _ambient_dim=3)
+    face = Polyhedron(None, np.array([[0, 1, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, ambient_dim=3)
     assert set(get_shis(face, env=env)) == {2, 3, 4, 5}
     assert False in calls  # row 1 decided exactly: not a facet
 

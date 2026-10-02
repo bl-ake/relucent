@@ -78,13 +78,11 @@ def slice_complex(cplx: Complex, x0: np.ndarray, V: np.ndarray) -> Complex:
 
     def _slice_poly_kwargs(parent: Polyhedron, halfspaces: np.ndarray) -> dict[str, Any]:
         err = rounding.slice_error(parent.halfspaces_np, parent.halfspaces_err_np, V_arr, x0_arr)
-        kwargs: dict[str, Any] = {"halfspaces": halfspaces, "halfspaces_err": err, "_ambient_dim": k}
+        kwargs: dict[str, Any] = {"halfspaces": halfspaces, "halfspaces_err": err, "ambient_dim": k}
         if parent._shis is not None:
             kwargs["shis"] = list(parent._shis)
-        for attr in ("_codim", "_dim", "_finite"):
-            val = getattr(parent, attr, None)
-            if val is not None:
-                kwargs[attr.lstrip("_")] = val
+        if parent._finite is not None:
+            kwargs["finite"] = parent._finite
         return kwargs
 
     for poly in cplx:

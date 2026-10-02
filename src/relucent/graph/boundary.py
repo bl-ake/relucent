@@ -57,21 +57,17 @@ def _codim_one_face_kwargs(p1: Polyhedron, shi: int) -> dict[str, Any]:
             halfspaces=p1.halfspaces,
             halfspaces_err=p1.halfspaces_err_np,
             halfspaces_ss=p1.halfspaces_rows_ss,
-            _rows_data=p1._rows_data,
-            codim=codim,
-            dim=face_dim,
-            _ambient_dim=ambient,
+            rows_data=p1._rows_data,
+            ambient_dim=ambient,
         )
         candidate_shis = [s for s in candidate_shis if probe.is_shi_face_feasible(int(s))]
     poly_kwargs: dict[str, Any] = {
         "halfspaces": p1.halfspaces,
         "halfspaces_err": p1.halfspaces_err_np,
         "halfspaces_ss": p1.halfspaces_rows_ss,
-        "_rows_data": p1._rows_data,
+        "rows_data": p1._rows_data,
         "shis": candidate_shis,
-        "codim": codim,
-        "dim": face_dim,
-        "_ambient_dim": ambient,
+        "ambient_dim": ambient,
     }
     return poly_kwargs
 
