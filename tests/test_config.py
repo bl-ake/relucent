@@ -127,14 +127,12 @@ def test_genericity_tells_vertices_apart_by_their_own_error() -> None:
         None,
         np.array([[0, 1, 1]], dtype=np.int8),
         halfspaces=np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, -1.0], [1.0, 0.0, 1e-9]]),
-        dim=1,
-        _ambient_dim=2,
+        ambient_dim=2,
     )
     right = Polyhedron(
         None,
         np.array([[0, 1, 1, 1]], dtype=np.int8),
         halfspaces=np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [1.0, 0.0, -1.0], [0.0, 0.0, -1.0]]),
-        dim=1,
-        _ambient_dim=2,
+        ambient_dim=2,
     )
     verify_arrangement_genericity([left, right])

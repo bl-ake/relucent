@@ -41,6 +41,7 @@ class Polyhedron:
         self,
         net: ReLUNetwork | Any,
         ss: np.ndarray | torch.Tensor,
+        *,
         halfspaces: np.ndarray | torch.Tensor | None = None,
         halfspaces_err: np.ndarray | None = None,
         halfspaces_ss: np.ndarray | None = None,
@@ -49,15 +50,36 @@ class Polyhedron:
         finite: bool | None = None,
         shis: list[int] | None = None,
         bound: float | None = None,
-        **kwargs: Any,
+        ambient_dim: int | None = None,
+        rows_data: bool | None = None,
+        shis_strict: bool = False,
+        covector_endpoint_shis: list[int] | None = None,
     ) -> None:
         """Create a Polyhedron object.
 
         Args:
-            net: Internal canonical NN class instance used for geometry calculations.
+            net: The network (a :class:`~relucent.model.model.ReLUNetwork`, or any model
+                :func:`~relucent.model.convert_model.convert` accepts), or ``None`` for a
+                cell given only by ``halfspaces``.
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
-
-        The kwargs can be used to supply precomputed values for various properties.
+            halfspaces: Precomputed rows ``[A | b]`` of ``Ax + b <= 0``.
+            halfspaces_err: Float64 error scale of ``halfspaces`` (see
+                :mod:`relucent._internal.rounding`). Rows given without it, and without
+                ``halfspaces_ss``, are taken as exact data.
+            halfspaces_ss: Sign sequence the ``halfspaces`` rows were composed for, when
+                they come from another cell.
+            W, b: Precomputed affine map of the network on this cell.
+            finite: Precomputed boundedness, if known.
+            shis: Precomputed supporting-hyperplane (facet) indices.
+            bound: Box radius used for this cell's LPs.
+            ambient_dim: Input dimension, when it can't be read from ``halfspaces`` yet.
+            rows_data: Whether the rows are exact data rather than float64 compositions of
+                the network's weights. Defaults to True for a net-less cell or rows given
+                without provenance.
+            shis_strict: Whether ``shis`` is this cell's certified facet list (rather than one
+                assigned from a dual graph or a coface).
+            covector_endpoint_shis: For a 1-cell, the SHIs whose faces are its verified
+                endpoints.
         """
         if net is not None and not isinstance(net, ReLUNetwork):
             from relucent.model.convert_model import convert
@@ -78,7 +100,7 @@ class Polyhedron:
         self._halfspaces_user: bool = halfspaces is not None and halfspaces_err is None and halfspaces_ss is None
         # Whether the rows are exact data (a net-less cell, or a caller's rows) rather than rows
         # composed from a network in float64. Kept separately from ``_net``, which pickling drops.
-        self._rows_data: bool = net is None or self._halfspaces_user
+        self._rows_data: bool = (net is None or self._halfspaces_user) if rows_data is None else rows_data
         # Sign sequence whose composed rows ``halfspaces`` are, when handed in from another cell
         # (so their error scale and exact values can be rebuilt; see relucent._internal).
         self._halfspaces_ss: np.ndarray | None = halfspaces_ss
@@ -95,7 +117,7 @@ class Polyhedron:
         self._shis: list[int] | None = shis
         # Whether ``_shis`` is this cell's certified facet list (get_shis on it), as opposed to a
         # list assigned from the dual graph or a coface; certification recomputes only the latter.
-        self._shis_strict: bool = False
+        self._shis_strict: bool = shis_strict
         self._hs: HalfspaceIntersection | None = None
         self._ch: ConvexHull | None = None
         self._finite: bool | None = finite
@@ -103,7 +125,7 @@ class Polyhedron:
         self._vertices: np.ndarray | None = None
         self._volume: float | None = None
         self._covector_infeasible: bool = False
-        self._covector_endpoint_shis: list[int] | None = None
+        self._covector_endpoint_shis: list[int] | None = covector_endpoint_shis
 
         self._hash: int | None = None
         self._tag: bytes | None = None
@@ -114,10 +136,7 @@ class Polyhedron:
         self._ss_np: np.ndarray | None = None
 
         self._attempted_compute_properties: bool = False
-        self._ambient_dim: int | None = None
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        self._ambient_dim: int | None = ambient_dim
 
         self._apply_zero_cell_finite_hint()
 
@@ -576,7 +595,7 @@ class Polyhedron:
         return {
             "halfspaces": self._halfspaces,
             "halfspaces_err": self.halfspaces_err_np,
-            "_rows_data": self._rows_data,
+            "rows_data": self._rows_data,
             "bound": self.bound,
         }
 

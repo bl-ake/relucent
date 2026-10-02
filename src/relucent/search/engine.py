@@ -244,7 +244,7 @@ def geometric_calculations(
         poly_index = int(task[2])
         rest = task[3:]
         shis_strict = False
-    p = Polyhedron(ctx.net, ss, shis=shis, bound=bound, _shis_strict=bool(shis_strict))
+    p = Polyhedron(ctx.net, ss, shis=shis, bound=bound, shis_strict=bool(shis_strict))
     if err := _worker_prepare_poly(p, tuple(geometry_properties), env=ctx.env):
         return err, poly_index, *rest
     return (p, poly_index, *rest)

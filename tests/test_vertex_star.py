@@ -14,7 +14,7 @@ from relucent.utils import encode_ss, mlp, set_seeds
 
 
 def _square_tope_graph() -> tuple[list[Polyhedron], nx.Graph[Polyhedron]]:
-    cells = [Polyhedron(None, np.array([[a, b, 1]], dtype=np.int8), dim=2, _ambient_dim=2) for a in (-1, 1) for b in (-1, 1)]
+    cells = [Polyhedron(None, np.array([[a, b, 1]], dtype=np.int8), ambient_dim=2) for a in (-1, 1) for b in (-1, 1)]
     by_sign = {tuple(p.ss_np.ravel()): p for p in cells}
     graph: nx.Graph[Polyhedron] = nx.Graph()
     graph.add_nodes_from(cells)
@@ -121,7 +121,7 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
 
 def _data_cell(rows: list[list[float]], ss: list[int]) -> Polyhedron:
     hs = np.array(rows, dtype=np.float64)
-    return Polyhedron(None, np.array([ss], dtype=np.int8), halfspaces=hs, dim=2, _ambient_dim=2)
+    return Polyhedron(None, np.array([ss], dtype=np.int8), halfspaces=hs, ambient_dim=2)
 
 
 def test_verify_vertex_covector_decides_from_the_cell_rows() -> None:

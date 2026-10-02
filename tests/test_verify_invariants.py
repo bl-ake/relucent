@@ -266,6 +266,9 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     from relucent.search import searcher
     from relucent.utils import BlockingQueue
 
+    # Seeded: the fake SHIs below aren't real facets, and on some random networks the cell
+    # across SHI 0 is empty, which the searcher reports as AmbiguousGeometryError.
+    set_seeds(0)
     model = mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
 
