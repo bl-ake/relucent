@@ -18,7 +18,7 @@ Core capabilities include:
 * Distributed local-search routines for discovering activation regions.
 * Polyhedron-level queries (halfspaces, boundaries, centers, neighbors).
 * Complex-level analyses and graph-based views of region adjacency.
-* 2D and 3D visualizations using Plotly and matplotlib-backed utilities.
+* 2D and 3D visualizations using Plotly.
 * Native compatibility with PyTorch models
 
 .. toctree::
