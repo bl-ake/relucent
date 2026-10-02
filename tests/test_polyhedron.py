@@ -179,7 +179,7 @@ class TestPolyhedronOps:
 
 class TestPolyhedronRetainGeometryCaches:
     def test_retain_geometry_caches_clears_heavy_caches(self, seeded):
-        from relucent.search import retain_geometry_caches
+        from relucent.search.engine import retain_geometry_caches
 
         assert seeded is not None
         net = mlp(widths=[2, 4, 2], add_last_relu=True)

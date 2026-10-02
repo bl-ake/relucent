@@ -487,4 +487,4 @@ def test_complex_figure_builders_and_plot_complex_dispatch():
     with pytest.raises(ValueError):
         vis.plot_complex(_complex_with_polys(4, []), plot_mode="cells")
     with pytest.raises(ValueError):
-        vis.plot_complex(c2, plot_mode="unknown")  # type: ignore[arg-type]
+        vis.plot_complex(c2, plot_mode="unknown")  # pyright: ignore[reportArgumentType]

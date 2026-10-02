@@ -199,7 +199,7 @@ release**. Set them the same ways as the settings above, e.g.
    * - ``INTERIOR_POINT_RADIUS_SEQUENCE``
      - ``list[float]``
      - ``[0.01, 0.1, 1, 10, 100]``
-     - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.get_ip`.
+     - Radii tried in order when locating an interior point for a neighbor in :func:`~relucent.search.engine.get_ip`.
    * - ``ASTAR_BIAS_WEIGHT``
      - ``float``
      - ``0.9``
