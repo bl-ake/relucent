@@ -6,6 +6,7 @@ Functions here take a :class:`~relucent.core.poly.Polyhedron` instance; the clas
 
 import warnings
 from collections.abc import Callable, Iterable, Mapping
+from functools import partial
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 import numpy as np
@@ -1152,6 +1153,33 @@ def get_shis(
             interior.append(np.asarray(zc, dtype=np.float64).reshape(-1))
         return interior[0]
 
+    def decide_without_lp(i: int, j: int) -> bool | None:
+        """Row i's facet verdict in exact arithmetic alone, for when every LP re-solve failed.
+
+        None when it cannot decide: no exact rows (too large a network), a fixed box (the exact
+        question is over the unbounded cell), or a near-duplicate partner, whose coincidence
+        check needs the LP.
+        """
+        if not escalate_bound or j in dup_partners:
+            return None
+        rows = poly._exact_rows()
+        if rows is None:
+            return None
+        from relucent._internal import exact
+
+        start = null_basis @ interior_point().reshape(-1, 1) + x0
+        return exact.exact_facet_by_simplex(rows, i, eq_orig_idx, start)
+
+    def record_without_lp(i: int, j: int, verdict: bool) -> None:
+        """Record an exact verdict for row i (LP row j) and restore its RHS; the LP has no solution."""
+        if verdict and zero_units.size:
+            _raise_if_coincident_across(poly, i, zero_units, eq_orig_idx)
+        if verdict:
+            shis.append(i)
+        if poly_info is not None:
+            poly_info.append({"Status": "exact (LP failed)", "Verdict": verdict})
+        constrs[j].setAttr("RHS", -b_red[j, 0])
+
     candidate_subset = subset or set(range(n_orig)) - set(poly.zero_indices)
     candidate_subset = set(candidate_subset)
 
@@ -1229,14 +1257,20 @@ def get_shis(
             if model.status not in (GRB.OPTIMAL, GRB.USER_OBJ_LIMIT):
                 # This LP relaxes one row of a cell just solved as feasible, and its objective is
                 # capped by that row's relaxed bound, so anything but optimal is a solver failure.
-                _recover_relaxed_shi_lp(model, poly, i)
+                exact_verdict = _recover_relaxed_shi_lp(model, poly, i, partial(decide_without_lp, int(i), j))
+                if exact_verdict is not None:
+                    record_without_lp(int(i), j, exact_verdict)
+                    continue
             if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
                 verdict = _certify_facet_from_model(model, z, constrs, j, h_red, err_red, interior_point)
                 if verdict is None and model.status == GRB.USER_OBJ_LIMIT:
                     model.params.BestObjStop = GRB.INFINITY
                     model.optimize()
                     if model.status != GRB.OPTIMAL:
-                        _recover_relaxed_shi_lp(model, poly, i)
+                        exact_verdict = _recover_relaxed_shi_lp(model, poly, i, partial(decide_without_lp, int(i), j))
+                        if exact_verdict is not None:
+                            record_without_lp(int(i), j, exact_verdict)
+                            continue
                     verdict = _certify_facet_from_model(model, z, constrs, j, h_red, err_red, interior_point)
                 if verdict is None and escalate_bound:
                     # Float64 can't decide (usually a redundant row parallel to a facet, with
@@ -1367,39 +1401,58 @@ def get_shis(
     return shis
 
 
-def _cold_retry(model: Model) -> list[int]:
-    """Re-solve a failed SHI LP ``model`` once, from scratch, under Gurobi's automatic scaling.
+# ScaleFlag values tried in turn, each from scratch, when a SHI LP fails. In a census of real cells,
+# re-solving with no scaling (0) recovered every failure that any ScaleFlag recovered; the rest
+# need the exact decision in get_shis (docs/search_shi_and_graphs.rst, "LP solver failures").
+_SHI_LP_RETRY_SCALE_FLAGS: tuple[int, ...] = (0,)
+
+
+def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]:
+    """Re-solve a failed SHI LP ``model`` from scratch under each of :data:`_SHI_LP_RETRY_SCALE_FLAGS`.
 
     Warm starts and the configured scaling (:data:`relucent.config.GUROBI_SHI_SCALE_FLAG`) are
     what typically fail on a badly conditioned cell; every answer is certified afterwards, so the
-    setting only changes what is proposed. Returns both statuses; the configured scaling is restored.
+    setting only changes what is proposed. Stops at the first status in ``ok``. Returns every
+    status seen (the failed one first); the configured scaling is restored.
     """
     tried = [int(model.status)]
-    model.reset()  # discard the basis
-    model.params.ScaleFlag = -1
     try:
-        model.optimize()
+        for scale_flag in _SHI_LP_RETRY_SCALE_FLAGS:
+            model.reset()  # discard the basis
+            model.params.ScaleFlag = scale_flag
+            model.optimize()
+            tried.append(int(model.status))
+            if model.status in ok:
+                break
     finally:
         model.params.ScaleFlag = cfg.GUROBI_SHI_SCALE_FLAG
-    tried.append(int(model.status))
     return tried
 
 
-def _recover_relaxed_shi_lp(model: Model, poly: "Polyhedron", i: int) -> None:
-    """Re-solve a failed SHI LP for halfspace ``i`` once (:func:`_cold_retry`), or raise.
+def _recover_relaxed_shi_lp(
+    model: Model, poly: "Polyhedron", i: int, decide: Callable[[], bool | None] | None = None
+) -> bool | None:
+    """Re-solve a failed SHI LP for halfspace ``i`` (:func:`_cold_retry`), else decide without it, else raise.
 
     The LP relaxes one row of a feasible cell and caps its objective, so it is feasible and bounded:
-    any non-optimal status is a solver failure.
+    any non-optimal status is a solver failure. Returns None once a re-solve succeeds (``model``
+    then holds the solution). If none does, returns ``decide()``'s verdict (made in exact arithmetic,
+    without the LP) when it has one, and otherwise raises.
     """
-    tried = _cold_retry(model)
-    if model.status not in (GRB.OPTIMAL, GRB.USER_OBJ_LIMIT):
-        from relucent.core.errors import AmbiguousGeometryError
+    tried = _cold_retry(model, (GRB.OPTIMAL, GRB.USER_OBJ_LIMIT))
+    if model.status in (GRB.OPTIMAL, GRB.USER_OBJ_LIMIT):
+        return None
+    verdict = decide() if decide is not None else None
+    if verdict is not None:
+        return verdict
+    from relucent.core.errors import AmbiguousGeometryError
 
-        model.close()
-        raise AmbiguousGeometryError(
-            f"the SHI LP for halfspace {i} of {poly!r} failed although it relaxes a feasible LP (statuses "
-            + f"{tried}, warm then cold): LP solver failure"
-        )
+    model.close()
+    raise AmbiguousGeometryError(
+        f"the SHI LP for halfspace {i} of {poly!r} failed although it relaxes a feasible LP (statuses "
+        + f"{tried}: warm, then cold under ScaleFlag {list(_SHI_LP_RETRY_SCALE_FLAGS)}), and exact "
+        + "arithmetic could not decide it either: LP solver failure"
+    )
 
 
 def _raise_if_coincident_facet(
