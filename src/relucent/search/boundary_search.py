@@ -9,10 +9,9 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent._internal.logging import logger
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
@@ -43,18 +42,6 @@ __all__ = [
 
 class BoundaryDiscoveryStats(dict[str, Any]):
     """Statistics returned by :func:`discover_boundary_complex`."""
-
-
-def _discovery_log(msg: str, *, verbose: bool) -> None:
-    if verbose:
-        print(msg, flush=True)
-
-
-def _phase_log(msg: str, *, verbose: bool) -> None:
-    """Emit progress to logger and optionally stdout (for long finalize / post steps)."""
-    logger.info(msg)
-    if verbose:
-        print(msg, flush=True)
 
 
 def _ambient_lift_polyhedra(
@@ -135,7 +122,6 @@ def _apply_ambient_boundary_shis(
     *,
     bound: float | None = None,
     nworkers: int | None = None,
-    verbose: bool = False,
     **shis_kwargs: Any,
 ) -> None:
     """Assign slice ``_shis`` to every top boundary cell before dual-graph finalize."""
@@ -175,11 +161,9 @@ def _apply_ambient_boundary_shis(
         tag_to_poly[tag]._shis = shis
         tag_to_poly[tag]._shis_strict = False  # slice crossings, not this cell's certified LP facets
         _set_coface_rows(tag_to_poly[tag], halfspaces, halfspaces_err, halfspaces_ss)
-    if verbose:
-        _phase_log(
-            "discover finalize: ambient coface _shis for " + f"{len(polys)} cells ({nw} workers)",
-            verbose=True,
-        )
+    logger.debug(
+        "discover finalize: ambient coface _shis for " + f"{len(polys)} cells ({nw} workers)",
+    )
 
 
 def _ambient_coface_shis_worker(
@@ -203,6 +187,7 @@ def _ambient_coface_shis_worker(
     return tag, shis, halfspaces, halfspaces_err, halfspaces_ss
 
 
+@with_verbosity
 def boundary_searcher(
     cx: Complex,
     boundary_shi: int,
@@ -226,7 +211,8 @@ def boundary_searcher(
         max_polys: Maximum cells to discover in this component.
         bound: Gurobi box bound for SHI LPs.
         nworkers: Worker process count.
-        verbose: Progress verbosity.
+        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` pricing and
+            search detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         geometry_properties: Optional geometry caches (default topology-only).
         verify: When True (default), require complete exploration. Certification runs
             later in :func:`~relucent.search.exploration.finalize_boundary_complex`.
@@ -240,8 +226,7 @@ def boundary_searcher(
     Raises:
         ValueError: If ``start`` is not a top-dimensional boundary cell.
     """
-    if verbose is None:
-        verbose = cfg.VERBOSE
+    del verbose  # applied by @with_verbosity
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
     shis_kwargs = without_deprecated_strict(kwargs)
@@ -258,13 +243,12 @@ def boundary_searcher(
 
     pending_neighbors: dict[bytes, list[tuple[int, int]]] = {}
     nworkers = nworkers or process_aware_cpu_count()
-    if verbose:
-        logger.info(
-            "boundary_searcher running on %d workers (boundary_shi=%d, verify=%s)",
-            nworkers,
-            boundary_shi,
-            verify,
-        )
+    logger.info(
+        "boundary_searcher running on %d workers (boundary_shi=%d, verify=%s)",
+        nworkers,
+        boundary_shi,
+        verify,
+    )
 
     queue = BlockingQueue(
         queue_class=deque,
@@ -299,11 +283,10 @@ def boundary_searcher(
 
     rolling_average = len(start.shis)
     bad_shi_computations: list[Any] = []
-    pbar = tqdm(
+    pbar = progress(
         desc="Boundary Search",
         mininterval=5,
         total=max_polys if max_polys != float("inf") else None,
-        disable=not verbose,
     )
     pbar.update(n=1)
     pbar.get_lock().locks = []
@@ -418,10 +401,9 @@ def boundary_searcher(
     # cannot treat an empty queue as proof that the boundary complex is complete —
     # except for true phantoms (empty flip-neighbor sign patterns).
     complete = unprocessed == 0 and not hit_cap and not depth_limited and not blocking_mistakes
-    if verbose:
-        n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
-        if n_phantom:
-            logger.info("boundary search: ignored %d true phantom flip-neighbor(s)", n_phantom)
+    n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
+    if n_phantom:
+        logger.info("boundary search: ignored %d true phantom flip-neighbor(s)", n_phantom)
     if not complete:
         # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
         cx.set_exploration_state(complete=False, verified=False)
@@ -447,14 +429,15 @@ def boundary_searcher(
     )
 
 
+@with_verbosity
 def discover_boundary_complex(
     net: ReLUNetwork,
     boundary_shi: int,
     *,
     bound: float | None = None,
     nworkers: int | None = None,
-    verbose: bool = False,
     verify: bool = True,
+    verbose: int | None = None,
     **kwargs: Any,
 ) -> tuple[Complex, BoundaryDiscoveryStats]:
     """Discover the full boundary complex via MIP pricing + slice BFS per component.
@@ -471,13 +454,15 @@ def discover_boundary_complex(
         bound: Gurobi box bound for SHI LPs; defaults to
             :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
         nworkers: Worker process count for slice BFS.
-        verbose: If True, log pricing and search progress.
+        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` pricing and
+            search detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         verify: When True (default), run full certification during finalize.
         **kwargs: Forwarded to slice BFS / SHI routines.
 
     Returns:
         ``(complex, stats)`` where ``stats`` records component counts and timings.
     """
+    del verbose  # applied by @with_verbosity
     from relucent.core.complex import Complex
 
     merged = Complex(net)
@@ -489,10 +474,9 @@ def discover_boundary_complex(
 
     while True:
         n_pricing_calls += 1
-        _discovery_log(
+        logger.debug(
             "discover_boundary_complex: pricing call "
             + f"{n_pricing_calls} (excluded_tags={len(visited)}, boundary_shi={boundary_shi}) ...",
-            verbose=verbose,
         )
         t0 = time.perf_counter()
         witness = price_boundary_witness(
@@ -500,25 +484,22 @@ def discover_boundary_complex(
             boundary_shi,
             visited,
             bound=bound,
-            verbose=verbose,
             pricing_call=n_pricing_calls,
         )
         call_seconds = time.perf_counter() - t0
         pricing_time += call_seconds
         if witness is None:
-            _discovery_log(
+            logger.debug(
                 "discover_boundary_complex: pricing call "
                 + f"{n_pricing_calls} proven infeasible after {call_seconds:.3f}s "
                 + "(no more boundary components)",
-                verbose=verbose,
             )
             break
 
-        _discovery_log(
+        logger.debug(
             "discover_boundary_complex: pricing call "
             + f"{n_pricing_calls} found witness after {call_seconds:.3f}s, "
             + "starting boundary search ...",
-            verbose=verbose,
         )
 
         cx = Complex(net)
@@ -528,7 +509,6 @@ def discover_boundary_complex(
             witness,
             bound=bound,
             nworkers=nworkers,
-            verbose=1 if verbose else 0,
             verify=verify,
             **kwargs,
         )
@@ -537,9 +517,8 @@ def discover_boundary_complex(
         for poly in cx:
             merged.add_polyhedron(poly, check_exists=True)
             visited.add(poly.tag)
-        _discovery_log(
+        logger.debug(
             "discover_boundary_complex: component " + f"{n_components} finished, n_cells={len(cx)}, total_cells={len(merged)}",
-            verbose=verbose,
         )
 
     if len(merged) == 0:
@@ -557,9 +536,8 @@ def discover_boundary_complex(
         )
         return merged, stats
 
-    _discovery_log(
+    logger.debug(
         "discover_boundary_complex: post-processing " + f"{len(merged)} cells (SHI filter, genericity) ...",
-        verbose=verbose,
     )
     t_post = time.perf_counter()
     t_verify = time.perf_counter()
@@ -568,7 +546,6 @@ def discover_boundary_complex(
         boundary_shi,
         bound=bound,
         nworkers=nworkers,
-        verbose=verbose,
         verify=verify,
         **kwargs,
     )
@@ -576,9 +553,8 @@ def discover_boundary_complex(
     post_halfspaces_s = post_verify_s  # halfspaces computed inside finalize
     post_classify_s = 0.0
     post_total_s = time.perf_counter() - t_post
-    _discovery_log(
+    logger.debug(
         "discover_boundary_complex: post-processing finished in " + f"{post_total_s:.3f}s",
-        verbose=verbose,
     )
 
     stats = BoundaryDiscoveryStats(

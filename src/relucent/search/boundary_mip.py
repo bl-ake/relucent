@@ -16,6 +16,7 @@ from gurobipy import GRB, Env, Model, quicksum
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import boundary_mip_eps, count_relu_units, estimate_input_bound, relu_linear_blocks
 from relucent.core.poly import Polyhedron
 from relucent.model.model import ReLUNetwork
@@ -64,20 +65,14 @@ class _PricingCallbackState:
     proven_infeasible: bool = False
     stall: bool = False
     precompiled_exclusions: bool = False
-    verbose: bool = False
     excl_pbar: tqdm | None = None
-
-
-def _pricing_log(msg: str, *, verbose: bool) -> None:
-    if verbose:
-        print(msg, flush=True)
 
 
 def _configure_pricing_mip_logging(model: Model, *, log_path: Path | None) -> None:
     """Configure Gurobi solver logging for a pricing MIP without mutating the shared env.
 
     Controlled by :data:`~relucent.config.BOUNDARY_MIP_GUROBI_LOG`, not by the
-    Relucent ``verbose`` flag. Model parameters override the cached
+    relucent verbosity. Model parameters override the cached
     :func:`~relucent.utils.get_env` defaults.
     """
     if cfg.BOUNDARY_MIP_GUROBI_LOG:
@@ -393,7 +388,6 @@ def _static_add_exclude_tags(
     y_mvar: Any | None = None,
     name_prefix: str = "exclude_static_",
     start_idx: int = 0,
-    verbose: bool = False,
 ) -> int:
     tag_list = list(exclude_tags)
     if not tag_list:
@@ -401,13 +395,11 @@ def _static_add_exclude_tags(
     t0 = time.perf_counter()
     pairs = _build_ordered_static_pairs(tag_list, boundary_shi=boundary_shi, n=n, net=net)
     specs = [spec for _, spec in pairs]
-    if verbose:
-        _pricing_log(
-            "boundary pricing MIP: built "
-            + f"{len(specs)} static nogood specs from {len(tag_list)} tags "
-            + f"(order={cfg.advanced.BOUNDARY_MIP_CUT_ORDER})",
-            verbose=True,
-        )
+    logger.debug(
+        "boundary pricing MIP: built "
+        + f"{len(specs)} static nogood specs from {len(tag_list)} tags "
+        + f"(order={cfg.advanced.BOUNDARY_MIP_CUT_ORDER})",
+    )
     next_idx = _batch_add_nogood_constraints(
         model,
         specs,
@@ -417,12 +409,9 @@ def _static_add_exclude_tags(
         y_mvar=y_mvar,
     )
     static_emit_s = time.perf_counter() - t0
-    if verbose:
-        _pricing_log(
-            "boundary pricing MIP: static exclusions emitted in "
-            + f"{static_emit_s:.3f}s ({next_idx - start_idx} constraints)",
-            verbose=True,
-        )
+    logger.debug(
+        "boundary pricing MIP: static exclusions emitted in " + f"{static_emit_s:.3f}s ({next_idx - start_idx} constraints)",
+    )
     return next_idx
 
 
@@ -435,7 +424,6 @@ def _compile_exclude_tags(
     boundary_shi: int,
     net: ReLUNetwork | None = None,
     y_mvar: Any | None = None,
-    verbose: bool = False,
 ) -> _ExclusionCompileResult:
     """Tiered exclusion compiler: trie compression, then batched static nogoods."""
     result = _ExclusionCompileResult(n_tags=len(exclude_tags))
@@ -456,16 +444,14 @@ def _compile_exclude_tags(
     if not skip_trie and len(exclude_tags) >= cfg.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS:
         from relucent.search.boundary_exclusion_trie import ForbiddenPatternTrie
 
-        _pricing_log(
+        logger.debug(
             "boundary pricing MIP: compiling " + f"{len(exclude_tags)} excluded tags into exclusion trie ...",
-            verbose=verbose,
         )
         t_compile = time.perf_counter()
-        trie = ForbiddenPatternTrie.from_tags(exclude_tags, n, boundary_shi, verbose=verbose)
+        trie = ForbiddenPatternTrie.from_tags(exclude_tags, n, boundary_shi)
         result.trie_build_s = time.perf_counter() - t_compile
-        _pricing_log(
+        logger.debug(
             "boundary pricing MIP: exclusion trie built in " + f"{result.trie_build_s:.3f}s",
-            verbose=verbose,
         )
         if trie.fully_saturated:
             result.fully_saturated = True
@@ -479,12 +465,11 @@ def _compile_exclude_tags(
             trie_stats = trie.compile_to_model(model, y_vars, include_leaves=False)
             result.trie_emit_s = time.perf_counter() - t_emit
             result.n_trie_constraints = trie_stats.n_constraints
-            _pricing_log(
+            logger.debug(
                 "boundary pricing MIP: trie constraints emitted in "
                 + f"{result.trie_emit_s:.3f}s "
                 + f"({trie_stats.n_constraints} constraints, "
                 + f"ratio={trie_stats.compression_ratio:.1f}x)",
-                verbose=verbose,
             )
         compression_ratio = trie_stats.compression_ratio if trie_stats is not None else float(len(exclude_tags))
         static_all = n_saturated == 0 or compression_ratio < cfg.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO
@@ -506,7 +491,6 @@ def _compile_exclude_tags(
                 y_mvar=y_mvar,
                 name_prefix="exclude_static_",
                 start_idx=start_idx,
-                verbose=verbose,
             )
             result.n_static_constraints = next_idx - start_idx
             result.static_precompiled = result.n_trie_constraints > 0 or result.n_static_constraints > 0
@@ -787,25 +771,22 @@ def _run_pricing_optimize(
     model: Model,
     state: _PricingCallbackState,
     *,
-    verbose: bool,
     log_path: Path | None,
 ) -> float:
     time_limit = float(cfg.BOUNDARY_MIP_TIME_LIMIT)
-    _pricing_log(
+    logger.debug(
         "boundary pricing MIP: optimize "
         + f"(time_limit={'none' if time_limit <= 0 else f'{time_limit:.1f}s'}"
         + (f", log_file={log_path.resolve()})" if log_path is not None else ")"),
-        verbose=verbose,
     )
     t_opt = time.perf_counter()
     model.setObjective(0.0, GRB.MINIMIZE)
     model.optimize(lambda m, w: _mip_pricing_callback(m, w, state))
     mip_optimize_s = time.perf_counter() - t_opt
-    _pricing_log(
+    logger.debug(
         "boundary pricing MIP: optimize finished in "
         + f"{mip_optimize_s:.3f}s, status={model.Status}, "
         + f"cuts={state.n_cuts}",
-        verbose=verbose,
     )
     return mip_optimize_s
 
@@ -818,7 +799,6 @@ def _mip_boundary_witness(
     bound: float,
     env: Env,
     eps: float,
-    verbose: bool = False,
     pricing_call: int | None = None,
 ) -> Polyhedron | None:
     blocks = relu_linear_blocks(net)
@@ -830,15 +810,13 @@ def _mip_boundary_witness(
     big_m = float(bound)
 
     log_path: Path | None = None
-    if verbose:
-        call_suffix = f", pricing_call={pricing_call}" if pricing_call is not None else ""
-        _pricing_log(
-            "boundary pricing MIP: building model "
-            + f"(boundary_shi={boundary_shi}, excluded_tags={len(exclude_tags)}, "
-            + f"lazy_callback=True{call_suffix}, "
-            + f"log_file={log_path.resolve() if log_path is not None else None})",
-            verbose=True,
-        )
+    call_suffix = f", pricing_call={pricing_call}" if pricing_call is not None else ""
+    logger.debug(
+        "boundary pricing MIP: building model "
+        + f"(boundary_shi={boundary_shi}, excluded_tags={len(exclude_tags)}, "
+        + f"lazy_callback=True{call_suffix}, "
+        + f"log_file={log_path.resolve() if log_path is not None else None})",
+    )
 
     model = Model("boundary_pricing", env)
     _configure_pricing_mip_logging(model, log_path=log_path)
@@ -876,7 +854,7 @@ def _mip_boundary_witness(
         model.addConstr(z_j >= eps - big_m * (1 - y_vars[j]), name=f"sign_pos_{j}")
         model.addConstr(z_j <= -eps + big_m * y_vars[j], name=f"sign_neg_{j}")
 
-    excl_pbar = tqdm(desc="Pattern exclusions", disable=not verbose, unit=" cuts")
+    excl_pbar = progress(desc="Pattern exclusions", unit=" cuts")
     state = _PricingCallbackState(
         net=net,
         boundary_shi=boundary_shi,
@@ -884,7 +862,6 @@ def _mip_boundary_witness(
         n=n,
         x=x,
         y_vars=y_vars,
-        verbose=verbose,
         excl_pbar=excl_pbar,
     )
 
@@ -902,12 +879,10 @@ def _mip_boundary_witness(
                 boundary_shi=boundary_shi,
                 net=net,
                 y_mvar=y_mvar,
-                verbose=verbose,
             )
             if compile_result.fully_saturated:
-                _pricing_log(
+                logger.debug(
                     "boundary pricing MIP: compiled exclusions cover all sign patterns " + "(proven infeasible)",
-                    verbose=verbose,
                 )
                 return None
 
@@ -928,7 +903,7 @@ def _mip_boundary_witness(
                     compile_result.n_static_constraints += next_idx - start_idx
                     start_idx = next_idx
                     state.precompiled_exclusions = True
-                    mip_optimize_s += _run_pricing_optimize(model, state, verbose=verbose, log_path=log_path)
+                    mip_optimize_s += _run_pricing_optimize(model, state, log_path=log_path)
                     if state.witness is not None:
                         return state.witness
                     if state.proven_infeasible or state.stall:
@@ -939,34 +914,30 @@ def _mip_boundary_witness(
             else:
                 state.precompiled_exclusions = compile_result.static_precompiled
                 if compile_result.static_precompiled:
-                    _pricing_log(
+                    logger.debug(
                         "boundary pricing MIP: precompiled exclusions "
                         + f"(trie={compile_result.n_trie_constraints}, "
                         + f"static={compile_result.n_static_constraints}, "
                         + f"tags={compile_result.n_tags}, order={cfg.advanced.BOUNDARY_MIP_CUT_ORDER})",
-                        verbose=verbose,
                     )
                 else:
-                    _pricing_log(
+                    logger.debug(
                         "boundary pricing MIP: lazy callback mode "
                         + f"({len(exclude_tags)} visited tags; cuts added on integer incumbents)",
-                        verbose=verbose,
                     )
-                mip_optimize_s = _run_pricing_optimize(model, state, verbose=verbose, log_path=log_path)
+                mip_optimize_s = _run_pricing_optimize(model, state, log_path=log_path)
         elif exclude_tags and lazy_only:
-            _pricing_log(
+            logger.debug(
                 "boundary pricing MIP: lazy-only mode " + f"({len(exclude_tags)} visited tags; no static/trie precompilation)",
-                verbose=verbose,
             )
             state.precompiled_exclusions = False
-            mip_optimize_s = _run_pricing_optimize(model, state, verbose=verbose, log_path=log_path)
+            mip_optimize_s = _run_pricing_optimize(model, state, log_path=log_path)
         else:
-            mip_optimize_s = _run_pricing_optimize(model, state, verbose=verbose, log_path=log_path)
+            mip_optimize_s = _run_pricing_optimize(model, state, log_path=log_path)
 
         if state.witness is not None:
-            _pricing_log(
+            logger.debug(
                 "boundary pricing MIP: witness found via lazy callback " + f"({state.n_cuts} cut(s))",
-                verbose=verbose,
             )
             return state.witness
 
@@ -977,9 +948,8 @@ def _mip_boundary_witness(
 
         status = int(model.Status)
         if state.proven_infeasible or _is_mip_proven_infeasible(status):
-            _pricing_log(
+            logger.debug(
                 "boundary pricing MIP: proven infeasible (no new witness exists)",
-                verbose=verbose,
             )
             return None
 
@@ -1001,9 +971,8 @@ def _mip_boundary_witness(
             boundary_shi=boundary_shi,
         )
         if witness is not None:
-            _pricing_log(
+            logger.debug(
                 "boundary pricing MIP: witness found from final incumbent (callback fallback)",
-                verbose=verbose,
             )
             return witness
 
@@ -1013,6 +982,7 @@ def _mip_boundary_witness(
         model.close()
 
 
+@with_verbosity
 def price_boundary_witness(
     net: ReLUNetwork,
     boundary_shi: int,
@@ -1021,8 +991,8 @@ def price_boundary_witness(
     bound: float | None = None,
     env: Env | None = None,
     eps: float | None = None,
-    verbose: bool = False,
     pricing_call: int | None = None,
+    verbose: int | None = None,
 ) -> Polyhedron | None:
     """Find a new top-dimensional cell on ``boundary_shi`` not in ``exclude_tags``.
 
@@ -1036,6 +1006,7 @@ def price_boundary_witness(
         BoundaryPricingIncompleteError: If pricing stops without a witness or proven
             infeasibility (e.g. time limit without solution, or solver stall).
     """
+    del verbose  # applied by @with_verbosity
     exclude_tags = exclude_tags or set()
     bound = estimate_input_bound(net, margin=float(cfg.BOUNDARY_MIP_BOUND_MARGIN)) if bound is None else float(bound)
     env = env or get_env()
@@ -1045,18 +1016,16 @@ def price_boundary_witness(
 
     witness = _brute_force_boundary_witness(net, boundary_shi, exclude_tags)
     if witness is not None:
-        _pricing_log(
+        logger.debug(
             "boundary pricing: brute-force witness found " + f"(excluded_tags={len(exclude_tags)})",
-            verbose=verbose,
         )
         return witness
 
     n = count_relu_units(net)
     if n <= cfg.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N:
-        _pricing_log(
+        logger.debug(
             "boundary pricing: brute-force found no witness "
             + f"(all {2 ** max(0, n - 1)} sign patterns excluded or infeasible)",
-            verbose=verbose,
         )
         return None
 
@@ -1067,6 +1036,5 @@ def price_boundary_witness(
         bound=bound,
         env=env,
         eps=eps,
-        verbose=verbose,
         pricing_call=pricing_call,
     )

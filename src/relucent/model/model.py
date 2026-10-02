@@ -110,18 +110,17 @@ class ReLUNetwork:
         raise ValueError(f"Unsupported canonical layer: {type(layer)}")
 
     def get_all_layer_outputs(
-        self, data: np.ndarray | Any, layers: Container[str] | None = None, verbose: bool = False
+        self, data: np.ndarray | Any, layers: Container[str] | None = None
     ) -> OrderedDict[str, np.ndarray | Any]:
         """Return the output of each layer for ``data``.
 
         Unlike :meth:`forward`, ``data`` is not reshaped first. ``layers`` restricts the result to the named
-        layers (default: all); ``verbose`` logs each layer as it runs.
+        layers (default: all).
         """
         outputs: list[tuple[str, np.ndarray | Any]] = []
         x = data
         for name, layer in self.layers.items():
-            if verbose:
-                logger.info("Layer %s: %s", name, layer)
+            logger.debug("Layer %s: %s", name, layer)
             x = self._apply_layer(layer, x)
             if layers is None or name in layers:
                 outputs.append((name, x))

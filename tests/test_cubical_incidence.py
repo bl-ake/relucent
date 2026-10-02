@@ -42,7 +42,7 @@ def test_dual_edges_match_flip_neighbors_on_diamond_boundary(seeded: int) -> Non
     explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     db = cplx.get_boundary_complex(cplx.n - 1)
-    G = db.get_dual_graph(verbose=False)
+    G = db.get_dual_graph()
     assert G.number_of_edges() >= 1
     from relucent.graph.incidence import certify_dual_graph
 
@@ -61,7 +61,7 @@ def test_cubical_dual_graph_on_boundary_has_edges(seeded: int) -> None:
     explore_for_topology(cplx, np.array([0.1, 0.2]))
 
     db = cplx.get_boundary_complex(cplx.n - 1)
-    G = db.get_dual_graph(verbose=False)
+    G = db.get_dual_graph()
     assert G.number_of_edges() >= 1
     assert nx.number_connected_components(G) == 1
 
@@ -78,7 +78,7 @@ def test_meta_graph_dual_graph_top_dim_consistency(seeded: int) -> None:
 
     meta = cplx.get_meta_graph(verbose=False)
     top_dim = max(int(p.dim) for p in cplx)
-    dual = cplx.get_dual_graph(verbose=False)
+    dual = cplx.get_dual_graph()
 
     face_to_tops: dict[bytes, list[bytes]] = defaultdict(list)
     for u, v, _data in meta.edges(data=True):

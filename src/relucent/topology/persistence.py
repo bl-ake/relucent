@@ -7,11 +7,12 @@ filtration boundary matrix (algebraic), matching the incidence convention in
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+from relucent._internal.logging import logger, with_verbosity
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex
@@ -24,11 +25,6 @@ __all__ = [
     "betti_curve",
     "compute_persistent_homology",
 ]
-
-
-def _verbose_line(verbose: bool, msg: str) -> None:
-    if verbose:
-        print(f"relucent.topology.persistence: {msg}", file=sys.stderr, flush=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +180,7 @@ def _cell_boundary_faces(
     return faces
 
 
+@with_verbosity
 def compute_persistent_homology(
     cplx: Complex,
     filtration: Filtration,
@@ -191,7 +188,7 @@ def compute_persistent_homology(
     compactify: bool = False,
     respect_finite: bool = False,
     lower_star: bool | None = None,
-    verbose: bool = False,
+    verbose: int | None = None,
 ) -> PersistenceDiagram:
     """Compute persistence pairs for a filtration on a :class:`~relucent.core.complex.Complex`.
 
@@ -208,16 +205,18 @@ def compute_persistent_homology(
         lower_star: If True, extend values to higher cells by
             ``f(σ) = max_{τ ≤ σ} f(τ)`` (sublevel-set convention). If None, use
             ``filtration.lower_star`` (default True for built-in filtrations).
-        verbose: Progress lines on stderr.
+        verbose: Output level (``2`` adds per-stage detail). ``None`` uses
+            :data:`relucent.config.VERBOSE`.
 
     Returns:
         :class:`PersistenceDiagram` with finite and essential pairs over GF(2).
     """
+    del verbose  # applied by @with_verbosity
     if len(cplx) == 0:
         return PersistenceDiagram(pairs=(), cell_filtration={})
 
-    _verbose_line(verbose, "building meta-graph …")
-    meta = cplx.get_meta_graph(verbose=verbose)
+    logger.debug("building meta-graph …")
+    meta = cplx.get_meta_graph()
     if not compactify and not respect_finite:
         from relucent.graph.meta_graph import truncate_meta_graph
 
@@ -266,9 +265,9 @@ def compute_persistent_homology(
             )
         )
 
-    _verbose_line(verbose, f"reducing boundary matrix ({len(cell_keys)} cells) …")
+    logger.debug(f"reducing boundary matrix ({len(cell_keys)} cells) …")
     pairs = _gf2_column_reduce_persistence(boundaries, filt, dimensions, cell_keys)
-    _verbose_line(verbose, f"done ({len(pairs)} pairs)")
+    logger.debug(f"done ({len(pairs)} pairs)")
 
     return PersistenceDiagram(pairs=tuple(pairs), cell_filtration=dict(cell_values))
 

@@ -170,7 +170,7 @@ Logging
    * - ``VERBOSE``
      - ``int``
      - ``1``
-     - Default for every ``verbose=None`` argument, and the ``"relucent"`` logger level: ``0`` → warnings only; ``1`` → progress bars and one-line summaries; ``2`` → per-stage debug detail. Also adjustable at runtime via :func:`~relucent.config.update_settings`.
+     - Default for every ``verbose=None`` argument: ``0`` → warnings only; ``1`` → progress bars and one-line summaries; ``2`` → per-stage debug detail. Each call sets the ``"relucent"`` logger to the matching level (``WARNING``, ``INFO``, ``DEBUG``) while it runs; a relucent call made inside another inherits the outer call's level. Progress bars appear only after a one-second delay, so quick calls print nothing.
 
 Advanced settings (unstable)
 ----------------------------

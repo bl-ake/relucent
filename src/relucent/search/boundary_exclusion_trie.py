@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from tqdm.auto import tqdm
+
+from relucent._internal.logging import progress
 
 if TYPE_CHECKING:
     from gurobipy import Model
@@ -76,20 +77,15 @@ class ForbiddenPatternTrie:
         tags: Iterable[bytes],
         n: int,
         boundary_shi: int,
-        *,
-        verbose: bool = False,
     ) -> ForbiddenPatternTrie:
-        """Build a trie from bytes-encoded sign sequences of length ``n``; ``verbose`` shows a progress bar."""
+        """Build a trie from bytes-encoded sign sequences of length ``n``."""
         trie = cls(n, boundary_shi)
         tag_list = list(tags)
         if not tag_list:
             return trie
 
         rows = np.frombuffer(b"".join(tag_list), dtype=np.int8).reshape(len(tag_list), n)
-        iterator: Sequence[np.ndarray] | Iterable[np.ndarray] = rows
-        if verbose:
-            iterator = tqdm(rows, desc="Building exclusion trie", unit="tag")
-        for signs in iterator:
+        for signs in progress(rows, desc="Building exclusion trie", unit="tag"):
             trie._insert_signs(signs)
         return trie
 

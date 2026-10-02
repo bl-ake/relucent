@@ -119,7 +119,7 @@ Example:
    print(betti)  # e.g. {0: 1}
 
    # Or discover the boundary directly without a full ambient BFS:
-   # db = cplx.discover_boundary_complex(cplx.n - 1, verbose=False)
+   # db = cplx.discover_boundary_complex(cplx.n - 1, verbose=0)
 
    # Cross-check via persistent homology with a constant filtration
    diagram = compute_persistent_homology(
@@ -203,5 +203,7 @@ the system temp directory. It is built with ``-march=native``, and the cached fi
 by the CPU's feature flags, so an install shared between machines with different CPUs keeps
 one build per CPU type.
 
-Set ``verbose=True`` on topology and persistence calls for progress on stderr.
-Package-wide search logging is controlled by :data:`relucent.config.VERBOSE`.
+Topology, persistence, and search calls take ``verbose``: ``0`` is quiet, ``1`` shows
+progress bars (after a one-second delay) and one-line summaries, and ``2`` adds per-stage
+detail such as boundary-map shapes and ranks. ``None`` (the default) uses
+:data:`relucent.config.VERBOSE`.

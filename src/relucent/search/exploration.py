@@ -39,7 +39,7 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
             )
         return
     # Build dual graph and resync top-cell _shis from it (repair=True, the default).
-    graph = cx.get_dual_graph(verbose=False, require_complete=False)
+    graph = cx.get_dual_graph(require_complete=False)
     if verify:
         top_dim = max(int(p.dim) for p in cx)
         if top_dim == int(cx.dim):
@@ -48,10 +48,10 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
                     poly._shis_strict = True
     cx.set_exploration_state(complete=True, verified=False)
     if verify:
-        logger.info("ambient finalize: certifying %d polyhedra ...", len(cx))
+        logger.debug("ambient finalize: certifying %d polyhedra ...", len(cx))
         t_verify = time.perf_counter()
         certify_complex(cx, level=CertifyLevel.COMPLETE, graph=graph, record_state=True)
-        logger.info("ambient finalize: certification finished in %.1fs", time.perf_counter() - t_verify)
+        logger.debug("ambient finalize: certification finished in %.1fs", time.perf_counter() - t_verify)
     else:
         cx.set_exploration_state(complete=True, verified=False)
 
@@ -62,12 +62,11 @@ def finalize_boundary_complex(
     *,
     bound: float | None = None,
     nworkers: int | None = None,
-    verbose: bool = False,
     verify: bool = True,
     **shis_kwargs: Any,
 ) -> None:
     """Ambient coface SHIs, dual graph, genericity, and invariant certification."""
-    from relucent.search.boundary_search import _apply_ambient_boundary_shis, _phase_log
+    from relucent.search.boundary_search import _apply_ambient_boundary_shis
 
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
@@ -75,9 +74,8 @@ def finalize_boundary_complex(
     n_cells = len(cx)
     nw = nworkers or process_aware_cpu_count() or 1
     t0 = time.perf_counter()
-    _phase_log(
+    logger.debug(
         f"discover finalize: {n_cells} cells, ambient coface _shis ({nw} workers) ...",
-        verbose=verbose,
     )
     ambient_shis_kwargs = {k: v for k, v in shis_kwargs.items() if k != "subset"}  # slice-only kwarg
     _apply_ambient_boundary_shis(
@@ -85,12 +83,10 @@ def finalize_boundary_complex(
         boundary_shi,
         bound=bound,
         nworkers=nw,
-        verbose=verbose,
         **ambient_shis_kwargs,
     )
-    _phase_log(
+    logger.debug(
         "discover finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
-        verbose=verbose,
     )
     if verify:
         for poly in cx:
@@ -99,19 +95,17 @@ def finalize_boundary_complex(
         poly._finite = None  # slice search may leave stale boundedness flags
         poly._finite_computed = False
     t2 = time.perf_counter()
-    _phase_log("discover finalize: building dual graph ...", verbose=verbose)
-    cx._dual_graph = cx.get_dual_graph(verbose=verbose, require_complete=verify)
-    _phase_log(
+    logger.debug("discover finalize: building dual graph ...")
+    cx._dual_graph = cx.get_dual_graph(require_complete=verify)
+    logger.debug(
         "discover finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
-        verbose=verbose,
     )
     t4 = time.perf_counter()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # genericity can warn on near-degenerate 1-cells
         cx.verify_arrangement_genericity()
-    _phase_log(
+    logger.debug(
         "discover finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
-        verbose=verbose,
     )
     set_contracted_shis(cx)  # boundary top cells need contracted SHIs before certify
     if verify:

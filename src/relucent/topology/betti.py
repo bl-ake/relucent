@@ -14,12 +14,11 @@ GF(2), and reads Betti numbers off their ranks.
 from __future__ import annotations
 
 import heapq
-import sys
-from collections.abc import Iterable
 from typing import Any, Literal, overload
 
 import numpy as np
-from tqdm.auto import tqdm
+
+from relucent._internal.logging import logger, progress, show_progress, with_verbosity
 
 # Try to load the C backend once at import time.
 _c_backend = False
@@ -57,11 +56,6 @@ _SLOW_RANK_MIN_DIM = 50_000
 
 # Public flag: True when _gf2_rank.c compiled and loaded successfully.
 C_BACKEND_AVAILABLE: bool = _c_backend
-
-
-def _verbose_line(verbose: bool, msg: str) -> None:
-    if verbose:
-        print(f"relucent.topology.betti: {msg}", file=sys.stderr, flush=True)
 
 
 class ChainComplexInconsistent(RuntimeError):
@@ -353,11 +347,12 @@ _SPARSE_BYTES_PER_NONZERO = 128
 _DENSE_REMAINDER_MAX_BYTES = 1 << 30
 
 
+@with_verbosity
 def gf2_rank_sparse_rowsets(
     row_sets: list[set[int]],
     ncols: int,
     *,
-    progress: bool = False,
+    verbose: int | None = None,
     progress_desc: str | None = None,
 ) -> int:
     """Gaussian elimination rank over GF(2) on sparse row sets.
@@ -372,6 +367,7 @@ def gf2_rank_sparse_rowsets(
 
     ``row_sets`` is consumed.
     """
+    del verbose  # applied by @with_verbosity
     nrows = len(row_sets)
     if nrows == 0 or ncols == 0:
         return 0
@@ -385,7 +381,7 @@ def gf2_rank_sparse_rowsets(
     nnz = sum(len(s) for s in cols)
     next_density_check = 2 * nnz
 
-    pbar = tqdm(desc=progress_desc or "GF(2) rank", total=len(heap), leave=False) if progress else None
+    pbar = progress(desc=progress_desc or "GF(2) rank", total=len(heap), leave=False)
     rank = 0
     try:
         while heap:
@@ -415,8 +411,7 @@ def gf2_rank_sparse_rowsets(
             cols[c] = set()
             rows[r] = set()
             rank += 1
-            if pbar is not None:
-                pbar.update(1)
+            pbar.update(1)
             if nnz > next_density_check:
                 next_density_check = 2 * nnz
                 live_rows = [i for i, s in enumerate(rows) if s]
@@ -428,8 +423,7 @@ def gf2_rank_sparse_rowsets(
                     packed = _row_sets_to_packed([{renumber[j] for j in rows[i]} for i in live_rows], len(live_cols))
                     return rank + int(gf2_rank_boundary(packed, len(live_cols)))
     finally:
-        if pbar is not None:
-            pbar.close()
+        pbar.close()
     return rank
 
 
@@ -536,7 +530,6 @@ def _chain_square_violations(
     ncols_by_k: dict[int, int],
     kmin: int,
     kmax: int,
-    verbose: bool = False,
 ) -> list[dict[str, Any]]:
     """Return nonempty list if any ∂_k ∘ ∂_{k+1} is nonzero over GF(2) for kmin < k < kmax."""
     violations: list[dict[str, Any]] = []
@@ -551,20 +544,17 @@ def _chain_square_violations(
             continue
         nrows_lo = len(left_rows)
         nrows_hi = len(right_rows)
-        _verbose_line(
-            verbose,
-            f"chain_square: checking ∂_{k}∘∂_{k + 1} (sparse multiply), " + f"shapes ({nrows_lo},{n_mid})@({nrows_hi},{n_hi})",
+        logger.debug(
+            f"chain_square: checking ∂_{k}∘∂_{k + 1} (sparse multiply), shapes ({nrows_lo},{n_mid})@({nrows_hi},{n_hi})"
         )
         nnz = _gf2_product_nnz(left_rows, right_rows)
-        _verbose_line(
-            verbose,
-            f"chain_square: ∂_{k}∘∂_{k + 1} composition is {'nonzero' if nnz else 'zero'}",
-        )
+        logger.debug(f"chain_square: ∂_{k}∘∂_{k + 1} composition is {'nonzero' if nnz else 'zero'}")
         if nnz:
             violations.append({"k": k, "nnz": nnz, "shape": [nrows_lo, n_hi]})
     return violations
 
 
+@with_verbosity
 def get_betti_numbers(
     meta: Any,
     *,
@@ -572,7 +562,7 @@ def get_betti_numbers(
     reduced: bool = False,
     verify_chain_complex: bool = False,
     verify_connected_components: bool = True,  ## TODO: How slow is this?
-    verbose: bool = False,
+    verbose: int | None = None,
     nworkers: int | None = None,
     method: Literal["sparse", "dense"] = "sparse",
 ) -> dict[int, int]:
@@ -593,7 +583,8 @@ def get_betti_numbers(
         verify_connected_components: If True, require rank-formula β₀ to agree with the
             number of path-connected components when ``kmin == 0``; otherwise raise
             :class:`ConnectedComponentsMismatch`.
-        verbose: If True, print short progress lines to stderr.
+        verbose: Output level: ``0`` quiet, ``1`` progress bars, ``2`` per-map detail.
+            ``None`` uses :data:`relucent.config.VERBOSE`.
         nworkers: ``method="dense"`` only. Threads for ranking boundary maps concurrently.
             ``None`` (default) uses one per non-trivial map if the C backend is available,
             else runs sequentially. ``0`` or ``1`` is always sequential; ``N > 1`` uses up
@@ -616,11 +607,11 @@ def get_betti_numbers(
         truncated and closed) meta-graph. ``verify_connected_components=True`` checks it
         against the path-component count.
     """
+    del verbose  # applied by @with_verbosity
     if meta.number_of_nodes() == 0:
         return {}
 
-    _verbose_line(
-        verbose,
+    logger.debug(
         f"get_betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
         + f"require_shared_faces={require_shared_faces} reduced={reduced} "
         + f"verify_chain_complex={verify_chain_complex} "
@@ -640,7 +631,7 @@ def get_betti_numbers(
     kmin = min(nodes_by_dim.keys())
     kmax = max(nodes_by_dim.keys())
     counts = ", ".join(f"{k}d:{len(nodes_by_dim[k])}" for k in sorted(nodes_by_dim))
-    _verbose_line(verbose, f"get_betti_numbers: cells by dim kmin={kmin} kmax={kmax} ({counts})")
+    logger.debug(f"get_betti_numbers: cells by dim kmin={kmin} kmax={kmax} ({counts})")
 
     boundary_rank: dict[int, int] = {k: 0 for k in range(kmin, kmax + 2)}
     sparse_by_k: dict[int, list[list[int]]] = {}
@@ -650,16 +641,13 @@ def get_betti_numbers(
 
     if method == "sparse":
         maps = _sparse_boundary_maps(meta, nodes_by_dim, require_shared_faces=require_shared_faces)
-        k_iter_sparse: Iterable[int] = k_values
-        if verbose:
-            k_iter_sparse = tqdm(k_values, desc="Betti: boundary ranks", unit="∂", leave=False)
-        for k in k_iter_sparse:
+        for k in progress(k_values, desc="Betti: boundary ranks", unit="∂", leave=False):
             row_sets, ncols = maps.pop(k, ([], 0))
             ncols_by_k[k] = ncols
             if verify_chain_complex and ncols:
                 sparse_by_k[k] = [list(s) for s in row_sets]  # ranking consumes the sets
-            boundary_rank[k] = gf2_rank_sparse_rowsets(row_sets, ncols, progress=verbose, progress_desc=f"GF(2) rank ∂_{k}")
-            _verbose_line(verbose, f"get_betti_numbers: ∂_{k} shape ({len(row_sets)},{ncols}) rank={boundary_rank[k]}")
+            boundary_rank[k] = gf2_rank_sparse_rowsets(row_sets, ncols, progress_desc=f"GF(2) rank ∂_{k}")
+            logger.debug(f"get_betti_numbers: ∂_{k} shape ({len(row_sets)},{ncols}) rank={boundary_rank[k]}")
             del row_sets
         return _finish_betti_numbers(
             meta,
@@ -672,7 +660,6 @@ def get_betti_numbers(
             reduced=reduced,
             verify_chain_complex=verify_chain_complex,
             verify_connected_components=verify_connected_components,
-            verbose=verbose,
         )
 
     # Phase A: build all boundary matrices (fast, sequential). When verifying, also keep
@@ -697,7 +684,7 @@ def get_betti_numbers(
         ncols_by_k[k] = ncols
         if ncols == 0:
             boundary_rank[k] = 0
-            _verbose_line(verbose, f"get_betti_numbers: ∂_{k} skipped (no columns)")
+            logger.debug(f"get_betti_numbers: ∂_{k} skipped (no columns)")
         else:
             if sparse_rows is not None:
                 sparse_by_k[k] = sparse_rows
@@ -725,11 +712,10 @@ def get_betti_numbers(
     def _rank_one(k: int) -> tuple[int, int]:
         packed, ncols = matrices[k]
         nrows = int(packed.shape[0])
-        if verbose and not _c_backend and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
+        if not _c_backend and nrows >= _SLOW_RANK_MIN_DIM and ncols >= _SLOW_RANK_MIN_DIM:
             ratio = ncols / max(nrows, 1)
             if 0.5 <= ratio <= 2.0:
-                _verbose_line(
-                    True,
+                logger.info(
                     f"get_betti_numbers: ∂_{k} is large and nearly square ({nrows}×{ncols}); "
                     + "C backend unavailable—pure-Python GF(2) rank may take hours.",
                 )
@@ -740,34 +726,29 @@ def get_betti_numbers(
                 # Individual per-map progress bars look garbled when multiple
                 # threads write to the terminal simultaneously; suppress them
                 # in parallel mode and show a single outer completion bar instead.
-                progress=verbose and not _parallel,
+                verbose=0 if _parallel else None,
                 progress_desc=f"GF(2) rank ∂_{k}",
             )
         )
-        _verbose_line(verbose, f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={rank}")
+        logger.debug(f"get_betti_numbers: ∂_{k} shape ({nrows},{ncols}) rank={rank}")
         return k, rank
 
     if _parallel:
         from concurrent.futures import ThreadPoolExecutor
         from concurrent.futures import as_completed as _as_completed
 
-        pbar = tqdm(total=len(non_trivial_ks), desc="Betti: boundary ranks", unit="∂", leave=False) if verbose else None
+        pbar = progress(total=len(non_trivial_ks), desc="Betti: boundary ranks", unit="∂", leave=False)
         try:
             with ThreadPoolExecutor(max_workers=min(_nw, len(non_trivial_ks))) as executor:
                 futures = {executor.submit(_rank_one, k): k for k in non_trivial_ks}
                 for fut in _as_completed(futures):
                     k_done, r = fut.result()
                     boundary_rank[k_done] = r
-                    if pbar is not None:
-                        pbar.update(1)
+                    pbar.update(1)
         finally:
-            if pbar is not None:
-                pbar.close()
+            pbar.close()
     else:
-        k_iter: Iterable[int] = non_trivial_ks
-        if verbose:
-            k_iter = tqdm(non_trivial_ks, desc="Betti: boundary ranks", unit="∂", leave=False)
-        for k in k_iter:
+        for k in progress(non_trivial_ks, desc="Betti: boundary ranks", unit="∂", leave=False):
             _, boundary_rank[k] = _rank_one(k)
 
     return _finish_betti_numbers(
@@ -781,7 +762,6 @@ def get_betti_numbers(
         reduced=reduced,
         verify_chain_complex=verify_chain_complex,
         verify_connected_components=verify_connected_components,
-        verbose=verbose,
     )
 
 
@@ -797,19 +777,17 @@ def _finish_betti_numbers(
     reduced: bool,
     verify_chain_complex: bool,
     verify_connected_components: bool,
-    verbose: bool,
 ) -> dict[int, int]:
     """Check ∂²=0 if asked, then Betti numbers from the boundary ranks (zeros trimmed)."""
     if verify_chain_complex:
-        _verbose_line(verbose, "get_betti_numbers: verifying ∂²=0 (chain_square) …")
+        logger.debug("get_betti_numbers: verifying ∂²=0 (chain_square) …")
         viol = _chain_square_violations(
             sparse_by_k=sparse_by_k,
             ncols_by_k=ncols_by_k,
             kmin=kmin,
             kmax=kmax,
-            verbose=verbose,
         )
-        _verbose_line(verbose, "get_betti_numbers: chain_square checks finished")
+        logger.debug("get_betti_numbers: chain_square checks finished")
         if viol:
             raise ChainComplexInconsistent(viol)
 
@@ -835,33 +813,27 @@ def _finish_betti_numbers(
             beta[0] = b0
 
     trimmed = {k: v for k, v in beta.items() if v != 0}
-    _verbose_line(verbose, f"get_betti_numbers: done (nonzero Betti entries: {trimmed})")
+    logger.debug(f"get_betti_numbers: done (nonzero Betti entries: {trimmed})")
 
     # Trim zeros for cleanliness.
     return trimmed
 
 
+@with_verbosity
 def gf2_rank_packed(
     packed: np.ndarray,
     ncols: int,
     *,
-    progress: bool = False,
+    verbose: int | None = None,
     progress_desc: str | None = None,
 ) -> int:
     """Gaussian elimination rank over GF(2) on row-major bit-packed rows (uint64 words)."""
+    del verbose  # applied by @with_verbosity
     if packed.size == 0 or ncols == 0:
         return 0
     nrows = int(packed.shape[0])
     rank = 0
-    col_iter: Iterable[int] = range(ncols)
-    if progress:
-        col_iter = tqdm(
-            col_iter,
-            desc=progress_desc or "GF(2) rank",
-            leave=False,
-            total=ncols,
-        )
-    for col in col_iter:
+    for col in progress(range(ncols), desc=progress_desc or "GF(2) rank", leave=False, total=ncols):
         if rank >= nrows:
             break
         word = col >> 6
@@ -883,11 +855,12 @@ def gf2_rank_packed(
     return rank
 
 
+@with_verbosity
 def gf2_rank_boundary(
     packed: np.ndarray,
     ncols: int,
     *,
-    progress: bool = False,
+    verbose: int | None = None,
     progress_desc: str | None = None,
 ) -> int:
     """Rank of a boundary matrix.
@@ -898,15 +871,16 @@ def gf2_rank_boundary(
     Falls back gracefully to pure Python if the C library could not be
     compiled or loaded.
     """
+    del verbose  # applied by @with_verbosity
     if _c_backend and _gf2_rank_boundary_c is not None:
-        return _gf2_rank_boundary_c(packed, ncols, progress=progress, progress_desc=progress_desc)
+        return _gf2_rank_boundary_c(packed, ncols, show_bar=show_progress(), progress_desc=progress_desc)
     # Pure-Python fallback: transpose when it reduces column count.
     nrows = int(packed.shape[0])
     if nrows > ncols and ncols > 0:
         transposed, ncols_t = _transpose_packed(packed, ncols)
         desc = f"{progress_desc} (A^T)" if progress_desc else "GF(2) rank (A^T)"
-        return gf2_rank_packed(transposed, ncols_t, progress=progress, progress_desc=desc)
-    return gf2_rank_packed(packed, ncols, progress=progress, progress_desc=progress_desc)
+        return gf2_rank_packed(transposed, ncols_t, progress_desc=desc)
+    return gf2_rank_packed(packed, ncols, progress_desc=progress_desc)
 
 
 #
