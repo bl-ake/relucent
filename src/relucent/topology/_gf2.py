@@ -1,8 +1,13 @@
 """JIT-compiled C backend for GF(2) rank.
 
-On first use, ``_gf2_rank.c`` (next to this file) is compiled to a shared library cached
-in ``__pycache__/`` and loaded with :mod:`ctypes`. If that fails, :func:`available`
-returns ``False`` and callers fall back to pure Python.
+On first use, ``_gf2_rank.c`` (next to this file) is compiled with ``gcc`` to a shared
+library and loaded with :mod:`ctypes`. If that fails, :func:`available` returns ``False``
+and callers fall back to pure Python.
+
+The library is cached in ``$RELUCENT_CACHE_DIR`` if set, else the user cache directory
+(``~/.cache/relucent`` on Linux), else the system temp directory. It is built with
+``-march=native``, so the file name is keyed by the source, the compiler flags, and the
+CPU's feature flags: a shared install used from different CPUs builds one copy per CPU type.
 
 Public API
 ----------
@@ -15,13 +20,16 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import os
+import platform
 import subprocess
 import sys
+import tempfile
 import threading
-
-# import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from relucent._internal.logging import logger
 
 if TYPE_CHECKING:
     import numpy as np
@@ -35,37 +43,81 @@ _lib_lock = threading.Lock()
 _ProgressFn: Any = None
 
 
-def _so_path() -> Path:
-    """Deterministic path in __pycache__ keyed by a hash of the C source."""
-    digest = hashlib.sha1(_C_SRC.read_bytes()).hexdigest()[:12]
-    cache = _HERE / "__pycache__"
-    cache.mkdir(exist_ok=True)
-    suffix = ".so" if sys.platform != "win32" else ".dll"
-    return cache / f"_gf2_rank_{digest}{suffix}"
+_CFLAGS = ("-O3", "-march=native", "-shared", "-fPIC")
+_SUFFIX = ".dll" if sys.platform == "win32" else ".so"
+
+
+def _cpu_fingerprint() -> str:
+    """What ``-march=native`` targets: the CPU's feature flags where the OS reports them."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.split(":", 1)[0].strip() in ("flags", "Features"):
+                    return line.strip()
+    except OSError:
+        pass
+    return platform.processor()
+
+
+def _so_name() -> str:
+    key = hashlib.sha1(_C_SRC.read_bytes())
+    for part in (*_CFLAGS, platform.machine(), _cpu_fingerprint()):
+        key.update(b"\0" + part.encode())
+    return f"_gf2_rank_{key.hexdigest()[:16]}{_SUFFIX}"
+
+
+def _cache_dirs() -> list[Path]:
+    """Candidate cache directories, most preferred first."""
+    dirs: list[Path] = []
+    if override := os.getenv("RELUCENT_CACHE_DIR"):
+        dirs.append(Path(override))
+    if sys.platform == "win32":
+        dirs.append(Path(os.getenv("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "relucent" / "Cache")
+    elif sys.platform == "darwin":
+        dirs.append(Path.home() / "Library" / "Caches" / "relucent")
+    else:
+        dirs.append(Path(os.getenv("XDG_CACHE_HOME") or Path.home() / ".cache") / "relucent")
+    uid = os.getuid() if hasattr(os, "getuid") else ""
+    dirs.append(Path(tempfile.gettempdir()) / f"relucent-{uid}")
+    return dirs
 
 
 def _compile(so: Path) -> bool:
-    # Try with OpenMP first (uses all available cores in the sweep step),
-    # fall back to a single-threaded build if -fopenmp is unavailable.
-    for extra in (["-fopenmp"], []):
-        cmd = [
-            "gcc",
-            "-O3",
-            "-march=native",
-            *extra,
-            "-shared",
-            "-fPIC",
-            str(_C_SRC),
-            "-o",
-            str(so),
-        ]
-        try:
-            result = subprocess.run(cmd, capture_output=True, timeout=60)
+    """Build ``so`` atomically, so concurrent processes never load a half-written library."""
+    try:
+        so.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=so.parent, prefix=f"{so.stem}.", suffix=".tmp")
+        os.close(fd)
+    except OSError:
+        return False
+    try:
+        # Try with OpenMP first (uses all available cores in the sweep step),
+        # fall back to a single-threaded build if -fopenmp is unavailable.
+        for extra in (["-fopenmp"], []):
+            cmd = ["gcc", *_CFLAGS, *extra, str(_C_SRC), "-o", tmp]
+            try:
+                result = subprocess.run(cmd, capture_output=True, timeout=60)
+            except (OSError, subprocess.SubprocessError):
+                return False
             if result.returncode == 0:
+                os.replace(tmp, so)
                 return True
-        except Exception:
-            pass
-    return False
+        return False
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def _find_or_build() -> Path | None:
+    name = _so_name()
+    dirs = _cache_dirs()
+    for d in dirs:
+        if (d / name).exists():
+            return d / name
+    for d in dirs:
+        if _compile(d / name):
+            return d / name
+    return None
 
 
 def _load_lib() -> ctypes.CDLL | None:
@@ -75,9 +127,10 @@ def _load_lib() -> ctypes.CDLL | None:
         if _lib is not None:
             return _lib if isinstance(_lib, ctypes.CDLL) else None
         try:
-            so = _so_path()
-            if not so.exists() and not _compile(so):
+            so = _find_or_build()
+            if so is None:
                 _lib = False
+                logger.warning("relucent: could not build the GF(2) C backend with gcc; using the slower pure-Python rank.")
                 return None
             lib = ctypes.CDLL(str(so))
 
@@ -110,8 +163,9 @@ def _load_lib() -> ctypes.CDLL | None:
             ]
 
             _lib = lib
-        except Exception:
+        except Exception as exc:
             _lib = False
+            logger.warning("relucent: could not load the GF(2) C backend (%s); using the slower pure-Python rank.", exc)
             return None
     return _lib  # type: ignore[return-value]
 
