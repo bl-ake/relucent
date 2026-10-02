@@ -19,7 +19,6 @@ dependencies = [
     "scikit_learn>=1.8.0",
     "scipy>=1.17.0",
     "tqdm>=4.67.0",
-    "torch>=2.10.0",
 ]
 authors = [{ name = "Blake B. Gaines" }]
 license = "AGPL-3.0-or-later"
