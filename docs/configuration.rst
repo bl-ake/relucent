@@ -207,7 +207,7 @@ release**. Set them the same ways as the settings above, e.g.
    * - ``BLOCKING_QUEUE_WAIT_TIMEOUT``
      - ``float``
      - ``0.5``
-     - Seconds to wait on ``Condition.wait`` when polling a :class:`~relucent.utils.BlockingQueue`.
+     - Seconds to wait on ``Condition.wait`` when polling a :class:`~relucent._internal.parallel.BlockingQueue`.
    * - ``BOUNDARY_PRICING_BRUTE_FORCE_MAX_N``
      - ``int``
      - ``18``

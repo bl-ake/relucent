@@ -529,7 +529,7 @@ def critical_flags_for_vertices(
     if nworkers <= 1 or n < PARALLEL_CRITICAL_MIN_VERTICES:
         return [is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in vertex_ss_list]
 
-    from relucent.utils import get_mp_context
+    from relucent._internal.parallel import get_mp_context
 
     effective_workers = min(nworkers, max(1, n // MIN_VERTICES_PER_WORKER))
     chunk_size = max(n // (effective_workers * 4), 1)
@@ -601,9 +601,10 @@ def critical_points(
     Returns:
         List of :class:`~relucent.topology.morse.CriticalPoint` records.
     """
+    from relucent._internal.parallel import process_aware_cpu_count
+    from relucent.core.ss import encode_ss
     from relucent.graph import incidence
     from relucent.graph.vertex_star import verified_vertices, vertex_polyhedron
-    from relucent.utils import encode_ss, process_aware_cpu_count
 
     assert_scalar_output(cplx._net)
     cplx.assert_topology_ready()
@@ -624,7 +625,7 @@ def critical_points(
         # The completeness check reads `cplx`/`meta` per vertex, so this path stays
         # sequential; only the common `require_complete=False` case below (every
         # caller in this codebase) is farmed out across a worker pool.
-        from relucent.utils import encode_ss
+        from relucent.core.ss import encode_ss
 
         flags = []
         for vertex in vertices:

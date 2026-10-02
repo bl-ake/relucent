@@ -9,12 +9,12 @@ import torch
 import torch.nn as nn
 
 from relucent import Complex, Polyhedron
-from relucent import mlp as _mlp
-from relucent.utils import TorchMLP
+from relucent import torch_mlp as _mlp
+from relucent.model.builders import TorchMLP
 from tests.helpers import ss_to_numpy
 
 
-def mlp(widths: Iterable[int], add_last_relu: bool = False) -> TorchMLP:
+def torch_mlp(widths: Iterable[int], add_last_relu: bool = False) -> TorchMLP:
     result = _mlp(widths, add_last_relu=add_last_relu)
     assert isinstance(result, TorchMLP)
     return result
@@ -33,7 +33,7 @@ class TestPolyhedronBasics:
 
     def test_create_from_ss(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[3, 6, 2], add_last_relu=True)
+        net = torch_mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -43,7 +43,7 @@ class TestPolyhedronBasics:
 
     def test_affine_map_matches_forward(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[4, 8, 2], add_last_relu=True)
+        net = torch_mlp(widths=[4, 8, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 4), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -56,7 +56,7 @@ class TestPolyhedronBasics:
 
     def test_tag_stable(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -67,7 +67,7 @@ class TestPolyhedronBasics:
 
     def test_eq_hash(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 2], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p1 = cplx.add_point(x)
@@ -77,7 +77,7 @@ class TestPolyhedronBasics:
 
     def test_neq(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 2], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         x2 = x1 + 0.1
@@ -88,7 +88,7 @@ class TestPolyhedronBasics:
 
     def test_eq_other_type_raises(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -98,7 +98,7 @@ class TestPolyhedronBasics:
     def test_volume(self):
         W = torch.tensor([[1, 0], [0, 1], [-1, 0], [0, -1]])
         b = torch.tensor([1, 1, 1, 1])
-        net = mlp(widths=[2, 4], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4], add_last_relu=True)
         _set_linear_params(net, "fc0", W, b)
         cplx = Complex(net)
         p = cplx.add_point(torch.zeros((1, 2), device=net.device, dtype=net.dtype))
@@ -109,7 +109,7 @@ class TestPolyhedronBasics:
 class TestPolyhedronContainment:
     def test_interior_point_in_polyhedron(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[3, 6, 2], add_last_relu=True)
+        net = torch_mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -119,7 +119,7 @@ class TestPolyhedronContainment:
 
     def test_point_containment_tensor(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -130,7 +130,7 @@ class TestPolyhedronContainment:
 class TestPolyhedronBoundedVertices:
     def test_bounded_vertices_supports_codim1_polyhedron(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 1], add_last_relu=True)
+        net = torch_mlp(widths=[2, 1], add_last_relu=True)
         _set_linear_params(
             net,
             "fc0",
@@ -148,7 +148,7 @@ class TestPolyhedronBoundedVertices:
 
     def test_bounded_vertices_supports_point_polyhedron(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 2], add_last_relu=True)
+        net = torch_mlp(widths=[2, 2], add_last_relu=True)
         _set_linear_params(
             net,
             "fc0",
@@ -166,7 +166,7 @@ class TestPolyhedronBoundedVertices:
 class TestPolyhedronOps:
     def test_nflips(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 2], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x1 = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         x2 = x1 + 0.2
@@ -182,7 +182,7 @@ class TestPolyhedronRetainGeometryCaches:
         from relucent.search.engine import retain_geometry_caches
 
         assert seeded is not None
-        net = mlp(widths=[2, 4, 2], add_last_relu=True)
+        net = torch_mlp(widths=[2, 4, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 2), device=net.device, dtype=net.dtype)
         p = cplx.add_point(x)
@@ -200,7 +200,7 @@ class TestPolyhedronPickle:
 
     def test_pickle_roundtrip(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[3, 6, 2], add_last_relu=True)
+        net = torch_mlp(widths=[3, 6, 2], add_last_relu=True)
         cplx = Complex(net)
         x = torch.rand((1, 3), device=net.device, dtype=net.dtype)
         ss = cplx.point2ss(x)
@@ -227,7 +227,7 @@ class TestPolyhedronPickle:
 
     def test_pickle_roundtrip_preserves_dimension_caches(self, seeded):
         assert seeded is not None
-        net = mlp(widths=[2, 4, 1])
+        net = torch_mlp(widths=[2, 4, 1])
         cplx = Complex(net)
         p = cplx.add_point(torch.randn(1, 2, device=net.device, dtype=net.dtype))
         _ = p.halfspaces

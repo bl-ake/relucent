@@ -15,8 +15,8 @@ from torch import nn
 
 from relucent import Complex
 from relucent._internal.network_scale import default_polyhedron_bound
+from relucent.model.builders import TorchMLP
 from relucent.search.exploration import finalize_ambient_search
-from relucent.utils import TorchMLP
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 MANIFEST_PATH = FIXTURES_DIR / "manifest.json"

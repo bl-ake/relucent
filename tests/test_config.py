@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 import relucent.config as cfg
-from relucent import convert, mlp
+from relucent import convert, torch_mlp
 from relucent._internal.network_scale import boundary_mip_eps
 from relucent.config import update_settings
 from relucent.model.model import LinearLayer
@@ -32,7 +32,7 @@ def test_import_and_complex_leave_settings_alone() -> None:
         "import relucent, relucent.config as cfg; "
         "assert cfg.BOUNDARY_MIP_EPS is None, cfg.BOUNDARY_MIP_EPS; "
         "cfg.update_settings(MAX_RADIUS=7.0, BOUNDARY_MIP_EPS=0.5); "
-        "relucent.Complex(relucent.mlp([2, 4, 1])); "
+        "relucent.Complex(relucent.torch_mlp([2, 4, 1])); "
         "assert (cfg.MAX_RADIUS, cfg.BOUNDARY_MIP_EPS) == (7.0, 0.5)"
     )
     proc = _run(code)
@@ -43,14 +43,14 @@ def test_complex_does_not_change_any_setting() -> None:
     before = _settings()
     from relucent.core.complex import Complex
 
-    Complex(convert(mlp([2, 3, 1])))
+    Complex(convert(torch_mlp([2, 3, 1])))
     assert _settings() == before
 
 
 def test_boundary_mip_eps_floor_and_scaling() -> None:
-    small = convert(mlp([2, 4, 1]))
+    small = convert(torch_mlp([2, 4, 1]))
     assert boundary_mip_eps(small) == 2e-4
-    big = convert(mlp([2, 8, 8, 1]))
+    big = convert(torch_mlp([2, 8, 8, 1]))
     for layer in big.layers.values():
         if isinstance(layer, LinearLayer):
             layer.weight = layer.weight * 1e3
@@ -99,7 +99,7 @@ def test_bfs_explores_deep_large_weight_network() -> None:
     from relucent.model.model import LinearLayer
 
     torch.manual_seed(0)
-    net = convert(mlp([2, 6, 6, 6, 6, 6, 1]))
+    net = convert(torch_mlp([2, 6, 6, 6, 6, 6, 1]))
     for layer in net.layers.values():
         if isinstance(layer, LinearLayer):
             layer.weight = layer.weight * 35.0

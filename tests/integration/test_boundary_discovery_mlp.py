@@ -5,13 +5,13 @@ from __future__ import annotations
 import networkx as nx
 import pytest
 
-from relucent import Complex, add_output_relu, mlp, set_seeds
+from relucent import Complex, add_output_relu, set_seeds, torch_mlp
 
 pytestmark = [pytest.mark.integration]
 
 
 def _mlp_small_model():
-    return add_output_relu(mlp(widths=[5, 8, 8, 8, 1]))
+    return add_output_relu(torch_mlp(widths=[5, 8, 8, 8, 1]))
 
 
 def _dual_components(cplx: Complex) -> int:
@@ -49,7 +49,7 @@ def test_discover_boundary_complex_mlp_small(seeded: int, integration_nworkers: 
 
 def test_discover_boundary_complex_mlp_medium_parity(seeded: int, integration_nworkers: int) -> None:
     set_seeds(seeded)
-    model = add_output_relu(mlp(widths=[4, 12, 12, 12, 12, 1]))
+    model = add_output_relu(torch_mlp(widths=[4, 12, 12, 12, 12, 1]))
     cplx = Complex(model)
     cplx.bfs(verbose=0, nworkers=integration_nworkers)
     shi = cplx.n - 1

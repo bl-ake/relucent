@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 
 
 def test_slice_affine_covers_plane_with_parent_sign_sequences() -> None:
     """Every point of a 2-D slice of a 3-D complex lies in the sliced cell of its parent's sign sequence."""
     set_seeds(1)
-    cplx = Complex(mlp([3, 6, 1]))
+    cplx = Complex(torch_mlp([3, 6, 1]))
     cplx.bfs(start=np.zeros((1, 3)) + 0.05, nworkers=2, verbose=0)
 
     x0 = np.array([0.1, -0.2, 0.3])

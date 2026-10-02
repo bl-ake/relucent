@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from relucent.utils import get_env
+from relucent._internal.gurobi import get_env
 
 if TYPE_CHECKING:
     from gurobipy import Env

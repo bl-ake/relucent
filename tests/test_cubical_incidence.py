@@ -8,10 +8,10 @@ import networkx as nx
 import numpy as np
 import torch
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
+from relucent.core.ss import encode_ss
 from relucent.graph import incidence as mg
 from relucent.search.exploration import explore_for_topology
-from relucent.utils import encode_ss
 from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,
@@ -68,7 +68,7 @@ def test_meta_graph_dual_graph_top_dim_consistency(seeded: int) -> None:
     from collections import defaultdict
 
     set_seeds(seeded)
-    net = mlp(widths=[2, 4, 4, 1], add_last_relu=True, init="uniform")
+    net = torch_mlp(widths=[2, 4, 4, 1], add_last_relu=True, init="uniform")
     cplx = Complex(net)
     start = torch.randn(2, dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=500)
@@ -93,7 +93,7 @@ def test_meta_graph_dual_graph_top_dim_consistency(seeded: int) -> None:
 def test_cubical_dual_graph_build_is_fast_enough(seeded: int) -> None:
     """Smoke benchmark: cubical dual-graph build stays under a loose time budget."""
     set_seeds(seeded)
-    net = mlp(widths=[2, 8, 4, 1], add_last_relu=True)
+    net = torch_mlp(widths=[2, 8, 4, 1], add_last_relu=True)
     cplx = Complex(net)
     explore_for_topology(cplx, np.zeros(2), max_polys=800)
     top = [p for p in cplx if p.dim == cplx.dim]

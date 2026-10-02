@@ -30,8 +30,10 @@ import networkx as nx
 import numpy as np
 
 from relucent._internal.logging import logger, progress, with_verbosity
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
 from relucent.core.errors import IncompleteDualGraphError, NonGenericArrangementError, ShiProofError
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.graph.incidence import (
     certify_dual_graph,
     face_tag,
@@ -40,7 +42,6 @@ from relucent.graph.incidence import (
     verify_flip_shi_symmetry,
 )
 from relucent.search.worker_context import get_worker_context, set_worker_context
-from relucent.utils import encode_ss, flip_ss_at_shi, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex

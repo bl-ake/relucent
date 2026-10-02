@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent.core.errors import ComplexNotCompleteError, IncompleteDualGraphError
 from relucent.graph.boundary import boundary_edges
 from relucent.graph.incidence import verify_flip_shi_symmetry
@@ -16,7 +16,7 @@ os_environ = __import__("os").environ
 
 
 def test_bfs_sets_verified_on_small_network() -> None:
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False)
     assert cplx.complete is True
@@ -24,7 +24,7 @@ def test_bfs_sets_verified_on_small_network() -> None:
 
 
 def test_max_polys_disables_verify() -> None:
-    model = mlp(widths=[2, 8, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 8, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3)
     assert cplx.complete is False
@@ -32,7 +32,7 @@ def test_max_polys_disables_verify() -> None:
 
 
 def test_incomplete_search_raises_with_verify() -> None:
-    model = mlp(widths=[2, 8, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 8, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3)
     assert cplx.complete is False
@@ -46,7 +46,7 @@ def test_incomplete_search_raises_with_verify() -> None:
 def test_empty_boundary_complex_verifies() -> None:
     """Output ReLU constant on all regions → empty boundary, not a certify crash."""
     set_seeds(3)
-    model = mlp(widths=[2, 4, 1], add_last_relu=True, init="uniform")
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True, init="uniform")
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False)
     assert len(boundary_edges(cplx, cplx.n - 1)) == 0
@@ -58,7 +58,7 @@ def test_empty_boundary_complex_verifies() -> None:
 
 
 def test_assert_topology_ready_blocks_unverified() -> None:
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3)
     assert cplx.complete is False
@@ -84,9 +84,9 @@ def test_assert_topology_ready_blocks_add_point_only() -> None:
 def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
     """Top-cell ``_shis`` are re-derived from the dual graph, repairing asymmetric LP cache."""
     from relucent.core.errors import ShiFlipInvariantError
-    from relucent.utils import flip_ss_at_shi
+    from relucent.core.ss import flip_ss_at_shi
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
     top = next(p for p in cplx if p.dim == cplx.dim)
@@ -103,7 +103,7 @@ def test_finalize_sync_corrects_asymmetric_shi_cache() -> None:
 
 
 def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPatch) -> None:
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
 
@@ -125,7 +125,7 @@ def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPat
 def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
@@ -146,7 +146,7 @@ def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytes
 def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
 
@@ -162,7 +162,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
 def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
     graph = cplx.get_dual_graph(relabel=True)
@@ -190,7 +190,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
 def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
     cplx.set_exploration_state(complete=True, verified=False)
@@ -210,7 +210,7 @@ def _forget_certified_shis(cplx: Complex) -> None:
 
 
 def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
@@ -221,7 +221,7 @@ def test_lp_verify_serial_and_parallel_agree_on_complete_complex() -> None:
 
 
 def test_lp_verify_serial_and_parallel_agree_on_incomplete_complex() -> None:
-    model = mlp(widths=[2, 8, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 8, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, max_polys=3, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
@@ -242,7 +242,7 @@ def test_start_shis_for_search_does_not_relax_on_shi_proof_error(monkeypatch) ->
     from relucent.core.poly import Polyhedron
     from relucent.search.engine import _start_shis_for_search
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     start = cplx.add_point(np.zeros((1, 2), dtype=np.float64))
     calls: list[object] = []
@@ -261,14 +261,14 @@ def test_start_shis_for_search_does_not_relax_on_shi_proof_error(monkeypatch) ->
 def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     import warnings
 
+    from relucent._internal.parallel import BlockingQueue
     from relucent.core.poly import Polyhedron
     from relucent.search import searcher
-    from relucent.utils import BlockingQueue
 
     # Seeded: the fake SHIs below aren't real facets, and on some random networks the cell
     # across SHI 0 is empty, which the searcher reports as AmbiguousGeometryError.
     set_seeds(0)
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
 
     def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
@@ -294,11 +294,11 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
 
 
 def test_searcher_marks_shis_certified(monkeypatch) -> None:
+    from relucent._internal.parallel import BlockingQueue
     from relucent.core.poly import Polyhedron
     from relucent.search import searcher
-    from relucent.utils import BlockingQueue
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     seen: list[dict[str, object]] = []
 
@@ -332,7 +332,7 @@ def test_geometric_certify_recomputes_only_assigned_shis(monkeypatch: pytest.Mon
     import relucent.geometry.calculations as calc
     from relucent.verify.certify import verify_shi_geometry
 
-    model = mlp(widths=[2, 4, 1], add_last_relu=True)
+    model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
     top = next(p for p in cplx if p.dim == cplx.dim)

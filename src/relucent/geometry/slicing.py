@@ -8,12 +8,12 @@ import numpy as np
 
 import relucent.config as cfg
 from relucent._internal import rounding
+from relucent._internal.gurobi import get_env
 from relucent.core.errors import AmbiguousGeometryError
 from relucent.core.poly import Polyhedron
 from relucent.geometry.calculations import solve_radius
 from relucent.graph import incidence
 from relucent.model.model import LinearLayer, ReLUNetwork
-from relucent.utils import get_env
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex

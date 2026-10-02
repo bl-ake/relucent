@@ -12,7 +12,7 @@ from collections.abc import Iterable
 import numpy as np
 import pytest
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent.config import update_settings
 from relucent.search.exploration import explore_for_topology
 
@@ -72,7 +72,7 @@ def test_contract_vertices_expand_to_maximal_cells(
 ) -> None:
     """Each 0-cell from ``get_chain_complex`` yields ``2^d`` feasible maximal cells."""
     set_seeds(seed)
-    net = mlp(widths=widths, add_last_relu=True, init="uniform")
+    net = torch_mlp(widths=widths, add_last_relu=True, init="uniform")
     cplx = Complex(net)
     input_dim = widths[0]
     expected_per_vertex = 2**input_dim
@@ -103,11 +103,11 @@ def test_contract_vertices_expand_to_maximal_cells(
 
 def test_tolerance_sweep_does_not_revive_encoding_phantom() -> None:
     """A canonical-only phantom SS stays infeasible under loose relucent tolerances."""
-    # Sign pattern for mlp([2, 4, 4, 1], seed=2): feasible in canonical get_ssr but
+    # Sign pattern for torch_mlp([2, 4, 4, 1], seed=2): feasible in canonical get_ssr but
     # empty for relucent's ReLU sign semantics.
     phantom = (-1, -1, -1, 1, -1, -1, 1, 1, -1)
     set_seeds(2)
-    cplx = Complex(mlp([2, 4, 4, 1], add_last_relu=True, init="uniform"))
+    cplx = Complex(torch_mlp([2, 4, 4, 1], add_last_relu=True, init="uniform"))
     explore_for_topology(cplx, np.zeros((1, 2), dtype=np.float64), max_polys=10000)
 
     defaults = {

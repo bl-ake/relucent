@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent.topology.morse import (
     assert_scalar_output,
     coface_sign_sequence,
@@ -20,7 +20,7 @@ from relucent.topology.morse import (
 class TestLemma9Gradient:
     def test_gradient_matches_polyhedron_W(self, seed: int):
         set_seeds(seed)
-        net = mlp(widths=[2, 4, 1])
+        net = torch_mlp(widths=[2, 4, 1])
         cplx = Complex(net)
         cplx.add_point(np.zeros(2, dtype=np.float64))
         poly = cplx.index2poly[0]
@@ -33,7 +33,7 @@ class TestLemma9Gradient:
 class TestPartialDerivativeOn1Cell:
     def test_sign_matches_finite_difference(self, seed: int):
         set_seeds(seed)
-        net = mlp(widths=[2, 4, 1])
+        net = torch_mlp(widths=[2, 4, 1])
         cplx = Complex(net)
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=100)
         chain = cplx.get_chain_complex()
@@ -78,7 +78,7 @@ class TestPartialDerivativeOn1Cell:
 class TestCriticalPoints:
     def test_scalar_output_required(self):
         set_seeds(0)
-        cplx = Complex(mlp(widths=[2, 4, 2]))
+        cplx = Complex(torch_mlp(widths=[2, 4, 2]))
         with pytest.raises(ValueError, match="scalar output"):
             cplx.get_critical_points()
         with pytest.raises(ValueError, match="scalar output"):
@@ -86,7 +86,7 @@ class TestCriticalPoints:
 
     def test_small_network_critical_points_run(self, seed: int):
         set_seeds(seed)
-        net = mlp(widths=[1, 2, 1])
+        net = torch_mlp(widths=[1, 2, 1])
         cplx = Complex(net)
         cplx.add_point(np.array([[0.3]], dtype=np.float64))
         cplx.bfs(start=np.array([[0.3]], dtype=np.float64), max_polys=50)
@@ -99,7 +99,7 @@ class TestCriticalPoints:
 
     def test_lemma10_yields_nondegenerate_critical_points(self):
         set_seeds(0)
-        net = mlp(widths=[2, 8, 1])
+        net = torch_mlp(widths=[2, 8, 1])
         cplx = Complex(net)
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=150)
         # Lemma 10 / Jacobians must run; many random nets have only regular vertices.
@@ -110,10 +110,10 @@ class TestCriticalPoints:
             assert cp.index >= -1
 
     def test_output_relu_network_critical_points_run(self, seed: int):
-        from relucent.utils import add_output_relu
+        from relucent.model.builders import add_output_relu
 
         set_seeds(seed)
-        net = add_output_relu(mlp(widths=[2, 4, 1]))
+        net = add_output_relu(torch_mlp(widths=[2, 4, 1]))
         cplx = Complex(net)
         cplx.bfs(start=np.zeros(2, dtype=np.float64), max_polys=100)
         # Trailing output ReLU must not break Jacobian / critical-point code.
@@ -127,7 +127,7 @@ class TestCriticalPoints:
     def test_non_vertex_cell_raises(self):
         """Non-vertex cells (0 < zeros.size < n_in) must raise, not silently fail."""
         set_seeds(0)
-        net = Complex(mlp(widths=[2, 4, 1]))._net
+        net = Complex(torch_mlp(widths=[2, 4, 1]))._net
         # 2D input: vertex needs 2 zeros; an edge cell has 1 zero → not a vertex.
         edge_ss = np.array([[0, 1]], dtype=np.int8)  # one zero, one non-zero
         with pytest.raises(ValueError, match="0-cell"):
@@ -163,8 +163,8 @@ class TestCriticalPoints:
         """Index = # of axes with both edges oriented toward v (Def. 5 / Lemma 7)."""
         import relucent.topology.morse as morse_mod
 
-        # ``mlp`` returns a Torch module; Morse helpers need the Relucent ReLUNetwork.
-        net = Complex(mlp(widths=[2, 4, 1]))._net
+        # ``torch_mlp`` returns a Torch module; Morse helpers need the Relucent ReLUNetwork.
+        net = Complex(torch_mlp(widths=[2, 4, 1]))._net
         assert_scalar_output(net)
         ss = np.zeros((1, 2), dtype=np.int8)
         monkeypatch.setattr(morse_mod, "_is_collapsed_edge", lambda *args, **kwargs: False)
@@ -220,7 +220,7 @@ class TestCriticalPoints:
 class TestTheorem4Consistency:
     def test_partial_derivative_sign_vs_value(self, seed: int):
         set_seeds(seed)
-        net = mlp(widths=[2, 3, 1])
+        net = torch_mlp(widths=[2, 3, 1])
         cplx = Complex(net)
         cplx.add_point(np.zeros(2, dtype=np.float64))
         poly = cplx.index2poly[0]
@@ -252,7 +252,7 @@ def test_critical_points_match_the_chain_complex_route(widths: list[int], seed: 
     from relucent.topology.morse import is_pl_critical_vertex
 
     set_seeds(seed)
-    cplx = Complex(mlp(widths=widths))
+    cplx = Complex(torch_mlp(widths=widths))
     cplx.bfs(start=np.zeros(widths[0], dtype=np.float64))
     chain = cplx.get_chain_complex()
     assert int(chain[-1].index2poly[0].dim) == 0
@@ -278,7 +278,7 @@ def test_vertex_screen_drops_only_non_vertices(seed: int, nworkers: int, monkeyp
     monkeypatch.setattr(vertex_star, "PARALLEL_VERIFY_MIN_CANDIDATES", 1)
     monkeypatch.setattr(vertex_star, "MIN_CANDIDATES_PER_WORKER", 1)
     set_seeds(seed)
-    cplx = Complex(mlp(widths=[3, 8, 8, 1]))
+    cplx = Complex(torch_mlp(widths=[3, 8, 8, 1]))
     cplx.bfs(start=np.zeros(3, dtype=np.float64))
     top = [p for p in cplx if int(p.dim) == 3]
     graph = cplx.get_dual_graph(require_complete=False)

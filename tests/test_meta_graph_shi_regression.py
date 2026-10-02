@@ -19,7 +19,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 from relucent.graph import meta_graph as mg
 from relucent.search.exploration import explore_for_topology
 
@@ -62,7 +62,7 @@ def test_meta_graph_chain_complex_regression(
 ) -> None:
     """``∂² = 0`` and stable chain / meta-graph statistics on deep-batch witnesses."""
     set_seeds(seed)
-    net = mlp(widths=architecture, add_last_relu=True, init="uniform")
+    net = torch_mlp(widths=architecture, add_last_relu=True, init="uniform")
     cplx = Complex(net)
     start = torch.randn(architecture[0], dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=10000, nworkers=1)
@@ -98,7 +98,7 @@ def test_truncated_homology_chain_complex_regression(
 ) -> None:
     """Truncated boundary homology (``compactify="truncate"``) satisfies ``∂² = 0``."""
     set_seeds(seed)
-    net = mlp(widths=architecture, add_last_relu=True, init="uniform")
+    net = torch_mlp(widths=architecture, add_last_relu=True, init="uniform")
     cplx = Complex(net)
     start = torch.randn(architecture[0], dtype=torch.float64)
     explore_for_topology(cplx, start.numpy(), max_polys=10000, nworkers=1)

@@ -43,9 +43,10 @@ import numpy as np
 
 import relucent.config as cfg
 from relucent._internal.logging import logger
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
 from relucent.core.errors import CubicalConsistencyError, DualGraphAsymmetricEdgeError, ShiFlipInvariantError
 from relucent.core.poly import Polyhedron
-from relucent.utils import encode_ss, flip_ss_at_shi, get_mp_context, process_aware_cpu_count
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex

@@ -20,11 +20,12 @@ import numpy as np
 
 import relucent.config as cfg
 from relucent._internal.logging import logger, progress, with_verbosity
+from relucent._internal.parallel import process_aware_cpu_count
 from relucent.core.errors import CubicalConsistencyError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss
 from relucent.graph import incidence
 from relucent.graph.incidence import assemble_face_edges_by_dim, cubical_cell_shis, face_tag, ss_nonzero_indices
-from relucent.utils import encode_ss, process_aware_cpu_count
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex
@@ -354,7 +355,7 @@ def rebuild_meta_graph_face_edges(meta: nx.MultiDiGraph[Any]) -> None:
 
 
 def _retag_meta_nodes_from_ss(meta: nx.MultiDiGraph[Any]) -> dict[Any, Any]:
-    """Relabel nodes so keys match :func:`~relucent.utils.encode_ss` of their ``ss``."""
+    """Relabel nodes so keys match :func:`~relucent.core.ss.encode_ss` of their ``ss``."""
     tag_remap: dict[Any, Any] = {}
     for n, attrs in meta.nodes(data=True):
         ss = attrs.get("ss")

@@ -8,7 +8,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from relucent import Complex, add_output_relu, mlp, set_seeds
+from relucent import Complex, add_output_relu, set_seeds, torch_mlp
 from relucent.config import update_settings
 from relucent.search.exploration import explore_for_topology
 
@@ -61,7 +61,7 @@ def _line_boundary_model() -> nn.Sequential:
 
 
 def _mlp_tiny_model() -> nn.Sequential:
-    return add_output_relu(mlp(widths=[3, 5, 5, 1]))
+    return add_output_relu(torch_mlp(widths=[3, 5, 5, 1]))
 
 
 def _populate_diamond(cplx: Complex) -> None:

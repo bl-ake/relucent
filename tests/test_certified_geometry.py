@@ -18,8 +18,8 @@ import pytest
 
 import relucent.config as cfg
 from relucent import AmbiguousGeometryError, Polyhedron
+from relucent._internal.gurobi import get_env
 from relucent.geometry.calculations import get_shis, solve_radius
-from relucent.utils import get_env
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def _strip_net(eps: float):
     import torch
 
     from relucent import convert
-    from relucent.utils import TorchMLP
+    from relucent.model.builders import TorchMLP
 
     fc1 = torch.nn.Linear(1, 2, dtype=torch.float64)
     fc2 = torch.nn.Linear(2, 1, dtype=torch.float64)
@@ -116,7 +116,7 @@ def test_exact_rows_follow_the_network_weights() -> None:
 
     import torch
 
-    from relucent import convert, mlp
+    from relucent import convert, torch_mlp
     from relucent._internal import exact
     from relucent.model.model import LinearLayer
 
@@ -127,7 +127,7 @@ def test_exact_rows_follow_the_network_weights() -> None:
         return exact.exact_rows_for_ss(net, ss)
 
     torch.manual_seed(0)
-    net = convert(mlp([2, 4, 1]))
+    net = convert(torch_mlp([2, 4, 1]))
     before = exact.exact_rows_for_ss(net, ss)
     for layer in net.layers.values():
         if isinstance(layer, LinearLayer):
@@ -138,7 +138,7 @@ def test_exact_rows_follow_the_network_weights() -> None:
 
     for seed in range(20):  # freed networks' ids get reused
         torch.manual_seed(seed)
-        other = convert(mlp([2, 4, 1]))
+        other = convert(torch_mlp([2, 4, 1]))
         got = exact.exact_rows_for_ss(other, ss)
         expected = fresh(other)
         assert got == expected
@@ -150,15 +150,15 @@ def test_exact_rows_follow_the_network_weights() -> None:
 def test_exact_rows_declined_for_wide_networks() -> None:
     import torch
 
-    from relucent import convert, mlp
+    from relucent import convert, torch_mlp
     from relucent._internal import exact
 
     torch.manual_seed(0)
-    wide = convert(mlp([100, 400, 400, 1]))
+    wide = convert(torch_mlp([100, 400, 400, 1]))
     assert not exact.exact_rows_affordable(wide)
     cell = Polyhedron(wide, np.ones((1, 800), dtype=np.int8))
     assert cell._exact_rows() is None
-    assert exact.exact_rows_affordable(convert(mlp([2, 8, 8, 1])))
+    assert exact.exact_rows_affordable(convert(torch_mlp([2, 8, 8, 1])))
 
 
 @pytest.mark.parametrize("seed", [3, 8, 9, 10, 11])
@@ -275,7 +275,7 @@ def _coincident_net():
     import torch
 
     from relucent import convert
-    from relucent.utils import TorchMLP
+    from relucent.model.builders import TorchMLP
 
     fc0 = torch.nn.Linear(2, 2, dtype=torch.float64)
     fc1 = torch.nn.Linear(2, 2, dtype=torch.float64)

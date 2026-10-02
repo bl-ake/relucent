@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import torch
 
-from relucent import Complex, mlp, set_seeds
+from relucent import Complex, set_seeds, torch_mlp
 
 
 def _generic_hyperplane_arrangement_num_d_cells(*, ambient_dim: int, num_hyperplanes: int) -> int:
@@ -43,7 +43,7 @@ def test_single_hidden_layer_bfs_region_count_matches_arrangement_formula(
         ambient_dim=ambient_dim,
         num_hyperplanes=num_hidden,
     )
-    model = mlp(widths=[ambient_dim, num_hidden, 1], add_last_relu=False)
+    model = torch_mlp(widths=[ambient_dim, num_hidden, 1], add_last_relu=False)
     cplx = Complex(model)
     assert cplx.n == num_hidden
 

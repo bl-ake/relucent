@@ -6,9 +6,10 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from relucent import Complex, mlp
+from relucent import Complex, torch_mlp
 from relucent.core.errors import CubicalConsistencyError, ShiFlipInvariantError
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.graph.incidence import (
     set_contracted_shis,
     sync_shis_from_dual_graph,
@@ -17,11 +18,10 @@ from relucent.graph.incidence import (
     verify_shi_flip_neighbors,
     verify_shis_from_dual_graph,
 )
-from relucent.utils import encode_ss, flip_ss_at_shi
 
 
 def _asymmetric_one_cell_fixture() -> tuple[Complex, Polyhedron, Polyhedron]:
-    net = mlp(widths=[2, 4, 1], add_last_relu=True)
+    net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(net)
     ss_a = np.array([[1, -1, 1, -1, 1, -1, 1, -1, 1]], dtype=np.int8)
     ss_b = flip_ss_at_shi(ss_a, 0)
@@ -69,7 +69,7 @@ def test_verify_shi_flip_neighbors_raises_on_mismatch() -> None:
 
 
 def test_verify_shis_from_dual_graph_matches_edge_labels() -> None:
-    net = mlp(widths=[2, 4, 1], add_last_relu=True)
+    net = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(net)
     ss_a = np.array([[1, -1, 1, -1, 1, -1, 1, -1, 1]], dtype=np.int8)
     ss_b = flip_ss_at_shi(ss_a, 0)

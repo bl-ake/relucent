@@ -10,9 +10,8 @@ from collections.abc import Iterator
 import numpy as np
 
 from relucent._internal.torch_compat import torch
-from relucent.utils import encode_ss
 
-__all__ = ["SSManager"]
+__all__ = ["SSManager", "encode_ss", "flip_ss_at_shi", "flip_ss_at_shi_inplace"]
 
 
 class SSManager:
@@ -71,3 +70,52 @@ class SSManager:
 
     def __len__(self) -> int:
         return self._len
+
+
+def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
+    """Create a hashable representation of a sign sequence.
+
+    Converts a sign sequence array into a bytes object that can be used as a
+    dictionary key or for hashing.
+
+    The sign sequence is always encoded using an integer dtype so that float
+    and integer representations with the same logical values (in {-1, 0, 1})
+    produce identical tags.
+
+    Args:
+        ss: A sign sequence as np.ndarray or torch.Tensor with values in {-1, 0, 1}.
+
+    Returns:
+        bytes: A hashable bytes representation of the flattened sign sequence.
+    """
+    # Hot path (millions of calls from cubical incidence / chain-complex assembly): a
+    # sign sequence that is already a C-contiguous int8 ndarray needs no coercion —
+    # ``tobytes()`` flattens in C order, exactly what ``.ravel().tobytes()`` produced.
+    if type(ss) is np.ndarray and ss.dtype == np.int8 and ss.flags["C_CONTIGUOUS"]:
+        return ss.tobytes()
+
+    ss = ss.detach().cpu().numpy() if isinstance(ss, torch.Tensor) else np.asarray(ss)
+
+    ss = ss.astype(np.int8, copy=False)
+    return ss.ravel().tobytes()
+
+
+def flip_ss_at_shi_inplace(ss: np.ndarray, shi: int) -> None:
+    """Negate coordinate ``shi`` of ``ss`` in place.
+
+    Call twice on the same ``shi`` to restore the original sign sequence.  Useful
+    when iterating many SHIs over one working copy (e.g. dual-graph construction).
+    """
+    ss.ravel()[int(shi)] *= -1
+
+
+def flip_ss_at_shi(ss: np.ndarray | torch.Tensor, shi: int) -> np.ndarray:
+    """Return a copy of ``ss`` with coordinate ``shi`` negated.
+
+    Codimension-1 neighbors across supporting hyperplane ``shi`` differ by this flip.
+    """
+    if isinstance(ss, torch.Tensor):
+        ss = ss.detach().cpu().numpy()
+    flipped = np.asarray(ss, dtype=np.int8).copy()
+    flip_ss_at_shi_inplace(flipped, shi)
+    return flipped

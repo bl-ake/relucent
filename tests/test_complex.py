@@ -11,10 +11,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-from relucent import Complex, Polyhedron, mlp, set_seeds
+from relucent import Complex, Polyhedron, set_seeds, torch_mlp
 from relucent.geometry.calculations import adjacent_polyhedra
 from relucent.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
-from relucent.utils import TorchMLP
+from relucent.model.builders import TorchMLP
 
 
 def _rand_batch(dim: int, batch: int = 1) -> torch.Tensor:
@@ -24,7 +24,7 @@ def _rand_batch(dim: int, batch: int = 1) -> torch.Tensor:
 def test_bfs_dfs_dual_graph_isomorphic(seed: int):
     """BFS/DFS equivalence, conversion to dual graph."""
     set_seeds(seed)
-    model = mlp(widths=[4, 8], add_last_relu=True)
+    model = torch_mlp(widths=[4, 8], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = _rand_batch(4)
     cplx1.bfs(start=start1)
@@ -43,7 +43,7 @@ def test_bfs_dfs_dual_graph_isomorphic(seed: int):
 def test_recover_from_dual_graph(seed: int):
     """Recovery of full complex from dual graph."""
     set_seeds(seed)
-    model = mlp(widths=[5, 9], add_last_relu=True)
+    model = torch_mlp(widths=[5, 9], add_last_relu=True)
     cplx1 = Complex(model)
     start1 = _rand_batch(5)
     cplx1.bfs(start=start1)
@@ -62,7 +62,7 @@ def test_recover_from_dual_graph(seed: int):
 def test_bfs_polyhedron_affine_and_membership(seed: int):
     """BFS with larger network, point2poly, affine map, max_polys."""
     set_seeds(seed)
-    model = mlp(widths=[16, 64, 64, 64, 10])
+    model = torch_mlp(widths=[16, 64, 64, 64, 10])
     cplx = Complex(model)
     start = torch.rand(16, dtype=torch.float64)
     p = cplx.point2poly(start)
@@ -81,7 +81,7 @@ def test_bfs_polyhedron_affine_and_membership(seed: int):
 def test_dfs_max_depth_and_shis(seed: int):
     """DFS with max_depth and nworkers=1."""
     set_seeds(seed)
-    model = mlp(widths=[6, 8, 10])
+    model = torch_mlp(widths=[6, 8, 10])
     cplx = Complex(model)
     result = cplx.dfs(max_depth=2, nworkers=1, verify=False)
     assert result.depth == 2
@@ -91,7 +91,7 @@ def test_dfs_max_depth_and_shis(seed: int):
 def test_hamming_astar_path(seed: int):
     """Pathfinding between two polyhedra via Hamming A*."""
     set_seeds(seed)
-    model = mlp(widths=[16, 32, 32, 1])
+    model = torch_mlp(widths=[16, 32, 32, 1])
     cplx = Complex(model)
     start = torch.rand(16, dtype=torch.float64)
     end = torch.rand(16, dtype=torch.float64)
@@ -301,7 +301,7 @@ class TestComplexAutoConversion:
     def test_auto_converted_matches_explicit_nn(self, seeded):
         """Auto-converting a Sequential gives the same complex as the explicit NN."""
         assert seeded is not None
-        net = mlp(widths=[4, 8, 2])
+        net = torch_mlp(widths=[4, 8, 2])
         assert isinstance(net, TorchMLP)
         # Build an equivalent torch Sequential from canonical weights.
         fc0_layer = cast(nn.Linear, net.layers["fc0"])
@@ -328,7 +328,7 @@ class TestComplexAutoConversion:
     def test_model_kept_as_source_model(self, seeded):
         """The model passed in is kept as source_model; a ReLUNetwork is used as-is for net."""
         assert seeded is not None
-        net = mlp(widths=[4, 8, 2])
+        net = torch_mlp(widths=[4, 8, 2])
         cplx = Complex(net)
         assert cplx.source_model is net
         assert isinstance(cplx.net, ReLUNetwork)
@@ -351,7 +351,7 @@ def _exercise_complex_for_model(model: nn.Module | ReLUNetwork) -> None:
 
 
 def _build_canonical_nn() -> TorchMLP | ReLUNetwork:
-    return mlp(widths=[4, 8, 2], add_last_relu=False)
+    return torch_mlp(widths=[4, 8, 2], add_last_relu=False)
 
 
 def _build_plain_sequential() -> nn.Module:

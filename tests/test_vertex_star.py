@@ -8,9 +8,10 @@ import pytest
 
 from relucent import Complex
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss
 from relucent.graph.vertex_star import expand_vertex_star, find_vertices, recover_cells_from_vertices
+from relucent.model.builders import set_seeds, torch_mlp
 from relucent.search.exploration import explore_for_topology
-from relucent.utils import encode_ss, mlp, set_seeds
 
 
 def _square_tope_graph() -> tuple[list[Polyhedron], nx.Graph[Polyhedron]]:
@@ -77,7 +78,7 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     set_seeds(4)
-    cplx = Complex(mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
+    cplx = Complex(torch_mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
     explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
 
     def fail(*_args: object, **_kwargs: object) -> None:
@@ -99,7 +100,7 @@ def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.Monkey
     from relucent.graph import incidence
 
     set_seeds(4)
-    cplx = Complex(mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
+    cplx = Complex(torch_mlp(widths=[2, 3, 1], add_last_relu=True, init="uniform"))
     explore_for_topology(cplx, np.zeros(2), max_polys=1000, nworkers=1)
     cplx.get_chain_complex()
 

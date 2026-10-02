@@ -19,8 +19,8 @@ import relucent.config as cfg
 import relucent.verify.certify as certify
 from relucent._internal.logging import progress
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent.core.ss import flip_ss_at_shi
 from relucent.model.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
-from relucent.utils import flip_ss_at_shi
 from relucent.verify.certify import CertifyLevel
 
 if TYPE_CHECKING:

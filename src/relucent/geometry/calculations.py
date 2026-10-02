@@ -15,9 +15,10 @@ from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.gurobi import get_env
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent.core.ss import flip_ss_at_shi
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer
-from relucent.utils import flip_ss_at_shi, get_env
 
 if TYPE_CHECKING:
     from relucent.core.poly import Polyhedron
@@ -1032,7 +1033,7 @@ def get_shis(
         subset: Halfspace indices to consider; default is all.
         new_method: Extra basis-based skipping (does not improve runtime). Its skips are not
             certified; do not use it where correctness matters.
-        env: Gurobi environment; default uses :func:`~relucent.utils.get_env`.
+        env: Gurobi environment; default uses :func:`~relucent._internal.gurobi.get_env`.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
         escalate_bound: If False, use only the requested ``bound`` (no automatic box-radius

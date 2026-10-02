@@ -16,11 +16,13 @@ from gurobipy import GRB, Env, Model, quicksum
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.gurobi import get_env
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import boundary_mip_eps, count_relu_units, estimate_input_bound, relu_linear_blocks
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
 from relucent.core.poly import Polyhedron
+from relucent.core.ss import encode_ss
 from relucent.model.model import ReLUNetwork
-from relucent.utils import encode_ss, get_env, get_mp_context, process_aware_cpu_count
 
 if TYPE_CHECKING:
     pass
@@ -73,7 +75,7 @@ def _configure_pricing_mip_logging(model: Model, *, log_path: Path | None) -> No
 
     Controlled by :data:`~relucent.config.BOUNDARY_MIP_GUROBI_LOG`, not by the
     relucent verbosity. Model parameters override the cached
-    :func:`~relucent.utils.get_env` defaults.
+    :func:`~relucent._internal.gurobi.get_env` defaults.
     """
     if cfg.BOUNDARY_MIP_GUROBI_LOG:
         model.Params.OutputFlag = 1
