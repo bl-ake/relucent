@@ -1780,7 +1780,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
         else:
             raise ValueError(f"Error while computing halfspace intersection: {e}") from e
 
-    poly._hs = hs
+    poly._halfspace_intersection = hs
     raw_vertices = hs.intersections  # in reduced coordinates when projected
 
     # Remap to ambient coordinates for the trust filter and poly._vertices.
@@ -1801,9 +1801,9 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
 
     if poly.finite and len(ch_vertices) > reduced_dim:
         try:
-            poly._ch = ConvexHull(ch_vertices)
+            poly._convex_hull = ConvexHull(ch_vertices)
             try:
-                poly._volume = poly._ch.volume
+                poly._volume = poly._convex_hull.volume
             except Exception as e:
                 raise ValueError(f"Error while computing convex hull volume: {e}") from e
         except Exception as e:
@@ -1811,7 +1811,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
                 warnings.warn(f"Error while computing convex hull: {e}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
                 raise ValueError(f"Error while computing convex hull: {e}") from e
-            poly._ch = None
+            poly._convex_hull = None
             poly._volume = -1
     else:
         poly._volume = float("inf")

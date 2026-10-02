@@ -4,7 +4,7 @@ import hashlib
 import warnings
 from collections.abc import Callable, Iterable
 from functools import cached_property
-from typing import Any, cast
+from typing import Any, Literal, cast, overload
 
 import numpy as np
 import plotly.graph_objects as go
@@ -118,8 +118,8 @@ class Polyhedron:
         # Whether ``_shis`` is this cell's certified facet list (get_shis on it), as opposed to a
         # list assigned from the dual graph or a coface; certification recomputes only the latter.
         self._shis_strict: bool = shis_strict
-        self._hs: HalfspaceIntersection | None = None
-        self._ch: ConvexHull | None = None
+        self._halfspace_intersection: HalfspaceIntersection | None = None
+        self._convex_hull: ConvexHull | None = None
         self._finite: bool | None = finite
         self._finite_computed: bool = finite is not None
         self._vertices: np.ndarray | None = None
@@ -422,19 +422,14 @@ class Polyhedron:
         return np.flatnonzero(self.ss_np != 0)
 
     @property
-    def hyperplanes(self) -> np.ndarray:
-        """Hyperplanes that are safe to use for computation of polyhedron properties."""
-        return self.halfspaces_np[self.zero_indices]
-
-    @property
     def inequalities(self) -> np.ndarray:
         """Rows of ``halfspaces_np`` for the nonzero sign-sequence entries (the strict inequality constraints)."""
         return self.halfspaces_np[self.non_zero_indices]
 
     @property
     def equalities(self) -> np.ndarray:
-        """Rows of ``halfspaces_np`` corresponding to equality constraints (zeros in the sign sequence)."""
-        return self.hyperplanes
+        """Rows of ``halfspaces_np`` for the zero sign-sequence entries (the hyperplanes this cell lies on)."""
+        return self.halfspaces_np[self.zero_indices]
 
     def get_interior_point(
         self,
@@ -837,71 +832,29 @@ class Polyhedron:
 
         return bounded_plot_geometry(self, bound)
 
-    def plot_cells(
-        self,
-        fill: str = "toself",
-        showlegend: bool = False,
-        bound: float | None = None,
-        filled: bool = False,
-        plot_halfspaces: bool = False,
-        halfspace_shade: bool = True,
-        **kwargs: Any,
-    ) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d]:
-        """Plot this cell in input space (2D ``Scatter`` or 3D ``Mesh3d`` / ``Scatter3d`` traces).
+    @overload
+    def plot(
+        self, plot_mode: Literal["cells"] = "cells", **kwargs: Any
+    ) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d]: ...
 
-        Chooses 2D vs 3D from :attr:`ambient_dim` (input-space dimension; typically matches
-        :attr:`Complex.dim` when this polyhedron belongs to a complex).
+    @overload
+    def plot(self, plot_mode: Literal["graph"], **kwargs: Any) -> dict[str, go.Mesh3d | go.Scatter3d] | None: ...
+
+    def plot(
+        self, plot_mode: Literal["cells", "graph"] = "cells", **kwargs: Any
+    ) -> list[go.Scatter] | list[go.Mesh3d | go.Scatter3d] | dict[str, go.Mesh3d | go.Scatter3d] | None:
+        """Plotly traces for this cell: ``"cells"`` in input space (2D or 3D), or ``"graph"``,
+        a 2D cell lifted through the network.
+
+        Keyword arguments go to :func:`relucent.vis.plot_polyhedron` (``bound`` defaults to
+        :data:`relucent.config.DEFAULT_PLOT_BOUND`). For a 3D cell, options that only apply to
+        2D traces (``fill``, ``plot_halfspaces``, ...) are ignored.
         """
-        if bound is None:
-            bound = cfg.DEFAULT_PLOT_BOUND
-        plot_kwargs: dict[str, Any] = dict(
-            showlegend=showlegend,
-            bound=bound,
-            filled=filled,
-            **kwargs,
-        )
-        # 2D-only controls must not be forwarded to 3D plotting paths.
-        if self.ambient_dim == 2:
-            plot_kwargs["fill"] = fill
-            plot_kwargs["plot_halfspaces"] = plot_halfspaces
-            plot_kwargs["halfspace_shade"] = halfspace_shade
-        from relucent.vis import plot_polyhedron
+        from relucent.vis import _POLY_CELLS_3D_EXCLUDE, plot_polyhedron
 
-        return plot_polyhedron(self, plot_mode="cells", **plot_kwargs)
-
-    def plot_graph(
-        self,
-        fill: str = "toself",
-        showlegend: bool = False,
-        bound: float | None = None,
-        project: float | None = None,
-        **kwargs: Any,
-    ) -> dict[str, go.Mesh3d | go.Scatter3d] | None:
-        """Plot this 2D cell lifted through the network (its graph over the input plane).
-
-        Args:
-            fill: Plotly fill mode for the outline.
-            showlegend: Whether to show a legend entry.
-            bound: Plot bound; defaults to ``config.DEFAULT_PLOT_BOUND``.
-            project: If set, flatten the lifted surface to this height.
-            **kwargs: Passed to :func:`relucent.plot_polyhedron`.
-
-        Returns:
-            The mesh/outline traces, or ``None`` if plotting failed.
-        """
-        if bound is None:
-            bound = cfg.DEFAULT_PLOT_BOUND
-        from relucent.vis import plot_polyhedron
-
-        return plot_polyhedron(
-            self,
-            plot_mode="graph",
-            fill=fill,
-            showlegend=showlegend,
-            bound=bound,
-            project=project,
-            **kwargs,
-        )
+        if plot_mode == "cells" and self.ambient_dim == 3:
+            kwargs = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_3D_EXCLUDE}
+        return plot_polyhedron(self, plot_mode=plot_mode, **kwargs)
 
     def get_geometry(
         self,
@@ -915,7 +868,8 @@ class Polyhedron:
                 Supported names include ``"halfspaces"``, ``"W"``, ``"b"``,
                 ``"finite"``, ``"center"``,
                 ``"inradius"``, ``"interior_point"``, ``"interior_point_norm"``,
-                ``"Wl2"``, ``"volume"``, ``"vertices"``, ``"ch"``, and ``"hs"``.
+                ``"Wl2"``, ``"volume"``, ``"vertices"``, ``"convex_hull"``, and
+                ``"halfspace_intersection"``.
             env: Optional Gurobi environment used for interior-point/feasibility
                 solves when relevant.
         """
@@ -923,7 +877,7 @@ class Polyhedron:
         if not requested:
             return
 
-        geometry_aliases = {"hs", "vertices", "ch", "volume"}
+        geometry_aliases = {"halfspace_intersection", "vertices", "convex_hull", "volume"}
         if "halfspaces_np" in requested:
             requested.add("halfspaces")
         if requested & geometry_aliases:
@@ -950,7 +904,7 @@ class Polyhedron:
             self._compute_qhull_geometry()
 
     def _compute_qhull_geometry(self, qhull_mode: str | None = None) -> None:
-        """Compute Qhull-derived geometry caches (hs/vertices/ch/volume)."""
+        """Compute Qhull-derived geometry caches (halfspace intersection, vertices, convex hull, volume)."""
         compute_properties(self, qhull_mode=qhull_mode)
 
     def _ensure_affine_data(self, *, force_numpy: bool = False) -> None:
@@ -973,19 +927,19 @@ class Polyhedron:
         return self._vertices
 
     @property
-    def hs(self) -> HalfspaceIntersection:
-        """Halfspace intersection object from scipy."""
+    def halfspace_intersection(self) -> HalfspaceIntersection:
+        """SciPy :class:`~scipy.spatial.HalfspaceIntersection` of this cell's halfspaces."""
         if not self._attempted_compute_properties:
             self._compute_qhull_geometry()
-        assert isinstance(self._hs, HalfspaceIntersection)
-        return self._hs
+        assert isinstance(self._halfspace_intersection, HalfspaceIntersection)
+        return self._halfspace_intersection
 
     @property
-    def ch(self) -> ConvexHull | None:
-        """Convex hull of the polyhedron for finite polyhedra, or None if unbounded or computation fails."""
+    def convex_hull(self) -> ConvexHull | None:
+        """SciPy :class:`~scipy.spatial.ConvexHull` of a bounded cell; ``None`` if unbounded or if Qhull fails."""
         if not self._attempted_compute_properties and self.finite:
             self._compute_qhull_geometry()
-        return self._ch
+        return self._convex_hull
 
     @property
     def volume(self) -> float:
@@ -1220,11 +1174,6 @@ class Polyhedron:
     def num_shis(self) -> int:
         """Number of faces."""
         return len(self.shis)
-
-    @property
-    def num_faces(self) -> int:
-        """Number of faces; alias for :attr:`num_shis`."""
-        return self.num_shis
 
     @cached_property
     def interior_point(self) -> np.ndarray | None:

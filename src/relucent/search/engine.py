@@ -67,9 +67,9 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "interior_point",
     "interior_point_norm",
     "Wl2",
-    "hs",
+    "halfspace_intersection",
     "vertices",
-    "ch",
+    "convex_hull",
     "volume",
 )
 
@@ -127,9 +127,9 @@ def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
             for attr in attrs:
                 setattr(p, attr, None)
     # Qhull objects are the heaviest; clear the whole cluster unless something needs them.
-    qhull_props = {"hs", "vertices", "ch", "volume"}
+    qhull_props = {"halfspace_intersection", "vertices", "convex_hull", "volume"}
     if not (requested & qhull_props):
-        p._hs = p._vertices = p._ch = p._volume = None
+        p._halfspace_intersection = p._vertices = p._convex_hull = p._volume = None
         p._attempted_compute_properties = False
     elif "volume" not in requested:
         p._volume = None
