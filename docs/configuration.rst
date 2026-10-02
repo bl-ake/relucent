@@ -120,7 +120,7 @@ Polyhedron and halfspace geometry
    * - ``GUROBI_SHI_SCALE_FLAG``
      - ``int``
      - ``2``
-     - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling.
+     - Gurobi ``ScaleFlag`` for the SHI LP (``-1`` auto, ``0`` off, ``1``-``3`` scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (``2``) avoids spurious infeasibility from automatic scaling. If an SHI LP still fails, it is re-solved from scratch with no scaling (``0``), and if that fails too, decided in exact arithmetic; see :doc:`search_shi_and_graphs`.
    * - ``TOL_NEARLY_VERTICAL``
      - ``float``
      - ``1e-10``

@@ -208,6 +208,53 @@ The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
 
 The ``strict`` option is deprecated and has no effect: every answer is already certified.
 
+LP solver failures
+~~~~~~~~~~~~~~~~~~
+
+Each SHI LP relaxes one row of a cell already solved as feasible, and its objective is
+capped, so it is feasible and bounded. Any status other than optimal is a solver failure,
+not a fact about the cell. On badly conditioned cells, where rows span orders of magnitude
+or are nearly parallel, Gurobi does report ``NUMERIC``, ``UNBOUNDED``, ``INFEASIBLE`` or
+``INF_OR_UNBD`` for such LPs.
+
+When that happens, ``get_shis`` re-solves the LP once from scratch with no scaling
+(``ScaleFlag=0``), discarding the warm-start basis. The configured
+:data:`~relucent.config.GUROBI_SHI_SCALE_FLAG` is restored afterwards. The setting only
+changes which answer the LP proposes: every answer is still certified.
+
+**Deciding without the LP.** If the re-solve fails too, the question the LP was asking, whether
+row ``i`` is a facet of the cell, is settled in exact rational arithmetic instead, by
+:func:`relucent._internal.exact.exact_facet_by_simplex`. It starts from the cell's verified
+interior point, and it is the same routine ``get_shis`` uses when float64 cannot certify an
+LP answer. If it cannot decide either,
+:class:`~relucent.core.errors.AmbiguousGeometryError` is raised, naming the halfspace and
+every LP status seen. That happens when:
+
+* the network is too large for exact rows (see ``exact_rows_affordable``);
+* the search uses a fixed box (``escalate_bound=False``), because the exact question is over
+  the unbounded cell;
+* the row has a near-duplicate partner, whose coincidence check needs the LP; or
+* the exact simplex hits its iteration limit.
+
+The re-solve comes first because it is much cheaper: a few milliseconds per row. The exact
+decision took 3–50 ms per row on the cells below (input dimension 3–4,
+width 8–16). It grows steeply with input dimension and depth: about 1 s per row for input
+dimension 8 and width 64 at depth 6, and about 15 s for input dimension 16 and width 128 at
+depth 4.
+
+**How often this happens.** Failures are rare and cluster in a few cells.
+
+* In a census of 100,812 cells, sampled uniformly from 60 trained networks (input dimension
+  2–4, width 8–16, up to 6 hidden layers), 1 of 4.8 million SHI LPs failed under the default
+  scaling, and a re-solve with no scaling recovers it.
+* Most networks have no failures at all, so a whole complex rarely needs a fallback. Among
+  232 hard training checkpoints, 8 complete searches hit a failure that automatic scaling
+  alone could not recover. Retrying with no scaling recovers five of those cells. In the
+  other three, some row fails under every scaling and is decided exactly. In each such case
+  the row was not a facet.
+* All eight are kept as fixtures in ``tests/integration/test_shi_lp_recovery.py``, with SHIs
+  that agree with an independent HiGHS LP.
+
 After complete ambient search (authoritative top cells)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -333,19 +333,52 @@ class _FlakyModel:
     def reset(self) -> None:
         self.resets += 1
 
+    def close(self) -> None:
+        pass
+
     def optimize(self) -> None:
         self.seen.append(self.params.ScaleFlag)
         self.status = 12 if len(self.seen) <= self.failures else 2
 
 
-@pytest.mark.parametrize("failures", [0, 1])
-def test_lp_cold_retry_uses_automatic_scaling_and_restores_settings(failures: int) -> None:
+@pytest.mark.parametrize(
+    ("failures", "statuses", "seen"),
+    [(0, [12, 2], [0]), (1, [12, 12], [0])],
+)
+def test_lp_cold_retry_uses_no_scaling_and_restores_settings(failures: int, statuses: list[int], seen: list[int]) -> None:
     from relucent.geometry import calculations as C
 
     m = _FlakyModel(failures)
-    assert C._cold_retry(cast(Any, m)) == [12, 2 if failures == 0 else 12]
-    assert m.resets == 1 and m.seen == [-1]  # one cold solve, under automatic scaling
+    assert C._cold_retry(cast(Any, m)) == statuses
+    assert m.seen == seen and m.resets == len(seen)  # one cold solve, under no scaling
     assert m.params.ScaleFlag == cfg.GUROBI_SHI_SCALE_FLAG
+
+
+@pytest.mark.parametrize("exact_verdict", [True, False])
+def test_failed_shi_lp_falls_back_to_the_exact_decision(exact_verdict: bool) -> None:
+    from relucent.geometry import calculations as C
+
+    calls: list[int] = []
+
+    def decide() -> bool:
+        calls.append(1)
+        return exact_verdict
+
+    # The re-solve succeeds: the LP answer is used and the exact decision is never made.
+    assert C._recover_relaxed_shi_lp(cast(Any, _FlakyModel(0)), cast(Any, "cell"), 3, decide) is None
+    assert not calls
+    # The re-solve fails: the exact verdict is returned.
+    assert C._recover_relaxed_shi_lp(cast(Any, _FlakyModel(1)), cast(Any, "cell"), 3, decide) is exact_verdict
+    assert calls == [1]
+
+
+@pytest.mark.parametrize("decide", [None, lambda: None])
+def test_failed_shi_lp_raises_when_exact_arithmetic_cannot_decide(decide: Any) -> None:
+    from relucent.core.errors import AmbiguousGeometryError
+    from relucent.geometry import calculations as C
+
+    with pytest.raises(AmbiguousGeometryError, match=r"statuses \[12, 12\].*could not decide"):
+        C._recover_relaxed_shi_lp(cast(Any, _FlakyModel(1)), cast(Any, "cell"), 3, decide)
 
 
 @pytest.mark.parametrize(("d", "n", "scale"), [(2, 7, 1e-4), (3, 6, 1e-4), (2, 7, 1e-8), (2, 7, 1e-12), (3, 6, 1e-8)])
@@ -434,12 +467,27 @@ class _RelaxedLPsFail:
         return 12 if self._solves > 1 else int(self._model.status)
 
 
-@pytest.mark.parametrize("extra", [[1.0, 1.0, -2.0], [1.0, 1.0, -1.5], [1.0, 0.0, -1.0 - 1e-9]])
-def test_failed_lp_raises(env, monkeypatch: pytest.MonkeyPatch, extra) -> None:
+_FAILED_LP_EXTRAS = [[1.0, 1.0, -2.0], [1.0, 1.0, -1.5], [1.0, 0.0, -1.0 - 1e-9]]
+
+
+@pytest.mark.parametrize("extra", _FAILED_LP_EXTRAS)
+def test_failed_lp_is_decided_exactly(env, monkeypatch: pytest.MonkeyPatch, extra) -> None:
+    """When every relaxed LP fails, each row is decided in exact arithmetic, with the LP's answers:
+    a row touching only a corner, a facet cutting one off, and a row 1e-9 outside a facet."""
+    from relucent.geometry import calculations as C
+
+    expected = set(get_shis(_cell([*_rectangle(), extra]), env=env))
+    monkeypatch.setattr(C, "Model", _RelaxedLPsFail)
+    assert set(get_shis(_cell([*_rectangle(), extra]), env=env)) == expected
+
+
+@pytest.mark.parametrize("extra", _FAILED_LP_EXTRAS)
+def test_failed_lp_raises_without_exact_rows(env, monkeypatch: pytest.MonkeyPatch, extra) -> None:
     from relucent.geometry import calculations as C
 
     cell = _cell([*_rectangle(), extra])
     monkeypatch.setattr(C, "Model", _RelaxedLPsFail)
+    monkeypatch.setattr(Polyhedron, "_exact_rows", lambda self: None)  # as for a network too large
     with pytest.raises(AmbiguousGeometryError, match="LP solver failure"):
         get_shis(cell, env=env)
 
