@@ -57,7 +57,7 @@ if __name__ == "__main__":
 ```
 
 Given some input point, you could get a minimal H-representation of the polyhedral region containing it like this:
-```
+```python
 input_point = np.random.random((1, 2))
 p = cplx.point2poly(input_point)
 print(p.halfspaces[p.shis])
@@ -65,11 +65,11 @@ print(p.halfspaces[p.shis])
 Attributes like `p.halfspaces` (halfspaces of the form Ax + b <= 0, in format [A; b], induced by each neuron), `p.shis` (the indices of the non-redundant halfspaces), and `p.center` (the Chebyshev center) are computed lazily.
 
 You could also check the average number of faces of all polyhedrons with:
-```
+```python
 sum(len(p.shis) for p in cplx) / len(cplx)
 ```
 Or, get the adjacency graph of top-dimensional cells in the complex with:
-```
+```python
 print(cplx.get_dual_graph())
 ```
 
