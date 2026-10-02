@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import networkx as nx
 import numpy as np
 import pytest
@@ -14,7 +12,6 @@ from relucent import Complex, add_output_relu, mlp, set_seeds
 from relucent.config import update_settings
 from relucent.search.exploration import explore_for_topology
 
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 update_settings(VERBOSE=0)
 
 

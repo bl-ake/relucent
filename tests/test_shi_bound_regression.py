@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import contextlib
-import os
 
 import numpy as np
 
 from relucent import AmbiguousGeometryError, Complex, Polyhedron, mlp, set_seeds
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.geometry.calculations import get_shis
-
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 def test_default_polyhedron_bound_used_by_lazy_shis() -> None:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import networkx as nx
 import numpy as np
 import pytest
@@ -16,8 +14,6 @@ from tests.test_betti_decision_boundaries import (
     _add_points,
     _diamond_boundary_model_l1_ball,
 )
-
-os.environ.setdefault("DISABLE_RESEARCH_WARNING", "1")
 
 
 def _degenerate_v_boundary_model() -> nn.Sequential:
