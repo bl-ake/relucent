@@ -9,12 +9,15 @@ match :meth:`~relucent.core.complex.Complex.get_betti_numbers` with the same ``c
 
 from __future__ import annotations
 
+from typing import Literal
+
 import numpy as np
 import pytest
 import torch
 import torch.nn as nn
 
 from relucent import Complex, set_seeds
+from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import get_betti_numbers
 from relucent.topology.filtration import ConstantFiltration
@@ -42,7 +45,7 @@ def _max_hom_dim(cplx: Complex) -> int:
 def assert_betti_match_topology(
     cplx: Complex,
     *,
-    compactify: bool = False,
+    compactify: Literal["truncate", "borel_moore"] = "truncate",
     respect_finite: bool = False,
     filtration: ConstantFiltration | None = None,
 ) -> None:
@@ -126,16 +129,16 @@ def _populate_diamond_boundary(cplx: Complex, *, seed: int) -> Complex:
     return cplx.get_boundary_complex(cplx.n - 1)
 
 
-@pytest.mark.parametrize("compactify", [False, True])
-def test_constant_filtration_matches_betti_on_diamond_boundary(seeded: int, compactify: bool):
+@pytest.mark.parametrize("compactify", ["truncate", "borel_moore"])
+def test_constant_filtration_matches_betti_on_diamond_boundary(seeded: int, compactify: Literal["truncate", "borel_moore"]):
     set_seeds(seeded)
     cplx = _populate_diamond_boundary(Complex(_diamond_boundary_model()), seed=seeded)
     assert len(cplx) > 0
     assert_betti_match_topology(cplx, compactify=compactify)
 
 
-@pytest.mark.parametrize("compactify", [False, True])
-def test_constant_filtration_matches_betti_on_line_boundary(seeded: int, compactify: bool):
+@pytest.mark.parametrize("compactify", ["truncate", "borel_moore"])
+def test_constant_filtration_matches_betti_on_line_boundary(seeded: int, compactify: Literal["truncate", "borel_moore"]):
     set_seeds(seeded)
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
@@ -154,7 +157,7 @@ def test_line_boundary_beta0_matches_components(seeded: int) -> None:
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
-    betti = db.get_betti_numbers(compactify=False, verify_connected_components=True)
+    betti = db.get_betti_numbers(compactify="truncate", verify_connected_components=True)
     assert betti.get(0, 0) == 1, f"single truncated line segment should have β₀=1, got {betti}"
 
 
@@ -165,7 +168,7 @@ def test_line_boundary_truncated_chain_complex_is_consistent(seeded: int) -> Non
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
     db = _populate_line_boundary(Complex(nn.Sequential(fc, nn.ReLU())), seed=seeded)
     meta = db.get_meta_graph(verbose=False)
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
     get_betti_numbers(meta, verify_chain_complex=True)
 
 
@@ -176,7 +179,7 @@ def test_constant_filtration_matches_betti_on_small_relu_complex(seeded: int):
     explore_for_topology(cplx, np.array([0.0]))
     assert len(cplx) > 0
     # Sparse 1D sampling does not match compactified truncation Betti; see boundary tests.
-    assert_betti_match_topology(cplx, compactify=False)
+    assert_betti_match_topology(cplx, compactify="truncate")
 
 
 def test_betti_curve_end_matches_topology(seeded: int):

@@ -109,7 +109,7 @@ def test_decision_boundary_diamond_circle_betti_agree(seeded: int):
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
-    betti_bm = db_cplx.get_betti_numbers(compactify=True, reduced=True)
+    betti_bm = db_cplx.get_betti_numbers(compactify="borel_moore", reduced=True)
 
     # These are different conventions; just sanity-check both run and that the
     # boundary has a nontrivial 1-cycle over GF(2).
@@ -133,8 +133,8 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     db = cplx.get_boundary_complex(cplx.n - 1)
     betti_std = db.get_betti_numbers()
     assert db.get_betti_numbers(verify_chain_complex=True) == betti_std
-    betti_bm = db.get_betti_numbers(compactify=True, reduced=True)
-    assert db.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True) == betti_bm
+    betti_bm = db.get_betti_numbers(compactify="borel_moore", reduced=True)
+    assert db.get_betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True) == betti_bm
 
     fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
     fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
@@ -152,7 +152,7 @@ def test_decision_boundary_verify_chain_complex_passes(seeded: int):
     explore_for_topology(cplx2, np.array([0.5, 0.0]))
     db2 = cplx2.get_boundary_complex(cplx2.n - 1)
     _ = db2.get_betti_numbers(verify_chain_complex=True)
-    _ = db2.get_betti_numbers(compactify=True, reduced=True, verify_chain_complex=True)
+    _ = db2.get_betti_numbers(compactify="borel_moore", reduced=True, verify_chain_complex=True)
     _ = db2.get_betti_numbers(respect_finite=True, verify_chain_complex=True)
 
 
@@ -178,7 +178,7 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
     db_cplx = cplx.get_boundary_complex(cplx.n - 1)
 
     betti_std = db_cplx.get_betti_numbers()
-    betti_bm = db_cplx.get_betti_numbers(compactify=True, reduced=True)
+    betti_bm = db_cplx.get_betti_numbers(compactify="borel_moore", reduced=True)
     betti_trad = db_cplx.get_betti_numbers()
     betti_embedded = db_cplx.get_betti_numbers(respect_finite=True)
 

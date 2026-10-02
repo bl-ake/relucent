@@ -46,7 +46,7 @@ __all__ = [
 def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
     """Return the subcomplex induced by nodes with ``finite is True``.
 
-    Used by :meth:`~relucent.core.complex.Complex.get_betti_numbers_from_meta` when
+    Used by :func:`relucent.topology.get_betti_numbers` when
     ``respect_finite=True`` to compute homology on bounded cells only (no truncation).
     """
     finite = [n for n, a in meta.nodes(data=True) if a.get("finite", None) is True]
@@ -421,8 +421,8 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     without a matching sphere-cut breaks ``∂²=0``. Those cofaces receive a trunc-cap
     instead (see :func:`_open_cap_count`).
 
-    Called automatically by :meth:`~relucent.core.complex.Complex.get_betti_numbers` when
-    ``compactify=False`` (the default), and by persistent-homology code in
+    Called by :func:`relucent.topology.get_betti_numbers` when ``compactify="truncate"``
+    (the default for :meth:`~relucent.core.complex.Complex.get_betti_numbers`), and by persistent-homology code in
     :mod:`relucent.topology.persistence` for the same link-at-infinity convention.
     """
     if meta.number_of_nodes() == 0:
@@ -496,8 +496,7 @@ def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
     second incidence to one new 0-cell representing infinity.  Returns whether the
     infinity node was added.
 
-    Called by :meth:`~relucent.core.complex.Complex.get_betti_numbers` when
-    ``compactify="one_point"``.
+    Called by :func:`relucent.topology.get_betti_numbers` when ``compactify="one_point"``.
     """
     if meta.number_of_nodes() == 0:
         return False

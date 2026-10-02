@@ -42,6 +42,7 @@ except Exception:
 
 __all__ = [
     "ChainComplexInconsistent",
+    "Compactify",
     "ConnectedComponentsMismatch",
     "C_BACKEND_AVAILABLE",
     "get_betti_numbers",
@@ -56,6 +57,13 @@ _SLOW_RANK_MIN_DIM = 50_000
 
 # Public flag: True when _gf2_rank.c compiled and loaded successfully.
 C_BACKEND_AVAILABLE: bool = _c_backend
+
+# How unbounded cells are handled when computing homology:
+#   "truncate": combinatorial truncation at infinity (cap unbounded cells with new faces).
+#   "borel_moore": Borel–Moore homology; only faces with at least two cofaces count.
+#   "one_point": one-point compactification (a single extra 0-cell at infinity).
+Compactify = Literal["truncate", "borel_moore", "one_point"]
+COMPACTIFY_MODES: tuple[Compactify, ...] = ("truncate", "borel_moore", "one_point")
 
 
 class ChainComplexInconsistent(RuntimeError):
@@ -558,7 +566,8 @@ def _chain_square_violations(
 def get_betti_numbers(
     meta: Any,
     *,
-    require_shared_faces: bool = False,
+    compactify: Compactify | None = None,
+    respect_finite: bool = False,
     reduced: bool = False,
     verify_chain_complex: bool = False,
     verify_connected_components: bool = True,  ## TODO: How slow is this?
@@ -569,13 +578,15 @@ def get_betti_numbers(
     """Compute Betti numbers from face incidences in ``meta``.
 
     Args:
-        meta: Face poset as a NetworkX ``MultiDiGraph`` from
-            :meth:`~relucent.core.complex.Complex.get_meta_graph` (optionally truncated or
-            restricted to finite cells first).
-        require_shared_faces: If True, only incidences where a codimension-one face has at
-            least two cofaces (Borel–Moore-style). Default False counts every meta edge.
-            Set by :meth:`~relucent.core.complex.Complex.get_betti_numbers_from_meta` when
-            ``compactify=True``.
+        meta: Face poset as a NetworkX ``MultiDiGraph``, e.g. from
+            :meth:`~relucent.core.complex.Complex.get_meta_graph`.
+        compactify: How to treat unbounded cells (see :data:`Compactify`). ``None``
+            (default) ranks ``meta`` exactly as given. ``"truncate"`` and ``"one_point"``
+            first add the truncation or point-at-infinity cells to ``meta`` **in place**
+            (pass a copy to keep the original). ``"borel_moore"`` leaves ``meta`` alone and
+            counts only incidences where a codimension-one face has at least two cofaces.
+        respect_finite: If True, rank the subcomplex of cells with ``finite is True``
+            instead (no truncation is applied).
         reduced: If True, return reduced homology (β̃₀ = β₀ - 1 for nonempty complexes).
         verify_chain_complex: If True, require ``∂_k ∘ ∂_{k+1} = 0`` (mod 2) for every ``k``
             where both maps exist; otherwise raise :class:`ChainComplexInconsistent`.
@@ -596,9 +607,6 @@ def get_betti_numbers(
             cross-checking.
 
     Note:
-        Truncation and finite-cell restriction are done on
-        :class:`~relucent.core.complex.Complex` before calling this.
-
         With no 0-cells (``kmin > 0``), the lowest Betti number is keyed by ``kmin``, not
         ``0``. E.g. a boundary complex of only 1- and 2-cells returns ``{1: n}``, where
         ``n`` is the number of connected components of the 1-skeleton.
@@ -608,12 +616,25 @@ def get_betti_numbers(
         against the path-component count.
     """
     del verbose  # applied by @with_verbosity
+    if compactify is not None and compactify not in COMPACTIFY_MODES:
+        raise ValueError(f"compactify must be one of {list(COMPACTIFY_MODES)} or None, got {compactify!r}")
     if meta.number_of_nodes() == 0:
         return {}
+    from relucent.graph import meta_graph as mg
+
+    if compactify == "one_point":
+        mg.one_point_compactify_meta_graph(meta)
+    elif compactify == "truncate" and not respect_finite:
+        mg.truncate_meta_graph(meta)
+    if respect_finite:
+        meta = mg.finite_cells_subgraph(meta)
+        if meta.number_of_nodes() == 0:
+            return {}
+    require_shared_faces = compactify == "borel_moore"
 
     logger.debug(
         f"get_betti_numbers: |V|={meta.number_of_nodes()} |E|={meta.number_of_edges()} "
-        + f"require_shared_faces={require_shared_faces} reduced={reduced} "
+        + f"compactify={compactify} reduced={reduced} "
         + f"verify_chain_complex={verify_chain_complex} "
         + f"verify_connected_components={verify_connected_components}",
     )

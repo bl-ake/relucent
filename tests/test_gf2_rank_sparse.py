@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from relucent.topology import Compactify
 from relucent.topology.betti import (
     _boundary_row_sets,
     _packed_boundary_matrix,
@@ -212,8 +213,8 @@ def _random_meta(rng: np.random.Generator, counts: tuple[int, ...], faces_per_ce
     return meta
 
 
-@pytest.mark.parametrize("require_shared_faces", [False, True])
-def test_sparse_and_dense_betti_agree(require_shared_faces: bool) -> None:
+@pytest.mark.parametrize("compactify", [None, "borel_moore"])
+def test_sparse_and_dense_betti_agree(compactify: Compactify | None) -> None:
     """Both rank methods give the same Betti numbers, including repeated (mod-2 cancelling) edges."""
     from relucent.topology import get_betti_numbers
 
@@ -221,8 +222,9 @@ def test_sparse_and_dense_betti_agree(require_shared_faces: bool) -> None:
     for _ in range(20):
         counts = tuple(int(v) for v in rng.integers(5, 40, size=int(rng.integers(2, 5))))
         meta = _random_meta(rng, counts, int(rng.integers(1, 5)), repeat=True)
-        kw = {"require_shared_faces": require_shared_faces, "verify_connected_components": False}
-        assert get_betti_numbers(meta, method="sparse", **kw) == get_betti_numbers(meta, method="dense", **kw)
+        sparse = get_betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="sparse")
+        dense = get_betti_numbers(meta, compactify=compactify, verify_connected_components=False, method="dense")
+        assert sparse == dense
 
 
 def test_sparse_boundary_maps_match_packed() -> None:

@@ -100,7 +100,7 @@ def test_truncated_homology_chain_complex_regression(
     seed: int,
     betti: dict[int, int],
 ) -> None:
-    """Truncated boundary homology (``compactify=False``) satisfies ``∂² = 0``."""
+    """Truncated boundary homology (``compactify="truncate"``) satisfies ``∂² = 0``."""
     set_seeds(seed)
     net = mlp(widths=architecture, add_last_relu=True, init="uniform")
     cplx = Complex(net)
@@ -109,7 +109,7 @@ def test_truncated_homology_chain_complex_regression(
     boundary = cplx.get_boundary_complex(cplx.n - 1)
 
     got = boundary.get_betti_numbers(
-        compactify=False,
+        compactify="truncate",
         reduced=False,
         verify_chain_complex=True,
     )

@@ -174,7 +174,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
     top = next(p for p in reloaded if p.dim == reloaded.dim)
     assert top._shis_strict is True
 
-    reloaded.get_poly_attrs(["finite"])
+    _ = [p.finite for p in reloaded]
     top = next(p for p in reloaded if p.dim == reloaded.dim)
     assert top._shis_strict is True
 

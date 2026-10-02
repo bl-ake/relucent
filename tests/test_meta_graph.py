@@ -18,6 +18,7 @@ from relucent.graph.incidence import (
     geometric_infeasible_one_cells,
     ss_nonzero_indices,
 )
+from relucent.graph.meta_graph import truncate_meta_graph
 from relucent.search.exploration import explore_for_topology
 from relucent.topology import ChainComplexInconsistent, get_betti_numbers
 from relucent.utils import encode_ss, get_env
@@ -124,7 +125,7 @@ def test_meta_graph_truncate_augmented_ss_bounded_subcomplex(seeded: int):
 
     meta_plain = db.get_meta_graph(verbose=False)
     meta_tr = meta_plain.copy()
-    Complex.truncate_meta_graph(meta_tr)
+    truncate_meta_graph(meta_tr)
 
     assert not any(isinstance(n, tuple) for n in meta_tr.nodes()), "truncation uses byte tags only"
 
@@ -181,7 +182,7 @@ def test_meta_graph_truncate_unbounded_duplication_and_links(seeded: int):
     meta_plain = cplx.get_meta_graph(verbose=False)
     mg.verify_meta_graph_one_cells(meta_plain)
     meta_tr = meta_plain.copy()
-    Complex.truncate_meta_graph(meta_tr)
+    truncate_meta_graph(meta_tr)
 
     assert not any(isinstance(n, tuple) for n in meta_tr.nodes()), "truncation uses byte tags only"
 
@@ -257,7 +258,7 @@ def test_meta_graph_truncated_satisfies_chain_complex(seeded: int) -> None:
     db = cplx.get_boundary_complex(cplx.n - 1)
 
     meta = db.get_meta_graph(verbose=False)
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
     get_betti_numbers(meta, verify_chain_complex=True)
 
 
@@ -303,7 +304,7 @@ def test_truncation_cap_functor_mixed_boundary_2_cell() -> None:
     assert mg._open_cap_count(unbounded, meta, ub, cap_cache) == 1
 
     meta_tr = meta.copy()
-    Complex.truncate_meta_graph(meta_tr)
+    truncate_meta_graph(meta_tr)
 
     # Derive expected trunc pads from open-cap counts (not hardcoded bits).
     sheet_n = cap_cache[sheet]
@@ -432,7 +433,7 @@ def test_open_cap_count_anchored_with_only_bi_infinite_facets_gets_one_cap() -> 
     # this minimal hand-built graph need not be ∂²=0 (line–sheet trunc-bit mismatch
     # is intentional; full witnesses live in shi-regression / Synthetic_Progress).
     meta_tr = meta.copy()
-    Complex.truncate_meta_graph(meta_tr)
+    truncate_meta_graph(meta_tr)
     sheet_ext = encode_ss(mg._ss_with_truncation_bits(np.array([[1, 1, 1]], dtype=np.int8), 1, 0))
     assert sheet_ext in meta_tr.nodes
     t1_shi, _t2 = mg._truncation_bit_indices(np.asarray(meta_tr.nodes[sheet_ext]["ss"]))
@@ -515,7 +516,7 @@ def test_truncate_caps_an_isolated_ray() -> None:
     meta = _isolated_ray_meta()
     n_before = meta.number_of_nodes()
 
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
 
     assert meta.number_of_nodes() == n_before + 1, "expected exactly one new cap 0-cell"
 
@@ -528,7 +529,7 @@ def test_truncate_caps_an_isolated_ray() -> None:
 def test_truncate_closes_mixed_boundary_cell_into_a_disk() -> None:
     """Truncating a half-infinite strip yields a closed disk with trivial homology."""
     meta = _mixed_boundary_wedge_meta()
-    Complex.truncate_meta_graph(meta)
+    truncate_meta_graph(meta)
 
     unbounded_after = [n for n, a in meta.nodes(data=True) if a.get("finite") is False]
     assert not unbounded_after, f"truncation should leave no unbounded cells, got {unbounded_after!r}"

@@ -93,10 +93,6 @@ ASTAR_BIAS_WEIGHT: float = env_float("ASTAR_BIAS_WEIGHT", 0.9)
 # BlockingQueue: seconds to wait on the lock before rechecking.
 BLOCKING_QUEUE_WAIT_TIMEOUT: float = env_float("BLOCKING_QUEUE_WAIT_TIMEOUT", 0.5)
 
-# Match a geometric vertex to an intrinsic one if
-# ||x - x_intrinsic||_inf <= TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR * tol.
-TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR: float = env_float("TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR", 2.0)
-
 # String settings and their allowed values, checked by update_settings.
 CHOICES: dict[str, tuple[str, ...]] = {
     "BOUNDARY_MIP_CUT_ORDER": CUT_ORDERS,
@@ -120,5 +116,4 @@ __all__ = [
     "GUROBI_SHI_OPTIMALITY_TOL",
     "GUROBI_SHI_SCALE_FLAG",
     "INTERIOR_POINT_RADIUS_SEQUENCE",
-    "TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR",
 ]

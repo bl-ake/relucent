@@ -6,8 +6,7 @@ import os
 import pickle
 import random
 import warnings
-from collections.abc import Callable, Generator, Iterable, Iterator
-from itertools import combinations
+from collections.abc import Generator, Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
 import networkx as nx
@@ -71,7 +70,10 @@ from relucent.utils import (
 from relucent.verify.certify import CertifyLevel
 
 if TYPE_CHECKING:
+    from relucent.topology.betti import Compactify
+    from relucent.topology.filtration import Filtration
     from relucent.topology.morse import CriticalPoint
+    from relucent.topology.persistence import PersistenceDiagram
 
 __all__ = [
     "Complex",
@@ -87,12 +89,6 @@ __all__ = [
 ]
 
 RESEARCH_WARNING_DISABLE_ENV_VAR = "DISABLE_RESEARCH_WARNING"
-
-# ``compactify=False``: combinatorial truncation (``truncate_meta_graph``).
-# ``compactify=True``: Borel–Moore (``require_shared_faces``).
-# ``compactify="one_point"``: one-point compactification.
-# TODO: deprecate ``compactify=False`` and rename ``compactify=True`` to ``compactify="bm"``.
-CompactifyMode = bool | Literal["one_point"]
 
 
 class Complex:
@@ -132,7 +128,7 @@ class Complex:
                     self.ssi2maski.append((i, (0, neuron_idx)))
 
         self._dual_graph: nx.Graph[Polyhedron] | None = None
-        self._betti_cache: dict[tuple[bool, CompactifyMode, bool], dict[int, int]] = {}
+        self._betti_cache: dict[tuple[bool, Compactify, bool], dict[int, int]] = {}
         self._complete: bool | None = None
         self._verified: bool | None = None
 
@@ -899,25 +895,6 @@ class Complex:
             **kwargs,
         )
 
-    def get_poly_attrs(self, attrs: Iterable[str]) -> dict[str, list[Any]]:
-        """Extract specified attributes from all polyhedra in the complex.
-
-        Useful for building tabular representations or dataframes of polyhedra
-        properties. Attributes are returned in the same order as polyhedra were
-        added to the complex.
-
-        Args:
-            attrs: A list of attribute names to extract (e.g., ["finite", "Wl2"]).
-
-        Returns:
-            dict: A dictionary mapping attribute names to lists of attribute
-                values, with one value per polyhedron in the complex based on the order
-                they were added.
-        """
-        attrs = list(attrs)
-        self.compute_geometric_properties(properties=attrs)
-        return {attr: [getattr(poly, attr) for poly in self] for attr in attrs}
-
     def slice_affine(
         self,
         x0: np.ndarray,
@@ -1042,11 +1019,6 @@ class Complex:
         del verbose  # applied by @with_verbosity
         assert 0 <= i < self.n, f"Neuron index out of range: {i} not in [0, {self.n})"
         return {(a, b) for a, b, shi in progress(self.G.edges(data="shi"), desc="Getting Boundary Edges", delay=1) if shi == i}
-
-    def get_boundary_graph(self, i: int, verbose: int | None = None) -> nx.Graph[Polyhedron]:
-        """Get the induced subgraph of neuron i's BH."""
-        edges = list(self.get_boundary_edges(i, verbose=verbose))
-        return self.G.subgraph([p for edge in edges for p in edge])
 
     def _codim_one_face_kwargs(self, p1: Polyhedron, _p2: Polyhedron, shi: int) -> dict[str, Any]:
         """Shared kwargs for :meth:`get_boundary_cells` faces.
@@ -1468,21 +1440,6 @@ class Complex:
             incidence.set_contracted_shis(vertex_complex)
         return results
 
-    @staticmethod
-    def finite_cells_subgraph(meta: nx.MultiDiGraph[Any]) -> nx.MultiDiGraph[Any]:
-        """Return the subcomplex induced by nodes with ``finite is True``."""
-        return mg.finite_cells_subgraph(meta)
-
-    @staticmethod
-    def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
-        """Augment ``meta`` in place with combinatorial truncation at infinity."""
-        mg.truncate_meta_graph(meta)
-
-    @staticmethod
-    def one_point_compactify_meta_graph(meta: nx.MultiDiGraph[Any]) -> bool:
-        """Augment ``meta`` in place with a single point-at-infinity 0-cell."""
-        return mg.one_point_compactify_meta_graph(meta)
-
     @with_verbosity
     def get_meta_graph(self, *, verify: bool = False, verbose: int | None = None) -> nx.MultiDiGraph[Any]:
         """Return a meta-graph encoding cells across all dimensions and face relations.
@@ -1507,10 +1464,9 @@ class Complex:
         ``verify=True`` runs :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`
         to check edges, node SHIs, and finite labels against the incidence code.
 
-        For combinatorial truncation, build the graph here, then call
-        :meth:`truncate_meta_graph` on a copy before
-        :func:`relucent.topology.get_betti_numbers` or :meth:`get_betti_numbers_from_meta`
-        with ``compactify=False``.
+        To compute homology from it, pass it to :func:`relucent.topology.get_betti_numbers`
+        with a ``compactify`` mode (which modifies the graph in place for ``"truncate"`` and
+        ``"one_point"``).
 
         Note:
             This encodes the face relations in :meth:`get_chain_complex`'s chain
@@ -1746,88 +1702,13 @@ class Complex:
         )
         return meta
 
-    @staticmethod
-    def _gf2_rank_packed(packed: np.ndarray, ncols: int) -> int:
-        """Gaussian elimination rank over GF(2) on row-major bit-packed rows (uint64 words)."""
-        if packed.size == 0 or ncols == 0:
-            return 0
-        nrows = int(packed.shape[0])
-        rank = 0
-        for col in range(ncols):
-            if rank >= nrows:
-                break
-            word = col >> 6
-            sh = col & 63
-            bitm = np.uint64(1) << sh
-            colbits = packed[rank:, word] & bitm
-            pivot_offs = np.flatnonzero(colbits)
-            if pivot_offs.size == 0:
-                continue
-            pivot = rank + int(pivot_offs[0])
-            if pivot != rank:
-                packed[[rank, pivot], :] = packed[[pivot, rank], :]
-            mask = (packed[:, word] & bitm) != 0
-            mask[rank] = False
-            inds = np.flatnonzero(mask)
-            if inds.size > 0:
-                packed[inds, :] ^= packed[rank, :]
-            rank += 1
-        return rank
-
-    @classmethod
-    def get_betti_numbers_from_meta(
-        cls,
-        meta: nx.MultiDiGraph[Any],
-        *,
-        reduced: bool = False,
-        compactify: CompactifyMode = False,
-        respect_finite: bool = False,
-        verify_chain_complex: bool = False,
-        verify_connected_components: bool = False,
-        verbose: int | None = None,
-        nworkers: int | None = None,
-    ) -> dict[int, int]:
-        """Compute Betti numbers from an existing meta-graph.
-
-        Args:
-            meta: Output of :meth:`get_meta_graph`, optionally passed through
-                :meth:`truncate_meta_graph` or :meth:`one_point_compactify_meta_graph`.
-            compactify: Homology convention. ``False``: combinatorial truncation
-                (caller should apply :meth:`truncate_meta_graph` first unless
-                ``respect_finite``). ``True``: Borel–Moore (only faces with at least
-                two cofaces). ``"one_point"``: one-point compactification at infinity
-                (caller should apply :meth:`one_point_compactify_meta_graph` first).
-            respect_finite: If True, restrict to the subcomplex of cells with ``finite is True``
-                (no truncation). Other flags are forwarded to :func:`relucent.topology.get_betti_numbers`.
-            verify_connected_components: Forwarded to :func:`relucent.topology.get_betti_numbers`.
-            nworkers: Forwarded to :func:`relucent.topology.get_betti_numbers`; controls
-                how many threads rank independent boundary maps concurrently.
-        """
-        from relucent.topology.betti import get_betti_numbers
-
-        if meta.number_of_nodes() == 0:
-            return {}
-        if respect_finite:
-            meta = cls.finite_cells_subgraph(meta)
-            if meta.number_of_nodes() == 0:
-                return {}
-        return get_betti_numbers(
-            meta,
-            require_shared_faces=compactify is True,
-            reduced=reduced,
-            verify_chain_complex=verify_chain_complex,
-            verify_connected_components=verify_connected_components,
-            verbose=verbose,
-            nworkers=nworkers,
-        )
-
     @with_verbosity
     def get_betti_numbers(
         self,
         *,
-        reduced: bool = False,
-        compactify: CompactifyMode = False,
+        compactify: Compactify = "truncate",
         respect_finite: bool = False,
+        reduced: bool = False,
         verify_chain_complex: bool = False,
         verify_connected_components: bool = False,
         verbose: int | None = None,
@@ -1835,9 +1716,8 @@ class Complex:
     ) -> dict[int, int]:
         """Compute Betti numbers over GF(2).
 
-        Builds a meta-graph from this complex, applies truncation when appropriate, then
-        delegates to :meth:`get_betti_numbers_from_meta`. ``verbose`` controls progress
-        output from meta-graph construction and boundary maps.
+        Builds the meta-graph (:meth:`get_meta_graph`) and ranks it with
+        :func:`relucent.topology.get_betti_numbers`.
 
         Results are cached per ``(reduced, compactify, respect_finite)`` and survive
         :meth:`save` / :meth:`load`. The cache is cleared when polyhedra are added or
@@ -1845,13 +1725,21 @@ class Complex:
         bypass the cache and always recompute.
 
         Args:
-            compactify: ``False`` applies combinatorial truncation at infinity;
-                ``True`` uses Borel–Moore face incidences; ``"one_point"`` adds an
-                extra 0-cell at infinity for unbounded 1-cell ends.
-            nworkers: Number of threads for ranking independent boundary maps concurrently.
-                ``None`` (default): auto (one thread per map when the C backend is available).
-                ``1``: always sequential.  See :func:`relucent.topology.get_betti_numbers`.
+            compactify: How unbounded cells are handled: ``"truncate"`` (default) caps them
+                with combinatorial truncation at infinity, ``"borel_moore"`` computes
+                Borel–Moore homology, and ``"one_point"`` adds a single 0-cell at infinity.
+            respect_finite: If True, use the subcomplex of bounded cells instead.
+            reduced: If True, return reduced homology.
+            verify_chain_complex: Check ``∂² = 0`` (see :func:`relucent.topology.get_betti_numbers`).
+            verify_connected_components: Check β₀ against the path-component count.
+            verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
+                detail. ``None`` uses :data:`relucent.config.VERBOSE`.
+            nworkers: Threads for ranking independent boundary maps concurrently
+                (``method="dense"`` only; see :func:`relucent.topology.get_betti_numbers`).
         """
+        from relucent.topology.betti import get_betti_numbers
+
+        del verbose  # applied by @with_verbosity
         self._warn_research_use("get_betti_numbers")
         if len(self) == 0:
             return {}
@@ -1859,19 +1747,13 @@ class Complex:
         use_cache = not verify_chain_complex and not verify_connected_components
         if use_cache and cache_key in self._betti_cache:
             return dict(self._betti_cache[cache_key])
-        meta = self.get_meta_graph(verbose=verbose)
-        if compactify == "one_point":
-            self.one_point_compactify_meta_graph(meta)
-        elif not compactify and not respect_finite:
-            self.truncate_meta_graph(meta)
-        betti = self.get_betti_numbers_from_meta(
-            meta,
-            reduced=reduced,
+        betti = get_betti_numbers(
+            self.get_meta_graph(),
             compactify=compactify,
             respect_finite=respect_finite,
+            reduced=reduced,
             verify_chain_complex=verify_chain_complex,
             verify_connected_components=verify_connected_components,
-            verbose=verbose,
             nworkers=nworkers,
         )
         if use_cache:
@@ -1880,13 +1762,13 @@ class Complex:
 
     def get_persistent_homology(
         self,
-        filtration: object,
+        filtration: Filtration,
         *,
-        compactify: bool = False,
+        compactify: Literal["truncate", "borel_moore"] = "truncate",
         respect_finite: bool = False,
         lower_star: bool | None = None,
         verbose: int | None = None,
-    ) -> object:
+    ) -> PersistenceDiagram:
         """Compute persistent homology over GF(2) for a :class:`~relucent.topology.filtration.Filtration`.
 
         See :func:`relucent.topology.persistence.compute_persistent_homology`.
@@ -1917,148 +1799,6 @@ class Complex:
         top_dim = max(int(p.dim) for p in self)
         if top_dim == 1:
             certify.verify_arrangement_genericity(self)
-
-    def intrinsic_vertex_coords(
-        self,
-        *,
-        top_dim: int | None = None,
-        bound: float,
-        tol: float,
-        verify_cube: bool = True,
-    ) -> dict[bytes, np.ndarray]:
-        """Identify intrinsic (non-truncation-box) vertices and optionally verify them with the dual-graph."""
-        if len(self) == 0:
-            return {}
-        if top_dim is None:
-            top_dim = max(int(p.dim) for p in self)
-        if int(top_dim) < 2:
-            return {}
-
-        G = self.get_dual_graph()
-
-        # vertex_tag -> (S, incident top cells)
-        vtx: dict[bytes, tuple[tuple[int, ...], list[Polyhedron]]] = {}
-        for p in self:
-            if int(p.dim) != int(top_dim):
-                continue
-            shis = tuple(int(s) for s in p.shis)
-            if len(shis) < int(top_dim):
-                continue
-            for shis_subset in combinations(shis, int(top_dim)):
-                face = p.get_face_by_shis(shis_subset)
-                if int(face.dim) != 0:
-                    continue
-                if not face.is_face_of(p):
-                    continue
-                tag = face.tag
-                shis_sorted = tuple(sorted(int(x) for x in shis_subset))
-                hit = vtx.get(tag)
-                if hit is None:
-                    vtx[tag] = (shis_sorted, [p])
-                else:
-                    S0, cells = hit
-                    if shis_sorted != S0:
-                        raise RuntimeError(
-                            "Intrinsic vertex tag produced with inconsistent SHI sets: "
-                            + f"tag={tag!r} had {S0} vs {shis_sorted}."
-                        )
-                    cells.append(p)
-
-        out: dict[bytes, np.ndarray] = {}
-        match_box = float(cfg.advanced.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
-
-        for tag, (shis_cube, cells) in vtx.items():
-            if verify_cube:
-                patt2cell: dict[int, Polyhedron] = {}
-                for p in cells:
-                    ss = np.asarray(p.ss_np)
-                    patt = 0
-                    for i, shi in enumerate(shis_cube):
-                        sgn = int(ss[0, int(shi)])
-                        if sgn == 0:
-                            patt = -1
-                            break
-                        if sgn > 0:
-                            patt |= 1 << i
-                    if patt < 0:
-                        continue
-                    if patt in patt2cell and patt2cell[patt].tag != p.tag:
-                        raise RuntimeError(
-                            "Intrinsic vertex incident set contains duplicate sign patterns: "
-                            + f"vertex={tag!r} pattern={patt}."
-                        )
-                    patt2cell[patt] = p
-
-                patt_by_tag = {p.tag: patt for patt, p in patt2cell.items()}
-                cell_tags = set(patt_by_tag.keys())
-                for u, v, shi in G.edges(data="shi"):
-                    if u.tag not in cell_tags or v.tag not in cell_tags:
-                        continue
-                    if shi is None:
-                        raise RuntimeError("Dual-graph edge is missing 'shi' attribute.")
-                    if int(shi) not in shis_cube:
-                        raise RuntimeError(
-                            "Dual-graph edge crosses a facet not in the intrinsic-vertex cube directions: "
-                            + f"vertex={tag!r} edge_shi={int(shi)} S={shis_cube}."
-                        )
-                    pu = patt_by_tag[u.tag]
-                    pv = patt_by_tag[v.tag]
-                    if bin(pu ^ pv).count("1") != 1:
-                        raise RuntimeError(
-                            "Dual-graph edge within intrinsic-vertex incident set is not a single-bit flip: "
-                            + f"vertex={tag!r} patterns=({pu},{pv}) S={shis_cube}."
-                        )
-
-            witness = cells[0]
-            face = witness.get_face_by_shis(shis_cube)
-            x = getattr(face, "interior_point", None)
-            if x is None:
-                x = getattr(face, "center", None)
-            if x is None:
-                continue
-            x = np.asarray(x, dtype=np.float64).reshape(-1)
-            if float(np.max(np.abs(x))) <= float(bound) + match_box:
-                out[tag] = x
-
-        return out
-
-    def truncation_vertex_id_mapper(
-        self,
-        *,
-        top_dim: int,
-        bound: float,
-        tol: float,
-        verify_cube: bool,
-    ) -> Callable[[np.ndarray], int]:
-        """Return a vertex-id mapper that canonicalizes intrinsic vertices by SS tag."""
-        intrinsic_coords = self.intrinsic_vertex_coords(top_dim=top_dim, bound=bound, tol=tol, verify_cube=verify_cube)
-        intrinsic_tag2vid: dict[bytes, int] = {}
-        key2vid: dict[tuple[int, ...], int] = {}
-        vertices: list[np.ndarray] = []
-
-        def vid(v: np.ndarray) -> int:
-            vv = np.asarray(v, dtype=np.float64).reshape(-1)
-            if intrinsic_coords:
-                thr = float(cfg.advanced.TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR) * float(tol)
-                for t, x in intrinsic_coords.items():
-                    if float(np.max(np.abs(vv - x))) <= thr:
-                        hit = intrinsic_tag2vid.get(t)
-                        if hit is not None:
-                            return int(hit)
-                        new_id = len(vertices)
-                        intrinsic_tag2vid[t] = new_id
-                        vertices.append(np.asarray(x, dtype=np.float64).reshape(-1))
-                        return new_id
-            q = tuple(np.round(vv / tol).astype(np.int64).tolist())
-            hit = key2vid.get(q)
-            if hit is not None:
-                return int(hit)
-            new_id = len(vertices)
-            key2vid[q] = new_id
-            vertices.append(vv)
-            return new_id
-
-        return vid
 
     @property
     def G(self) -> nx.Graph[Polyhedron]:

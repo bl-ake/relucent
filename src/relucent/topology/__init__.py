@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from .betti import (
         C_BACKEND_AVAILABLE,
         ChainComplexInconsistent,
+        Compactify,
         ConnectedComponentsMismatch,
         get_betti_numbers,
         gf2_matmul_packed_stacked_rows,
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ChainComplexInconsistent",
+    "Compactify",
     "ConnectedComponentsMismatch",
     "C_BACKEND_AVAILABLE",
     "get_betti_numbers",

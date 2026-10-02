@@ -147,8 +147,8 @@ def test_discover_boundary_complex_bm_mode_line(seeded: int, nworkers: int):
     shi = cplx.n - 1
     ref = cplx.get_boundary_complex(shi, verbose=False)
     new = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
-    ref_bm = ref.get_betti_numbers(compactify=True, reduced=True)
-    new_bm = new.get_betti_numbers(compactify=True, reduced=True)
+    ref_bm = ref.get_betti_numbers(compactify="borel_moore", reduced=True)
+    new_bm = new.get_betti_numbers(compactify="borel_moore", reduced=True)
     assert ref_bm == new_bm
 
 
@@ -177,4 +177,4 @@ def test_discover_boundary_complex_mlp_tiny(seeded: int, nworkers: int):
     assert stats["n_components"] >= 1
     assert len(new) > 0
     _ = new.get_betti_numbers()
-    _ = new.get_betti_numbers(compactify=True, reduced=True)
+    _ = new.get_betti_numbers(compactify="borel_moore", reduced=True)
