@@ -210,6 +210,30 @@ def test_robustly_redundant_row_is_certified_in_float64(env, monkeypatch: pytest
     assert set(get_shis(_cell(rows), env=env)) == {0, 1}
 
 
+def _cube() -> list[list[float]]:
+    return [
+        [-1.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, -1.0],
+        [0.0, -1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, -1.0],
+        [0.0, 0.0, -1.0, 0.0],
+        [0.0, 0.0, 1.0, -1.0],
+    ]
+
+
+def test_dual_degenerate_redundant_row_is_decided_by_the_exact_dual(env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """x + y <= 3 on the unit cube: its LP optimum (-1) has a zero multiplier on the z-row it touches,
+    which float64 cannot prove nonnegative. The LP's dual, solved exactly, decides it without the
+    exact simplex (common in deep nets, where rows are exact combinations of others)."""
+    from relucent._internal import exact
+
+    def _no_simplex(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("the exact dual check should have decided")
+
+    monkeypatch.setattr(exact, "exact_facet_by_simplex", _no_simplex)
+    assert set(get_shis(_cell([*_cube(), [1.0, 1.0, 0.0, -3.0]]), env=env)) == set(range(6))
+
+
 @pytest.mark.parametrize("gap", [5e-7, 1e-9])
 def test_solve_radius_certifies_cells_empty_within_gurobi_tolerance(env, gap: float) -> None:
     """Gurobi returns a slightly negative radius; its duals prove emptiness, verified here."""
@@ -242,15 +266,22 @@ def test_row_constant_on_a_face_is_decided_exactly(env, monkeypatch: pytest.Monk
     """A row parallel to the face's equality row is constant on the face: exactly decided, not raised."""
     from relucent._internal import exact
 
-    calls: list[object] = []
-    real = exact.exact_facet_by_simplex
+    calls: list[object] = []  # exact "not a facet" verdicts, from either exact routine
+    real_simplex, real_dual = exact.exact_facet_by_simplex, exact.exact_dual_bound
 
-    def _counting(*args, **kwargs):
-        out = real(*args, **kwargs)
+    def _simplex(*args, **kwargs):
+        out = real_simplex(*args, **kwargs)
         calls.append(out)
         return out
 
-    monkeypatch.setattr(exact, "exact_facet_by_simplex", _counting)
+    def _dual(*args, **kwargs):
+        out = real_dual(*args, **kwargs)
+        if out is not None and out < 0:
+            calls.append(False)
+        return out
+
+    monkeypatch.setattr(exact, "exact_facet_by_simplex", _simplex)
+    monkeypatch.setattr(exact, "exact_dual_bound", _dual)
     rows = np.array(
         [
             [1.0, 2.0, 3.0, 0.5],  # equality row: the face is n . x = -0.5
@@ -443,6 +474,32 @@ def test_exact_facet_by_simplex_unbounded_and_face() -> None:
     assert exact.exact_facet_by_simplex(wedge, 0, [1], np.array([0.5, 1e-17])) is True
     # A start outside the cell is refused rather than trusted.
     assert exact.exact_facet_by_simplex(wedge, 2, [], np.array([-1.0, 0.5])) is None
+
+
+@pytest.mark.parametrize(
+    ("extra", "tight", "expected"),
+    [
+        ([1.0, 1.0, 0.0, -3.0], [1, 3, 5], Fraction(-1)),  # = x-row + y-row (+ 0 z-row) - 1: below -1
+        ([1.0, 1.0, 0.0, -1.5], [1, 3, 5], Fraction(1, 2)),  # cuts an edge off: bound 1/2 proves nothing
+        ([1.0, -1.0, 0.0, -3.0], [1, 3, 5], None),  # needs a negative multiplier on the y-row
+        ([1.0, 1.0, 1.0, -4.0], [1, 3], None),  # not in the span of the x- and y-rows
+        ([1.0, 1.0, 0.0, -3.0], [], None),  # no rows to combine
+    ],
+)
+def test_exact_dual_bound_on_cube(extra: list[float], tight: list[int], expected: Fraction | None) -> None:
+    from relucent._internal import exact
+
+    assert exact.exact_dual_bound(_exact_rows([*_cube(), extra]), tight, [], 6) == expected
+
+
+def test_exact_dual_bound_with_an_equality_row() -> None:
+    """On the face n . x = -0.5, the row 2 (n . x) <= 0 is the constant -1."""
+    from relucent._internal import exact
+
+    rows = _exact_rows([[1.0, 2.0, 3.0, 0.5], [2.0, 4.0, 6.0, 0.0], [1.0, 0.0, 0.0, -1.0], [2.0, 4.0, 6.0, 1.0]])
+    assert exact.exact_dual_bound(rows, [], [0], 1) == Fraction(-1)
+    assert exact.exact_dual_bound(rows, [2], [0], 1) == Fraction(-1)  # row 2 gets an exactly zero multiplier
+    assert exact.exact_dual_bound(rows, [3], [0], 1) is None  # row 3 is parallel to row 0: not unique
 
 
 class _RelaxedLPsFail:

@@ -294,6 +294,36 @@ def _feasible_start(ineq: list[Row], eq: list[Row], start: np.ndarray) -> list[F
     return x
 
 
+def exact_dual_bound(rows: list[Row], ineq_indices: list[int], eq_indices: list[int], j: int) -> Fraction | None:
+    """Exact upper bound on row ``j`` over the cell, from a dual certificate on the given rows.
+
+    If ``a_j = sum_r y_r a_r + sum_e lam_e a_e`` exactly, with ``y_r >= 0`` on the inequality rows
+    ``ineq_indices`` (typically the SHI LP's tight rows) and any ``lam_e`` on the equality rows
+    ``eq_indices`` (a face's zero entries), then on the face every point with those inequality
+    rows nonpositive has ``row_j = sum_r y_r row_r + c <= c`` for the constant
+    ``c = b_j - sum_r y_r b_r - sum_e lam_e b_e``. Returns ``c``, or None when no such unique
+    combination exists. With no inequality rows this says row ``j`` is constant on the face.
+
+    This is the exact counterpart of the float64 certificate in
+    :func:`relucent.geometry.calculations._certify_not_facet`, which cannot show a multiplier is
+    exactly zero or a normal exactly in a span: structural coincidences of ReLU networks (a unit
+    driven only by units whose rows are tight or zeroed) produce exactly those cases. One small
+    rational solve, it is far cheaper than :func:`exact_facet_by_simplex`.
+    """
+    cols = [int(r) for r in ineq_indices if int(r) != j] + [int(e) for e in eq_indices]
+    if not cols:
+        return None
+    d = len(rows[j]) - 1
+    a = [[rows[c][i] for c in cols] for i in range(d)]
+    coef, _, consistent = _solve(a, list(rows[j][:-1]))
+    if not consistent or coef is None:
+        return None
+    n_ineq = len(cols) - len(eq_indices)
+    if any(c < 0 for c in coef[:n_ineq]):
+        return None
+    return rows[j][-1] - sum((c * rows[k][-1] for c, k in zip(coef, cols, strict=True)), Fraction(0))
+
+
 def exact_facet_by_simplex(
     rows: list[Row],
     i: int,

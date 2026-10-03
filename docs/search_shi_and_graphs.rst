@@ -204,7 +204,12 @@ The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
    positive and every other row strictly negative beyond their float64 error, and not a
    facet when a verified dual certificate bounds row ``i`` below zero on the whole cell.
    When float64 cannot decide, the question is answered in exact arithmetic, or
-   :class:`~relucent.core.errors.AmbiguousGeometryError` is raised.
+   :class:`~relucent.core.errors.AmbiguousGeometryError` is raised. The exact step first
+   checks the LP's own dual: one small rational solve on the tight rows
+   (:func:`relucent._internal.exact.exact_dual_bound`). This settles the usual case in deep
+   networks, a row that is exactly a nonnegative combination of tight rows with a zero
+   multiplier, which float64 cannot prove. Only if that is inconclusive does an exact
+   simplex (:func:`relucent._internal.exact.exact_facet_by_simplex`) decide.
 
 The ``strict`` option is deprecated and has no effect: every answer is already certified.
 

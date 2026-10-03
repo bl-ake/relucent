@@ -1149,7 +1149,7 @@ def get_shis(
             shis.append(i)
         if poly_info is not None:
             poly_info.append({"Status": "exact (LP failed)", "Verdict": verdict})
-        constrs[j].setAttr("RHS", -b_red[j, 0])
+        lp_constrs[j].RHS = -b_red[j, 0]
 
     candidate_subset = subset or set(range(n_orig)) - set(poly.zero_indices)
     candidate_subset = set(candidate_subset)
@@ -1173,6 +1173,10 @@ def get_shis(
         dup_partners.setdefault(c, []).append(r)
     zero_units = np.flatnonzero(np.all(hs_np == 0.0, axis=1))
     eq_orig_idx = [] if zero_eff is None else [int(work_to_orig[int(w)]) for w in zero_eff]
+    # Row i's objective in z: maximise obj_all[i] @ z + const_all[i] (row i at x = N z + x0).
+    # Set per row as attributes: building an objective expression costs ~20x more.
+    obj_all = A_orig @ null_basis
+    const_all = (A_orig @ x0 + b_orig).ravel()
 
     for bound_index, attempt_bound in enumerate(bounds_to_try):
         if model is not None:
@@ -1180,9 +1184,12 @@ def get_shis(
         model = Model("SHIS", env)
         model.params.OptimalityTol = cfg.advanced.GUROBI_SHI_OPTIMALITY_TOL
         model.params.ScaleFlag = cfg.advanced.GUROBI_SHI_SCALE_FLAG
+        model.params.BestBdStop = GRB.INFINITY
+        model.ModelSense = GRB.MAXIMIZE  # objective is zero until the first row sets it
         z = model.addMVar((k, 1), lb=-attempt_bound, ub=attempt_bound, vtype=GRB.CONTINUOUS, name="z")
         constrs = model.addConstr(a_red @ z <= -b_red, name="hyperplanes")
         model.optimize()
+        lp_constrs = model.getConstrs()  # constraint handles in LP-row order: cheap RHS updates
         if model.status != GRB.OPTIMAL and bound_index + 1 == len(bounds_to_try):
             # The last box: infeasibility here is final, so rule out a solver failure first.
             _cold_retry(model)
@@ -1210,16 +1217,13 @@ def get_shis(
             pbar.set_postfix_str(f"#shis: {len(shis)}")
 
             # Relax halfspace i (row j in the LP over z); i is the original halfspace index.
-            constrs[j].setAttr("RHS", -b_red[j, 0] + push_size)
+            lp_constrs[j].RHS = -b_red[j, 0] + push_size
 
-            ai = A_orig[i : i + 1, :].T  # (amb_d, 1)
-            c_obj = null_basis.T @ ai  # (k, 1); left-multiply z as (1,k) @ (k,1) for Gurobi
-            const_obj = float((ai.T @ x0).item() + b_orig[i, 0])
-            model.setObjective(c_obj.T @ z + const_obj, GRB.MAXIMIZE)
+            z.Obj = obj_all[i].reshape(k, 1)
+            model.ObjCon = float(const_all[i])
             # Stopping once the objective is well above zero only saves time: the point is
             # certified below, and an uncertified stop is re-solved to optimality.
             model.params.BestObjStop = 0.5 * push_size
-            model.params.BestBdStop = GRB.INFINITY
             model.optimize()
 
             if model.status == GRB.INTERRUPTED:
@@ -1233,7 +1237,8 @@ def get_shis(
                     record_without_lp(int(i), j, exact_verdict)
                     continue
             if model.status == GRB.OPTIMAL or model.status == GRB.USER_OBJ_LIMIT:
-                verdict = _certify_facet_from_model(model, z, constrs, j, h_red, err_red, interior_point)
+                zv, cbasis = _read_lp_solution(z, constrs)
+                verdict = _certify_facet_from_model(model.status, zv, cbasis, j, h_red, err_red, interior_point)
                 if verdict is None and model.status == GRB.USER_OBJ_LIMIT:
                     model.params.BestObjStop = GRB.INFINITY
                     model.optimize()
@@ -1242,24 +1247,35 @@ def get_shis(
                         if exact_verdict is not None:
                             record_without_lp(int(i), j, exact_verdict)
                             continue
-                    verdict = _certify_facet_from_model(model, z, constrs, j, h_red, err_red, interior_point)
+                    zv, cbasis = _read_lp_solution(z, constrs)
+                    verdict = _certify_facet_from_model(model.status, zv, cbasis, j, h_red, err_red, interior_point)
                 if verdict is None and escalate_bound:
                     # Float64 can't decide (usually a redundant row parallel to a facet, with
                     # multiplier exactly zero, or hyperplanes concurrent at the LP vertex).
-                    # Decide exactly from the cell's verified interior point. The box is only a
-                    # numerical aid, so the exact question is over the unbounded cell.
+                    # Decide exactly. The box is only a numerical aid, so the exact question is
+                    # over the unbounded cell.
                     exact_rows = poly._exact_rows()
                     if exact_rows is not None:
                         from relucent._internal import exact
 
-                        start = null_basis @ interior_point().reshape(-1, 1) + x0
-                        verdict = exact.exact_facet_by_simplex(exact_rows, int(i), eq_orig_idx, start)
+                        if model.status == GRB.OPTIMAL and cbasis is not None:
+                            # First the LP's own dual, exactly: one small rational solve on its
+                            # tight rows. It settles the usual case, a row whose normal is exactly
+                            # a nonnegative combination of tight rows with a zero multiplier.
+                            tight_orig = [int(work_to_orig[int(ineq_rows[r])]) for r in np.flatnonzero(cbasis != 0) if r != j]
+                            bound_c = exact.exact_dual_bound(exact_rows, tight_orig, eq_orig_idx, int(i))
+                            if bound_c is not None and bound_c < 0:
+                                verdict = False  # row i is below a negative constant on the cell
+                        if verdict is None:
+                            # Otherwise the facet question itself, from the cell's verified interior point.
+                            start = null_basis @ interior_point().reshape(-1, 1) + x0
+                            verdict = exact.exact_facet_by_simplex(exact_rows, int(i), eq_orig_idx, start)
                 if verdict is False and j in dup_partners:
                     _raise_if_coincident_facet(
                         poly,
                         model,
                         z,
-                        constrs,
+                        lp_constrs,
                         j,
                         int(i),
                         dup_partners[j],
@@ -1273,7 +1289,7 @@ def get_shis(
                     )
                 elif verdict is True and zero_units.size:
                     _raise_if_coincident_across(poly, int(i), zero_units, eq_orig_idx)
-                x_proof = null_basis @ np.asarray(z.X).reshape(-1, 1) + x0
+                x_proof = null_basis @ zv.reshape(-1, 1) + x0
                 x_norm = float(np.linalg.norm(x_proof))
                 if verdict is True:
                     shis.append(i)
@@ -1289,14 +1305,14 @@ def get_shis(
                             + f"(LP objective {model.objVal:.4e})"
                         )
 
-                basis_indices = constrs.CBasis.ravel() != 0
-                if new_method and basis_indices.sum() != k:
+                basis_indices = cbasis != 0 if cbasis is not None else None
+                if new_method and basis_indices is not None and basis_indices.sum() != k:
                     warnings.warn(
                         "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
                         stacklevel=2,
                     )
                 skip_size = 0
-                if new_method and basis_indices.sum() == k:
+                if new_method and basis_indices is not None and basis_indices.sum() == k:
                     point_shis_np = a_red[basis_indices, :]
                     others_np = a_red[~basis_indices, :]
                     try:
@@ -1324,7 +1340,9 @@ def get_shis(
                 poly_info.append(
                     {
                         "Objective Value": model.objVal,
-                        "Min Non-Basis Slack": np.min(constrs.Slack[~basis_indices]),
+                        "Min Non-Basis Slack": np.min(
+                            constrs.Slack if basis_indices is None else constrs.Slack[~basis_indices]
+                        ),
                         "Status": model.status,
                         "# Skipped": skip_size,
                     }
@@ -1340,7 +1358,7 @@ def get_shis(
                     poly_info[-1]["Proof"] = x_proof
 
             # Restore halfspace i
-            constrs[j].setAttr("RHS", -b_red[j, 0])
+            lp_constrs[j].RHS = -b_red[j, 0]
 
             pbar.update(n_orig - len(subset) - pbar.n)
 
@@ -1430,7 +1448,7 @@ def _raise_if_coincident_facet(
     poly: "Polyhedron",
     model: Model,
     z: Any,
-    constrs: Any,
+    lp_constrs: list[Any],
     j: int,
     i: int,
     partners: list[int],
@@ -1452,7 +1470,7 @@ def _raise_if_coincident_facet(
     from relucent.core.errors import NonGenericArrangementError
 
     for jj in partners:
-        constrs[jj].setAttr("RHS", -b_red[jj, 0] + push_size)
+        lp_constrs[jj].RHS = -b_red[jj, 0] + push_size
     try:
         model.optimize()
         verdict = None
@@ -1462,9 +1480,9 @@ def _raise_if_coincident_facet(
             verdict = _certify_facet(h_red[keep], err_red[keep], int(np.flatnonzero(keep == j)[0]), zv, None, interior_point)
     finally:
         for jj in partners:
-            constrs[jj].setAttr("RHS", -b_red[jj, 0])
+            lp_constrs[jj].RHS = -b_red[jj, 0]
     if verdict is not True:
-        model.optimize()  # back to row j's own LP for the caller (debug info, basis shortcut)
+        model.optimize()  # back to row j's own LP for the caller's debug info (collect_info)
     if verdict is True:
         others = [int(work_to_orig[int(ineq_rows[jj])]) for jj in partners]
         raise NonGenericArrangementError(
@@ -1617,23 +1635,33 @@ def _certify_facet(
     return None
 
 
+def _read_lp_solution(z: Any, constrs: Any) -> tuple[np.ndarray, np.ndarray | None]:
+    """The SHI LP's point ``z.X`` (flat) and constraint basis ``CBasis`` (flat; None if unavailable).
+
+    Read once per row: each attribute read goes through Gurobi's matrix API.
+    """
+    zv = np.asarray(z.X, dtype=np.float64).reshape(-1)
+    try:
+        cbasis: np.ndarray | None = np.asarray(constrs.CBasis).reshape(-1)
+    except Exception:  # noqa: BLE001 - no basis available
+        cbasis = None
+    return zv, cbasis
+
+
 def _certify_facet_from_model(
-    model: Model,
-    z: Any,
-    constrs: Any,
+    status: int,
+    zv: np.ndarray,
+    cbasis: np.ndarray | None,
     j: int,
     h_red: np.ndarray,
     err_red: np.ndarray,
     interior_point: Callable[[], np.ndarray],
 ) -> bool | None:
-    """Run :func:`_certify_facet` on the current solution of the SHI LP ``model``."""
-    zv = np.asarray(z.X, dtype=np.float64).reshape(-1)
-    tight: np.ndarray | None = None
-    if model.status == GRB.OPTIMAL:
-        try:
-            tight = np.flatnonzero(np.asarray(constrs.CBasis).reshape(-1) != 0)
-        except Exception:  # noqa: BLE001 - no basis available: no non-facet certificate
-            tight = None
+    """Run :func:`_certify_facet` on an SHI LP solution (from :func:`_read_lp_solution`).
+
+    The basis's tight rows feed the non-facet certificate only when the LP is optimal.
+    """
+    tight = np.flatnonzero(cbasis != 0) if status == GRB.OPTIMAL and cbasis is not None else None
     return _certify_facet(h_red, err_red, j, zv, tight, interior_point)
 
 
