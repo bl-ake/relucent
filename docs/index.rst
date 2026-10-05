@@ -32,6 +32,7 @@ Core capabilities include:
    exploration_verification
    topology
    configuration
+   migrating
 
 .. toctree::
    :maxdepth: 1

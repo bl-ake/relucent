@@ -8,12 +8,13 @@ Requirements
 ------------
 
 1. Install Python 3.11 or newer.
-2. Install PyTorch (see the `PyTorch install guide <https://pytorch.org/get-started/locally/>`_).
-3. Install relucent:
+2. Install relucent. The example below uses PyTorch, which is optional; the ``torch`` extra
+   installs it (see the `PyTorch install guide <https://pytorch.org/get-started/locally/>`_
+   for GPU builds):
 
 .. code-block:: bash
 
-   pip install relucent
+   pip install "relucent[torch]"   # or: pip install relucent
 
 First Run Example
 -----------------

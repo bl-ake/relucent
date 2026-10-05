@@ -13,7 +13,7 @@
 Relucent is a Python package for computing the polyhedra of ReLU networks! Its main features include:
 - Distributed calculation of the activation regions of ReLU networks via local search
 - Visualization of ReLU complexes in two or three dimensions with [Plotly](https://plotly.com/python/)
-- Automatic compatibility with existing [PyTorch](https://docs.pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html) networks
+- Conversion of [PyTorch](https://docs.pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html) networks built from `Linear`, `ReLU`, `Conv2d`, `AvgPool2d`, `Flatten` and `Dropout` layers, checked against the network's own forward pass
 - Computation of the complex's dual as a [NetworkX](https://networkx.org/documentation/stable/tutorial.html) Graph
 - Various calculations for individual activation regions, decision boundaries, and affine splines
 
@@ -73,15 +73,15 @@ Or, get the adjacency graph of top-dimensional cells in the complex with:
 print(cplx.dual_graph())
 ```
 
-You can view the full documentation for this library at https://bl-ake.github.io/relucent/
+You can view the full documentation for this library at https://bl-ake.github.io/relucent/. Upgrading from 0.9? See [Stability and migrating to 1.0](https://bl-ake.github.io/relucent/migrating.html).
 
 ## Obtaining a Gurobi License
-This package will work for most applications without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license). However, without one, Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:
+`pip install relucent` installs the [Gurobi Python library](https://pypi.org/project/gurobipy/), which works for most applications without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license). However, without one, Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:
 0. Create a fresh Python environment using a distribution of [Anaconda](https://mamba.readthedocs.io/en/latest/index.html).
-1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/) using `conda install -c gurobi gurobi`.
+1. Install the [Gurobi Python library](https://pypi.org/project/gurobipy/) using `conda install -c gurobi gurobi`, before installing relucent, so that pip uses this copy.
 2. [Obtain a Gurobi license](https://support.gurobi.com/hc/en-us/articles/360040541251-How-do-I-obtain-a-free-academic-license) (Note: a WLS license will limit the number of concurrent sessions across multiple devices, which can result in slowdowns when using this library on different machines simultaneously.)
 3. In your Conda environment, run `grbgetkey` followed by your license key
-4. Complete the remaining steps in [Getting Started](#getting-started)
+4. Install relucent and complete the remaining steps in [Getting Started](#getting-started)
 
 ## Citing this Package
 If you run into any problems or have any feature requests, please create an issue on the project's [Github](https://github.com/bl-ake/relucent). If you want to credit its use in your research, please cite our [paper](https://openreview.net/forum?id=TgLW2DiRDG).
