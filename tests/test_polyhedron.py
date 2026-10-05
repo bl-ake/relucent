@@ -139,7 +139,7 @@ class TestPolyhedronBoundedVertices:
         )
         p = Polyhedron(net, np.array([[0]], dtype=np.int8))
 
-        verts = p.get_bounded_vertices(bound=1.0)
+        verts = p.bounded_vertices(bound=1.0)
         assert verts is not None
         assert verts.shape[1] == 2
         assert np.allclose(verts[:, 0], 0.0, atol=1e-6)
@@ -157,7 +157,7 @@ class TestPolyhedronBoundedVertices:
         )
         p = Polyhedron(net, np.array([[0, 0]], dtype=np.int8))
 
-        verts = p.get_bounded_vertices(bound=1.0)
+        verts = p.bounded_vertices(bound=1.0)
         assert verts is not None
         assert verts.shape == (1, 2)
         assert np.allclose(verts[0], np.array([0.0, 0.0]), atol=1e-6)

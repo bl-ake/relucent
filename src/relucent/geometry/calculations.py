@@ -27,8 +27,8 @@ __all__ = [
     "adjacent_polyhedra",
     "certified_bounded",
     "compute_properties",
-    "get_hs",
-    "get_shis",
+    "halfspaces",
+    "shis",
     "solve_radius",
 ]
 
@@ -152,7 +152,7 @@ def _drop_degenerate_halfspaces_tracked(
     kept_planes = kept[hyperplane[kept]]
     if cfg.CAREFUL_MODE and kept_planes.size > 1:
         # Look for fully identical rows (the same halfspace from two neurons). Same
-        # direction with a different bias is fine: get_shis keeps the tighter constraint.
+        # direction with a different bias is fine: shis() keeps the tighter constraint.
         # Only rows equal up to a positive scale, within float64 error (unit-normalised
         # rows closer than the sum of their relative errors), silently break SHI detection.
         pairs = [
@@ -676,30 +676,30 @@ def adjacent_polyhedra(
 
 
 @overload
-def get_hs(
+def halfspaces(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[False] = False,
+    per_layer: Literal[False] = False,
     force_numpy: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 @overload
-def get_hs(
+def halfspaces(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[True],
+    per_layer: Literal[True],
     force_numpy: bool = False,
 ) -> list[dict[str, object]]: ...
 
 
-def get_hs(
+def halfspaces(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: bool = False,
+    per_layer: bool = False,
     force_numpy: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, object]]:
     """Halfspace representation of ``poly`` from all neurons in the network.
@@ -709,42 +709,42 @@ def get_hs(
     Args:
         poly: "Polyhedron" whose sign sequence defines the region.
         data: Optional network input for verifying intermediate affine maps.
-        get_all_Ab: If True, return per-layer ``A``, ``b`` instead of final halfspaces.
+        per_layer: If True, return per-layer ``A``, ``b`` instead of final halfspaces.
         force_numpy: If True, use the NumPy path even when ``ss`` is a tensor.
 
     Returns:
-        If ``get_all_Ab`` is False: ``(halfspaces, W, b)``.
+        If ``per_layer`` is False: ``(halfspaces, W, b)``.
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
     if TORCH_AVAILABLE and isinstance(poly._ss, torch.Tensor) and not force_numpy:
-        return _get_hs_torch(poly, data, get_all_Ab=get_all_Ab)
-    return _get_hs_numpy(poly, data, get_all_Ab=get_all_Ab)
+        return _halfspaces_torch(poly, data, per_layer=per_layer)
+    return _halfspaces_numpy(poly, data, per_layer=per_layer)
 
 
 @overload
-def _get_hs_torch(
+def _halfspaces_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[False] = False,
+    per_layer: Literal[False] = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]: ...
 
 
 @overload
-def _get_hs_torch(
+def _halfspaces_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[True],
+    per_layer: Literal[True],
 ) -> list[dict[str, object]]: ...
 
 
 @torch.no_grad()
-def _get_hs_torch(
+def _halfspaces_torch(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: bool = False,
+    per_layer: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor] | list[dict[str, object]]:
     assert isinstance(poly._ss, torch.Tensor)
     constr_A, constr_b = None, None
@@ -817,7 +817,7 @@ def _get_hs_torch(
                 # Both sides round; |W| composed with every unit on bounds either one's error.
                 bound = 4.0 * _rounding().gamma(_rounding().composition_terms(poly._net)) * (data.abs() @ abs_A + abs_b)
                 assert bool((torch.as_tensor(outs[name]) - ((data @ current_A) + current_b)).abs().le(bound).all())
-        if get_all_Ab:
+        if per_layer:
             assert current_A is not None
             assert current_b is not None
 
@@ -828,7 +828,7 @@ def _get_hs_torch(
 
     halfspaces = torch.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
 
-    if get_all_Ab:
+    if per_layer:
         return all_Ab
 
     assert isinstance(halfspaces, torch.Tensor)
@@ -840,29 +840,29 @@ def _get_hs_torch(
 
 
 @overload
-def _get_hs_numpy(
+def _halfspaces_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[False] = False,
+    per_layer: Literal[False] = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]: ...
 
 
 @overload
-def _get_hs_numpy(
+def _halfspaces_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: Literal[True],
+    per_layer: Literal[True],
 ) -> list[dict[str, object]]: ...
 
 
 @torch.no_grad()
-def _get_hs_numpy(
+def _halfspaces_numpy(
     poly: "Polyhedron",
     data: torch.Tensor | None = None,
     *,
-    get_all_Ab: bool = False,
+    per_layer: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | list[dict[str, object]]:
     constr_A, constr_b = None, None
     current_A, current_b = None, None
@@ -937,7 +937,7 @@ def _get_hs_numpy(
                 data_np = np.asarray(data)
                 bound = 4.0 * _rounding().gamma(_rounding().composition_terms(poly._net)) * (np.abs(data_np) @ abs_A + abs_b)
                 assert bool(np.all(np.abs(expected - ((data_np @ current_A) + current_b)) <= bound))
-        if get_all_Ab:
+        if per_layer:
             assert current_A is not None
             assert current_b is not None
 
@@ -947,7 +947,7 @@ def _get_hs_numpy(
     assert constr_b is not None
 
     halfspaces = np.hstack((-constr_A.T, -constr_b.reshape(-1, 1)))
-    if get_all_Ab:
+    if per_layer:
         return all_Ab
     assert isinstance(halfspaces, np.ndarray)
     assert isinstance(current_A, np.ndarray)
@@ -958,7 +958,7 @@ def _get_hs_numpy(
 
 
 def shis_are_certified(shis_kwargs: Mapping[str, Any]) -> bool:
-    """Whether ``get_shis(poly, **shis_kwargs)`` returns ``poly``'s complete, certified facet list.
+    """Whether ``shis(poly, **shis_kwargs)`` returns ``poly``'s complete, certified facet list.
 
     Every facet decision is certified, so the answer is the cell's facet list (and recomputing it
     is redundant) unless ``subset`` restricts the candidates or ``escalate_bound=False`` makes
@@ -968,7 +968,7 @@ def shis_are_certified(shis_kwargs: Mapping[str, Any]) -> bool:
 
 
 @overload
-def get_shis(
+def shis(
     poly: "Polyhedron",
     collect_info: Literal[False] = False,
     bound: float = GRB.INFINITY,
@@ -981,7 +981,7 @@ def get_shis(
 
 
 @overload
-def get_shis(
+def shis(
     poly: "Polyhedron",
     collect_info: Literal[True] | Literal["All"],
     bound: float = GRB.INFINITY,
@@ -993,7 +993,7 @@ def get_shis(
 ) -> tuple[list[int], list[dict[str, object]]]: ...
 
 
-def get_shis(
+def shis(
     poly: "Polyhedron",
     collect_info: bool | str = False,
     bound: float = GRB.INFINITY,
@@ -1357,7 +1357,7 @@ def get_shis(
 
 # ScaleFlag values tried in turn, each from scratch, when a SHI LP fails. In a census of real cells,
 # re-solving with no scaling (0) recovered every failure that any ScaleFlag recovered; the rest
-# need the exact decision in get_shis (docs/search_shi_and_graphs.rst, "LP solver failures").
+# need the exact decision in shis() (docs/search_shi_and_graphs.rst, "LP solver failures").
 _SHI_LP_RETRY_SCALE_FLAGS: tuple[int, ...] = (0,)
 
 

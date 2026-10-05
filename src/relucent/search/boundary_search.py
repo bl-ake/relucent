@@ -17,7 +17,8 @@ from relucent._internal.parallel import BlockingQueue, get_mp_context, process_a
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
-from relucent.geometry.calculations import get_shis, shis_are_certified
+from relucent.geometry import calculations
+from relucent.geometry.calculations import shis_are_certified
 from relucent.graph.incidence import ss_nonzero_indices
 from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.search.engine import (
@@ -217,7 +218,7 @@ def boundary_searcher(
         geometry_properties: Optional geometry caches (default topology-only).
         verify: When True (default), require complete exploration. Certification runs
             later in :func:`~relucent.search.exploration.finalize_boundary_complex`.
-        **kwargs: Forwarded to :func:`~relucent.geometry.calculations.get_shis`.
+        **kwargs: Forwarded to :func:`~relucent.geometry.calculations.shis`.
 
     Returns:
         :class:`~relucent.search.exploration.SearchResult`. ``verified`` is ``None`` (or
@@ -260,7 +261,7 @@ def boundary_searcher(
     start = cx.add_polyhedron(start, check_exists=False)
     certified = shis_are_certified(shis_kwargs)
     try:
-        result = get_shis(start, bound=bound, **shis_kwargs)
+        result = calculations.shis(start, bound=bound, **shis_kwargs)
     except ValueError as exc:
         if "Initial Solve Failed" not in str(exc):
             raise

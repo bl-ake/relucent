@@ -69,9 +69,9 @@ def composition_terms(net: ReLUNetwork) -> int:
 
 
 def halfspaces_error_for_ss(net: ReLUNetwork, ss: np.ndarray) -> np.ndarray:
-    """Error-scale matrix for the rows :func:`relucent.geometry.calculations.get_hs` builds for ``ss``.
+    """Error-scale matrix for the rows :func:`relucent.geometry.calculations.halfspaces` builds for ``ss``.
 
-    Mirrors ``_get_hs_numpy`` exactly, with ``|W|`` and ``|b|`` in place of ``W`` and ``b``:
+    Mirrors ``_halfspaces_numpy`` exactly, with ``|W|`` and ``|b|`` in place of ``W`` and ``b``:
     a sign-sequence entry of 0 keeps the unit's row but switches it off downstream, as there.
     """
     from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer

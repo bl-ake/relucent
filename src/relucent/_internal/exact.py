@@ -95,9 +95,9 @@ def _dot(u: list[Fraction], v: list[Fraction]) -> Fraction:
 
 
 def exact_rows_for_ss(net: ReLUNetwork, ss: np.ndarray) -> list[Row]:
-    """The exact halfspace rows ``[a | b]`` that ``get_hs`` computes in float64 for ``ss``.
+    """The exact halfspace rows ``[a | b]`` that ``calculations.halfspaces`` computes in float64 for ``ss``.
 
-    Mirrors ``relucent.geometry.calculations._get_hs_numpy``: a 0 entry keeps its unit's row
+    Mirrors ``relucent.geometry.calculations._halfspaces_numpy``: a 0 entry keeps its unit's row
     (with sign +1) but switches the unit off downstream.
     """
     from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer

@@ -132,7 +132,7 @@ def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
     net = torch_mlp(widths=[2, 4, 1])
     cplx = Complex(net)
     p = cplx.add_point(np.zeros((1, 2)))
-    p.get_geometry(["halfspaces", "W", "b", "interior_point"])
+    p.compute_geometric_properties(["halfspaces", "W", "b", "interior_point"])
 
     retain_geometry_caches(p, ["halfspaces", "W", "b"])
     assert p._halfspaces is not None

@@ -40,7 +40,7 @@ def test_discover_boundary_complex_mlp_small(seeded: int, integration_nworkers: 
         )
     except ValueError as exc:
         if "Initial Solve Failed" in str(exc):
-            pytest.skip(f"boundary witness infeasible for get_shis at seed {seeded}: {exc}")
+            pytest.skip(f"boundary witness infeasible for calculations.shis at seed {seeded}: {exc}")
         raise
     assert stats["n_components"] >= 1
     assert len(new) > 0

@@ -62,7 +62,7 @@ def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
 
 def bounded_plot_geometry(poly: Polyhedron, bound: float) -> tuple[str, np.ndarray] | None:
     """Classify bounded 2D geometry for plotting as polygon, segment, or point."""
-    vertices = poly.get_bounded_vertices(bound)
+    vertices = poly.bounded_vertices(bound)
     if vertices is None or vertices.size == 0:
         return None
     if vertices.shape[1] != 2:
@@ -126,7 +126,7 @@ def _poly_traces_3d_complex(
     outline_width = float(base_kwargs.pop("outline_width", 0.0))
     show_outline = outline_width > 0
     traces: list[go.Mesh3d | go.Scatter3d] = []
-    vertices = poly.get_bounded_vertices(bound)
+    vertices = poly.bounded_vertices(bound)
     if vertices is None or vertices.size == 0 or vertices.shape[1] != 3:
         return traces
 
@@ -629,10 +629,10 @@ def _poly_hover_text(poly: object) -> str:
         except Exception:
             shis = None
     if shis is None:
-        get_shis = getattr(poly, "shis", None)
-        if callable(get_shis):
+        shis_attr = getattr(poly, "shis", None)
+        if callable(shis_attr):
             try:
-                shis = list(cast(Iterable[int], get_shis()))
+                shis = list(cast(Iterable[int], shis_attr()))
             except Exception:
                 shis = None
     if shis:
@@ -690,21 +690,21 @@ def _boundary_label(poly: Polyhedron, top_complex: Complex) -> str:
 def _poly_intersects_plot_bound(poly: object, bound: float) -> bool:
     """True if ``poly`` intersects the axis-aligned bounding hypercube of half-width ``bound``.
 
-    Matches the feasibility check used before ``get_bounded_vertices`` / cell plotting: polyhedra
+    Matches the feasibility check used before ``bounded_vertices`` / cell plotting: polyhedra
     that miss the box entirely are excluded from the success threshold denominator.
 
-    Uses :meth:`~relucent.core.poly.Polyhedron.get_bounded_halfspaces` when available (cheap feasibility
-    only). Otherwise falls back to :meth:`~relucent.core.poly.Polyhedron.get_bounded_vertices` so test
+    Uses :meth:`~relucent.core.poly.Polyhedron.bounded_halfspaces` when available (cheap feasibility
+    only). Otherwise falls back to :meth:`~relucent.core.poly.Polyhedron.bounded_vertices` so test
     doubles and stubs without halfspace helpers still work.
     """
-    get_hs = getattr(poly, "get_bounded_halfspaces", None)
-    if callable(get_hs):
+    bounded_hs = getattr(poly, "bounded_halfspaces", None)
+    if callable(bounded_hs):
         try:
-            get_hs(bound)
+            bounded_hs(bound)
             return True
         except ValueError:
             return False
-    get_verts = getattr(poly, "get_bounded_vertices", None)
+    get_verts = getattr(poly, "bounded_vertices", None)
     if callable(get_verts):
         verts = get_verts(bound)
         return verts is not None and getattr(verts, "size", 0) > 0

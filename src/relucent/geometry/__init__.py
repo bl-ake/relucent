@@ -1,17 +1,19 @@
-"""Polyhedron geometry: halfspaces, SHIs, and Qhull routines."""
+"""Polyhedron geometry: halfspaces, SHIs, boundedness, and Qhull routines."""
 
 from .calculations import (
     adjacent_polyhedra,
+    certified_bounded,
     compute_properties,
-    get_hs,
-    get_shis,
+    halfspaces,
+    shis,
     solve_radius,
 )
 
 __all__ = [
     "adjacent_polyhedra",
+    "certified_bounded",
     "compute_properties",
-    "get_hs",
-    "get_shis",
+    "halfspaces",
+    "shis",
     "solve_radius",
 ]

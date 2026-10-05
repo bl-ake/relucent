@@ -58,7 +58,7 @@ class TestOneCellsInAmbient1D:
         assert p.inradius is not None
         assert np.isclose(p.inradius, 0.5, atol=1e-7)
 
-        verts = p.get_bounded_vertices(bound=2.0)
+        verts = p.bounded_vertices(bound=2.0)
         assert verts is not None
         verts = _sorted_rows(np.unique(verts, axis=0))
         assert verts.shape == (2, 1)
@@ -78,12 +78,12 @@ class TestOneCellsInAmbient1D:
         for f in faces:
             assert f.ambient_dim == 1
             assert f.dim == 0
-            fv = f.get_bounded_vertices(bound=2.0)
+            fv = f.bounded_vertices(bound=2.0)
             assert fv is not None
             assert fv.shape == (1, 1)
         endpoints_list: list[np.ndarray] = []
         for f in faces:
-            fv = f.get_bounded_vertices(bound=2.0)
+            fv = f.bounded_vertices(bound=2.0)
             if fv is not None:
                 endpoints_list.append(fv)
         endpoints = _sorted_rows(np.vstack(endpoints_list))
@@ -98,7 +98,7 @@ class TestOneCellsEmbeddedInHigherDimensions:
         #   -x <= 0  (x >= 0)
         #    x - 1 <= 0 (x <= 1)
         # Equality (sign=0 row):
-        #    y <= 0 treated as y == 0 by zero_indices in solve_radius / get_bounded_vertices.
+        #    y <= 0 treated as y == 0 by zero_indices in solve_radius / bounded_vertices.
         halfspaces = np.array(
             [
                 [-1.0, 0.0, 0.0],
@@ -118,7 +118,7 @@ class TestOneCellsEmbeddedInHigherDimensions:
         assert p.inradius is not None
         assert np.isclose(p.inradius, 0.5, atol=1e-7)
 
-        verts = p.get_bounded_vertices(bound=2.0)
+        verts = p.bounded_vertices(bound=2.0)
         assert verts is not None
         verts = _sorted_rows(np.unique(verts, axis=0))
         assert verts.shape == (2, 2)
@@ -134,7 +134,7 @@ class TestOneCellsEmbeddedInHigherDimensions:
         for f in faces:
             assert f.ambient_dim == 2
             assert f.dim == 0
-            fv = f.get_bounded_vertices(bound=2.0)
+            fv = f.bounded_vertices(bound=2.0)
             assert fv is not None
             assert fv.shape == (1, 2)
             endpoints.append(fv[0])
@@ -144,7 +144,7 @@ class TestOneCellsEmbeddedInHigherDimensions:
     def test_bounded_clip_remaps_zero_indices_past_degenerate_row(self):
         """Degenerate row before an equality must not shift zero_indices onto a box face.
 
-        ``get_bounded_halfspaces`` drops near-zero normals then calls ``solve_radius``
+        ``bounded_halfspaces`` drops near-zero normals then calls ``solve_radius``
         with equality indices. If those indices are not remapped, they can point at a
         newly stacked bounding-box row (e.g. ``x = ±bound``), falsely marking a cell
         that clearly intersects the plot box as empty. This showed up when plotting
@@ -161,9 +161,9 @@ class TestOneCellsEmbeddedInHigherDimensions:
         p = _poly_from_halfspaces(halfspaces=halfspaces, zero_rows={3})
         assert list(p.zero_indices) == [3]
 
-        bounded = p.get_bounded_halfspaces(bound=2.0)
+        bounded = p.bounded_halfspaces(bound=2.0)
         assert bounded.shape[0] >= 4  # inequalities + box; degenerate removed
-        verts = p.get_bounded_vertices(bound=2.0)
+        verts = p.bounded_vertices(bound=2.0)
         assert verts is not None
         verts = _sorted_rows(np.unique(verts, axis=0))
         assert verts.shape == (2, 2)
@@ -191,7 +191,7 @@ class TestOneCellsEmbeddedInHigherDimensions:
         assert p.inradius is not None
         assert np.isclose(p.inradius, 0.5, atol=1e-7)
 
-        verts = p.get_bounded_vertices(bound=2.0)
+        verts = p.bounded_vertices(bound=2.0)
         assert verts is not None
         verts = _sorted_rows(np.unique(verts, axis=0))
         assert verts.shape == (2, 3)
@@ -217,7 +217,7 @@ def test_finite_true_without_chebyshev_cache_interior_and_center():
     assert p._center is None
     ip = np.asarray(p.interior_point).reshape(-1)
     assert np.allclose(ip, np.array([0.5]), atol=1e-6)
-    assert np.allclose(p.get_interior_point().reshape(-1), np.array([0.5]), atol=1e-6)
+    assert np.allclose(p.find_interior_point().reshape(-1), np.array([0.5]), atol=1e-6)
     assert p.center is not None
     assert p.inradius is not None
     assert np.isclose(float(p.inradius), 0.5, atol=1e-6)

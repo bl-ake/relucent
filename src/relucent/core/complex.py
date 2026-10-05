@@ -582,7 +582,7 @@ class Complex:
                 :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`
                 and related geometry helpers.
 
         Returns:
@@ -660,7 +660,7 @@ class Complex:
                 reuses them after dual-graph sync.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
         Returns:
             A :class:`~relucent.search.exploration.SearchResult`.
@@ -872,7 +872,7 @@ class Complex:
                 Defaults to infinity.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
+            **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
         Returns:
             dict[str, Any]: Dictionary containing the path (if found) and

@@ -29,7 +29,7 @@ If you then run a command like ``cplx.compute_geometric_properties(properties=["
 have to recompute the h-representation / affine map for each region, which can be slow.
 
 Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` to compute every property supported by
-:meth:`~relucent.core.poly.Polyhedron.get_geometry` (including Qhull-derived
+:meth:`~relucent.core.poly.Polyhedron.compute_geometric_properties` (including Qhull-derived
 ``vertices``, ``volume``).
 
 Any property listed in ``geometry_properties`` is retained on each polyhedron after the search is complete.

@@ -8,7 +8,7 @@
 - ``COMPLETE``: also checks LP flip-neighbor completeness on a fully explored
   ambient complex (every geometric facet has a neighbor in the complex).
 - ``GEOMETRIC``: also recomputes, with a fresh LP, every cached ``_shis`` that
-  ``get_shis`` didn't compute on its cell.
+  ``calculations.shis`` didn't compute on its cell.
 
 Chain-complex and meta-graph building only need ``COMBINATORIAL``; the other two
 are optional checks for search and geometry.
@@ -103,7 +103,7 @@ def certify_complex(
         IncompleteDualGraphError: ``level >= COMPLETE`` and a geometric facet has
             no same-dimension neighbor in the complex.
         ShiProofError: ``level == GEOMETRIC`` and a cached ``_shis`` list not computed by
-            ``get_shis`` on its cell does not match a fresh LP recompute.
+            ``calculations.shis`` on its cell does not match a fresh LP recompute.
     """
     del verbose  # applied by @with_verbosity
     if len(cplx) == 0:
@@ -166,7 +166,10 @@ def _iter_top_dim_polys(cplx: Complex, top_dim: int) -> Iterable[Polyhedron]:
 
 
 def _poly_has_strict_cached_shis(poly: Polyhedron) -> bool:
-    """Whether ``poly._shis`` is this cell's certified facet list (:func:`get_shis` on it), so needs no recompute."""
+    """Whether ``poly._shis`` is this cell's certified facet list, so needs no recompute.
+
+    That is, :func:`~relucent.geometry.calculations.shis` computed it on this cell.
+    """
     return poly._shis is not None and bool(getattr(poly, "_shis_strict", False))
 
 
@@ -177,10 +180,10 @@ def _verify_lp_neighbors_for_poly(
     bound: float,
 ) -> tuple[str | None, list[str]]:
     """Return a per-poly SHI recompute error or missing-neighbor diagnostics."""
-    from relucent.geometry.calculations import get_shis
+    from relucent.geometry import calculations
 
     try:
-        lp_shis = get_shis(poly, bound=float(bound))
+        lp_shis = calculations.shis(poly, bound=float(bound))
     except ValueError as exc:
         return str(exc), []
     return None, _missing_lp_neighbors_for_shis(poly, shis=lp_shis, top_tags=top_tags)
@@ -328,11 +331,11 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
 def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None:
     """Recompute SHIs and require the cached list to match.
 
-    A cached list that :func:`get_shis` computed on this cell (``_shis_strict``) is already its
+    A cached list that :func:`~relucent.geometry.calculations.shis` computed on this cell (``_shis_strict``) is already its
     certified facet list, so only lists assigned some other way (propagated from the dual graph or
     a coface) are recomputed.
     """
-    from relucent.geometry.calculations import get_shis
+    from relucent.geometry import calculations
 
     if poly._shis is None:
         raise ShiProofError(f"Polyhedron {poly!r} has no cached _shis.")
@@ -346,7 +349,7 @@ def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None
         if poly._net is None:
             raise ShiProofError(f"Polyhedron {poly!r} has no network for bound estimation.")
         bound = default_polyhedron_bound(poly._net)
-    fresh = get_shis(poly, bound=float(bound))
+    fresh = calculations.shis(poly, bound=float(bound))
     if set(fresh) != set(poly._shis):
         raise ShiProofError(f"Cached _shis {sorted(poly._shis)} != recomputed {sorted(fresh)} on {poly!r}.")
 

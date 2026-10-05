@@ -21,7 +21,7 @@ def _shared_face_empty(u: Polyhedron, shi: int) -> bool:
     ss.ravel()[int(shi)] = 0
     face = Polyhedron(u._net, ss, halfspaces=u.halfspaces)
     try:
-        center, inradius = face.get_center_inradius()
+        center, inradius = face._chebyshev_ball()
     except ValueError as exc:
         return str(exc).startswith("Inradius ")
     return center is None and inradius is None

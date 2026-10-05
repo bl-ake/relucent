@@ -11,7 +11,7 @@ from relucent import Complex, Polyhedron, set_seeds, torch_mlp
 from relucent._internal.gurobi import get_env
 from relucent.core.errors import NonGenericArrangementError
 from relucent.core.ss import encode_ss
-from relucent.geometry.calculations import get_shis
+from relucent.geometry import calculations
 from relucent.graph import meta_graph as mg
 from relucent.graph.incidence import (
     classify_one_cells_finite_from_face_edges,
@@ -554,13 +554,13 @@ def _cells_from_dual_graph_propagation(cplx: Complex) -> dict[bytes, Polyhedron]
 
 
 def _lp_shis(poly: Polyhedron, env) -> list[int] | None:
-    """Supporting hyperplane indices from a fresh ``get_shis`` LP solve."""
+    """Supporting hyperplane indices from a fresh ``calculations.shis`` LP solve."""
     poly._shis = None
     kwargs: dict[str, Any] = {"env": env}
     if poly.bound is not None:
         kwargs["bound"] = float(poly.bound)
     try:
-        return sorted(int(s) for s in get_shis(poly, **kwargs))
+        return sorted(int(s) for s in calculations.shis(poly, **kwargs))
     except ValueError:
         return None
 
@@ -747,7 +747,7 @@ def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeyp
     def _raise_inradius() -> tuple[None, None]:
         raise ValueError("Inradius -8.7393e-07")
 
-    monkeypatch.setattr(seg, "get_center_inradius", _raise_inradius)
+    monkeypatch.setattr(seg, "_chebyshev_ball", _raise_inradius)
 
     by_dim = {1: [seg]}
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}

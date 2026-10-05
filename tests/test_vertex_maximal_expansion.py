@@ -95,7 +95,7 @@ def test_contract_vertices_expand_to_maximal_cells(
         assert len(maximal) == expected_per_vertex
         for ss in maximal:
             poly = cplx.ss2poly(np.asarray(ss, dtype=np.int8).reshape(1, -1), check_exists=False)
-            poly.get_interior_point()
+            poly.find_interior_point()
             expanded.add(ss)
 
     assert expanded == top_cells
@@ -125,5 +125,5 @@ def test_tolerance_sweep_does_not_revive_encoding_phantom() -> None:
                 cplx.ss2poly(
                     np.asarray(phantom, dtype=np.int8).reshape(1, -1),
                     check_exists=False,
-                ).get_interior_point()
+                ).find_interior_point()
     update_settings(**defaults)

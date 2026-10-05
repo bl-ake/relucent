@@ -18,7 +18,7 @@ if str(_RELUCENT_ROOT) not in sys.path:
 import numpy as np  # noqa: E402
 
 from relucent.core.poly import Polyhedron  # noqa: E402
-from relucent.geometry.calculations import get_shis  # noqa: E402
+from relucent.geometry import calculations  # noqa: E402
 from tests.integration.helpers import (  # noqa: E402
     boundary_shi_for_spec,
     default_bound,
@@ -56,12 +56,12 @@ def main() -> None:
         ss_pos.ravel()[shi] = 1
         ppos = ambient[ss_pos]
         for escalate in (False, True):
-            sh_large = get_shis(
+            sh_large = calculations.shis(
                 Polyhedron(model, ppos.ss_np, bound=_LARGE_BOUND),
                 bound=_LARGE_BOUND,
                 escalate_bound=escalate,
             )
-            sh_net = get_shis(
+            sh_net = calculations.shis(
                 Polyhedron(model, ppos.ss_np, bound=net_bound),
                 bound=net_bound,
                 escalate_bound=escalate,

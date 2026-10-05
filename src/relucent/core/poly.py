@@ -16,14 +16,13 @@ from relucent._internal.gurobi import get_env
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError
 from relucent.core.ss import encode_ss, flip_ss_at_shi
+from relucent.geometry import calculations
 from relucent.geometry.calculations import (
     DegenerateHalfspaceInfeasibility,
     _affine_null_basis,
     _drop_degenerate_halfspaces_tracked,
     _remap_zero_indices,
     compute_properties,
-    get_hs,
-    get_shis,
     solve_radius,
 )
 from relucent.model.model import ReLUNetwork
@@ -116,7 +115,7 @@ class Polyhedron:
         self.bound = bound
 
         self._shis: list[int] | None = shis
-        # Whether ``_shis`` is this cell's certified facet list (get_shis on it), as opposed to a
+        # Whether ``_shis`` is this cell's certified facet list (``calculations.shis`` on it), as opposed to a
         # list assigned from the dual graph or a coface; certification recomputes only the latter.
         self._shis_strict: bool = shis_strict
         self._halfspace_intersection: HalfspaceIntersection | None = None
@@ -144,7 +143,7 @@ class Polyhedron:
     def _get_cached_halfspaces_np(self) -> np.ndarray | None:
         """Return the cached halfspace matrix as a NumPy array without triggering lazy computation.
 
-        Unlike :attr:`halfspaces_np`, this method does not call :func:`get_hs` if the
+        Unlike :attr:`halfspaces_np`, this method does not call :func:`~relucent.geometry.calculations.halfspaces` if the
         halfspace matrix has not yet been computed.  Returns ``None`` when halfspaces are
         unavailable, so callers can skip optional checks without paying the cost of a
         Gurobi LP.
@@ -440,7 +439,7 @@ class Polyhedron:
         """Rows of ``halfspaces_np`` for the zero sign-sequence entries (the hyperplanes this cell lies on)."""
         return self.halfspaces_np[self.zero_indices]
 
-    def get_interior_point(
+    def find_interior_point(
         self,
         env: Any = None,
         max_radius: float | None = None,
@@ -489,7 +488,7 @@ class Polyhedron:
             raise ValueError("Interior point not found. Check that the polyhedron is feasible and MAX_RADIUS is large enough.")
         return interior_point
 
-    def get_center_inradius(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
+    def _chebyshev_ball(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
         """Get the Chebyshev center and inradius of the polyhedron.
 
         This method is "compute-only": it returns (center, inradius) but does
@@ -562,7 +561,7 @@ class Polyhedron:
             raise ValueError("Bounding box constraints are not feasible")
         return halfspaces, zero_indices, errors
 
-    def get_bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
+    def bounded_halfspaces(self, bound: float, env: Any = None) -> np.ndarray:
         """Get halfspaces after adding bounding box constraints.
 
         Adds constraints that bound the space to a hypercube of radius ``bound``
@@ -603,8 +602,8 @@ class Polyhedron:
             "bound": self.bound,
         }
 
-    def get_neighbor(self, shi: int) -> "Polyhedron":
-        """Get the neighbor polyhedron across the supporting hyperplane at index shi.
+    def neighbor(self, shi: int) -> "Polyhedron":
+        """The neighbor polyhedron across the supporting hyperplane at index shi.
 
         Args:
             shi: Index of the supporting hyperplane to cross.
@@ -622,17 +621,21 @@ class Polyhedron:
             return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss)
 
-    def get_face(self, shi: int) -> "Polyhedron":
-        """Get the face of the polyhedron across the supporting hyperplane at index shi.
+    def face(self, shis: int | Iterable[int]) -> "Polyhedron":
+        """The face where the supporting hyperplane(s) ``shis`` hold with equality.
+
+        One index gives a facet; several give a higher-codimension face. This is a purely
+        combinatorial operation on the sign sequence (``ss[shi] = 0`` for each index).
 
         Args:
-            shi: Index of the supporting hyperplane to cross.
+            shis: Index, or indices, of the supporting hyperplanes to zero.
 
         Returns:
             Polyhedron: The face polyhedron.
         """
         ss = self.ss_np.copy()
-        ss[shi] = 0
+        for shi in [shis] if isinstance(shis, (int, np.integer)) else shis:
+            ss[int(shi)] = 0
         # Don't reuse cached geometry (halfspaces/W/b/shis) from the parent: zeroing a sign
         # changes which constraints are active, and stale caches can give an inconsistent
         # complex (and wrong Betti numbers).
@@ -644,24 +647,10 @@ class Polyhedron:
             return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss, bound=self.bound)
 
-    def get_face_by_shis(self, shis: Iterable[int]) -> "Polyhedron":
-        """Get a (possibly higher-codimension) face by zeroing multiple SHIs.
-
-        This is a purely combinatorial operation on the sign sequence: for each
-        ``shi`` in ``shis``, we set ``ss[shi] = 0`` and construct the resulting
-        Polyhedron. No cached geometry is reused (same rationale as :meth:`get_face`).
-        """
-        ss = self.ss_np.copy()
-        for shi in shis:
-            ss[int(shi)] = 0
-        if self._net is None and self._halfspaces is not None:
-            return Polyhedron(None, ss, **self._same_rows_kwargs())
-        return Polyhedron(self._net, ss, bound=self.bound)
-
     @property
     def faces(self) -> list["Polyhedron"]:
         """All codimension-1 faces of the polyhedron."""
-        return [self.get_face(shi) for shi in self.shis]
+        return [self.face(shi) for shi in self.shis]
 
     def nflips(self, other: "Polyhedron") -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
@@ -690,7 +679,7 @@ class Polyhedron:
             return bool(eq.all())
         return bool(cast(torch.Tensor, eq).all())
 
-    def get_bounded_vertices(self, bound: float, qhull_mode: str | None = None) -> np.ndarray | None:
+    def bounded_vertices(self, bound: float, qhull_mode: str | None = None) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
 
         Computes the vertices of the polyhedron after intersecting it with a
@@ -865,7 +854,7 @@ class Polyhedron:
             kwargs = {k: v for k, v in kwargs.items() if k not in _POLY_CELLS_3D_EXCLUDE}
         return plot_polyhedron(self, plot_mode=plot_mode, **kwargs)
 
-    def get_geometry(
+    def compute_geometric_properties(
         self,
         properties: Iterable[str],
         env: Any = None,
@@ -901,7 +890,7 @@ class Polyhedron:
         if "inradius" in requested:
             _ = self.inradius
         if "interior_point" in requested and self._interior_point is None:
-            self._interior_point = self.get_interior_point(env=env)
+            self._interior_point = self.find_interior_point(env=env)
         if "interior_point_norm" in requested:
             if self.interior_point is not None:
                 self._interior_point_norm = np.linalg.norm(self.interior_point).item()
@@ -917,8 +906,8 @@ class Polyhedron:
         compute_properties(self, qhull_mode=qhull_mode)
 
     def _ensure_affine_data(self, *, force_numpy: bool = False) -> None:
-        """Populate halfspace and affine-map caches via :func:`~relucent.geometry.calculations.get_hs`."""
-        halfspaces, w, b = get_hs(self, force_numpy=force_numpy)
+        """Populate halfspace and affine-map caches via :func:`~relucent.geometry.calculations.halfspaces`."""
+        halfspaces, w, b = calculations.halfspaces(self, force_numpy=force_numpy)
         self._halfspaces = halfspaces
         self._w = w
         self._b = b
@@ -1014,7 +1003,7 @@ class Polyhedron:
                 # Rows cached without their error scale (pickled before scales were tracked).
                 # They may be a coface's, so only use this cell's own scale if they match.
                 try:
-                    own, *_ = get_hs(Polyhedron(self._net, self.ss_np), force_numpy=True)
+                    own, *_ = calculations.halfspaces(Polyhedron(self._net, self.ss_np), force_numpy=True)
                 except AssertionError:
                     own = None
                 own_np = None if own is None else own if isinstance(own, np.ndarray) else own.detach().cpu().numpy()
@@ -1090,10 +1079,10 @@ class Polyhedron:
         return self._Wl2
 
     def _ensure_chebyshev(self, env: Any = None) -> None:
-        """Run the Chebyshev LP once, caching ``_center`` and ``_inradius`` (see :meth:`get_center_inradius`)."""
+        """Run the Chebyshev LP once, caching ``_center`` and ``_inradius`` (see :meth:`_chebyshev_ball`)."""
         if self._chebyshev_done:
             return
-        center, inradius = self.get_center_inradius(env=env)
+        center, inradius = self._chebyshev_ball(env=env)
         self._center = center
         self._inradius = inradius
         self._chebyshev_done = True
@@ -1178,7 +1167,7 @@ class Polyhedron:
                 bound = default_polyhedron_bound(self._net)
             elif bound is None:
                 bound = cfg.DEFAULT_SEARCH_BOUND
-            self._shis = get_shis(self, bound=float(bound))
+            self._shis = calculations.shis(self, bound=float(bound))
             self._shis_strict = True
         assert isinstance(self._shis, list)
         return self._shis
@@ -1192,7 +1181,7 @@ class Polyhedron:
     def interior_point(self) -> np.ndarray | None:
         """A point guaranteed to be inside the polyhedron."""
         if self._interior_point is None:
-            self._interior_point = self.get_interior_point()
+            self._interior_point = self.find_interior_point()
         return self._interior_point
 
     @property

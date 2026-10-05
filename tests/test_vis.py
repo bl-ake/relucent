@@ -52,10 +52,10 @@ def _poly_with_vertices(
     p._Wl2 = Wl2
 
     # Avoid heavy geometry computations by providing bounded vertices directly.
-    def _get_bounded_vertices(_self: Polyhedron, _bound: float) -> np.ndarray | None:
+    def _bounded_vertices(_self: Polyhedron, _bound: float) -> np.ndarray | None:
         return verts
 
-    p.get_bounded_vertices = MethodType(_get_bounded_vertices, p)
+    p.bounded_vertices = MethodType(_bounded_vertices, p)
     return p
 
 

@@ -39,9 +39,9 @@ crossed.
    * - Dual-graph edge ``shi``
      - Hyperplane shared by two adjacent top cells
 
-SHIs are computed by Gurobi LPs in :func:`~relucent.geometry.calculations.get_shis` and
+SHIs are computed by Gurobi LPs in :func:`~relucent.geometry.calculations.shis` and
 cached on ``Polyhedron._shis``. The public :attr:`~relucent.core.poly.Polyhedron.shis`
-property lazily calls ``get_shis()`` when the cache is empty.
+property lazily calls ``calculations.shis()`` when the cache is empty.
 
 How search works
 ----------------
@@ -80,7 +80,7 @@ Search loop
 
 ::
 
-   add_point(start) → get_shis(start) → seed frontier
+   add_point(start) → calculations.shis(start) → seed frontier
         ↓
    worker pool: search_calculations per (ss, crossed_shi, depth, parent)
         ↓
@@ -94,7 +94,7 @@ Search loop
    task per SHI: ``(neighbor_ss, crossed_shi, depth, parent_index)``.
 2. **Workers** — Each task builds a :class:`~relucent.core.poly.Polyhedron`, runs
    Chebyshev geometry (``finite``, ``center``, ``inradius``), then
-   ``get_shis()``. See :func:`~relucent.search.engine.search_calculations` and
+   ``calculations.shis()``. See :func:`~relucent.search.engine.search_calculations` and
    ``_worker_prepare_poly`` in :mod:`relucent.search`.
 3. **Main process** — On success, add the polyhedron and enqueue new neighbors
    for every SHI except the one just crossed. Failed flips are recorded so the
@@ -192,10 +192,10 @@ SHI assignment over the pipeline
 During search (frontier heuristic)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For each discovered cell, workers call ``get_shis()`` and store the result in
+For each discovered cell, workers call ``calculations.shis()`` and store the result in
 ``poly._shis``. This list drives which neighbors to enqueue.
 
-The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
+The LP algorithm (:func:`~relucent.geometry.calculations.shis`):
 
 1. Build halfspaces from the sign sequence; drop degenerate rows.
 2. Work in intrinsic coordinates (null-space of zero-sign equalities).
@@ -220,7 +220,7 @@ not a fact about the cell. On badly conditioned cells, where rows span orders of
 or are nearly parallel, Gurobi does report ``NUMERIC``, ``UNBOUNDED``, ``INFEASIBLE`` or
 ``INF_OR_UNBD`` for such LPs.
 
-When that happens, ``get_shis`` re-solves the LP once from scratch with no scaling
+When that happens, ``calculations.shis`` re-solves the LP once from scratch with no scaling
 (``ScaleFlag=0``), discarding the warm-start basis. The configured
 :data:`~relucent.config.advanced.GUROBI_SHI_SCALE_FLAG` is restored afterwards. The setting only
 changes which answer the LP proposes: every answer is still certified.
@@ -228,7 +228,7 @@ changes which answer the LP proposes: every answer is still certified.
 **Deciding without the LP.** If the re-solve fails too, the question the LP was asking, whether
 row ``i`` is a facet of the cell, is settled in exact rational arithmetic instead, by
 :func:`relucent._internal.exact.exact_facet_by_simplex`. It starts from the cell's verified
-interior point, and it is the same routine ``get_shis`` uses when float64 cannot certify an
+interior point, and it is the same routine ``calculations.shis`` uses when float64 cannot certify an
 LP answer. If it cannot decide either,
 :class:`~relucent.core.errors.AmbiguousGeometryError` is raised, naming the halfspace and
 every LP status seen. That happens when:
@@ -308,7 +308,7 @@ after a **complete** search via ``finalize_ambient_search`` at
   same-dimension neighbor in the complex
   (:func:`~relucent.verify.certify.verify_lp_flip_neighbors_in_complex`).
 * ``GEOMETRIC`` — additionally recompute SHIs on every cached cell whose list was not
-  computed by ``get_shis`` on that cell, and require an exact match
+  computed by ``calculations.shis`` on that cell, and require an exact match
   (:func:`~relucent.verify.certify.verify_shi_geometry`).
 
 When certification runs

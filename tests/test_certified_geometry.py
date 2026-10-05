@@ -19,7 +19,8 @@ import pytest
 import relucent.config as cfg
 from relucent import AmbiguousGeometryError, Polyhedron
 from relucent._internal.gurobi import get_env
-from relucent.geometry.calculations import get_shis, solve_radius
+from relucent.geometry import calculations
+from relucent.geometry.calculations import solve_radius
 
 
 @pytest.fixture
@@ -38,25 +39,25 @@ def _rectangle(width: float = 1.0, height: float = 1.0) -> list[list[float]]:
 
 @pytest.mark.parametrize("height", [1e-8, 1e-10, 1e-12])
 def test_thin_slab_keeps_every_facet(env, height: float) -> None:
-    assert set(get_shis(_cell(_rectangle(height=height)), env=env)) == {0, 1, 2, 3}
+    assert set(calculations.shis(_cell(_rectangle(height=height)), env=env)) == {0, 1, 2, 3}
 
 
 @pytest.mark.parametrize("height", [1e-3, 1e-9])
 def test_facets_do_not_depend_on_push_size(env, height: float) -> None:
     cell = _cell(_rectangle(height=height))
-    assert set(get_shis(cell, env=env, push_size=2.0 * height)) == {0, 1, 2, 3}
+    assert set(calculations.shis(cell, env=env, push_size=2.0 * height)) == {0, 1, 2, 3}
 
 
 @pytest.mark.parametrize("delta", [100.0, 1e-4, 1e-12])
 def test_looser_parallel_wall_is_not_a_facet(env, delta: float) -> None:
     rows = [*_rectangle(), [0.0, 1.0, -(1.0 + delta)]]
-    assert set(get_shis(_cell(rows), env=env)) == {0, 1, 2, 3}
+    assert set(calculations.shis(_cell(rows), env=env)) == {0, 1, 2, 3}
 
 
 def test_row_touching_one_vertex_is_not_a_facet(env) -> None:
     """``x + y <= 2`` meets the unit square only at (1, 1): its LP optimum is exactly 0."""
     rows = [*_rectangle(), [1.0, 1.0, -2.0]]
-    assert set(get_shis(_cell(rows), env=env)) == {0, 1, 2, 3}
+    assert set(calculations.shis(_cell(rows), env=env)) == {0, 1, 2, 3}
 
 
 @pytest.mark.parametrize("height", [1e-6, 1e-10, 1e-14])
@@ -175,7 +176,7 @@ def test_face_contains_its_own_interior_point(seed: int) -> None:
     box = [[0.0, -1.0, -1.0], [0.0, 1.0, -1.0], [-1.0, 0.0, -1.0], [1.0, 0.0, -1.0]]
     rows = np.array([[normal[0], normal[1], offset], *box])
     face = Polyhedron(None, np.array([[0, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, ambient_dim=2)
-    point = np.asarray(face.get_interior_point()).reshape(-1)
+    point = np.asarray(face.find_interior_point()).reshape(-1)
     assert point in face
     assert (point + 1e-3 * normal) not in face  # clearly off the face, on the outside
     assert np.array([2.0, 0.0]) not in face  # outside the box
@@ -191,7 +192,7 @@ def test_unbounded_tilted_row_is_never_called_redundant(env, eps: float, bound: 
     """
     rows = [[0.0, 1.0, 0.0], [0.0, -1.0, -1.0], [-1.0, 0.0, 0.0], [eps, 1.0, -0.5]]
     try:
-        shis = get_shis(_cell(rows), env=env, bound=bound)
+        shis = calculations.shis(_cell(rows), env=env, bound=bound)
     except AmbiguousGeometryError:
         return
     assert 3 in shis
@@ -207,7 +208,7 @@ def test_robustly_redundant_row_is_certified_in_float64(env, monkeypatch: pytest
     monkeypatch.setattr(exact, "exact_facet_by_simplex", _no_exact)
     # y <= 0 and x >= 0 cut the cell; the other two rows are redundant with positive multipliers.
     rows = [[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 1.0, -3.0], [-1.0, 0.5, -1.0]]
-    assert set(get_shis(_cell(rows), env=env)) == {0, 1}
+    assert set(calculations.shis(_cell(rows), env=env)) == {0, 1}
 
 
 def _cube() -> list[list[float]]:
@@ -231,7 +232,7 @@ def test_dual_degenerate_redundant_row_is_decided_by_the_exact_dual(env, monkeyp
         raise AssertionError("the exact dual check should have decided")
 
     monkeypatch.setattr(exact, "exact_facet_by_simplex", _no_simplex)
-    assert set(get_shis(_cell([*_cube(), [1.0, 1.0, 0.0, -3.0]]), env=env)) == set(range(6))
+    assert set(calculations.shis(_cell([*_cube(), [1.0, 1.0, 0.0, -3.0]]), env=env)) == set(range(6))
 
 
 @pytest.mark.parametrize("gap", [5e-7, 1e-9])
@@ -293,7 +294,7 @@ def test_row_constant_on_a_face_is_decided_exactly(env, monkeypatch: pytest.Monk
         ]
     )
     face = Polyhedron(None, np.array([[0, 1, 1, 1, 1, 1]], dtype=np.int8), halfspaces=rows, ambient_dim=3)
-    assert set(get_shis(face, env=env)) == {2, 3, 4, 5}
+    assert set(calculations.shis(face, env=env)) == {2, 3, 4, 5}
     assert False in calls  # row 1 decided exactly: not a facet
 
 
@@ -342,13 +343,13 @@ def test_unit_zero_here_but_coincident_across_is_reported(env) -> None:
     net = _coincident_net()
     zero_side = Polyhedron(net, np.array([[-1, 1, -1, 1]], dtype=np.int8))
     with pytest.raises(NonGenericArrangementError, match="identically zero"):
-        get_shis(zero_side, env=env)
+        calculations.shis(zero_side, env=env)
 
 
 def test_distinct_nearby_rows_are_not_reported(env) -> None:
     """Rows 1e-9 apart are distinct hyperplanes: the tighter one is a facet, no error."""
     rows = [*_rectangle(), [0.0, 1.0, -(1.0 + 1e-9)]]
-    assert set(get_shis(_cell(rows), env=env)) == {0, 1, 2, 3}
+    assert set(calculations.shis(_cell(rows), env=env)) == {0, 1, 2, 3}
 
 
 class _FlakyModel:
@@ -533,9 +534,9 @@ def test_failed_lp_is_decided_exactly(env, monkeypatch: pytest.MonkeyPatch, extr
     a row touching only a corner, a facet cutting one off, and a row 1e-9 outside a facet."""
     from relucent.geometry import calculations as C
 
-    expected = set(get_shis(_cell([*_rectangle(), extra]), env=env))
+    expected = set(calculations.shis(_cell([*_rectangle(), extra]), env=env))
     monkeypatch.setattr(C, "Model", _RelaxedLPsFail)
-    assert set(get_shis(_cell([*_rectangle(), extra]), env=env)) == expected
+    assert set(calculations.shis(_cell([*_rectangle(), extra]), env=env)) == expected
 
 
 @pytest.mark.parametrize("extra", _FAILED_LP_EXTRAS)
@@ -546,7 +547,7 @@ def test_failed_lp_raises_without_exact_rows(env, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(C, "Model", _RelaxedLPsFail)
     monkeypatch.setattr(Polyhedron, "_exact_rows", lambda self: None)  # as for a network too large
     with pytest.raises(AmbiguousGeometryError, match="LP solver failure"):
-        get_shis(cell, env=env)
+        calculations.shis(cell, env=env)
 
 
 def _prism() -> list[list[float]]:

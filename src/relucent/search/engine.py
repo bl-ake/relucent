@@ -26,7 +26,8 @@ from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
-from relucent.geometry.calculations import get_shis, shis_are_certified
+from relucent.geometry import calculations
+from relucent.geometry.calculations import shis_are_certified
 from relucent.search.exploration import (
     SearchResult,
     finalize_ambient_search,
@@ -56,7 +57,7 @@ __all__ = [
 # reliability checks depend on them. Boundedness (``finite``) is not needed to search.
 SEARCH_REQUIRED_GEOMETRY_PROPERTIES: tuple[str, ...] = ("center", "inradius")
 
-# Every cache/property name supported by :meth:`~relucent.core.poly.Polyhedron.get_geometry`.
+# Every cache/property name supported by :meth:`~relucent.core.poly.Polyhedron.compute_geometric_properties`.
 ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
     "halfspaces",
     "W",
@@ -77,7 +78,7 @@ ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
 def true_phantom_neighbor_error(error: object) -> bool:
     """Always False: no queued flip-neighbor is legitimately empty.
 
-    Neighbors are queued only across facets that :func:`~relucent.geometry.calculations.get_shis`
+    Neighbors are queued only across facets that :func:`~relucent.geometry.calculations.shis`
     certified, i.e. with a witness point just past the facet and inside every other row. The
     region across such a facet is nonempty, so an empty neighbor means something upstream is
     wrong and must block completeness. (This used to excuse neighbors whose Chebyshev radius fell
@@ -146,7 +147,7 @@ def _worker_prepare_poly(
 ) -> Exception | None:
     """Compute geometry (and optionally SHIs) on *p*. Return an error, or None on success."""
     try:
-        p.get_geometry(props, env=env)
+        p.compute_geometric_properties(props, env=env)
     except (ValueError, AmbiguousGeometryError) as error:
         return error
     if not p.feasible:
@@ -154,11 +155,11 @@ def _worker_prepare_poly(
         # center verified strictly inside every row, and raises when it cannot decide.
         return AmbiguousGeometryError(f"Polyhedron {p!r} is infeasible (empty), but it was reached across a certified facet")
     if need_interior and p._interior_point is None:
-        p._interior_point = p.get_interior_point(env=env)
+        p._interior_point = p.find_interior_point(env=env)
     if shis_kwargs is not None:
         try:
             if p._shis is None:
-                result = get_shis(p, env=env, **shis_kwargs)
+                result = calculations.shis(p, env=env, **shis_kwargs)
                 p._shis = result[0] if isinstance(result, tuple) else result
                 p._shis_strict = shis_are_certified(shis_kwargs)
         except Exception as error:
@@ -176,7 +177,7 @@ def _start_shis_for_search(
     shis_kwargs: dict[str, Any],
 ) -> list[int]:
     """SHIs for the search seed cell (certified like every other cell's; no fallback)."""
-    result = get_shis(start, bound=bound, **shis_kwargs)
+    result = calculations.shis(start, bound=bound, **shis_kwargs)
     assert isinstance(result, list)
     return result
 
@@ -372,7 +373,7 @@ def get_ip(
         # Neighbor may be skinny; try progressively larger bounding boxes until one works.
         for max_radius in cfg.advanced.INTERIOR_POINT_RADIUS_SEQUENCE:
             with contextlib.suppress(ValueError):
-                n._interior_point = n.get_interior_point(env=ctx.env, max_radius=max_radius)
+                n._interior_point = n.find_interior_point(env=ctx.env, max_radius=max_radius)
         return n, shi
     except ValueError as e:
         return e, shi
@@ -397,7 +398,7 @@ def astar_calculations(
         shuffle_shis=True,
     ):
         return p, err, *rest  # keep the poly so the parent can log which node failed
-    assert isinstance(p._shis, list), "get_shis() returns a list"
+    assert isinstance(p._shis, list), "calculations.shis() returns a list"
     return p, *rest
 
 
@@ -446,7 +447,7 @@ def searcher(
             :func:`~relucent.verify.certify.certify_complex` at the end. Skipped if
             ``max_polys`` stops the search early. A finite ``max_depth`` can leave
             ``complete=False``, which raises unless the cap was hit.
-        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
+        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
     Returns:
         :class:`~relucent.search.exploration.SearchResult`.
@@ -683,7 +684,7 @@ def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs
     diffs = diffs or set(np.argwhere((start.ss_np != end.ss_np).ravel()).ravel().tolist())
 
     if not start._shis:
-        get_shis(start)
+        calculations.shis(start)
     shis_set = set(start.shis)
     groupa = shis_set & diffs  # flip toward the goal (removes one diff)
     groupb = shis_set - diffs  # detour: flip away, then recurse with that diff added back
@@ -748,7 +749,7 @@ def hamming_astar(
             Defaults to infinity.
         verbose: ``0`` silences output; ``1`` shows a progress bar. ``None`` uses
             :data:`relucent.config.VERBOSE`.
-        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.get_shis`.
+        **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
     Returns:
         dict[str, Any]: A dictionary with the following keys:
@@ -796,8 +797,8 @@ def hamming_astar(
     if start_poly == end_poly:
         _ = start_poly.finite
 
-        start_poly._interior_point = start_poly.get_interior_point()
-        start_poly._shis = cast(list[int], get_shis(start_poly, bound=bound, collect_info=False))
+        start_poly._interior_point = start_poly.find_interior_point()
+        start_poly._shis = cast(list[int], calculations.shis(start_poly, bound=bound, collect_info=False))
         start_poly._shis_strict = True
         return {
             "path": [start_poly],
@@ -839,7 +840,7 @@ def hamming_astar(
     gScore[start_poly] = 0
     fScore[start_poly] = hamming_start_goal
 
-    result = get_shis(start_poly, bound=bound, **kwargs)
+    result = calculations.shis(start_poly, bound=bound, **kwargs)
     assert isinstance(result, list)
     start_poly._shis = result
     start_poly._shis_strict = shis_are_certified(kwargs)

@@ -7,7 +7,7 @@ import pytest
 
 from relucent.core.errors import AmbiguousGeometryError
 from relucent.core.poly import Polyhedron
-from relucent.geometry.calculations import get_shis
+from relucent.geometry import calculations
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     load_witness_model,
@@ -18,7 +18,7 @@ from tests.integration.helpers import (
 pytestmark = [pytest.mark.integration]
 
 # Too-small fixed box: on many unbounded cofaces it hides the output SHI. Facet
-# decisions are certified, so get_shis must raise there instead of dropping it.
+# decisions are certified, so calculations.shis must raise there instead of dropping it.
 _SMALL_BOUND = 10.0
 
 
@@ -40,11 +40,11 @@ def test_small_bound_refuses_instead_of_missing_output_shi(integration_nworkers:
         ppos = ambient[ss_pos]
         n_cofaces += 1
 
-        sh_default = get_shis(Polyhedron(model, ppos.ss_np))
-        assert shi in sh_default, f"default get_shis misses output SHI {shi} on coface {ppos!r}"
+        sh_default = calculations.shis(Polyhedron(model, ppos.ss_np))
+        assert shi in sh_default, f"default calculations.shis misses output SHI {shi} on coface {ppos!r}"
 
         try:
-            sh_small = get_shis(
+            sh_small = calculations.shis(
                 Polyhedron(model, ppos.ss_np),
                 bound=_SMALL_BOUND,
                 escalate_bound=False,

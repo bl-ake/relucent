@@ -81,7 +81,7 @@ BOUNDARY_MIP_GUROBI_LOG: bool = env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
 # Plotting
 # -----------------------------------------------------------------------------
 
-# Default hypercube half-width for plotting and get_bounded_vertices.
+# Default hypercube half-width for plotting and Polyhedron.bounded_vertices.
 DEFAULT_PLOT_BOUND: float = env_float("DEFAULT_PLOT_BOUND", 10)
 
 # Default bound for Complex.plot (2D).

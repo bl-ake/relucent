@@ -8,7 +8,7 @@ import numpy as np
 
 from relucent import AmbiguousGeometryError, Complex, Polyhedron, set_seeds, torch_mlp
 from relucent._internal.network_scale import default_polyhedron_bound
-from relucent.geometry.calculations import get_shis
+from relucent.geometry import calculations
 
 
 def test_default_polyhedron_bound_used_by_lazy_shis() -> None:
@@ -34,10 +34,10 @@ def test_get_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
     bound = default_polyhedron_bound(relu_net)
     ss = np.array([[1, -1, -1, 1]], dtype=np.int8)
     poly = Polyhedron(relu_net, ss, bound=bound)
-    poly.get_geometry(("finite",), env=None)
+    poly.compute_geometric_properties(("finite",), env=None)
     with contextlib.suppress(AmbiguousGeometryError):
-        assert len(get_shis(poly, bound=bound, escalate_bound=False)) > 0
-    assert len(get_shis(poly, bound=bound, escalate_bound=True)) > 0
+        assert len(calculations.shis(poly, bound=bound, escalate_bound=False)) > 0
+    assert len(calculations.shis(poly, bound=bound, escalate_bound=True)) > 0
 
 
 def test_get_shis_escalates_bound_for_unbounded_arrangement_cell(seeded: int) -> None:
@@ -50,7 +50,7 @@ def test_get_shis_escalates_bound_for_unbounded_arrangement_cell(seeded: int) ->
     # All-sign cell: unbounded in generic 2D arrangement with 4 hyperplanes.
     ss = np.array([[1, -1, -1, 1]], dtype=np.int8)
     poly = Polyhedron(net, ss, bound=bound)
-    poly.get_geometry(("finite",), env=None)
+    poly.compute_geometric_properties(("finite",), env=None)
     assert poly.finite is False
-    shis = get_shis(poly, bound=bound)
+    shis = calculations.shis(poly, bound=bound)
     assert len(shis) > 0

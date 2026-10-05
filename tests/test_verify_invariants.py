@@ -129,14 +129,14 @@ def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytes
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
     cplx.set_exploration_state(complete=True, verified=False)
-    orig_get_shis = calc.get_shis
+    orig_shis = calc.shis
 
     def _boom(poly, *args, **kwargs):
         if getattr(poly, "_shis_strict", False):
-            return orig_get_shis(poly, *args, **kwargs)
+            return orig_shis(poly, *args, **kwargs)
         raise ValueError("synthetic SHI failure")
 
-    monkeypatch.setattr(calc, "get_shis", _boom)
+    monkeypatch.setattr(calc, "shis", _boom)
     _forget_certified_shis(cplx)  # as if the lists had been assigned rather than computed
 
     with pytest.raises(IncompleteDualGraphError, match="failed to recompute SHIs"):
@@ -153,7 +153,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
     def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
-    monkeypatch.setattr(calc, "get_shis", _boom)
+    monkeypatch.setattr(calc, "shis", _boom)
 
     boundary = cplx.boundary_complex(cplx.n - 1)
     assert boundary.verified is True
@@ -181,7 +181,7 @@ def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monke
     def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
-    monkeypatch.setattr(calc, "get_shis", _boom)
+    monkeypatch.setattr(calc, "shis", _boom)
 
     boundary = reloaded.boundary_complex(reloaded.n - 1)
     assert boundary.verified is True
@@ -198,7 +198,7 @@ def test_lp_verify_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pyte
     def _boom(*_args, **_kwargs):
         raise AssertionError("strict SHIs should be reused instead of recomputed")
 
-    monkeypatch.setattr(calc, "get_shis", _boom)
+    monkeypatch.setattr(calc, "shis", _boom)
 
     verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
 
@@ -247,12 +247,12 @@ def test_start_shis_for_search_does_not_relax_on_shi_proof_error(monkeypatch) ->
     start = cplx.add_point(np.zeros((1, 2), dtype=np.float64))
     calls: list[object] = []
 
-    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+    def _fake_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
         _ = poly, bound
         calls.append(kwargs)
         raise ShiProofError("invalid proof")
 
-    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.geometry.calculations.shis", _fake_shis)
     with pytest.raises(ShiProofError):
         _start_shis_for_search(start, bound=1.0, shis_kwargs={})
     assert calls == [{}]
@@ -271,12 +271,12 @@ def test_invalid_proof_warnings_not_replayed_on_poly_add(monkeypatch) -> None:
     model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
     cplx = Complex(model)
 
-    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+    def _fake_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
         _ = bound, kwargs
         poly.warnings.append(RuntimeWarning("Invalid Proof for SHI 0! Violation Sizes: ..."))
         return [0]
 
-    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.geometry.calculations.shis", _fake_shis)
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -302,12 +302,12 @@ def test_searcher_marks_shis_certified(monkeypatch) -> None:
     cplx = Complex(model)
     seen: list[dict[str, object]] = []
 
-    def _fake_get_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
+    def _fake_shis(poly: Polyhedron, *, bound: float, **kwargs: object) -> list[int]:
         _ = poly, bound
         seen.append(kwargs)
         return []
 
-    monkeypatch.setattr("relucent.search.engine.get_shis", _fake_get_shis)
+    monkeypatch.setattr("relucent.geometry.calculations.shis", _fake_shis)
     searcher(
         cplx,
         start=np.zeros((1, 2), dtype=np.float64),
@@ -336,14 +336,14 @@ def test_geometric_certify_recomputes_only_assigned_shis(monkeypatch: pytest.Mon
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=True)
     top = next(p for p in cplx if p.dim == cplx.dim)
     recomputed: list[object] = []
-    orig_get_shis = calc.get_shis
+    orig_shis = calc.shis
 
     def _counting(poly, *args, **kwargs):
         recomputed.append(poly)
-        return orig_get_shis(poly, *args, **kwargs)
+        return orig_shis(poly, *args, **kwargs)
 
-    monkeypatch.setattr(calc, "get_shis", _counting)
-    verify_shi_geometry(top)  # computed by get_shis on this cell: already certified
+    monkeypatch.setattr(calc, "shis", _counting)
+    verify_shi_geometry(top)  # computed by calculations.shis on this cell: already certified
     assert recomputed == []
     top._shis_strict = False  # as if assigned from the dual graph
     verify_shi_geometry(top)

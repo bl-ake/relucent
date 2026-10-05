@@ -84,8 +84,7 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     def fail(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("topology builder called an LP routine")
 
-    monkeypatch.setattr("relucent.geometry.calculations.get_shis", fail)
-    monkeypatch.setattr("relucent.core.poly.get_shis", fail)
+    monkeypatch.setattr("relucent.geometry.calculations.shis", fail)
     monkeypatch.setattr("relucent.verify.certify.verify_lp_flip_neighbors_in_complex", fail)
     # Chebyshev may run for zero-face 1-cells in geometric_infeasible_one_cells; SHI LPs must not.
 

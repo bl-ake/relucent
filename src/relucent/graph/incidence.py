@@ -26,7 +26,7 @@ Don't mix up the two kinds of SHI:
 
 - Cubical flip SHIs (:func:`cubical_cell_shis`) drive dual-graph adjacency, meta-graph
   node metadata, and contracted slices.
-- LP facet SHIs (:func:`~relucent.geometry.calculations.get_shis`) are the geometric
+- LP facet SHIs (:func:`~relucent.geometry.calculations.shis`) are the geometric
   facets of ambient top cells. They can be a strict subset of the cubical set, so
   they must never build meta-graph edges or node metadata.
 """
@@ -739,7 +739,7 @@ def geometric_infeasible_one_cells(
         # Use compute-only Chebyshev; ``poly.finite`` would cache ``_finite`` and
         # skip combinatorial classification in :func:`classify_one_cells_finite_from_face_edges`.
         try:
-            _center, inradius = p.get_center_inradius()
+            _center, inradius = p._chebyshev_ball()
         except ValueError as exc:
             # Borderline phantom 1-cells can trip the Chebyshev LP with a tiny
             # negative radius (e.g. "Inradius -8e-07"). Treat those exactly as
