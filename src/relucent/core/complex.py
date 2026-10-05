@@ -1072,7 +1072,8 @@ class Complex:
             respect_finite: If True, use the subcomplex of bounded cells instead.
             reduced: If True, return reduced homology.
             verify_chain_complex: Check ``∂² = 0`` (see :func:`relucent.topology.betti_numbers`).
-            verify_connected_components: Check β₀ against the path-component count.
+            verify_connected_components: Check β₀ against the path-component count (ordinary
+                homology only; skipped for ``compactify="borel_moore"``).
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             nworkers: Threads for ranking independent boundary maps concurrently

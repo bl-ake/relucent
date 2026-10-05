@@ -193,3 +193,17 @@ def test_decision_boundary_line_differs_between_homologies(seeded: int):
 
     # Unbounded line boundary: the sole 1-cell is non-finite, so respect_finite is empty.
     assert betti_embedded == {} or betti_embedded == betti_std
+
+
+def test_borel_moore_beta0_is_not_checked_against_components() -> None:
+    """A single line in the plane: Borel-Moore homology has beta_0 = 0 and beta_1 = 1, although the
+    line is one component, so the beta_0 = #components check (on by default) must not run there."""
+    import relucent
+    from relucent.topology import betti_numbers
+
+    relucent.set_seeds(0)
+    cplx = relucent.Complex(relucent.mlp(widths=[2, 6, 1], add_last_relu=True))
+    cplx.bfs(verbose=0)
+    boundary = cplx.boundary_complex(cplx.n - 1)
+    assert betti_numbers(boundary.meta_graph(), compactify="truncate") == {0: 1}
+    assert betti_numbers(boundary.meta_graph(), compactify="borel_moore") == {1: 1}

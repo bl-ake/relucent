@@ -593,7 +593,8 @@ def betti_numbers(
             Uses sparse GF(2) matrix multiplication over the nonzero incidence pattern.
         verify_connected_components: If True, require rank-formula β₀ to agree with the
             number of path-connected components when ``kmin == 0``; otherwise raise
-            :class:`ConnectedComponentsMismatch`.
+            :class:`ConnectedComponentsMismatch`. Not applied with
+            ``compactify="borel_moore"``: there a non-compact component adds nothing to β₀.
         verbose: Output level: ``0`` quiet, ``1`` progress bars, ``2`` per-map detail.
             ``None`` uses :data:`relucent.config.VERBOSE`.
         nworkers: ``method="dense"`` only. Threads for ranking boundary maps concurrently.
@@ -618,6 +619,9 @@ def betti_numbers(
     del verbose  # applied by @with_verbosity
     if compactify is not None and compactify not in COMPACTIFY_MODES:
         raise ValueError(f"compactify must be one of {list(COMPACTIFY_MODES)} or None, got {compactify!r}")
+    # Borel-Moore H_0 counts only compact components (a line has H_0 = 0, H_1 = 1), so beta_0 need
+    # not equal the number of components there; the check holds for ordinary homology.
+    verify_connected_components = verify_connected_components and compactify != "borel_moore"
     if meta.number_of_nodes() == 0:
         return {}
     from relucent.graph import meta_graph as mg
