@@ -650,7 +650,7 @@ wheels = [
 
 [[package]]
 name = "relucent"
-version = "0.9.8"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "gurobipy" },
@@ -680,16 +680,16 @@ torch = [
 requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.39.0" },
     { name = "gurobipy", specifier = ">=12,<14" },
-    { name = "networkx", specifier = ">=2.0" },
-    { name = "numpy", specifier = ">=2.4.1" },
+    { name = "networkx", specifier = ">=3.0" },
+    { name = "numpy", specifier = ">=2.0" },
     { name = "plotly", specifier = ">=5.20" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scipy", specifier = ">=1.17.0" },
+    { name = "scipy", specifier = ">=1.13" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=9.0.4" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'" },
     { name = "torch", marker = "extra == 'torch'", specifier = ">=2.5.0" },
-    { name = "tqdm", specifier = ">=4.67.0" },
+    { name = "tqdm", specifier = ">=4.60" },
 ]
 provides-extras = ["torch", "dev", "docs"]
 

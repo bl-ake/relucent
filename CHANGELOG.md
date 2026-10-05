@@ -51,3 +51,7 @@ every rename.
   boundary components and still report the result complete. Use `bfs()` and
   `boundary_complex(i)` for a verified boundary.
 - Searching no longer computes `finite` (only the Chebyshev LP it needs).
+- Dependency floors are lowered from the newest releases to numpy 2.0, scipy 1.13,
+  networkx 3.0 and tqdm 4.60 (plotly 5.20 and gurobipy 12 as before). A CI job runs the
+  tests at exactly these versions on Python 3.11.
+- The wheel and sdist include the license text.

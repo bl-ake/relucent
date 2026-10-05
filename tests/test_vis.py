@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 import networkx as nx
 import numpy as np
-import plotly.express as px
+import plotly.colors as plotly_colors
 import plotly.graph_objects as go
 import pytest
 
@@ -267,9 +267,9 @@ def test_equitable_colors_uses_plotly_scheme_for_degree_at_most_10(monkeypatch):
 
     monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fake_equitable_color)
     colors = vis._equitable_colors(dual, nodes, remap=False)
-    assert seen["num_colors"] == min(len(px.colors.qualitative.Plotly), len(nodes))
+    assert seen["num_colors"] == min(len(plotly_colors.qualitative.Plotly), len(nodes))
     assert len(colors) == len(nodes)
-    assert all(c in px.colors.qualitative.Plotly for c in colors)
+    assert all(c in plotly_colors.qualitative.Plotly for c in colors)
 
 
 def test_equitable_colors_uses_light24_without_red_for_degree_11_to_23(monkeypatch):
@@ -286,11 +286,11 @@ def test_equitable_colors_uses_light24_without_red_for_degree_11_to_23(monkeypat
 
     monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fake_equitable_color)
     colors = vis._equitable_colors(dual, nodes, remap=False)
-    light24_without_red = px.colors.qualitative.Light24[1:]
+    light24_without_red = plotly_colors.qualitative.Light24[1:]
     assert seen["num_colors"] == min(len(light24_without_red), len(nodes))
     assert len(colors) == len(nodes)
     assert all(c in light24_without_red for c in colors)
-    assert px.colors.qualitative.Light24[0] not in colors
+    assert plotly_colors.qualitative.Light24[0] not in colors
 
 
 def test_equitable_colors_falls_back_to_scheme_for_degree_above_23():
@@ -302,7 +302,7 @@ def test_equitable_colors_falls_back_to_scheme_for_degree_above_23():
 
     colors = vis._equitable_colors(dual, nodes, remap=False)
     assert len(colors) == len(nodes)
-    assert all(c in px.colors.qualitative.Plotly for c in colors)
+    assert all(c in plotly_colors.qualitative.Plotly for c in colors)
 
 
 def test_equitable_colors_falls_back_to_random_scheme_when_equitable_fails(monkeypatch):
@@ -317,7 +317,7 @@ def test_equitable_colors_falls_back_to_random_scheme_when_equitable_fails(monke
     monkeypatch.setattr(nx.algorithms.coloring, "equitable_color", fail_equitable_color)
     colors = vis._equitable_colors(dual, nodes, remap=False)
     assert len(colors) == len(nodes)
-    assert all(c in px.colors.qualitative.Plotly for c in colors)
+    assert all(c in plotly_colors.qualitative.Plotly for c in colors)
 
 
 def test_plot_polyhedron_hide_unbounded_flag(monkeypatch):
