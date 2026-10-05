@@ -1,9 +1,9 @@
-"""Exact rational geometry for the two decisions float64 can't make on ReLU rows.
+"""Exact rational geometry for the decisions float64 can't make on ReLU rows.
 
 Float64 weights are dyadic rationals, so a cell's composed rows have exact rational
 values. ReLU networks produce structural coincidences that float64 can't tell from
 near-misses: a deeper unit's normal can lie exactly in the span of the active normals
-above it, so hyperplanes end up exactly parallel or exactly concurrent. Two decisions
+above it, so hyperplanes end up exactly parallel or exactly concurrent. These decisions
 hit this often. When float64 falls inside its error bound
 (:mod:`relucent._internal.rounding`), they're made here with
 :class:`fractions.Fraction` arithmetic:
@@ -12,6 +12,8 @@ hit this often. When float64 falls inside its error bound
   point is on (vertex recovery; parallel rows that never meet).
 * :func:`exact_facet_by_simplex`: whether a row is a facet (a redundant row parallel
   to a facet has a zero dual multiplier, which float64 can't certify).
+* :func:`exact_recession_cone_is_zero`: whether a cell is bounded (a recession direction
+  that lies exactly in some rows' hyperplanes, which float64 can't tell from a near-miss).
 
 Anything else undecidable raises :class:`~relucent.core.errors.AmbiguousGeometryError`.
 Exact arithmetic is slow (numbers reach a few hundred bits on deep nets), so it only
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 __all__ = [
     "exact_facet_by_simplex",
     "exact_point",
+    "exact_recession_cone_is_zero",
     "exact_rows_affordable",
     "exact_rows_for_ss",
 ]
@@ -322,6 +325,43 @@ def exact_dual_bound(rows: list[Row], ineq_indices: list[int], eq_indices: list[
     if any(c < 0 for c in coef[:n_ineq]):
         return None
     return rows[j][-1] - sum((c * rows[k][-1] for c, k in zip(coef, cols, strict=True)), Fraction(0))
+
+
+def exact_recession_cone_is_zero(
+    rows: list[Row],
+    eq_indices: list[int],
+    *,
+    max_iter: int | None = None,
+) -> bool | None:
+    """Exact answer to "is the cell's recession cone ``{0}``", i.e. is the nonempty cell bounded.
+
+    The cone is ``{d : a_i . d <= 0, a_e . d = 0}`` over the inequality rows ``i`` and the
+    ``eq_indices`` rows ``e``. This maximises each ``+-d_k`` over the cone cut by the box
+    ``|d_k| <= 1`` with :func:`_maximize`, starting from ``d = 0``; a positive value is a nonzero
+    recession direction.
+
+    Returns None when a run is undecided (dependent equality normals, or ``max_iter`` steps,
+    default ``50 * (len(rows) + 1)`` each).
+    """
+    zero = Fraction(0)
+    eq_set = {int(e) for e in eq_indices}
+    n = len(rows[0]) - 1
+    ineq = [rows[r][:-1] + [zero] for r in range(len(rows)) if r not in eq_set and any(rows[r][:-1])]
+    for k in range(n):
+        for s in (1, -1):
+            ineq.append([Fraction(s) if t == k else zero for t in range(n)] + [Fraction(-1)])
+    eq = [rows[e][:-1] + [zero] for e in sorted(eq_set) if any(rows[e][:-1])]
+    origin = [zero] * n
+    limit = max_iter if max_iter is not None else 50 * (len(rows) + 1)
+    for k in range(n):
+        for s in (1, -1):
+            objective = [Fraction(s) if t == k else zero for t in range(n)] + [zero]
+            result = _maximize(ineq, eq, objective, origin, stop_above=zero, max_iter=limit)
+            if result is None:
+                return None
+            if result != "optimal":
+                return False
+    return True
 
 
 def exact_facet_by_simplex(

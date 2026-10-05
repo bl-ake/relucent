@@ -52,9 +52,9 @@ __all__ = [
     "true_phantom_neighbor_error",
 ]
 
-# Chebyshev center/inradius (and boundedness) are always computed during search
-# workers because SHI reliability checks depend on them.
-SEARCH_REQUIRED_GEOMETRY_PROPERTIES: tuple[str, ...] = ("finite", "center", "inradius")
+# Chebyshev center/inradius are always computed during search workers because SHI
+# reliability checks depend on them. Boundedness (``finite``) is not needed to search.
+SEARCH_REQUIRED_GEOMETRY_PROPERTIES: tuple[str, ...] = ("center", "inradius")
 
 # Every cache/property name supported by :meth:`~relucent.core.poly.Polyhedron.get_geometry`.
 ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
@@ -149,7 +149,7 @@ def _worker_prepare_poly(
         p.get_geometry(props, env=env)
     except (ValueError, AmbiguousGeometryError) as error:
         return error
-    if p.finite is None:
+    if not p.feasible:
         # Thin cells need no special case: solve_radius only reports a cell nonempty with a
         # center verified strictly inside every row, and raises when it cannot decide.
         return AmbiguousGeometryError(f"Polyhedron {p!r} is infeasible (empty), but it was reached across a certified facet")

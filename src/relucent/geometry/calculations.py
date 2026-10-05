@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "adjacent_polyhedra",
+    "certified_bounded",
     "compute_properties",
     "get_hs",
     "get_shis",
@@ -1531,6 +1532,93 @@ def _raise_if_coincident_across(poly: "Polyhedron", i: int, zero_units: np.ndarr
                 + "other side (typically a unit with an exactly zero bias whose only active input is unit "
                 + f"{i}): the arrangement is not simple, and the region across facet {i} is not one sign flip away."
             )
+
+
+def certified_bounded(poly: "Polyhedron", env: Env | None = None) -> bool:
+    """Whether the nonempty cell ``poly`` is bounded, decided for its exact rows.
+
+    A nonempty cell ``{A x + b <= 0, A_eq x + b_eq = 0}`` is bounded exactly when its recession
+    cone ``{d : A d <= 0, A_eq d = 0}`` is ``{0}``. A finite Chebyshev radius does not show this:
+    a cell whose recession cone is lower-dimensional, such as a half-infinite prism, has a finite
+    inscribed ball. On ReLU networks such cones come from structural coincidences (a deeper
+    unit's normal lying exactly in the span of the active normals above it), which float64
+    cannot tell from a near-miss.
+
+    The float64 test is Stiemke's lemma: the cone is ``{0}`` iff the rows have full rank and
+    ``A^T y + A_eq^T z = 0`` for some ``y > 0``. One LP finds ``y >= 1``; it is accepted when a
+    basis of the rows stays nonsingular, and the correction that cancels the exact rows' residual
+    on that basis keeps ``y`` positive, under every perturbation within the rows' error
+    (:mod:`relucent._internal.rounding`). Anything else is decided by an exact simplex on the
+    recession cone (:func:`relucent._internal.exact.exact_recession_cone_is_zero`).
+
+    Raises:
+        AmbiguousGeometryError: If the float64 test fails and the exact rows are unavailable or
+            the exact simplex does not finish.
+    """
+    from relucent._internal import exact
+    from relucent.core.errors import AmbiguousGeometryError
+
+    hs = np.asarray(poly.halfspaces_np, dtype=np.float64)
+    err = np.asarray(poly.halfspaces_err_np, dtype=np.float64)
+    zero_idx = np.asarray(poly.zero_indices, dtype=np.intp)
+    zero_idx = zero_idx[zero_idx < hs.shape[0]]
+    is_eq = np.zeros(hs.shape[0], dtype=bool)
+    is_eq[zero_idx] = True
+    # A constant row (exactly zero normal) says nothing about directions.
+    keep = np.flatnonzero(np.any(hs[:, :-1] != 0.0, axis=1))
+    if _bounded_by_stiemke(hs[keep, :-1], err[keep, :-1], is_eq[keep], env=env):
+        return True
+    rows = poly._exact_rows()
+    verdict = exact.exact_recession_cone_is_zero(rows, zero_idx.tolist()) if rows is not None else None
+    if verdict is None:
+        raise AmbiguousGeometryError(
+            f"cannot decide whether {poly!r} is bounded: its recession cone is degenerate to within "
+            + "float64 error and its exact rows are unavailable"
+        )
+    return verdict
+
+
+def _bounded_by_stiemke(a: np.ndarray, a_err: np.ndarray, is_eq: np.ndarray, *, env: Env | None = None) -> bool:
+    """True when ``{d : a_i . d <= 0, a_e . d = 0}`` is certified ``{0}`` for every exact ``a``
+    within ``a_err`` of ``a`` (inequality rows ``~is_eq``, equality rows ``is_eq``).
+
+    False means only "not certified": see :func:`certified_bounded`.
+    """
+    import scipy.linalg
+
+    from relucent._internal import rounding
+
+    m, n = a.shape
+    if m < n:
+        return False  # rank < n: the cone holds a line
+    ineq = ~is_eq
+    model = Model("Recession cone", env or get_env())
+    try:
+        w = model.addMVar(m, lb=np.where(ineq, 1.0, -GRB.INFINITY), ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="w")
+        model.addConstr(a.T @ w == np.zeros(n))
+        model.setObjective(ineq.astype(np.float64) @ w, GRB.MINIMIZE)
+        model.optimize()
+        if model.status != GRB.OPTIMAL:
+            return False
+        y = np.asarray(w.X, dtype=np.float64).reshape(-1)
+    finally:
+        model.close()
+    if np.any(y[ineq] <= 0.0):
+        return False
+    # The correction below lives on n rows; pick a well-conditioned set.
+    pivots = scipy.linalg.qr(a.T, pivoting=True, mode="economic")[-1]
+    basis = np.asarray(pivots, dtype=np.intp)[:n]
+    m_b = a[basis]
+    # Perturbation of the basis (Frobenius bounds spectral), plus the SVD's own rounding.
+    dm = float(np.linalg.norm(a_err[basis])) + 8.0 * n * n * rounding.EPS * float(np.linalg.norm(m_b))
+    smin = float(np.linalg.svd(m_b, compute_uv=False)[-1])
+    if smin <= 2.0 * dm:
+        return False
+    # |A*^T y| for the exact rows A*: computed residual, its rounding, and the rows' own error.
+    resid = np.abs(a.T @ y) + rounding.gamma(m + 1) * (np.abs(a.T) @ np.abs(y)) + a_err.T @ np.abs(y)
+    # Moving the basis multipliers by delta cancels the exact residual (A*_B is nonsingular).
+    delta = float(np.linalg.norm(resid)) * (1.0 + 8.0 * rounding.EPS) / (smin - dm) * (1.0 + 8.0 * rounding.EPS)
+    return not bool(np.any(y[basis][ineq[basis]] <= delta))
 
 
 def _certify_not_facet(

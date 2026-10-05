@@ -112,6 +112,7 @@ class Polyhedron:
         self._interior_point_norm: float | None = None
         self._center: np.ndarray | None = None
         self._inradius: float | None = None
+        self._chebyshev_done: bool = False
         self.bound = bound
 
         self._shis: list[int] | None = shis
@@ -468,11 +469,10 @@ class Polyhedron:
         max_radius = max_radius or cfg.MAX_RADIUS
         if self._is_zero_cell():
             return self._interior_point_from_equalities()
-        if self.finite is None:
+        if not self.feasible:
             raise ValueError("Polyhedron is infeasible (empty).")
-        # ``finite=True`` may be supplied at construction (e.g. propagated from cofaces)
-        # without ever running the Chebyshev solve; in that case ``_center`` is unset.
-        if self._finite is True and self._center is not None:
+        # The Chebyshev center, when that LP has run and the cell's inscribed ball is bounded.
+        if self._chebyshev_done and self._center is not None:
             interior_point = np.asarray(self._center).squeeze()
         else:
             env = env or get_env()
@@ -503,7 +503,8 @@ class Polyhedron:
         Returns:
             tuple: ``(center, inradius)``. ``inradius`` is ``None`` if the halfspace
             system is infeasible (empty); ``center`` is ``None`` and ``inradius``
-            is ``inf`` for nonempty unbounded polyhedra (with infinite Chebyshev formulation).
+            is ``inf`` when the largest inscribed ball is unbounded. A finite inradius does
+            not mean the cell is bounded (see :attr:`finite`).
         """
         if self._is_zero_cell():
             pt = self._interior_point_from_equalities()
@@ -893,7 +894,7 @@ class Polyhedron:
 
         if requested & {"halfspaces", "W", "b"}:
             _ = self.halfspaces
-        if "finite" in requested or "center" in requested or "inradius" in requested:
+        if "finite" in requested:
             _ = self.finite
         if "center" in requested:
             _ = self.center
@@ -1088,79 +1089,83 @@ class Polyhedron:
                 raise NotImplementedError
         return self._Wl2
 
-    def _ensure_chebyshev_center(self, env: Any = None) -> None:
-        """Populate ``_center`` / ``_inradius`` for bounded cells (optional; not used by meta-graph)."""
-        if self._is_zero_cell():
-            if self._center is None:
-                pt = self._interior_point_from_equalities()
-                self._center = pt.reshape(-1, 1)
-                self._inradius = 0.0
+    def _ensure_chebyshev(self, env: Any = None) -> None:
+        """Run the Chebyshev LP once, caching ``_center`` and ``_inradius`` (see :meth:`get_center_inradius`)."""
+        if self._chebyshev_done:
             return
-        if self._finite is not True or (self._center is not None and self._inradius is not None):
-            return
-        env = env or get_env()
         center, inradius = self.get_center_inradius(env=env)
         self._center = center
         self._inradius = inradius
+        self._chebyshev_done = True
 
     @property
     def center(self) -> np.ndarray | None:
-        """Chebyshev center of the polyhedron for finite polyhedra, or None for unbounded or infeasible."""
-        if not self._finite_computed:
-            _ = self.finite
-        elif self._finite is True and self._center is None:
-            self._ensure_chebyshev_center()  # TODO: Make sure this only happens once
+        """Chebyshev center: the center of the largest ball in the cell (within its affine hull).
+
+        ``None`` if the cell is empty or that ball is unbounded. An unbounded cell can still have
+        a center, when its recession cone is lower-dimensional (see :attr:`finite`).
+        """
+        if self._finite_computed and self._finite is None:
+            return None
+        self._ensure_chebyshev()
         return self._center
 
     @property
     def inradius(self) -> float | None:
-        """Inradius of the polyhedron, ``inf`` if unbounded feasible, ``None`` if infeasible."""
-        if not self._finite_computed:
-            _ = self.finite
-        elif self._finite is True and self._inradius is None:
-            self._ensure_chebyshev_center()
-        if self._finite is True:
-            if cfg.CAREFUL_MODE:
-                assert self._inradius is not None  # when bounded, get_center_inradius() has set it
-            return self._inradius
-        if self._finite is False:
-            return float("inf")
-        return None
+        """Radius of the largest ball in the cell (within its affine hull).
+
+        ``inf`` if that ball is unbounded, ``None`` if the cell is empty. A finite inradius does
+        not mean the cell is bounded (see :attr:`finite`).
+        """
+        if self._finite_computed and self._finite is None:
+            return None
+        self._ensure_chebyshev()
+        return self._inradius
 
     @property
     def finite(self) -> bool | None:
-        """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``."""
+        """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``.
+
+        Decided from the recession cone, not the Chebyshev ball: a half-infinite prism is
+        unbounded with a finite inradius. See
+        :func:`~relucent.geometry.calculations.certified_bounded`.
+
+        Raises:
+            AmbiguousGeometryError: If boundedness cannot be decided for the exact rows.
+        """
         # 0-cells are vertices; bounded by definition. Never run Chebyshev on them.
         if self._is_zero_cell():
             self._finite = True
             self._finite_computed = True
-            if self._center is None:
-                pt = self._interior_point_from_equalities()
-                self._center = pt.reshape(-1, 1)
-                self._inradius = 0.0
+            self._ensure_chebyshev()
             return True
         if self._finite_computed:
             return self._finite
-        center, inradius = self.get_center_inradius()
-        self._center = center
-        self._inradius = inradius
-        if center is not None:
-            self._finite = True
-        elif inradius is None:
-            self._finite = None
-        elif inradius == float("inf"):
-            self._finite = False
+        self._ensure_chebyshev()
+        finite: bool | None
+        if self._inradius is None:
+            finite = None
+        elif self._center is None or self._inradius == float("inf"):
+            finite = False
+        elif self._inradius == 0.0:
+            finite = True  # the affine hull is a single point
         else:
-            raise ValueError(f"Unexpected Chebyshev result (center={center!r}, inradius={inradius!r})")
+            from relucent.geometry.calculations import certified_bounded
+
+            finite = certified_bounded(self)
+        self._finite = finite
         self._finite_computed = True
-        if self._finite is None:
+        if finite is None:
             self._interior_point = None
-        return self._finite
+        return finite
 
     @property
     def feasible(self) -> bool:
-        """Whether the halfspace system is nonempty (``finite`` is not ``None``)."""
-        return self.finite is not None
+        """Whether the cell is nonempty. Needs only the Chebyshev LP, not :attr:`finite`."""
+        if self._finite_computed:
+            return self._finite is not None
+        self._ensure_chebyshev()
+        return self._inradius is not None
 
     @property
     def shis(self) -> list[int]:
@@ -1263,8 +1268,7 @@ class Polyhedron:
         self.__dict__.setdefault("_rows_data", False)
         self.__dict__.setdefault("_halfspaces_err", None)
         self.__dict__.setdefault("_halfspaces_own", self.__dict__.get("_halfspaces_np") is None)
-        if self._finite is True and self._center is None:
-            self._finite_computed = False
+        self.__dict__.setdefault("_chebyshev_done", self.__dict__.get("_inradius") is not None)
 
     def __getstate__(self) -> dict[str, Any]:
         state: dict[str, Any] = {
@@ -1275,6 +1279,7 @@ class Polyhedron:
             "_center": self._center,
             "_interior_point_norm": self._interior_point_norm,
             "_inradius": self._inradius,
+            "_chebyshev_done": self._chebyshev_done,
             "_shis": self._shis,
             "_shis_strict": self._shis_strict,
             "_Wl2": self._Wl2,

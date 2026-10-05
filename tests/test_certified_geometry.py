@@ -547,3 +547,55 @@ def test_failed_lp_raises_without_exact_rows(env, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(Polyhedron, "_exact_rows", lambda self: None)  # as for a network too large
     with pytest.raises(AmbiguousGeometryError, match="LP solver failure"):
         get_shis(cell, env=env)
+
+
+def _prism() -> list[list[float]]:
+    """``x >= 0, y >= 0, x + y <= 1, z >= 0``: a triangular prism, infinite along ``+z``."""
+    return [[-1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [1.0, 1.0, 0.0, -1.0], [0.0, 0.0, -1.0, 0.0]]
+
+
+def test_half_infinite_prism_is_unbounded() -> None:
+    """Its recession cone is one ray: the inscribed ball is finite, but the cell is unbounded."""
+    cell = _cell(_prism())
+    assert cell.finite is False
+    assert cell.inradius is not None and 0.0 < cell.inradius < float("inf")
+    assert cell.center is not None
+    assert _cell([*_prism(), [0.0, 0.0, 1.0, -1.0]]).finite is True
+
+
+def test_degenerate_recession_cone_without_exact_rows_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(Polyhedron, "_exact_rows", lambda self: None)  # as for a network too large
+    with pytest.raises(AmbiguousGeometryError, match="bounded"):
+        _ = _cell(_prism()).finite
+
+
+def test_network_prism_cells_are_unbounded() -> None:
+    """Where only some first-layer units are active, every deeper row's normal lies exactly in
+    their span, so a cell can be a prism along their common null direction. Each cell's
+    ``finite`` must match an independent recession-cone LP, and the prisms must be real: the
+    forward pass keeps the cell's sign sequence far out along the recession direction."""
+    from scipy.optimize import linprog
+
+    import relucent
+
+    relucent.set_seeds(0)
+    cplx = relucent.Complex(relucent.mlp(widths=[3, 6, 6, 1]))
+    cplx.bfs(verbose=0)
+    prisms = 0
+    for p in cplx:
+        a = p.halfspaces_np[:, :-1]
+        direction = None
+        for k in range(3):
+            for s in (1.0, -1.0):
+                obj = np.zeros(3)
+                obj[k] = -s
+                res = linprog(obj, A_ub=a, b_ub=np.zeros(len(a)), bounds=[(-1.0, 1.0)] * 3)
+                if res.status == 0 and -res.fun > 1e-7:
+                    direction = res.x / np.linalg.norm(res.x)
+        assert p.finite is (direction is None)
+        if direction is not None and p.inradius is not None and p.inradius < float("inf"):
+            prisms += 1
+            center = np.asarray(p.center).reshape(-1)
+            far = (center + 1e5 * direction).reshape(1, -1)
+            assert np.array_equal(np.asarray(cplx.point2ss(far)).reshape(-1), p.ss_np.reshape(-1))
+    assert prisms > 0
