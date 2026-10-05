@@ -49,3 +49,57 @@ def test_complex_save_load_roundtrip_no_ssm(tmp_path, seed: int):
     for p in cplx:
         assert p.ss in loaded_no_ssm
         assert np.array_equal(ss_to_numpy(loaded_no_ssm[p.ss].ss), ss_to_numpy(p.ss))
+
+
+def _explored(seed: int) -> Complex:
+    import relucent
+
+    relucent.set_seeds(seed)
+    cplx = Complex(relucent.mlp(widths=[2, 5, 1]))
+    cplx.bfs(verbose=0)
+    return cplx
+
+
+def test_load_keeps_exploration_state(tmp_path, seed: int):
+    """A saved complete, verified complex runs topology after load without set_exploration_state."""
+    cplx = _explored(seed)
+    assert cplx.complete is True and cplx.verified is True
+    expected = cplx.betti_numbers()
+    path = tmp_path / "cplx.pkl"
+    cplx.save(path)
+    loaded = Complex.load(path)
+    assert loaded.complete is True and loaded.verified is True
+    loaded._betti_cache.clear()  # recompute, which requires the complex to be complete and verified
+    assert loaded.betti_numbers() == expected
+
+
+def test_load_refuses_a_newer_format(tmp_path, seed: int):
+    import pickle
+
+    import pytest
+
+    path = tmp_path / "cplx.pkl"
+    _explored(seed).save(path)
+    with open(path, "rb") as f:
+        state = pickle.load(f)
+    state["format_version"] = Complex.SAVE_FORMAT_VERSION + 1
+    with open(path, "wb") as f:
+        pickle.dump(state, f)
+    with pytest.raises(ValueError, match="Upgrade relucent"):
+        Complex.load(path)
+
+
+def test_load_accepts_a_file_without_a_format_version(tmp_path, seed: int):
+    """Files saved before relucent 1.0 load, without their exploration state."""
+    import pickle
+
+    cplx = _explored(seed)
+    state = cplx.__getstate__()
+    for key in ("_complete", "_verified"):
+        del state[key]
+    path = tmp_path / "legacy.pkl"
+    with open(path, "wb") as f:
+        pickle.dump(state, f)
+    loaded = Complex.load(path)
+    assert len(loaded) == len(cplx)
+    assert loaded.complete is None and loaded.verified is None

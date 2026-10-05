@@ -86,6 +86,9 @@ class Complex:
     (halfspace representations) of polyhedra in the complex.
     """
 
+    #: Version of the file layout :meth:`save` writes; :meth:`load` refuses newer files.
+    SAVE_FORMAT_VERSION = 1
+
     def __init__(self, net: Any) -> None:
         """Initialize the complex for a given network.
 
@@ -253,12 +256,17 @@ class Complex:
     def save(self, filename: str | os.PathLike[str], save_ssm: bool = True) -> None:
         """Save the complex to a pickle file.
 
+        The file keeps the cells, the network, cached Betti numbers and the
+        :attr:`complete` / :attr:`verified` state, so a loaded complex is ready for topology
+        routines without re-running :meth:`certify`.
+
         Args:
             filename: Path to the output file.
             save_ssm: If True, include the SSManager in the saved state so that
                 sign-sequence lookups are preserved. Defaults to True.
         """
         state = self.__getstate__()
+        state["format_version"] = self.SAVE_FORMAT_VERSION
         if save_ssm:
             state["ssm"] = self.ssm
         with open(filename, "wb") as f:
@@ -266,19 +274,29 @@ class Complex:
 
     @classmethod
     def load(cls, filename: str | os.PathLike[str]) -> Self:
-        """Load a Complex from a pickle file.
+        """Load a Complex written by :meth:`save`.
 
-        Intended to be called as Complex.load(filename). The file must have been
-        created by save().
+        This unpickles the file, which can run arbitrary code: only load files you trust.
+        Files from before relucent 1.0 carry no format version; they load without their
+        :attr:`complete` / :attr:`verified` state.
 
         Args:
             filename: Path to the pickle file.
 
         Returns:
             The restored complex.
+
+        Raises:
+            ValueError: If the file was written by a newer relucent (a newer format version).
         """
         with open(filename, "rb") as f:
             state = pickle.load(f)
+        version = int(state.get("format_version", 0))
+        if version > cls.SAVE_FORMAT_VERSION:
+            raise ValueError(
+                f"{os.fspath(filename)!r} has save format {version}; this relucent reads up to "
+                + f"{cls.SAVE_FORMAT_VERSION}. Upgrade relucent to load it."
+            )
         cplx = cls(state["net"])
         cplx.__setstate__(state)
         return cplx
@@ -289,6 +307,8 @@ class Complex:
             "net": self._net,
             "source_model": self.source_model,
             "_betti_cache": self._betti_cache,
+            "_complete": self._complete,
+            "_verified": self._verified,
         }
 
     def __setstate__(self, state: dict[str, Any]) -> None:
@@ -304,6 +324,8 @@ class Complex:
             p._net = self._net
             self.tag2poly[p.tag] = p
         self._betti_cache = state.get("_betti_cache", {})
+        self._complete = state.get("_complete")
+        self._verified = state.get("_verified")
 
     @property
     def net(self) -> ReLUNetwork:
