@@ -5,6 +5,7 @@ This module provides utilities to convert various PyTorch model architectures
 which consists of Linear and ReLU layers only.
 """
 
+import copy
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TypeGuard
@@ -12,7 +13,6 @@ from typing import Any, TypeGuard
 import numpy as np
 import numpy.typing as npt
 
-import relucent.config as cfg
 from relucent._internal.logging import progress
 from relucent._internal.torch_compat import nn, torch
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
@@ -72,6 +72,44 @@ def _canonical_from_affine_tuples(
     return canonical
 
 
+def _conv_padding(conv: nn.Conv2d) -> tuple[int, int]:
+    """``conv``'s padding, after checking :func:`torch_conv_layer_to_affine` reproduces ``conv`` exactly.
+
+    Raises:
+        ValueError: For dilation, groups, a padding mode other than zeros, or ``padding="same"``.
+    """
+    unsupported = []
+    if tuple(int(d) for d in conv.dilation) != (1, 1):
+        unsupported.append(f"dilation={tuple(conv.dilation)}")
+    if conv.groups != 1:
+        unsupported.append(f"groups={conv.groups}")
+    if conv.padding_mode != "zeros":
+        unsupported.append(f"padding_mode={conv.padding_mode!r}")
+    padding: Any = conv.padding
+    if isinstance(padding, str):
+        if padding == "valid":
+            padding = (0, 0)
+        else:
+            unsupported.append(f"padding={padding!r}")
+    if unsupported:
+        raise ValueError(f"Conv2d with {', '.join(unsupported)} is not supported: {conv}")
+    return int(padding[0]), int(padding[1])
+
+
+def _check_avgpool_supported(pool: nn.AvgPool2d) -> None:
+    """Raise unless :func:`avgpool2d_to_affine` reproduces ``pool`` exactly."""
+    padding = pool.padding if isinstance(pool.padding, tuple) else (pool.padding, pool.padding)
+    unsupported = []
+    if pool.ceil_mode:
+        unsupported.append("ceil_mode=True")
+    if pool.divisor_override is not None:
+        unsupported.append(f"divisor_override={pool.divisor_override}")
+    if not pool.count_include_pad and any(int(p) for p in padding):
+        unsupported.append("count_include_pad=False with padding")
+    if unsupported:
+        raise ValueError(f"AvgPool2d with {', '.join(unsupported)} is not supported: {pool}")
+
+
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
 @torch.no_grad()
 def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]) -> nn.Linear:
@@ -84,9 +122,13 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
     Returns:
         nn.Linear: A Linear layer that performs the equivalent operation.
 
+    Raises:
+        ValueError: For dilation, groups, a padding mode other than zeros, or ``padding="same"``.
+
     Reference:
         Based on: https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
     """
+    padding = _conv_padding(conv)
 
     def range2d(to_a: int, to_b: int) -> Iterable[tuple[int, int]]:
         for a in range(to_a):
@@ -107,7 +149,7 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
 
     # Formula from the Torch docs:
     # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
-    output_size = [(input_size[i + 1] + 2 * int(conv.padding[i]) - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]]
+    output_size = [(input_size[i + 1] + 2 * padding[i] - conv.kernel_size[i]) // conv.stride[i] + 1 for i in [0, 1]]
 
     in_shape = (conv.in_channels, w, h)
     out_shape = (conv.out_channels, output_size[0], output_size[1])
@@ -125,8 +167,8 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
         leave=False,
     ):
         # The upper-left corner of the filter in the input tensor
-        xi0 = -int(conv.padding[0]) + int(conv.stride[0]) * xo
-        yi0 = -int(conv.padding[1]) + int(conv.stride[1]) * yo
+        xi0 = -padding[0] + int(conv.stride[0]) * xo
+        yi0 = -padding[1] + int(conv.stride[1]) * yo
 
         # Position within the filter
         for xd, yd in range2d(conv.kernel_size[0], conv.kernel_size[1]):
@@ -162,6 +204,7 @@ def avgpool2d_to_affine(avgpool: nn.AvgPool2d, input_size: tuple[int, int, int])
     Reference:
         Based on: https://www.researchgate.net/figure/The-mean-pooling-is-described-with-the-matrix-multiplication-of-the-reshaped-feature-map_fig2_357833254
     """
+    _check_avgpool_supported(avgpool)
     # https://www.researchgate.net/figure/The-mean-pooling-is-described-with-the-matrix-multiplication-of-the-reshaped-feature-map_fig2_357833254
     conv2d = nn.Conv2d(
         in_channels=input_size[0],
@@ -219,6 +262,50 @@ def _conversion_error_bound(layers: Mapping[str, object], x: torch.Tensor, dtype
     return 2.0 * g * v * (1.0 + 4.0 * rounding.EPS)
 
 
+def _check_matches_source(
+    model: nn.Module,
+    new_model: ReLUNetwork,
+    layers: Mapping[str, object],
+    input_shape: tuple[int, ...],
+    dtype: torch.dtype,
+    device: torch.device,
+    n_samples: int = 8,
+) -> None:
+    """Raise unless ``new_model`` reproduces ``model``'s forward pass on random inputs, to within rounding.
+
+    :func:`convert` composes ``model``'s child modules in order, so a ``forward`` that does
+    anything else (a skip connection, a reused or reordered module) converts to a different
+    function. The inputs come from a private generator, so the global torch RNG is untouched.
+    """
+    generator = torch.Generator().manual_seed(0)
+    x = torch.randn((n_samples, *input_shape), generator=generator, dtype=torch.float64).to(device=device, dtype=dtype)
+    was_training = model.training
+    try:
+        model.eval()
+        source = model(x)
+    except Exception as e:
+        raise ValueError(f"Conversion failed: the source model's forward pass raised: {e}") from e
+    finally:
+        model.train(was_training)
+    old = torch.as_tensor(source).detach().double().cpu().reshape(n_samples, -1)
+    new = torch.as_tensor(new_model(x)).detach().double().cpu().reshape(n_samples, -1)
+    if old.shape != new.shape:
+        raise ValueError(
+            f"Conversion failed: the source model outputs shape {tuple(old.shape[1:])}, "
+            + f"the converted one {tuple(new.shape[1:])}"
+        )
+    for i in range(n_samples):
+        bound = torch.as_tensor(_conversion_error_bound(layers, x[i], dtype), dtype=torch.float64)
+        diff = (old[i] - new[i]).abs()
+        if not bool((diff <= bound).all()):
+            raise ValueError(
+                f"Conversion failed: the converted model differs from the source by {float(diff.max()):.3e}, "
+                + f"beyond its rounding bound {float(bound.max()):.3e}. convert() composes the model's child "
+                + "modules in order; a forward() that does anything else (skip connections, reused or "
+                + "reordered modules) is not supported."
+            )
+
+
 def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDict[str, nn.Module]:
     """Combine consecutive Linear layers into a single layer.
 
@@ -274,10 +361,16 @@ def convert(
 
     Supported layer types:
         - ``Linear``, ``ReLU``: passed through unchanged.
-        - ``Conv2d``: converted to ``Linear``.
-        - ``AvgPool2d``: converted to ``Linear`` (requires ``kernel_size == stride``).
+        - ``Conv2d``: converted to ``Linear`` (zero padding, no dilation or groups).
+        - ``AvgPool2d``: converted to ``Linear`` (requires ``kernel_size == stride``, no
+          ``ceil_mode`` or ``divisor_override``).
         - ``Flatten``, ``Dropout``: dropped (identity / inference-only).
         - ``LogSoftmax``: halts conversion at the output layer.
+
+    The model is read as the composition of its child modules, in order. For a
+    ``torch.nn.Module`` (other than a ``ModuleList`` / ``ModuleDict``, which have no forward
+    pass), the result is checked against the model's own forward pass on random inputs, so a
+    ``forward`` that does something else raises instead of converting to a different function.
 
     Args:
         model: A ``torch.nn.Module``, a ``ModuleList``, a ``ModuleDict``, or an
@@ -290,12 +383,13 @@ def convert(
         A :class:`~relucent.model.model.ReLUNetwork` in canonical format.
 
     Raises:
-        ValueError: If an unsupported layer type is encountered or ``input_shape``
-            cannot be inferred.
+        ValueError: If an unsupported layer type is encountered, ``input_shape``
+            cannot be inferred, or the result does not reproduce the model's forward pass.
     """
     if isinstance(model, ReLUNetwork):
-        if input_shape is not None:
-            model.input_shape = input_shape
+        if input_shape is not None and tuple(input_shape) != tuple(model.input_shape):
+            model = copy.copy(model)  # leave the caller's network as it was
+            model.input_shape = tuple(input_shape)
         return model
 
     if _is_affine_pair_sequence(model):
@@ -338,7 +432,7 @@ def convert(
             input_shape = (int(first_linear.in_features),)
     else:
         raise ValueError(
-            f"Unsupported input type: {type(input)}."
+            f"Unsupported input type: {type(model)}. "
             + "Must be a canonical relu network, an Iterable/Mapping of nn.Module objects, or an iterable of (W, b)."
         )
 
@@ -361,6 +455,7 @@ def convert(
             new_layer = torch_conv_layer_to_affine(module, shape).to(device=device, dtype=dtype)
             layers[name] = new_layer
         elif isinstance(module, nn.AvgPool2d) and module.kernel_size == module.stride:
+            _check_avgpool_supported(module)
             shape = tuple(int(dim) for dim in x.shape[1:])
             assert isinstance(shape, tuple) and len(shape) == 3
             new_layer = avgpool2d_to_affine(module, shape).to(device=device, dtype=dtype)
@@ -375,21 +470,6 @@ def convert(
     new_model = ReLUNetwork(layers=canonical_layers, input_shape=(np.prod(input_shape, dtype=int),))
 
     has_logsoftmax = any(isinstance(m, nn.LogSoftmax) for m in source_layers.values())
-    if not has_logsoftmax and isinstance(model, nn.Module) and not isinstance(model, nn.ModuleList):
-        was_training = model.training
-        try:
-            model.eval()
-            x = torch.randn(input_shape, dtype=dtype, device=device)
-            old_y = model(x)
-            new_y = torch.as_tensor(new_model(x))
-            if cfg.CAREFUL_MODE:
-                bound = _conversion_error_bound(uncombined_layers, x, dtype)
-                diff = (old_y.detach().double().reshape(-1) - new_y.detach().double().reshape(-1)).abs()
-                assert bool((diff <= torch.as_tensor(bound, dtype=torch.float64)).all()), (
-                    f"converted model differs from the source by {float(diff.max()):.3e}, beyond its rounding bound"
-                )
-        except Exception as e:
-            raise ValueError(f"Conversion failed: {e}") from e
-        finally:
-            model.train(was_training)
+    if not has_logsoftmax and isinstance(model, nn.Module) and not isinstance(model, (nn.ModuleList, nn.ModuleDict)):
+        _check_matches_source(model, new_model, uncombined_layers, tuple(input_shape), dtype, device)
     return new_model

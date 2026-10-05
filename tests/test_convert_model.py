@@ -307,3 +307,74 @@ class TestConvert:
         assert len(linear_layers) == 1
         assert linear_layers[0].weight.shape[1] == 4
         assert linear_layers[0].weight.shape[0] == 3
+
+
+class _Residual(nn.Module):
+    """``forward`` adds a skip connection, so it is not the composition of its children."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.fc0 = nn.Linear(2, 2)
+        self.relu = nn.ReLU()
+        self.fc1 = nn.Linear(2, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc1(self.relu(self.fc0(x)) + x)
+
+
+class TestConvertChecksSource:
+    @pytest.mark.parametrize(("h", "w", "stride", "padding"), [(6, 6, 1, 0), (6, 5, 1, 1), (7, 7, 2, 0), (6, 6, 1, "valid")])
+    def test_conv_sequential_converts(self, seeded, h, w, stride, padding):
+        """An ``nn.Sequential`` conv net (with a Flatten) converts, checked against its own forward pass."""
+        assert seeded is not None
+        conv = nn.Conv2d(1, 2, kernel_size=3, stride=stride, padding=padding)
+        x = torch.randn(4, 1, h, w)
+        n_out = conv(x).shape[1:].numel()
+        model = nn.Sequential(conv, nn.ReLU(), nn.Flatten(), nn.Linear(n_out, 1))
+        canonical = convert(model, input_shape=(1, h, w))
+        y = torch.as_tensor(canonical(x.reshape(4, -1)))
+        assert torch.allclose(model(x), y.to(torch.float32), atol=1e-5)
+
+    def test_skip_connection_raises(self, seeded):
+        assert seeded is not None
+        with pytest.raises(ValueError, match="composes the model's child modules in order"):
+            convert(_Residual())
+
+    @pytest.mark.parametrize(
+        ("kwargs", "match"),
+        [
+            ({"dilation": 2}, "dilation"),
+            ({"groups": 2}, "groups"),
+            ({"padding": "same"}, "padding="),
+            ({"padding": 1, "padding_mode": "reflect"}, "padding_mode"),
+        ],
+    )
+    def test_unsupported_conv_options_raise(self, seeded, kwargs, match):
+        assert seeded is not None
+        conv = nn.Conv2d(2, 2, kernel_size=3, **kwargs)
+        model = nn.Sequential(conv, nn.ReLU(), nn.Flatten(), nn.Linear(conv(torch.zeros(1, 2, 7, 7)).shape[1:].numel(), 1))
+        with pytest.raises(ValueError, match=match):
+            convert(model, input_shape=(2, 7, 7))
+
+    @pytest.mark.parametrize(
+        ("kwargs", "match"), [({"ceil_mode": True}, "ceil_mode"), ({"divisor_override": 3}, "divisor_override")]
+    )
+    def test_unsupported_avgpool_options_raise(self, seeded, kwargs, match):
+        assert seeded is not None
+        pool = nn.AvgPool2d(kernel_size=2, stride=2, **kwargs)
+        with pytest.raises(ValueError, match=match):
+            convert(nn.Sequential(pool, nn.Flatten(), nn.Linear(16, 1)), input_shape=(1, 8, 8))
+
+    def test_global_rng_is_untouched(self, seeded):
+        assert seeded is not None
+        model = torch_mlp(widths=[3, 5, 1])
+        state = torch.random.get_rng_state()
+        convert(model)
+        assert torch.equal(torch.random.get_rng_state(), state)
+
+    def test_relu_network_input_is_not_mutated(self, seeded):
+        assert seeded is not None
+        net = convert([[np.eye(4), np.zeros(4)], [np.ones((1, 4)), np.zeros(1)]])
+        out = convert(net, input_shape=(2, 2))
+        assert net.input_shape == (4,)
+        assert out.input_shape == (2, 2)
