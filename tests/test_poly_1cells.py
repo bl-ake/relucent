@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from relucent import AmbiguousGeometryError, Polyhedron
+from relucent._internal.cache import UNSET
 
 
 def _poly_from_halfspaces(*, halfspaces: np.ndarray, zero_rows: set[int] | None = None) -> Polyhedron:
@@ -214,7 +215,7 @@ def test_finite_true_without_chebyshev_cache_interior_and_center():
     )
     ss = np.ones((1, 2), dtype=np.int8)
     p = Polyhedron(None, ss, halfspaces=halfspaces, finite=True)
-    assert p._center is None
+    assert p._chebyshev is UNSET  # finite=True was given; the Chebyshev LP has not run
     ip = np.asarray(p.interior_point).reshape(-1)
     assert np.allclose(ip, np.array([0.5]), atol=1e-6)
     assert np.allclose(p.find_interior_point().reshape(-1), np.array([0.5]), atol=1e-6)

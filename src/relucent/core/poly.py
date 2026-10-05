@@ -1,10 +1,9 @@
 """Polyhedron: a single linear region of a ReLU network in input space."""
 
 import hashlib
-import warnings
 from collections.abc import Callable, Iterable
 from functools import cached_property
-from typing import Any, Literal, cast, overload
+from typing import Any, ClassVar, Literal, cast, overload
 
 import numpy as np
 import plotly.graph_objects as go
@@ -12,6 +11,7 @@ from scipy.spatial import ConvexHull, HalfspaceIntersection
 
 import relucent.config as cfg
 from relucent._internal import rounding
+from relucent._internal.cache import UNSET, Unset
 from relucent._internal.gurobi import get_env
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError
@@ -19,8 +19,11 @@ from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry import calculations
 from relucent.geometry.calculations import (
     DegenerateHalfspaceInfeasibility,
+    QhullGeometry,
     _affine_null_basis,
     _drop_degenerate_halfspaces_tracked,
+    _interval_endpoints,
+    _qhull_halfspace_intersection,
     _remap_zero_indices,
     compute_properties,
     solve_radius,
@@ -35,7 +38,33 @@ class Polyhedron:
 
     Prefer creating instances via :meth:`~relucent.Complex.add_point`,
     :meth:`~relucent.Complex.add_ss`, or search methods — not direct construction.
+
+    A polyhedron is identified by its sign sequence, which is fixed at construction. Its
+    geometry is computed lazily: the first read of a property such as :attr:`halfspaces`,
+    :attr:`shis`, :attr:`finite`, :attr:`interior_point` or :attr:`vertices` computes it, and
+    later reads return the cached value. :meth:`compute_geometric_properties` computes several
+    at once (the names are in :attr:`GEOMETRY_PROPERTIES`).
     """
+
+    #: Property names :meth:`compute_geometric_properties` and the search functions'
+    #: ``geometry_properties`` accept.
+    GEOMETRY_PROPERTIES: ClassVar[tuple[str, ...]] = (
+        "halfspaces",
+        "W",
+        "b",
+        "finite",
+        "center",
+        "inradius",
+        "interior_point",
+        "interior_point_norm",
+        "Wl2",
+        "halfspace_intersection",
+        "vertices",
+        "convex_hull",
+        "volume",
+    )
+    #: The subset of :attr:`GEOMETRY_PROPERTIES` that one Qhull computation provides.
+    QHULL_PROPERTIES: ClassVar[frozenset[str]] = frozenset({"halfspace_intersection", "vertices", "convex_hull", "volume"})
 
     def __init__(
         self,
@@ -106,36 +135,23 @@ class Polyhedron:
         self._halfspaces_ss: np.ndarray | None = halfspaces_ss
         self._w: torch.Tensor | np.ndarray | None = W
         self._b: torch.Tensor | np.ndarray | None = b
-        self._Wl2: float | None = None
-        self._interior_point: np.ndarray | None = None
-        self._interior_point_norm: float | None = None
-        self._center: np.ndarray | None = None
-        self._inradius: float | None = None
-        self._chebyshev_done: bool = False
         self.bound = bound
+
+        # Each computed property is cached in one slot. Slots whose answer can itself be None
+        # start at UNSET (not computed); the others use None for that (see relucent._internal.cache).
+        self._finite: bool | None | Unset = UNSET if finite is None else finite
+        self._chebyshev: tuple[np.ndarray | None, float | None] | Unset = UNSET  # (center, inradius)
+        self._interior_point: np.ndarray | None | Unset = UNSET
+        self._qhull: QhullGeometry | Unset = UNSET
 
         self._shis: list[int] | None = shis
         # Whether ``_shis`` is this cell's certified facet list (``calculations.shis`` on it), as opposed to a
         # list assigned from the dual graph or a coface; certification recomputes only the latter.
         self._shis_strict: bool = shis_strict
-        self._halfspace_intersection: HalfspaceIntersection | None = None
-        self._convex_hull: ConvexHull | None = None
-        self._finite: bool | None = finite
-        self._finite_computed: bool = finite is not None
-        self._vertices: np.ndarray | None = None
-        self._volume: float | None = None
         self._covector_infeasible: bool = False
         self._covector_endpoint_shis: list[int] | None = covector_endpoint_shis
 
-        self._hash: int | None = None
-        self._tag: bytes | None = None
-
         self.warnings: list[Warning] = []
-
-        # Cached NumPy representation of the sign sequence (if/when needed).
-        self._ss_np: np.ndarray | None = None
-
-        self._attempted_compute_properties: bool = False
         self._ambient_dim: int | None = ambient_dim
 
         self._apply_zero_cell_finite_hint()
@@ -284,7 +300,6 @@ class Polyhedron:
         if self.codim != ambient:
             return
         self._finite = True
-        self._finite_computed = True
 
     def _is_zero_cell(self) -> bool:
         return self.dim == 0
@@ -392,32 +407,20 @@ class Polyhedron:
 
     @property
     def ss(self) -> np.ndarray | torch.Tensor:
-        """The sign sequence: a 1-D array with one entry in {-1, 0, 1} per ReLU unit. Assigning it clears derived caches."""
+        """The sign sequence: a 1-D array with one entry in {-1, 0, 1} per ReLU unit.
+
+        Fixed at construction: it is the polyhedron's identity (:attr:`tag`, ``==``, ``hash``).
+        """
         return self._ss
 
-    @ss.setter
-    def ss(self, value: np.ndarray | torch.Tensor) -> None:
-        self._ss = self._coerce_ss_to_int(value)
-        self._clear_ss_derived_caches()
-
-    def _clear_ss_derived_caches(self) -> None:
-        """Drop sign-sequence-derived caches after ``ss`` changes."""
-        self._ss_np = None
-        for name in ("codim", "dim", "zero_indices", "non_zero_indices"):
-            self.__dict__.pop(name, None)
-
-    @property
+    @cached_property
     def ss_np(self) -> np.ndarray:
-        """Cached NumPy representation of the sign sequence."""
-        if self._ss_np is None:
-            if isinstance(self._ss, np.ndarray):
-                self._ss_np = self._ss
-            elif isinstance(self._ss, torch.Tensor):
-                self._ss_np = self._ss.detach().cpu().numpy().astype(np.int8, copy=False)
-            else:
-                raise TypeError(f"Unsupported ss type: {type(self._ss)}")
-        assert self._ss_np is not None
-        return self._ss_np
+        """The sign sequence as a NumPy ``int8`` array."""
+        if isinstance(self._ss, np.ndarray):
+            return self._ss
+        if isinstance(self._ss, torch.Tensor):
+            return self._ss.detach().cpu().numpy().astype(np.int8, copy=False)
+        raise TypeError(f"Unsupported ss type: {type(self._ss)}")
 
     @cached_property
     def zero_indices(self) -> np.ndarray:
@@ -444,20 +447,15 @@ class Polyhedron:
         env: Any = None,
         max_radius: float | None = None,
     ) -> np.ndarray:
-        """Get a point inside the polyhedron.
+        """Find a point inside the polyhedron (within its affine hull), without caching it.
 
-        Computes an interior point of the polyhedron.
-
-        This method is "compute-only": it returns the interior point but does not
-        mutate cached attributes like ``self._interior_point``.
+        The :attr:`interior_point` property caches the same point.
 
         Args:
             env: Gurobi environment for optimization. If None, uses a cached
                 environment. Defaults to None.
             max_radius: Maximum radius constraint for the search. If None, uses
                 :data:`relucent.config.MAX_RADIUS`. Defaults to None.
-            zero_indices: Indices of sign sequence elements that are zero (for
-                lower-dimensional polyhedra). Defaults to None.
 
         Returns:
             np.ndarray: An interior point of the polyhedron.
@@ -471,8 +469,9 @@ class Polyhedron:
         if not self.feasible:
             raise ValueError("Polyhedron is infeasible (empty).")
         # The Chebyshev center, when that LP has run and the cell's inscribed ball is bounded.
-        if self._chebyshev_done and self._center is not None:
-            interior_point = np.asarray(self._center).squeeze()
+        known_center = self._chebyshev[0] if self._chebyshev is not UNSET else None
+        if known_center is not None:
+            interior_point = np.asarray(known_center).squeeze()
         else:
             env = env or get_env()
             interior_point = solve_radius(
@@ -489,11 +488,7 @@ class Polyhedron:
         return interior_point
 
     def _chebyshev_ball(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
-        """Get the Chebyshev center and inradius of the polyhedron.
-
-        This method is "compute-only": it returns (center, inradius) but does
-        not mutate cached attributes like ``self._center``, ``self._inradius``,
-        or ``self._finite``.
+        """Solve for the Chebyshev center and inradius, without caching them (see :attr:`center`).
 
         Args:
             env: Gurobi environment for optimization. If None, uses a cached
@@ -589,9 +584,8 @@ class Polyhedron:
         return NotImplemented
 
     def __hash__(self) -> int:
-        if self._hash is None:
-            self._hash = hash(self.tag)
-        return self._hash
+        # Not cached or pickled: hash(bytes) differs between processes (hash randomization).
+        return hash(self.tag)
 
     def _same_rows_kwargs(self) -> dict[str, Any]:
         """Constructor kwargs for a net-less cell that shares this cell's rows (and their provenance)."""
@@ -746,81 +740,10 @@ class Polyhedron:
 
             remap_vertices = _remap_vertices
 
-        reduced_dim = projected_halfspaces.shape[1] - 1
-        if reduced_dim == 1:
-            a = projected_halfspaces[:, 0]
-            b = projected_halfspaces[:, 1]
-            lower = -float("inf")
-            upper = float("inf")
-            for ai, bi in zip(a, b, strict=True):
-                if ai == 0.0:
-                    # A row parallel to the segment; the segment was certified nonempty.
-                    if bi > 0.0:
-                        raise ValueError("Infeasible 1D projected halfspace system")
-                    continue
-                cutoff = -bi / ai
-                if ai > 0:
-                    upper = min(upper, cutoff)
-                else:
-                    lower = max(lower, cutoff)
-            if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper:
-                raise ValueError("Projected 1D intersection is empty or unbounded")
-            reduced_vertices = np.array([[lower], [upper]], dtype=np.float64)
-            vertices = remap_vertices(reduced_vertices)
-            return np.unique(vertices, axis=0)
-        try:
-            with warnings.catch_warnings(record=True) as w:
-                hs = HalfspaceIntersection(
-                    projected_halfspaces,
-                    projected_int_point,
-                    qhull_options=None,
-                )  # http://www.qhull.org/html/qh-optq.htm
-            if w:
-                msgs = "; ".join(str(wi.message) for wi in w)
-                if qhull_mode == "IGNORE":
-                    self.warnings.extend([RuntimeWarning(wi) for wi in w])
-                if qhull_mode == "WARN_ALL":
-                    warnings.warn(f"Halfspace intersection emitted warnings: {msgs}", stacklevel=2)
-                elif qhull_mode == "HIGH_PRECISION":
-                    raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
-                elif qhull_mode == "JITTERED":
-                    with warnings.catch_warnings(record=True) as w2:
-                        new_hs = HalfspaceIntersection(
-                            projected_halfspaces,
-                            projected_int_point,
-                            # Triangulated output is approximately 1000 times more accurate than joggled input.
-                            qhull_options="QJ",
-                        )  # http://www.qhull.org/html/qh-optq.htm
-                    if w2:
-                        self.warnings.append(
-                            RuntimeWarning(
-                                "Recomputing HalfspaceIntersection with jitter option 'QJ' still had numerical problems"
-                            )
-                        )
-                        self.warnings.extend([RuntimeWarning(wi) for wi in w2])
-                    else:
-                        ## Jittering solved the numerical problems
-                        hs = new_hs
-        except ValueError:
-            raise  # Our HIGH_PRECISION raise - do not retry
-        except Exception as e:
-            if qhull_mode == "JITTERED":
-                try:
-                    hs = HalfspaceIntersection(
-                        projected_halfspaces,
-                        projected_int_point,
-                        # Triangulated output is approximately 1000 times more accurate than joggled input.
-                        qhull_options="QJ",
-                    )  # http://www.qhull.org/html/qh-optq.htm
-                    self.warnings.append(
-                        RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}")
-                    )
-                except Exception as e2:
-                    raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
-            else:
-                raise ValueError(f"Error while computing halfspace intersection: {e}") from e
-        vertices = remap_vertices(hs.intersections)
-        return vertices
+        if projected_halfspaces.shape[1] - 1 == 1:  # Qhull needs two dimensions
+            return np.unique(remap_vertices(_interval_endpoints(projected_halfspaces)), axis=0)
+        hs = _qhull_halfspace_intersection(projected_halfspaces, projected_int_point, qhull_mode, self.warnings)
+        return remap_vertices(hs.intersections)
 
     def _get_bounded_plot_geometry(
         self,
@@ -859,51 +782,35 @@ class Polyhedron:
         properties: Iterable[str],
         env: Any = None,
     ) -> None:
-        """Compute selected cached properties.
+        """Compute and cache the named properties (names from :attr:`GEOMETRY_PROPERTIES`).
+
+        The same as reading each property, except that ``env`` is used for the LPs.
 
         Args:
-            properties: Iterable of cache/property names to ensure are computed.
-                Supported names include ``"halfspaces"``, ``"W"``, ``"b"``,
-                ``"finite"``, ``"center"``,
-                ``"inradius"``, ``"interior_point"``, ``"interior_point_norm"``,
-                ``"Wl2"``, ``"volume"``, ``"vertices"``, ``"convex_hull"``, and
-                ``"halfspace_intersection"``.
-            env: Optional Gurobi environment used for interior-point/feasibility
-                solves when relevant.
+            properties: Names of the properties to compute.
+            env: Gurobi environment for the Chebyshev and interior-point LPs; the default
+                uses the process's cached environment.
+
+        Raises:
+            ValueError: If a name is not in :attr:`GEOMETRY_PROPERTIES`.
         """
-        requested = {name.strip() for name in properties}
-        if not requested:
-            return
+        requested = {str(name).strip() for name in properties}
+        unknown = requested - set(self.GEOMETRY_PROPERTIES)
+        if unknown:
+            raise ValueError(f"Unknown geometry properties {sorted(unknown)}; expected names from {self.GEOMETRY_PROPERTIES}")
+        if requested & {"finite", "center", "inradius"}:
+            self._ensure_chebyshev(env)
+        if requested & ({"interior_point", "interior_point_norm"} | self.QHULL_PROPERTIES):
+            self._ensure_interior_point(env)
+        for name in self.GEOMETRY_PROPERTIES:
+            if name in requested:
+                getattr(self, name)
 
-        geometry_aliases = {"halfspace_intersection", "vertices", "convex_hull", "volume"}
-        if "halfspaces_np" in requested:
-            requested.add("halfspaces")
-        if requested & geometry_aliases:
-            requested.add("interior_point")
-
-        if requested & {"halfspaces", "W", "b"}:
-            _ = self.halfspaces
-        if "finite" in requested:
-            _ = self.finite
-        if "center" in requested:
-            _ = self.center
-        if "inradius" in requested:
-            _ = self.inradius
-        if "interior_point" in requested and self._interior_point is None:
-            self._interior_point = self.find_interior_point(env=env)
-        if "interior_point_norm" in requested:
-            if self.interior_point is not None:
-                self._interior_point_norm = np.linalg.norm(self.interior_point).item()
-            else:
-                self._interior_point_norm = float("inf")
-        if "Wl2" in requested:
-            _ = self.Wl2
-        if requested & geometry_aliases:
-            self._compute_qhull_geometry()
-
-    def _compute_qhull_geometry(self, qhull_mode: str | None = None) -> None:
-        """Compute Qhull-derived geometry caches (halfspace intersection, vertices, convex hull, volume)."""
-        compute_properties(self, qhull_mode=qhull_mode)
+    def _ensure_qhull(self) -> QhullGeometry:
+        """Run :func:`~relucent.geometry.calculations.compute_properties` once and cache it."""
+        if self._qhull is UNSET:
+            self._qhull = compute_properties(self)
+        return self._qhull
 
     def _ensure_affine_data(self, *, force_numpy: bool = False) -> None:
         """Populate halfspace and affine-map caches via :func:`~relucent.geometry.calculations.halfspaces`."""
@@ -919,37 +826,41 @@ class Polyhedron:
 
     @property
     def vertices(self) -> np.ndarray | None:
-        """Vertices of the polyhedron (not always reliable)."""
-        if not self._attempted_compute_properties:
-            self._compute_qhull_geometry()
-        return self._vertices
+        """Vertices Qhull finds, in input coordinates; ``None`` if the cell is empty.
+
+        For an unbounded cell these are its finite vertices. They are Qhull's, kept when they
+        satisfy every row within its float64 error, and do not enter any topology computation.
+        """
+        if not self.feasible:
+            return None
+        return self._ensure_qhull().vertices
 
     @property
-    def halfspace_intersection(self) -> HalfspaceIntersection:
-        """SciPy :class:`~scipy.spatial.HalfspaceIntersection` of this cell's halfspaces."""
-        if not self._attempted_compute_properties:
-            self._compute_qhull_geometry()
-        assert isinstance(self._halfspace_intersection, HalfspaceIntersection)
-        return self._halfspace_intersection
+    def halfspace_intersection(self) -> HalfspaceIntersection | None:
+        """SciPy :class:`~scipy.spatial.HalfspaceIntersection` of this cell's halfspaces.
+
+        ``None`` if the cell is empty or has dimension below 2 (Qhull needs two).
+        """
+        if not self.feasible:
+            return None
+        return self._ensure_qhull().halfspace_intersection
 
     @property
     def convex_hull(self) -> ConvexHull | None:
-        """SciPy :class:`~scipy.spatial.ConvexHull` of a bounded cell; ``None`` if unbounded or if Qhull fails."""
-        if not self._attempted_compute_properties and self.finite:
-            self._compute_qhull_geometry()
-        return self._convex_hull
+        """SciPy :class:`~scipy.spatial.ConvexHull` of a bounded cell; ``None`` if unbounded, empty, or if Qhull fails."""
+        if self.finite is not True:
+            return None
+        return self._ensure_qhull().convex_hull
 
     @property
-    def volume(self) -> float:
-        """Volume of the polyhedron, infinity for unbounded polyhedra, or -1 if computation fails."""
-        fin = self.finite
-        if fin is False:
-            self._volume = float("inf")
-        elif fin is None:
-            self._volume = -1.0
-        elif not self._attempted_compute_properties:
-            self._compute_qhull_geometry()
-        return self._volume if self._volume is not None else -1.0
+    def volume(self) -> float | None:
+        """Volume (within the affine hull): ``inf`` if unbounded, ``None`` if empty or if Qhull fails."""
+        finite = self.finite
+        if finite is None:
+            return None
+        if finite is False:
+            return float("inf")
+        return self._ensure_qhull().volume
 
     @cached_property
     def tag(self) -> bytes:
@@ -1068,24 +979,17 @@ class Polyhedron:
 
     @property
     def Wl2(self) -> float:
-        """L2 norm of the transformation matrix W."""
-        if self._Wl2 is None:
-            if isinstance(self.W, torch.Tensor):
-                self._Wl2 = float(torch.linalg.norm(self.W).item())
-            elif isinstance(self.W, np.ndarray):
-                self._Wl2 = float(np.linalg.norm(self.W))
-            else:
-                raise NotImplementedError
-        return self._Wl2
+        """Frobenius norm of :attr:`W`."""
+        w = self.W
+        if isinstance(w, np.ndarray):
+            return float(np.linalg.norm(w))
+        return float(torch.linalg.norm(w).item())
 
-    def _ensure_chebyshev(self, env: Any = None) -> None:
-        """Run the Chebyshev LP once, caching ``_center`` and ``_inradius`` (see :meth:`_chebyshev_ball`)."""
-        if self._chebyshev_done:
-            return
-        center, inradius = self._chebyshev_ball(env=env)
-        self._center = center
-        self._inradius = inradius
-        self._chebyshev_done = True
+    def _ensure_chebyshev(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
+        """Run the Chebyshev LP once and cache ``(center, inradius)`` (see :meth:`_chebyshev_ball`)."""
+        if self._chebyshev is UNSET:
+            self._chebyshev = self._chebyshev_ball(env=env)
+        return self._chebyshev
 
     @property
     def center(self) -> np.ndarray | None:
@@ -1094,10 +998,9 @@ class Polyhedron:
         ``None`` if the cell is empty or that ball is unbounded. An unbounded cell can still have
         a center, when its recession cone is lower-dimensional (see :attr:`finite`).
         """
-        if self._finite_computed and self._finite is None:
+        if self._finite is None:  # known to be empty
             return None
-        self._ensure_chebyshev()
-        return self._center
+        return self._ensure_chebyshev()[0]
 
     @property
     def inradius(self) -> float | None:
@@ -1106,10 +1009,9 @@ class Polyhedron:
         ``inf`` if that ball is unbounded, ``None`` if the cell is empty. A finite inradius does
         not mean the cell is bounded (see :attr:`finite`).
         """
-        if self._finite_computed and self._finite is None:
+        if self._finite is None:  # known to be empty
             return None
-        self._ensure_chebyshev()
-        return self._inradius
+        return self._ensure_chebyshev()[1]
 
     @property
     def finite(self) -> bool | None:
@@ -1122,39 +1024,33 @@ class Polyhedron:
         Raises:
             AmbiguousGeometryError: If boundedness cannot be decided for the exact rows.
         """
-        # 0-cells are vertices; bounded by definition. Never run Chebyshev on them.
+        # 0-cells are vertices; bounded by definition.
         if self._is_zero_cell():
             self._finite = True
-            self._finite_computed = True
-            self._ensure_chebyshev()
             return True
-        if self._finite_computed:
+        if self._finite is not UNSET:
             return self._finite
-        self._ensure_chebyshev()
+        center, inradius = self._ensure_chebyshev()
         finite: bool | None
-        if self._inradius is None:
+        if inradius is None:
             finite = None
-        elif self._center is None or self._inradius == float("inf"):
+        elif center is None or inradius == float("inf"):
             finite = False
-        elif self._inradius == 0.0:
+        elif inradius == 0.0:
             finite = True  # the affine hull is a single point
         else:
             from relucent.geometry.calculations import certified_bounded
 
             finite = certified_bounded(self)
         self._finite = finite
-        self._finite_computed = True
-        if finite is None:
-            self._interior_point = None
         return finite
 
     @property
     def feasible(self) -> bool:
         """Whether the cell is nonempty. Needs only the Chebyshev LP, not :attr:`finite`."""
-        if self._finite_computed:
+        if self._finite is not UNSET:
             return self._finite is not None
-        self._ensure_chebyshev()
-        return self._inradius is not None
+        return self._ensure_chebyshev()[1] is not None
 
     @property
     def shis(self) -> list[int]:
@@ -1177,20 +1073,22 @@ class Polyhedron:
         """Number of faces."""
         return len(self.shis)
 
-    @cached_property
-    def interior_point(self) -> np.ndarray | None:
-        """A point guaranteed to be inside the polyhedron."""
-        if self._interior_point is None:
-            self._interior_point = self.find_interior_point()
+    def _ensure_interior_point(self, env: Any = None) -> np.ndarray | None:
+        """Find an interior point once and cache it (``None`` for an empty cell)."""
+        if self._interior_point is UNSET:
+            self._interior_point = self.find_interior_point(env=env) if self.feasible else None
         return self._interior_point
 
     @property
+    def interior_point(self) -> np.ndarray | None:
+        """A point strictly inside the cell (within its affine hull); ``None`` if the cell is empty."""
+        return self._ensure_interior_point()
+
+    @property
     def interior_point_norm(self) -> float | None:
-        """L2 norm of the interior point."""
-        assert self.interior_point is not None
-        if self._interior_point_norm is None:
-            self._interior_point_norm = np.linalg.norm(self.interior_point).item()
-        return self._interior_point_norm
+        """Euclidean norm of :attr:`interior_point`; ``None`` if the cell is empty."""
+        point = self.interior_point
+        return None if point is None else float(np.linalg.norm(point))
 
     @cached_property
     def codim(self) -> int:
@@ -1248,6 +1146,7 @@ class Polyhedron:
         return Polyhedron(self._net, self.ss + other.ss * (self.ss == 0))
 
     def __setstate__(self, state: dict[str, Any]) -> None:
+        state = _upgrade_legacy_state(dict(state))
         self.__dict__.update(state)
         if "_halfspaces_own" not in state and state.get("_halfspaces_np") is not None:
             # Pickled before error scales were tracked: the cached rows may be a coface's.
@@ -1257,24 +1156,17 @@ class Polyhedron:
         self.__dict__.setdefault("_rows_data", False)
         self.__dict__.setdefault("_halfspaces_err", None)
         self.__dict__.setdefault("_halfspaces_own", self.__dict__.get("_halfspaces_np") is None)
-        self.__dict__.setdefault("_chebyshev_done", self.__dict__.get("_inradius") is not None)
+        for slot in ("_finite", "_chebyshev", "_interior_point", "_qhull"):
+            self.__dict__.setdefault(slot, UNSET)
 
     def __getstate__(self) -> dict[str, Any]:
         state: dict[str, Any] = {
-            "_tag": self.tag,
-            "_hash": self._hash,
-            "_finite_computed": self._finite_computed,
             "_finite": self._finite,
-            "_center": self._center,
-            "_interior_point_norm": self._interior_point_norm,
-            "_inradius": self._inradius,
-            "_chebyshev_done": self._chebyshev_done,
+            "_chebyshev": self._chebyshev,
+            "_interior_point": self._interior_point,
+            "_qhull": self._qhull,
             "_shis": self._shis,
             "_shis_strict": self._shis_strict,
-            "_Wl2": self._Wl2,
-            "_volume": self._volume,
-            "_interior_point": self._interior_point,
-            "_attempted_compute_properties": self._attempted_compute_properties,
             "_covector_infeasible": self._covector_infeasible,
             "_covector_endpoint_shis": self._covector_endpoint_shis,
             "warnings": self.warnings,
@@ -1311,3 +1203,34 @@ class Polyhedron:
             (None, self.ss_np),
             self.__getstate__(),
         )  # Control what gets saved, do not pickle the net
+
+
+def _upgrade_legacy_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Map the cache layout pickled before relucent 1.0 onto the current slots.
+
+    0.9 kept separate "computed" flags beside ``_finite`` and the Chebyshev values, cached the
+    hash (which differs between processes), and kept no Qhull objects in the pickle.
+    """
+    if "_finite_computed" in state and not state.pop("_finite_computed"):
+        state["_finite"] = UNSET
+    if "_chebyshev" not in state and ("_center" in state or "_inradius" in state):
+        center, inradius = state.pop("_center", None), state.pop("_inradius", None)
+        done = state.pop("_chebyshev_done", inradius is not None)
+        state["_chebyshev"] = (center, inradius) if done else UNSET
+    if "_interior_point" in state and state["_interior_point"] is None:
+        state["_interior_point"] = UNSET  # 0.9 used None for "not computed"
+    for key in (
+        "_tag",
+        "_hash",
+        "_ss_np",
+        "_Wl2",
+        "_interior_point_norm",
+        "_chebyshev_done",
+        "_attempted_compute_properties",
+        "_volume",
+        "_vertices",
+        "_convex_hull",
+        "_halfspace_intersection",
+    ):
+        state.pop(key, None)
+    return state

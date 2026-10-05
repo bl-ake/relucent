@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.parallel import process_aware_cpu_count
@@ -93,8 +94,7 @@ def finalize_boundary_complex(
         for poly in cx:
             verify_boundary_cell(poly, boundary_shi)
     for poly in cx:
-        poly._finite = None  # slice search may leave stale boundedness flags
-        poly._finite_computed = False
+        poly._finite = UNSET  # slice search may leave stale boundedness flags
     t2 = time.perf_counter()
     logger.debug("discover finalize: building dual graph ...")
     cx._dual_graph = cx.dual_graph(require_complete=verify)

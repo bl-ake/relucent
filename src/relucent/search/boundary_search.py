@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 import relucent.config as cfg
+from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.parallel import BlockingQueue, get_mp_context, process_aware_cpu_count
@@ -419,8 +420,7 @@ def boundary_searcher(
         )
 
     for poly in cx:
-        poly._finite = None
-        poly._finite_computed = False
+        poly._finite = UNSET
     return SearchResult(
         depth=depth,
         mean_facets=rolling_average,

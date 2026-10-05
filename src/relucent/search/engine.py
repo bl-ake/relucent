@@ -13,6 +13,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.parallel import (
@@ -57,22 +58,8 @@ __all__ = [
 # reliability checks depend on them. Boundedness (``finite``) is not needed to search.
 SEARCH_REQUIRED_GEOMETRY_PROPERTIES: tuple[str, ...] = ("center", "inradius")
 
-# Every cache/property name supported by :meth:`~relucent.core.poly.Polyhedron.compute_geometric_properties`.
-ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = (
-    "halfspaces",
-    "W",
-    "b",
-    "finite",
-    "center",
-    "inradius",
-    "interior_point",
-    "interior_point_norm",
-    "Wl2",
-    "halfspace_intersection",
-    "vertices",
-    "convex_hull",
-    "volume",
-)
+# Every property name :meth:`~relucent.core.poly.Polyhedron.compute_geometric_properties` accepts.
+ALL_GEOMETRY_PROPERTIES: tuple[str, ...] = Polyhedron.GEOMETRY_PROPERTIES
 
 
 def true_phantom_neighbor_error(error: object) -> bool:
@@ -117,8 +104,6 @@ def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
     """Retain geometry caches listed in *properties*; drop other heavy caches."""
     # Workers only need what search asked for; drop the rest to keep IPC payloads small.
     requested = {str(name).strip() for name in properties if str(name).strip()}
-    if "halfspaces_np" in requested:
-        requested.add("halfspaces")  # np view and list form are paired
     for name, attrs in (
         ("halfspaces", ("_halfspaces", "_halfspaces_np", "_halfspaces_err")),
         ("W", ("_w",)),
@@ -127,13 +112,9 @@ def retain_geometry_caches(p: Polyhedron, properties: Iterable[str]) -> None:
         if name not in requested:
             for attr in attrs:
                 setattr(p, attr, None)
-    # Qhull objects are the heaviest; clear the whole cluster unless something needs them.
-    qhull_props = {"halfspace_intersection", "vertices", "convex_hull", "volume"}
-    if not (requested & qhull_props):
-        p._halfspace_intersection = p._vertices = p._convex_hull = p._volume = None
-        p._attempted_compute_properties = False
-    elif "volume" not in requested:
-        p._volume = None
+    # Qhull objects are the heaviest; drop them unless something needs them.
+    if not (requested & Polyhedron.QHULL_PROPERTIES):
+        p._qhull = UNSET
 
 
 def _worker_prepare_poly(
@@ -154,8 +135,8 @@ def _worker_prepare_poly(
         # Thin cells need no special case: solve_radius only reports a cell nonempty with a
         # center verified strictly inside every row, and raises when it cannot decide.
         return AmbiguousGeometryError(f"Polyhedron {p!r} is infeasible (empty), but it was reached across a certified facet")
-    if need_interior and p._interior_point is None:
-        p._interior_point = p.find_interior_point(env=env)
+    if need_interior:
+        p._ensure_interior_point(env)
     if shis_kwargs is not None:
         try:
             if p._shis is None:

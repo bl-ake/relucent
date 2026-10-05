@@ -43,13 +43,14 @@ def _poly_with_vertices(
     dummy_hs = np.zeros((max(1, ss_np.shape[1]), ambient_dim + 1), dtype=float)
     p = Polyhedron(net or _tiny_nn(ambient_dim), ss_np, halfspaces=dummy_hs)
 
-    # Seed caches used by plotting helpers.
-    p._w = np.zeros((ambient_dim, ambient_dim), dtype=float)
+    # Seed caches used by plotting helpers. Wl2 is the Frobenius norm of W.
+    p._w = np.eye(ambient_dim, dtype=float) * (Wl2 / np.sqrt(ambient_dim))
     if halfspaces_np is not None:
         p._halfspaces_np = halfspaces_np
-    p._center = center
-    p._interior_point = interior_point
-    p._Wl2 = Wl2
+    if center is not None:
+        p._chebyshev = (center, 1.0)
+    if interior_point is not None:
+        p._interior_point = interior_point
 
     # Avoid heavy geometry computations by providing bounded vertices directly.
     def _bounded_vertices(_self: Polyhedron, _bound: float) -> np.ndarray | None:
@@ -328,7 +329,6 @@ def test_plot_polyhedron_hide_unbounded_flag(monkeypatch):
         net=_tiny_nn(2),
     )
     poly._finite = False
-    poly._finite_computed = True
 
     # Ensure no plotting backend gets called when hide_unbounded=True.
     monkeypatch.setattr(
@@ -355,10 +355,8 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
         net=_tiny_nn(2),
     )
     p_bounded._finite = True
-    p_bounded._finite_computed = True
-    # Complete Chebyshev cache so ``finite`` does not re-run LP on dummy halfspaces.
-    p_bounded._center = np.array([0.1, 0.1], dtype=np.float64)
-    p_bounded._inradius = 0.05
+    # Complete Chebyshev cache so ``center`` does not re-run the LP on dummy halfspaces.
+    p_bounded._chebyshev = (np.array([0.1, 0.1], dtype=np.float64), 0.05)
 
     p_unbounded = _poly_with_vertices(
         ambient_dim=2,
@@ -367,7 +365,6 @@ def test_plot_complex_hide_unbounded_filters_regions(monkeypatch):
         net=_tiny_nn(2),
     )
     p_unbounded._finite = False
-    p_unbounded._finite_computed = True
 
     c2 = _complex_with_polys(2, [p_bounded, p_unbounded])
     c2.dual_graph = MethodType(  # type: ignore[method-assign]

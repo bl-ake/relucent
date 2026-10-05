@@ -7,7 +7,7 @@ Functions here take a :class:`~relucent.core.poly.Polyhedron` instance; the clas
 import warnings
 from collections.abc import Callable, Iterable, Mapping
 from functools import partial
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, overload
 
 import numpy as np
 from gurobipy import GRB, Env, Model
@@ -15,6 +15,7 @@ from scipy.spatial import ConvexHull, HalfspaceIntersection
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
+from relucent._internal.cache import UNSET
 from relucent._internal.gurobi import get_env
 from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
 from relucent.core.ss import flip_ss_at_shi
@@ -27,6 +28,7 @@ __all__ = [
     "adjacent_polyhedra",
     "certified_bounded",
     "compute_properties",
+    "QhullGeometry",
     "halfspaces",
     "shis",
     "solve_radius",
@@ -1104,9 +1106,10 @@ def shis(
             from relucent.core.errors import AmbiguousGeometryError
 
             zc = None
-            if poly._center is not None:
+            known_center = poly._chebyshev[0] if poly._chebyshev is not UNSET else None
+            if known_center is not None:
                 # The cell's own center, already verified: reuse it when it verifies in z too.
-                z_try = null_basis.T @ (np.asarray(poly._center, dtype=np.float64).reshape(-1, 1) - x0)
+                z_try = null_basis.T @ (np.asarray(known_center, dtype=np.float64).reshape(-1, 1) - x0)
                 if verify_interior_point(h_red, err_red, z_try):
                     zc = z_try
             if zc is None:
@@ -1717,11 +1720,101 @@ def _certify_facet_from_model(
     return _certify_facet(h_red, err_red, j, zv, tight, interior_point)
 
 
-def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> None:
-    """Compute additional geometric properties for low-dimensional polyhedra (vertices, hull, volume).
+class QhullGeometry(NamedTuple):
+    """Qhull-derived geometry of one cell, as :func:`compute_properties` returns it.
 
-    Mutates ``poly`` cache fields (``_hs``, ``_vertices``, ``_ch``, ``_volume``,
-    ``_attempted_compute_properties``). No-op if already attempted.
+    ``volume`` is ``inf`` for an unbounded cell. A field is ``None`` when it does not apply or
+    could not be computed: ``halfspace_intersection`` for a cell of dimension 0 or 1 (Qhull
+    needs two), ``convex_hull`` for an unbounded cell, and ``convex_hull`` / ``volume`` when the
+    hull fails outside ``QHULL_MODE="HIGH_PRECISION"`` (which raises instead).
+    """
+
+    halfspace_intersection: HalfspaceIntersection | None
+    vertices: np.ndarray | None
+    convex_hull: ConvexHull | None
+    volume: float | None
+
+
+def _qhull_halfspace_intersection(
+    halfspaces: np.ndarray,
+    interior_point: np.ndarray,
+    qhull_mode: str,
+    warnings_out: list[Warning],
+) -> HalfspaceIntersection:
+    """:class:`~scipy.spatial.HalfspaceIntersection`, handling Qhull's warnings per ``qhull_mode``.
+
+    ``"IGNORE"`` records them in ``warnings_out``, ``"WARN_ALL"`` re-emits them,
+    ``"HIGH_PRECISION"`` raises, and ``"JITTERED"`` retries with Qhull's ``QJ`` option (also
+    when the first attempt fails outright).
+
+    Raises:
+        ValueError: If Qhull fails, or warns under ``"HIGH_PRECISION"``.
+    """
+    try:
+        with warnings.catch_warnings(record=True) as w:
+            hs = HalfspaceIntersection(halfspaces, interior_point, qhull_options=None)
+        if w:
+            msgs = "; ".join(str(wi.message) for wi in w)
+            if qhull_mode == "IGNORE":
+                warnings_out.extend([RuntimeWarning(wi) for wi in w])
+            if qhull_mode == "WARN_ALL":
+                warnings.warn(f"Halfspace intersection emitted warnings: {msgs}", stacklevel=3)
+            elif qhull_mode == "HIGH_PRECISION":
+                raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
+            elif qhull_mode == "JITTERED":
+                # Triangulated output is approximately 1000 times more accurate than joggled input.
+                with warnings.catch_warnings(record=True) as w2:
+                    jittered = HalfspaceIntersection(halfspaces, interior_point, qhull_options="QJ")
+                if w2:
+                    warnings_out.append(
+                        RuntimeWarning(
+                            "Recomputing HalfspaceIntersection with jitter option 'QJ' still had numerical problems"
+                        )
+                    )
+                    warnings_out.extend([RuntimeWarning(wi) for wi in w2])
+                else:
+                    hs = jittered
+    except ValueError:
+        raise  # the HIGH_PRECISION raise: do not retry
+    except Exception as e:
+        if qhull_mode != "JITTERED":
+            raise ValueError(f"Error while computing halfspace intersection: {e}") from e
+        try:
+            hs = HalfspaceIntersection(halfspaces, interior_point, qhull_options="QJ")
+        except Exception as e2:
+            raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
+        warnings_out.append(RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"))
+    return hs
+
+
+def _interval_endpoints(halfspaces: np.ndarray) -> np.ndarray:
+    """Endpoints ``[[lower], [upper]]`` of the 1-D system ``a t + b <= 0`` (Qhull needs two dimensions).
+
+    Raises:
+        ValueError: If the interval is empty or unbounded.
+    """
+    lower, upper = -float("inf"), float("inf")
+    for ai, bi in zip(halfspaces[:, 0], halfspaces[:, 1], strict=True):
+        if ai == 0.0:
+            # A row parallel to the segment; the segment was certified nonempty.
+            if bi > 0.0:
+                raise ValueError("Infeasible 1-D projected halfspace system")
+            continue
+        cutoff = -bi / ai
+        if ai > 0:
+            upper = min(upper, cutoff)
+        else:
+            lower = max(lower, cutoff)
+    if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper:
+        raise ValueError("Projected 1-D intersection is empty or unbounded")
+    return np.array([[lower], [upper]], dtype=np.float64)
+
+
+def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> QhullGeometry:
+    """Qhull geometry of a nonempty cell: halfspace intersection, vertices, convex hull, volume.
+
+    :class:`~relucent.core.poly.Polyhedron` caches the result behind its ``vertices``,
+    ``halfspace_intersection``, ``convex_hull`` and ``volume`` properties.
 
     For non-maximal cells (``zero_indices`` non-empty) the halfspace system lives on a
     lower-dimensional affine subspace.  The function projects into that subspace via an
@@ -1731,17 +1824,12 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
     of collapsing to zero due to the ambient degeneracy.
 
     Raises:
-        ValueError: If input dimension > 6, interior point is missing, or qhull fails
+        ValueError: If input dimension > 6, the cell is empty, or qhull fails
             (depending on ``qhull_mode``).
     """
     if qhull_mode is None:
         qhull_mode = cfg.QHULL_MODE
-    if poly._attempted_compute_properties:
-        return
-    poly._attempted_compute_properties = True
-
-    assert poly._net is not None
-    if poly._net.input_shape[0] > 6:
+    if poly.ambient_dim > 6:
         raise ValueError("Input shape too large to compute extra properties")
 
     # Filter degenerate constraints and remap zero_indices accordingly.
@@ -1763,9 +1851,7 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
 
         if null_basis.shape[1] == 0:
             # The equality system pins a unique point; no inequalities can reduce it further.
-            poly._vertices = x0.T  # shape (1, ambient_dim)
-            poly._volume = 0.0
-            return
+            return QhullGeometry(None, x0.T, None, 0.0)
 
         # Express inequality halfspaces in reduced coordinates z: x = null_basis @ z + x0.
         inequalities = halfspaces[ineq_mask]
@@ -1774,96 +1860,29 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
         projected_halfspaces = np.hstack((A_red, b_red))
 
     # Project interior point to reduced coordinates.
-    if poly.interior_point is None:
-        raise ValueError("Interior point not found")
+    interior_point = poly.interior_point
+    if interior_point is None:
+        raise ValueError("Interior point not found: the cell is empty")
     if null_basis is not None and x0 is not None:
-        z0, *_ = np.linalg.lstsq(null_basis, poly.interior_point.reshape(-1, 1) - x0, rcond=None)
+        z0, *_ = np.linalg.lstsq(null_basis, interior_point.reshape(-1, 1) - x0, rcond=None)
         projected_interior_point = np.asarray(z0).reshape(-1)
     else:
-        projected_interior_point = poly.interior_point
+        projected_interior_point = interior_point
 
     # Qhull does not support 1-D halfspace intersection; handle analytically.
     reduced_dim = projected_halfspaces.shape[1] - 1
     if reduced_dim == 1:
-        a_col = projected_halfspaces[:, 0]
-        b_col = projected_halfspaces[:, 1]
-        lower, upper = -float("inf"), float("inf")
-        for ai, bi in zip(a_col, b_col, strict=True):
-            if ai == 0.0:
-                # A row parallel to the segment; the segment was certified nonempty.
-                if bi > 0.0:
-                    raise ValueError("Infeasible 1-D projected halfspace system")
-                continue
-            cutoff = -bi / ai
-            if ai > 0:
-                upper = min(upper, cutoff)
-            else:
-                lower = max(lower, cutoff)
-        if not np.isfinite(lower) or not np.isfinite(upper) or lower > upper:
-            raise ValueError("Projected 1-D intersection is empty or unbounded")
-        reduced_verts = np.array([[lower], [upper]], dtype=np.float64)
+        reduced_verts = _interval_endpoints(projected_halfspaces)
         if null_basis is not None and x0 is not None:
-            poly._vertices = np.unique((null_basis @ reduced_verts.T + x0).T, axis=0)
+            vertices_1d = np.unique((null_basis @ reduced_verts.T + x0).T, axis=0)
         else:
-            poly._vertices = np.unique(reduced_verts, axis=0)
-        poly._volume = float(upper - lower)
-        return
+            vertices_1d = np.unique(reduced_verts, axis=0)
+        return QhullGeometry(None, vertices_1d, None, float(reduced_verts[1, 0] - reduced_verts[0, 0]))
 
-    try:
-        with warnings.catch_warnings(record=True) as w:
-            hs = HalfspaceIntersection(
-                projected_halfspaces,
-                projected_interior_point,
-                qhull_options=None,
-            )  # http://www.qhull.org/html/qh-optq.htm
-        if w:
-            msgs = "; ".join(str(wi.message) for wi in w)
-            if qhull_mode == "IGNORE":
-                poly.warnings.extend([RuntimeWarning(wi) for wi in w])
-            if qhull_mode == "WARN_ALL":
-                warnings.warn(f"Halfspace intersection emitted warnings: {msgs}", stacklevel=2)
-            elif qhull_mode == "HIGH_PRECISION":
-                raise ValueError(f"HalfspaceIntersection emitted warnings in HIGH_PRECISION mode: {msgs}")
-            elif qhull_mode == "JITTERED":
-                with warnings.catch_warnings(record=True) as w2:
-                    new_hs = HalfspaceIntersection(
-                        projected_halfspaces,
-                        projected_interior_point,
-                        # Triangulated output is approximately 1000 times more accurate than joggled input.
-                        qhull_options="QJ",
-                    )  # http://www.qhull.org/html/qh-optq.htm
-                if w2:
-                    poly.warnings.append(
-                        RuntimeWarning(
-                            "Recomputing HalfspaceIntersection with jitter option 'QJ' still had numerical problems"
-                        )
-                    )
-                    poly.warnings.extend([RuntimeWarning(wi) for wi in w2])
-                    msgs = "; ".join(str(wi.message) for wi in w)
-                else:
-                    ## Jittering solved the numerical problems
-                    hs = new_hs
-    except ValueError:
-        raise  # Our HIGH_PRECISION raise - do not retry
-    except Exception as e:
-        if qhull_mode == "JITTERED":
-            try:
-                hs = HalfspaceIntersection(
-                    projected_halfspaces,
-                    projected_interior_point,
-                    # Triangulated output is approximately 1000 times more accurate than joggled input.
-                    qhull_options="QJ",
-                )  # http://www.qhull.org/html/qh-optq.htm
-                poly.warnings.append(RuntimeWarning(f"HalfspaceIntersection failed initially, succeeded with QJ retry: {e}"))
-            except Exception as e2:
-                raise ValueError(f"Error while computing halfspace intersection: {e}") from e2
-        else:
-            raise ValueError(f"Error while computing halfspace intersection: {e}") from e
-
-    poly._halfspace_intersection = hs
+    hs = _qhull_halfspace_intersection(projected_halfspaces, projected_interior_point, qhull_mode, poly.warnings)
     raw_vertices = hs.intersections  # in reduced coordinates when projected
 
-    # Remap to ambient coordinates for the trust filter and poly._vertices.
+    # Remap to ambient coordinates for the trust filter and the returned vertices.
     vertices = (null_basis @ raw_vertices.T + x0).T if null_basis is not None and x0 is not None else raw_vertices
 
     trust_vertices = ~(np.isinf(vertices).any(axis=1) | np.isnan(vertices).any(axis=1))
@@ -1873,25 +1892,25 @@ def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> Non
         [not np.any(_rounding().classify_rows(halfspaces, errors, v, 0.0) == 1) for v in vertices[trust_vertices]],
         dtype=bool,
     )
-    poly._vertices = vertices[trust_vertices][trust_vertices_2]
+    kept_vertices = vertices[trust_vertices][trust_vertices_2]
 
     # ConvexHull and volume are computed in the intrinsic (reduced) coordinates.
     # Using ambient-space vertices for non-maximal cells would produce a degenerate hull.
-    ch_vertices = raw_vertices[trust_vertices][trust_vertices_2] if null_basis is not None else poly._vertices
+    ch_vertices = raw_vertices[trust_vertices][trust_vertices_2] if null_basis is not None else kept_vertices
 
-    if poly.finite and len(ch_vertices) > reduced_dim:
+    finite = poly.finite
+    if finite is False:
+        return QhullGeometry(hs, kept_vertices, None, float("inf"))
+    hull: ConvexHull | None = None
+    volume: float | None = None
+    if len(ch_vertices) > reduced_dim:
         try:
-            poly._convex_hull = ConvexHull(ch_vertices)
-            try:
-                poly._volume = poly._convex_hull.volume
-            except Exception as e:
-                raise ValueError(f"Error while computing convex hull volume: {e}") from e
+            hull = ConvexHull(ch_vertices)
+            volume = float(hull.volume)
         except Exception as e:
             if qhull_mode == "WARN_ALL":
                 warnings.warn(f"Error while computing convex hull: {e}", stacklevel=2)
             elif qhull_mode == "HIGH_PRECISION":
                 raise ValueError(f"Error while computing convex hull: {e}") from e
-            poly._convex_hull = None
-            poly._volume = -1
-    else:
-        poly._volume = float("inf")
+            hull, volume = None, None
+    return QhullGeometry(hs, kept_vertices, hull, volume)

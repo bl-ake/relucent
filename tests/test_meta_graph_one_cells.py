@@ -75,7 +75,6 @@ def test_classify_one_cells_finite_one_zero_face_is_unbounded() -> None:
     ss_ray = np.array([[1, 0, 0, 0]], dtype=np.int8)
     p0 = Polyhedron(None, ss_z0, halfspaces=halfspaces, finite=True)
     ray = Polyhedron(None, ss_ray, halfspaces=halfspaces, shis=[1], finite=None)
-    ray._finite_computed = False
 
     by_dim = {0: [p0], 1: [ray]}
     edges_by_dim = {1: ([(ray.tag, p0.tag, 2)], [])}

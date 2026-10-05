@@ -42,6 +42,7 @@ import networkx as nx
 import numpy as np
 
 import relucent.config as cfg
+from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger
 from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
 from relucent.core.errors import CubicalConsistencyError, DualGraphAsymmetricEdgeError, ShiFlipInvariantError
@@ -688,7 +689,7 @@ def meta_node_attrs(poly: Polyhedron, *, neighbor_tags: set[bytes]) -> dict[str,
     """
     if poly.dim == 0:
         finite: bool | None = True
-    elif poly._finite_computed:
+    elif poly._finite is not UNSET:
         finite = poly._finite
     else:
         finite = poly.finite
@@ -785,16 +786,14 @@ def classify_one_cells_finite_from_face_edges(
         infeasible = geometric_infeasible_one_cells(by_dim, edges_by_dim)
     n_classified = 0
     for p in by_dim[1]:
-        if p._finite_computed:
+        if p._finite is not UNSET:
             continue
         if p.tag in infeasible:
             p._finite = None
-            p._finite_computed = True
             n_classified += 1
             continue
         n_zero = len(zero_faces_by_coface.get(p.tag, ()))
         p._finite = n_zero >= 2
-        p._finite_computed = True
         n_classified += 1
     return n_classified, infeasible
 
@@ -853,7 +852,7 @@ def classify_finite_ascending(
 
         for coface_tag, face_tags in coface_faces.items():
             coface = lookup.get(coface_tag)
-            if coface is None or coface._finite_computed:
+            if coface is None or coface._finite is not UNSET:
                 continue
 
             n_bounded = 0
@@ -862,7 +861,7 @@ def classify_finite_ascending(
             unknown = False
             for ft in face_tags:
                 face = lookup.get(ft)
-                if face is None or not face._finite_computed:
+                if face is None or face._finite is UNSET:
                     unknown = True
                     continue
                 if face._finite is False:
@@ -874,15 +873,12 @@ def classify_finite_ascending(
 
             if n_unbounded > 0:
                 coface._finite = False
-                coface._finite_computed = True
                 total += 1
             elif n_bounded > 0 and not unknown:
                 coface._finite = True
-                coface._finite_computed = True
                 total += 1
             elif n_infeasible > 0 and n_bounded == 0 and n_unbounded == 0 and not unknown:
                 coface._finite = None
-                coface._finite_computed = True
                 total += 1
 
     return total
@@ -919,7 +915,7 @@ def classify_finite_lp_fallback(polys: Iterable[Polyhedron]) -> int:
     """
     n = 0
     for poly in polys:
-        if poly._finite_computed:
+        if poly._finite is not UNSET:
             continue
         _ = poly.finite
         n += 1
@@ -932,7 +928,7 @@ def format_pending_finite_polys(polys: Iterable[Polyhedron], *, limit: int = 10)
     Used in :meth:`~relucent.core.complex.Complex.meta_graph` error messages when
     boundedness classification fails to converge.
     """
-    pending = [p for p in polys if not p._finite_computed]
+    pending = [p for p in polys if p._finite is UNSET]
     if not pending:
         return ""
     samples = ", ".join(f"({p.tag.hex()!r}, dim={int(p.dim)})" for p in pending[:limit])
@@ -979,11 +975,10 @@ def classify_lazy_face_polys(
     pending: dict[int, list[Polyhedron]] = defaultdict(list)
     for tag in face_tags:
         poly = lookup.get(tag)
-        if poly is None or poly._finite_computed:
+        if poly is None or poly._finite is not UNSET:
             continue
         if int(poly.dim) == 0:
             poly._finite = True
-            poly._finite_computed = True
             continue
         pending[int(poly.dim)].append(poly)
     if not pending:

@@ -81,7 +81,7 @@ def slice_complex(cplx: Complex, x0: np.ndarray, V: np.ndarray) -> Complex:
         kwargs: dict[str, Any] = {"halfspaces": halfspaces, "halfspaces_err": err, "ambient_dim": k}
         if parent._shis is not None:
             kwargs["shis"] = list(parent._shis)
-        if parent._finite_computed and parent._finite is True:
+        if parent._finite is True:
             # A slice of a bounded cell is bounded; a slice of an unbounded one may not be.
             kwargs["finite"] = True
         return kwargs

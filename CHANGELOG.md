@@ -30,6 +30,9 @@ every rename.
   `equalities`); the SHI options `strict` and `new_method`.
 - Dropped dependencies: pandas, scikit-learn, Pillow, matplotlib, pyvis, kaleido. PyTorch is
   an optional extra.
+- `Polyhedron.ss` is read-only. Properties of an empty cell are `None`; `volume` is `None`
+  (was `-1`) when empty or when Qhull fails; `halfspace_intersection` returns `None` instead of
+  raising. `compute_geometric_properties` rejects names outside `Polyhedron.GEOMETRY_PROPERTIES`.
 
 ### Fixed
 
@@ -43,6 +46,15 @@ every rename.
 - `Complex.save`/`load` keep `complete`/`verified`, so a loaded complex runs topology
   directly. Files carry a format version.
 - `contract()` returned the 1-cells instead of the codimension-one cells above 2D.
+- A `Polyhedron` pickled its hash, which Python randomizes per process: after `Complex.load`,
+  or from a `spawn` worker (macOS, Windows), a cell compared equal to a fresh one but was not
+  found in sets or graphs. The hash is no longer cached or pickled.
+- A bounded cell whose convex hull Qhull could not build reported `volume == inf`.
+- `relucent.topology.betti_numbers(meta, compactify="borel_moore")` raised
+  `ConnectedComponentsMismatch` for any boundary with a non-compact component: it checked
+  beta_0 against the number of components, which only holds for ordinary homology. The check is
+  skipped for Borel-Moore homology.
+- `pyvis_dual_graph(node_size="volume")` gave NaN sizes on any complex with an unbounded cell.
 - The GF(2) C backend is cached per CPU in a user cache directory and built atomically.
 
 ### Changed
@@ -51,6 +63,9 @@ every rename.
   boundary components and still report the result complete. Use `bfs()` and
   `boundary_complex(i)` for a verified boundary.
 - Searching no longer computes `finite` (only the Chebyshev LP it needs).
+- `Polyhedron` caches each computed property in one place (Qhull geometry is computed once
+  for all four Qhull properties and survives pickling), and the duplicated Qhull code in
+  `bounded_vertices` and `compute_properties` is shared.
 - Dependency floors are lowered from the newest releases to numpy 2.0, scipy 1.13,
   networkx 3.0 and tqdm 4.60 (plotly 5.20 and gurobipy 12 as before). A CI job runs the
   tests at exactly these versions on Python 3.11.

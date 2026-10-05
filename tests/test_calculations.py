@@ -143,7 +143,7 @@ def test_retain_geometry_caches_retains_requested_heavy_caches(seeded):
     assert p._halfspaces is None
     assert p._w is None
     assert p._b is None
-    assert p._interior_point is not None
+    assert isinstance(p._interior_point, np.ndarray)
 
 
 def test_default_search_is_topology_only(seeded):

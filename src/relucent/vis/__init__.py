@@ -780,9 +780,7 @@ def _complex_figure_1_skeleton(
         finite = getattr(p, "finite", True)
         if not finite:
             continue
-        ip = getattr(p, "_interior_point", None)
-        if ip is None:
-            ip = getattr(p, "interior_point", None)
+        ip = getattr(p, "interior_point", None)  # cached after the first read
         if ip is not None:
             interior_points.append(float(np.max(np.abs(ip))))
     maxcoord = (
@@ -860,10 +858,7 @@ def _complex_figure_2d_cells(
         finite = getattr(p, "finite", True)
         if not finite:
             continue
-        # Prefer the cached private interior point to avoid expensive Gurobi solves.
-        ip = getattr(p, "_interior_point", None)
-        if ip is None:
-            ip = getattr(p, "interior_point", None)
+        ip = getattr(p, "interior_point", None)  # cached after the first read
         if ip is not None:
             interior_points.append(float(np.max(np.abs(ip))))
     maxcoord = (
@@ -1112,6 +1107,14 @@ def _persistence_plot_extent(
     return xmin - pad_x, xmax + pad_x, ymin - pad_y, ymax + pad_y
 
 
+def _capped_volumes(polys: Iterable[Polyhedron]) -> list[float]:
+    """Cell volumes for sizing and coloring: unbounded or unknown volumes take the largest finite one."""
+    volumes = [poly.volume for poly in polys]
+    finite = [v for v in volumes if v is not None and np.isfinite(v)]
+    cap = max(finite, default=1.0)
+    return [v if v is not None and np.isfinite(v) else cap for v in volumes]
+
+
 def pyvis_dual_graph(
     cplx: Complex,
     *,
@@ -1162,13 +1165,13 @@ def pyvis_dual_graph(
         for c, poly in zip(colors, plot_graph.nodes, strict=True):
             plot_graph.nodes[poly]["color"] = c
     elif node_color == "volume":
-        colors = get_colors([poly.volume for poly in plot_graph.nodes], cmap=cmap)
+        colors = get_colors(_capped_volumes(plot_graph.nodes), cmap=cmap)
         for c, poly in zip(colors, plot_graph.nodes, strict=True):
             plot_graph.nodes[poly]["color"] = c
 
     if node_size == "volume":
-        sizes = [poly.volume for poly in plot_graph.nodes]
-        maxsize = max(sizes)
+        sizes = _capped_volumes(plot_graph.nodes)
+        maxsize = max(max(sizes, default=0.0), 1e-300)
         for size, poly in zip(sizes, plot_graph.nodes, strict=True):
             plot_graph.nodes[poly]["size"] = (10 + 1000 * size / maxsize) ** 1
     else:

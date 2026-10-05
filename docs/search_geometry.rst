@@ -102,13 +102,19 @@ Two-phase approach: topology first, geometry later
    cplx.bfs(max_polys=1000)  # fast discovery (default)
    cplx.compute_geometric_properties(properties=["Wl2"])
 
-Useful property names
----------------------
+Property names
+--------------
 
-Examples of valid names for ``geometry_properties`` / ``properties``:
+``geometry_properties`` / ``properties`` take names from
+:attr:`Polyhedron.GEOMETRY_PROPERTIES <relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES>`
+(also :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`); any other name raises ``ValueError``:
 
-- :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` — every supported property
-- ``"halfspaces"``, ``"halfspaces_np"``, ``"W"``, ``"b"``
-- ``"interior_point"``, ``"interior_point_norm"``
-- ``"Wl2"``, ``"vertices"``, ``"halfspace_intersection"`` (SciPy's HalfspaceIntersection), ``"convex_hull"`` (SciPy's ConvexHull), ``"volume"``
-- Always computed during search: ``"finite"``, ``"center"``, ``"inradius"``
+- ``"halfspaces"``, ``"W"``, ``"b"``
+- ``"finite"``, ``"center"``, ``"inradius"``
+- ``"interior_point"``, ``"interior_point_norm"``, ``"Wl2"``
+- ``"vertices"``, ``"halfspace_intersection"`` (SciPy's HalfspaceIntersection), ``"convex_hull"`` (SciPy's ConvexHull), ``"volume"``
+
+Each name is a :class:`~relucent.core.poly.Polyhedron` property. Computing one caches it on the
+cell, exactly as reading the property would. The last four come from one Qhull computation.
+Search always computes ``"center"`` and ``"inradius"`` (the Chebyshev LP); ``"finite"`` needs
+an extra recession-cone test and is computed only when requested.

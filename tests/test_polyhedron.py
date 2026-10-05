@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from relucent import Complex, Polyhedron
 from relucent import torch_mlp as _mlp
+from relucent._internal.cache import UNSET
 from relucent.model.builders import TorchMLP
 from tests.helpers import ss_to_numpy
 
@@ -242,3 +243,110 @@ class TestPolyhedronPickle:
         assert p2.dim == p.dim
         assert "codim" in p2.__dict__
         assert "dim" in p2.__dict__
+
+
+def _data_cell(rows: list[list[float]]) -> Polyhedron:
+    hs = np.asarray(rows, dtype=np.float64)
+    return Polyhedron(None, np.ones(hs.shape[0], dtype=np.int8), halfspaces=hs)
+
+
+_UNIT_SQUARE = [[-1.0, 0.0, 0.0], [1.0, 0.0, -1.0], [0.0, -1.0, 0.0], [0.0, 1.0, -1.0]]
+
+
+class TestPolyhedronCaching:
+    """Each computed property is cached once; "not computed" and a computed ``None`` stay distinct."""
+
+    def test_empty_cell_properties_are_none(self):
+        cell = _data_cell([[1.0, 0.0, 0.0], [-1.0, 0.0, 1.0]])  # x <= 0 and x >= 1
+        assert cell.feasible is False
+        assert cell.finite is None
+        assert cell.center is None and cell.inradius is None
+        assert cell.interior_point is None and cell.interior_point_norm is None
+        assert cell.vertices is None and cell.convex_hull is None and cell.volume is None
+
+    def test_bounded_and_unbounded_cells(self):
+        square = _data_cell(_UNIT_SQUARE)
+        assert square.finite is True
+        assert square.volume == pytest.approx(1.0)
+        assert square.convex_hull is not None and square.halfspace_intersection is not None
+        assert square.vertices is not None and len(square.vertices) == 4
+        quadrant = _data_cell([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]])
+        assert quadrant.finite is False
+        assert quadrant.volume == float("inf") and quadrant.convex_hull is None
+
+    def test_qhull_runs_once(self, monkeypatch: pytest.MonkeyPatch):
+        from relucent.geometry.calculations import compute_properties
+
+        calls: list[int] = []
+
+        def counting(*args, **kwargs):
+            calls.append(1)
+            return compute_properties(*args, **kwargs)
+
+        monkeypatch.setattr("relucent.core.poly.compute_properties", counting)
+        square = _data_cell(_UNIT_SQUARE)
+        _ = square.vertices, square.volume, square.convex_hull, square.halfspace_intersection
+        assert len(calls) == 1
+
+    def test_compute_geometric_properties_rejects_unknown_names(self):
+        with pytest.raises(ValueError, match="Unknown geometry properties"):
+            _data_cell(_UNIT_SQUARE).compute_geometric_properties(["volume", "hs"])
+
+    def test_compute_geometric_properties_fills_every_name(self):
+        square = Polyhedron(None, np.ones(4, dtype=np.int8), halfspaces=np.asarray(_UNIT_SQUARE), W=np.eye(2), b=np.zeros(2))
+        square.compute_geometric_properties(Polyhedron.GEOMETRY_PROPERTIES)
+        assert square._finite is True and square._chebyshev is not UNSET
+        assert square._interior_point is not UNSET and square._qhull is not UNSET
+
+    def test_sign_sequence_is_read_only(self):
+        cell = _data_cell(_UNIT_SQUARE)
+        with pytest.raises(AttributeError):
+            setattr(cell, "ss", np.zeros(4, dtype=np.int8))  # noqa: B010 - the assignment is the test
+
+    def test_hash_is_not_pickled(self):
+        """hash(bytes) differs between processes, so a pickled hash breaks sets after loading."""
+        cell = _data_cell(_UNIT_SQUARE)
+        assert hash(cell) == hash(cell.tag)
+        state = cell.__getstate__()
+        assert "_hash" not in state and "_tag" not in state
+
+    def test_pickle_keeps_computed_geometry(self):
+        square = _data_cell(_UNIT_SQUARE)
+        _ = square.finite, square.center, square.interior_point, square.volume
+        copy = pickle.loads(pickle.dumps(square))
+        assert copy._finite is True and copy._chebyshev is not UNSET and copy._qhull is not UNSET
+        assert copy.volume == pytest.approx(1.0)
+
+    def test_legacy_pickled_state_is_upgraded(self):
+        """State as relucent 0.9 pickled it: separate "computed" flags and a cached hash."""
+        center = np.array([[0.5], [0.5]])
+        legacy = {
+            "_finite_computed": True,
+            "_finite": True,
+            "_center": center,
+            "_inradius": 0.5,
+            "_chebyshev_done": True,
+            "_interior_point": None,
+            "_attempted_compute_properties": True,
+            "_volume": 1.0,
+            "_hash": 12345,
+            "_tag": b"stale",
+            "_Wl2": 3.0,
+            "_halfspaces_np": np.asarray(_UNIT_SQUARE),
+            "_rows_data": True,
+        }
+        cell = Polyhedron(None, np.ones(4, dtype=np.int8))
+        cell.__setstate__(legacy)
+        assert cell._finite is True
+        assert cell._chebyshev is not UNSET and cell._chebyshev[1] == 0.5
+        assert cell._interior_point is UNSET and cell._qhull is UNSET
+        assert "_hash" not in cell.__dict__ and hash(cell) == hash(cell.tag)
+        assert cell.volume == pytest.approx(1.0)
+
+    def test_legacy_uncomputed_finite_becomes_unset(self):
+        cell = Polyhedron(None, np.ones(4, dtype=np.int8))
+        cell.__setstate__(
+            {"_finite_computed": False, "_finite": None, "_halfspaces_np": np.asarray(_UNIT_SQUARE), "_rows_data": True}
+        )
+        assert cell._finite is UNSET
+        assert cell.finite is True

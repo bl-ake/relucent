@@ -8,6 +8,7 @@ import pytest
 import torch
 
 from relucent import Complex, Polyhedron, set_seeds, torch_mlp
+from relucent._internal.cache import UNSET
 from relucent._internal.gurobi import get_env
 from relucent.core.errors import NonGenericArrangementError
 from relucent.core.ss import encode_ss
@@ -627,18 +628,14 @@ def test_classify_finite_combinatorial_fixed_point() -> None:
     def _poly(dim: int, tag_byte: int) -> Polyhedron:
         ss = np.zeros((1, 4), dtype=np.int8)
         p = Polyhedron(None, ss, halfspaces=None, finite=None)
-        p._finite_computed = False
-        p._finite = None
         object.__setattr__(p, "dim", dim)  # type: ignore[misc]
         p.tag = bytes([tag_byte])  # type: ignore[misc]
         return p
 
     one_ub = _poly(1, 1)
     one_ub._finite = False
-    one_ub._finite_computed = True
     one_bd = _poly(1, 2)
     one_bd._finite = True
-    one_bd._finite_computed = True
 
     face_c = _poly(2, 3)
     face_b = _poly(2, 4)
@@ -689,8 +686,7 @@ def test_classify_one_cells_finite_from_face_edges_empty_shis_two_zero_faces() -
     p1 = Polyhedron(None, ss_z1, halfspaces=halfspaces, finite=True)
     seg = Polyhedron(None, ss_seg, halfspaces=halfspaces, finite=True)
     seg._shis = []
-    seg._finite_computed = False
-    seg._finite = None
+    seg._finite = UNSET
 
     by_dim = {0: [p0, p1], 1: [seg]}
     edges_by_dim = {1: ([(seg.tag, p0.tag, 1), (seg.tag, p1.tag, 2)], [])}
@@ -714,7 +710,6 @@ def test_classify_one_cells_finite_from_face_edges_infeasible_left_none() -> Non
     ss_seg = np.array([[1, 0, 0, 0]], dtype=np.int8)
     seg = Polyhedron(None, ss_seg, halfspaces=halfspaces, finite=None)
     seg._shis = []
-    seg._finite_computed = False
 
     by_dim = {1: [seg]}
     edges_by_dim: dict[int, tuple[list[tuple[bytes, bytes, int]], list[bytes]]] = {1: ([], [])}
@@ -742,7 +737,6 @@ def test_geometric_infeasible_one_cells_absorbs_near_zero_inradius_error(monkeyp
     ss_seg = np.array([[1, 0, 0, 0]], dtype=np.int8)
     seg = Polyhedron(None, ss_seg, halfspaces=halfspaces, finite=None)
     seg._shis = []
-    seg._finite_computed = False
 
     def _raise_inradius() -> tuple[None, None]:
         raise ValueError("Inradius -8.7393e-07")

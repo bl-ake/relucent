@@ -116,7 +116,16 @@ Other changes
   ``complete``/``verified``, so a loaded complex is ready for topology without
   ``set_exploration_state``. Files from 0.9 still load, without that state.
 * **Polyhedron construction.** Everything after ``ss`` is keyword-only, and unknown keywords
-  raise ``TypeError``. Sign sequences are stored 1-D.
+  raise ``TypeError``. Sign sequences are stored 1-D, and ``Polyhedron.ss`` is read-only (it is
+  the cell's identity).
+* **Polyhedron properties.** Every computed property is cached the same way, and an empty cell
+  answers ``None``: ``interior_point``, ``interior_point_norm``, ``center``, ``inradius``,
+  ``vertices``, ``halfspace_intersection``, ``convex_hull`` and ``volume``. ``volume`` is
+  ``None`` (was ``-1``) when the cell is empty or Qhull fails, and ``inf`` only for an unbounded
+  cell. ``halfspace_intersection`` returns ``None`` instead of raising when Qhull gives none.
+  ``compute_geometric_properties`` raises ``ValueError`` for a name outside
+  ``Polyhedron.GEOMETRY_PROPERTIES`` (``"halfspaces_np"`` is no longer accepted; use
+  ``"halfspaces"``).
 * **Removed.** ``Polyhedron.num_dead_relus``, ``Polyhedron.num_faces`` (use ``num_shis``),
   ``Polyhedron.hyperplanes`` (use ``equalities``), the ``strict`` and ``new_method`` options
   of the SHI computation, ``Complex.partial_derivative_on_1cell`` (use

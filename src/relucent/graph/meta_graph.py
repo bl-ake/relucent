@@ -19,6 +19,7 @@ import networkx as nx
 import numpy as np
 
 import relucent.config as cfg
+from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.parallel import process_aware_cpu_count
 from relucent.core.errors import CubicalConsistencyError, NonGenericArrangementError
@@ -642,7 +643,7 @@ def verify_meta_graph_incidence(
 
     for c_k in by_dim.values():
         for poly in c_k:
-            if poly.tag not in meta.nodes or not poly._finite_computed:
+            if poly.tag not in meta.nodes or poly._finite is UNSET:
                 continue
             node_finite = meta.nodes[poly.tag].get("finite")
             if node_finite != poly._finite:
@@ -776,8 +777,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
     # Recompute boundedness solely from the recovered face lattice.
     for p in all_chain_polys:
         if p.dim > 0:
-            p._finite_computed = False
-            p._finite = None
+            p._finite = UNSET
 
     # Step 1: classify all 1-dim cells from 0-face incidence in meta edges.
     # Union leftover covector flags with Chebyshev-empty phantoms (passing only the
@@ -810,7 +810,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
 
     # Skipping virtual 1-cells (rejected endpoints) can leave higher cells with
     # incomplete combinatorial faces; resolve those via Chebyshev then re-ascend.
-    pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+    pending_finite = sum(1 for p in all_chain_polys if p._finite is UNSET)
     if pending_finite:
         logger.debug(
             "meta_graph: %d cells pending after combinatorial passes; Chebyshev LP fallback",
@@ -826,7 +826,7 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
                 n_ascending2,
             )
 
-    pending_finite = sum(1 for p in all_chain_polys if not p._finite_computed)
+    pending_finite = sum(1 for p in all_chain_polys if p._finite is UNSET)
     if pending_finite:
         detail = incidence.format_pending_finite_polys(all_chain_polys)
         msg = (
@@ -845,13 +845,13 @@ def build_meta_graph(cplx: Complex, *, verify: bool = False, verbose: int | None
         )
 
     excluded_tags: set[bytes] = set()
-    infeasible_tags = {p.tag for p in all_chain_polys if p._finite_computed and p._finite is None}
+    infeasible_tags = {p.tag for p in all_chain_polys if p._finite is None}
     if infeasible_tags:
         excluded_tags = set(infeasible_tags)
         # Propagate exclusion only if the complex has genuinely unbounded cells. On closed
         # bounded surfaces (e.g. a torus), phantom 1-cells are spurious faces; dropping
         # just those (not their cofaces) keeps homology [1, 2, 1] and filters bad edges.
-        has_unbounded_chain = any(p._finite_computed and p._finite is False for p in all_chain_polys)
+        has_unbounded_chain = any(p._finite is False for p in all_chain_polys)
         if has_unbounded_chain:
             excluded_tags = incidence.propagate_infeasible_exclusion(infeasible_tags, edges_by_dim)
         logger.debug(
