@@ -107,6 +107,8 @@ Two paths build a decision-boundary complex:
   uses MIP pricing plus slice-restricted BFS per connected component, then
   :func:`~relucent.search.exploration.finalize_boundary_complex` for slice SHI assignment,
   dual graph, and verification. Does not require a full ambient BFS first.
+  **Experimental**: verification covers only the components pricing finds, and pricing
+  can miss some (see :doc:`boundary_search`).
 
 Dual-graph SHI model
 --------------------

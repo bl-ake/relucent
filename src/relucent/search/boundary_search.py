@@ -441,7 +441,10 @@ def discover_boundary_complex(
     verbose: int | None = None,
     **kwargs: Any,
 ) -> tuple[Complex, BoundaryDiscoveryStats]:
-    """Discover the full boundary complex via MIP pricing + slice BFS per component.
+    """Discover the boundary complex via MIP pricing + slice BFS per component.
+
+    Experimental: see :meth:`relucent.core.complex.Complex.discover_boundary_complex` for the
+    components pricing can miss.
 
     Repeatedly calls :func:`~relucent.search.boundary_mip.price_boundary_witness` to find
     a new connected component on the slice ``ss[boundary_shi] = 0``, explores it

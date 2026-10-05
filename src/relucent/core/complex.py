@@ -958,6 +958,13 @@ class Complex:
         Uses MIP pricing to find new connected components on the slice ``ss[i]=0``,
         then slice-restricted BFS to complete each component.
 
+        Experimental, and outside relucent's stability guarantees: certification covers only
+        the components pricing finds. A component outside the pricing box
+        (``estimate_input_bound``) or one on which some
+        other unit stays within :data:`~relucent.config.BOUNDARY_MIP_EPS` of zero can be
+        missed, and the result is still reported complete. For a verified boundary use
+        :meth:`bfs` and then :meth:`boundary_complex`.
+
         Args:
             i: Global supporting-hyperplane index (bent hyperplane).
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug

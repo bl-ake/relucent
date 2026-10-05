@@ -999,8 +999,11 @@ def price_boundary_witness(
     Tries brute-force sign scan on tiny networks, then a Gurobi MIP pricing model.
 
     Returns:
-        A new witness polyhedron, or ``None`` when the MIP is **proven infeasible**
-        (no uncut feasible sign pattern remains).
+        A new witness polyhedron, or ``None`` when the MIP is infeasible: no uncut sign
+        pattern has a point in the box ``|x| <= bound`` with every other unit at least ``eps``
+        from zero. That does not prove no boundary cell remains; a cell outside the box, or
+        one where some unit stays within ``eps`` of zero, is not seen (experimental; see
+        :meth:`relucent.core.complex.Complex.discover_boundary_complex`).
 
     Raises:
         BoundaryPricingIncompleteError: If pricing stops without a witness or proven

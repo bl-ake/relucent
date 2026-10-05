@@ -37,8 +37,9 @@ After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :meth:`~relucent.core.complex.Complex.contract` and
 :meth:`~relucent.core.complex.Complex.boundary_complex` require a complete, verified
 ambient complex via :meth:`~relucent.core.complex.Complex.assert_topology_ready`.
-For boundary components not covered by ambient exploration, use
-:meth:`~relucent.core.complex.Complex.discover_boundary_complex`.
+:meth:`~relucent.core.complex.Complex.discover_boundary_complex` finds a boundary without
+exploring the whole input space, but it is experimental and can miss components (see
+:doc:`boundary_search`).
 
 **Geometry for filtrations.** Built-in filtrations such as
 :class:`~relucent.topology.filtration.AffineOutputFiltration` and
