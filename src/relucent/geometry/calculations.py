@@ -961,14 +961,10 @@ def shis_are_certified(shis_kwargs: Mapping[str, Any]) -> bool:
     """Whether ``get_shis(poly, **shis_kwargs)`` returns ``poly``'s complete, certified facet list.
 
     Every facet decision is certified, so the answer is the cell's facet list (and recomputing it
-    is redundant) unless ``subset`` restricts the candidates, ``escalate_bound=False`` makes the
-    box a constraint, or ``new_method`` skips rows uncertified. Recorded as ``poly._shis_strict``.
+    is redundant) unless ``subset`` restricts the candidates or ``escalate_bound=False`` makes
+    the box a constraint. Recorded as ``poly._shis_strict``.
     """
-    return (
-        shis_kwargs.get("subset") is None
-        and bool(shis_kwargs.get("escalate_bound", True))
-        and not shis_kwargs.get("new_method", False)
-    )
+    return shis_kwargs.get("subset") is None and bool(shis_kwargs.get("escalate_bound", True))
 
 
 @overload
@@ -977,7 +973,6 @@ def get_shis(
     collect_info: Literal[False] = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
-    new_method: bool = False,
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
@@ -991,7 +986,6 @@ def get_shis(
     collect_info: Literal[True] | Literal["All"],
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
-    new_method: bool = False,
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
@@ -1004,7 +998,6 @@ def get_shis(
     collect_info: bool | str = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
-    new_method: bool = False,
     env: Env | None = None,
     shi_pbar: bool = False,
     push_size: float = 1.0,
@@ -1032,8 +1025,6 @@ def get_shis(
         collect_info: If true, also return debug info; ``"All"`` adds more detail.
         bound: Hypercube bound for the Gurobi variable box.
         subset: Halfspace indices to consider; default is all.
-        new_method: Extra basis-based skipping (does not improve runtime). Its skips are not
-            certified; do not use it where correctness matters.
         env: Gurobi environment; default uses :func:`~relucent._internal.gurobi.get_env`.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
@@ -1307,32 +1298,6 @@ def get_shis(
                         )
 
                 basis_indices = cbasis != 0 if cbasis is not None else None
-                if new_method and basis_indices is not None and basis_indices.sum() != k:
-                    warnings.warn(
-                        "SHI computation: bound constraints detected in LP basis; basis-based shortcut skipped.",
-                        stacklevel=2,
-                    )
-                skip_size = 0
-                if new_method and basis_indices is not None and basis_indices.sum() == k:
-                    point_shis_np = a_red[basis_indices, :]
-                    others_np = a_red[~basis_indices, :]
-                    try:
-                        sols_np = np.linalg.solve(point_shis_np, others_np.T)
-                    except np.linalg.LinAlgError:
-                        warnings.warn(
-                            "SHI computation: failed to solve linear system for basis shortcut; falling back.",
-                            stacklevel=2,
-                        )
-                        sols_np = np.zeros(others_np.T.shape, dtype=np.float64)
-                    all_correct_np = (sols_np > 0).all(axis=0)
-                    if all_correct_np.any():
-                        reduced_idx = np.arange(a_red.shape[0], dtype=np.intp)[~basis_indices][all_correct_np]
-                        work_rows = ineq_rows[reduced_idx]
-                        orig_to_remove = work_to_orig[work_rows]
-                        old_len = len(subset)
-                        subset -= set(int(x) for x in orig_to_remove.tolist() if x >= 0)
-                        new_len = len(subset)
-                        skip_size = old_len - new_len
             else:
                 raise ValueError(f"Model status: {model.status}")
 
@@ -1345,7 +1310,6 @@ def get_shis(
                             constrs.Slack if basis_indices is None else constrs.Slack[~basis_indices]
                         ),
                         "Status": model.status,
-                        "# Skipped": skip_size,
                     }
                 )
                 if hasattr(model, "objVal"):

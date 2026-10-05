@@ -211,8 +211,6 @@ The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
    multiplier, which float64 cannot prove. Only if that is inconclusive does an exact
    simplex (:func:`relucent._internal.exact.exact_facet_by_simplex`) decide.
 
-The ``strict`` option is deprecated and has no effect: every answer is already certified.
-
 LP solver failures
 ~~~~~~~~~~~~~~~~~~
 
@@ -502,6 +500,17 @@ conflating the two breaks ``∂² = 0`` for GF(2) boundary maps.
 
 Boundary discovery
 ------------------
+
+.. warning::
+
+   Boundary discovery is **experimental** and outside relucent's stability guarantees.
+   Certification covers only the components it finds. MIP pricing can miss a component
+   that lies outside its input box (``estimate_input_bound``, which shrinks as the weights
+   shrink while the boundary moves outward) or on which some other unit stays within
+   ``BOUNDARY_MIP_EPS`` of zero (for example a dead unit under weight decay), and the
+   result is still reported as complete. For a verified boundary, explore the input space
+   with :meth:`~relucent.core.complex.Complex.bfs` and take
+   :meth:`~relucent.core.complex.Complex.boundary_complex`.
 
 :meth:`~relucent.core.complex.Complex.discover_boundary_complex` builds the
 decision-boundary complex for neuron ``i`` without a full ambient BFS:

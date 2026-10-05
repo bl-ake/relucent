@@ -325,7 +325,6 @@ def test_shi_options_that_change_the_answer_are_not_certified() -> None:
     assert shis_are_certified({}) and shis_are_certified({"bound": 5.0, "push_size": 2.0})
     assert not shis_are_certified({"subset": [0, 1]})
     assert not shis_are_certified({"escalate_bound": False})
-    assert not shis_are_certified({"new_method": True})
 
 
 def test_geometric_certify_recomputes_only_assigned_shis(monkeypatch: pytest.MonkeyPatch) -> None:
