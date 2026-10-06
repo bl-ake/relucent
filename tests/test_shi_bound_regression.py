@@ -20,7 +20,7 @@ def test_default_polyhedron_bound_used_by_lazy_shis() -> None:
     assert len(top.shis) > 0
 
 
-def test_get_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
+def test_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
     """``escalate_bound=False`` keeps SHI LPs at the requested box radius.
 
     With the box a real constraint there is no exact fallback (it decides facets of the unbounded
@@ -40,7 +40,7 @@ def test_get_shis_escalate_bound_false_uses_single_box(seeded: int) -> None:
     assert len(calculations.shis(poly, bound=bound, escalate_bound=True)) > 0
 
 
-def test_get_shis_escalates_bound_for_unbounded_arrangement_cell(seeded: int) -> None:
+def test_shis_escalates_bound_for_unbounded_arrangement_cell(seeded: int) -> None:
     """Unbounded hyperplane cells must not fail SHI LPs at the network-scaled box."""
     set_seeds(seeded)
     model = torch_mlp(widths=[2, 4, 1], add_last_relu=False)

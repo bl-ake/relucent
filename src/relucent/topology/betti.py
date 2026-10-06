@@ -570,7 +570,7 @@ def betti_numbers(
     respect_finite: bool = False,
     reduced: bool = False,
     verify_chain_complex: bool = False,
-    verify_connected_components: bool = True,  ## TODO: How slow is this?
+    verify_connected_components: bool = True,
     verbose: int | None = None,
     nworkers: int | None = None,
     method: Literal["sparse", "dense"] = "sparse",

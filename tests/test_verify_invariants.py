@@ -107,14 +107,14 @@ def test_finalize_ambient_search_reuses_dual_graph(monkeypatch: pytest.MonkeyPat
     cplx = Complex(model)
     cplx.bfs(start=np.zeros((1, 2), dtype=np.float64), verbose=False, verify=False)
 
-    orig_get_dual_graph = cplx.dual_graph
+    orig_dual_graph = cplx.dual_graph
     calls = {"count": 0}
 
-    def _counting_get_dual_graph(*args, **kwargs):
+    def _counting_dual_graph(*args, **kwargs):
         calls["count"] += 1
-        return orig_get_dual_graph(*args, **kwargs)
+        return orig_dual_graph(*args, **kwargs)
 
-    monkeypatch.setattr(cplx, "dual_graph", _counting_get_dual_graph)
+    monkeypatch.setattr(cplx, "dual_graph", _counting_dual_graph)
 
     finalize_ambient_search(cplx, complete=True, verify=True)
 
@@ -143,7 +143,7 @@ def test_complete_certify_fails_closed_on_shi_recompute_error(monkeypatch: pytes
         verify_lp_flip_neighbors_in_complex(cplx, nworkers=1)
 
 
-def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
     model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)
@@ -159,7 +159,7 @@ def test_get_boundary_complex_reuses_strict_cached_shis_from_verified_bfs(monkey
     assert boundary.verified is True
 
 
-def test_get_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_boundary_complex_reuses_strict_shis_after_dual_graph_recovery(monkeypatch: pytest.MonkeyPatch) -> None:
     import relucent.geometry.calculations as calc
 
     model = torch_mlp(widths=[2, 4, 1], add_last_relu=True)

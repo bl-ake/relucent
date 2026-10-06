@@ -179,7 +179,7 @@ def _populate_small_1d_complex(seed: int) -> Complex:
 
 
 @pytest.mark.python_gf2
-def test_get_betti_numbers_python_backend_smoke(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_betti_numbers_python_backend_smoke(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
     """Pure-Python GF(2) rank path runs end-to-end (no C required)."""
     db = _populate_diamond_boundary(seeded)
     betti = _betti_for_backend(monkeypatch, db, use_c=False)
@@ -207,7 +207,7 @@ def test_c_gf2_backend_available() -> None:
         (_populate_small_1d_complex, {"compactify": "borel_moore"}),
     ],
 )
-def test_get_betti_numbers_c_matches_python(
+def test_betti_numbers_c_matches_python(
     seeded: int,
     monkeypatch: pytest.MonkeyPatch,
     build_cplx: Callable[[int], Complex],
@@ -221,7 +221,7 @@ def test_get_betti_numbers_c_matches_python(
     assert betti_c == betti_py, f"C {betti_c} != Python {betti_py} (kwargs={kwargs})"
 
 
-def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_complex_betti_numbers_delegates_to_topology(seeded: int, monkeypatch: pytest.MonkeyPatch) -> None:
     """Public :meth:`~relucent.core.complex.Complex.betti_numbers`` matches topology module."""
     db = _populate_diamond_boundary(seeded)
     _set_gf2_backend(monkeypatch, use_c=C_BACKEND_AVAILABLE)
@@ -243,7 +243,7 @@ def test_complex_get_betti_numbers_delegates_to_topology(seeded: int, monkeypatc
         (_populate_small_1d_complex, {}),
     ],
 )
-def test_get_betti_numbers_parallel_matches_sequential(
+def test_betti_numbers_parallel_matches_sequential(
     seeded: int,
     monkeypatch: pytest.MonkeyPatch,
     build_cplx: Callable[[int], Complex],
@@ -263,7 +263,7 @@ def test_get_betti_numbers_parallel_matches_sequential(
 # ---------------------------------------------------------------------------
 
 
-def test_get_betti_numbers_kmin1_two_isolated_1cells() -> None:
+def test_betti_numbers_kmin1_two_isolated_1cells() -> None:
     """Two isolated 1-cells (no 0-cells, no 2-cells) → β₁ = 2.
 
     When kmin = 1 there is no ∂₁ (C₀ = 0), so the "bottom" of the chain is
@@ -276,7 +276,7 @@ def test_get_betti_numbers_kmin1_two_isolated_1cells() -> None:
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
 
-def test_get_betti_numbers_kmin1_two_components_via_2cells() -> None:
+def test_betti_numbers_kmin1_two_components_via_2cells() -> None:
     """kmin = 1 with two groups of 1-cells connected internally by 2-cells.
 
     Group P: 1-cells (1,0) and (1,1) both face 2-cell (2,0).
@@ -302,7 +302,7 @@ def test_get_betti_numbers_kmin1_two_components_via_2cells() -> None:
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
 
-def test_get_betti_numbers_kmin1_single_component() -> None:
+def test_betti_numbers_kmin1_single_component() -> None:
     """kmin = 1, four 1-cells connected into one component via three 2-cells → β₁ = 1."""
     # Chain: C₂ →^{∂₂} C₁;  n₁=4, n₂=3
     # 2-cell (2,0): faces (1,0),(1,1);  (2,1): faces (1,1),(1,2);  (2,2): faces (1,2),(1,3)
@@ -322,7 +322,7 @@ def test_get_betti_numbers_kmin1_single_component() -> None:
     assert 0 not in betti, f"key 0 should be absent when kmin=1, got {betti}"
 
 
-def test_get_betti_numbers_kmin0_unaffected() -> None:
+def test_betti_numbers_kmin0_unaffected() -> None:
     """When kmin = 0 (0-cells present), behaviour is identical to before the fix.
 
     Two isolated 0-cells → β₀ = 2 (standard connected-components formula).

@@ -94,7 +94,7 @@ def test_default_chain_and_meta_graph_do_not_call_lp(
     assert meta.number_of_nodes() > 0
 
 
-def test_get_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_meta_graph_unions_chebyshev_phantom_scan(monkeypatch: pytest.MonkeyPatch) -> None:
     """Empty vertex-star-infeasible set must not disable geometric_infeasible_one_cells."""
     from relucent.graph import incidence
 

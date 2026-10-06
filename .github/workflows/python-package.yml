@@ -94,7 +94,7 @@ jobs:
       run: pytest -m "not requires_c_gf2"
 
   gf2-backend:
-    name: GF(2) C backend + get_betti_numbers parity
+    name: GF(2) C backend + betti_numbers parity
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
