@@ -1,0 +1,25 @@
+# Monthly, one grouped pull request per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: monthly
+    # Only ever update uv.lock. The version ranges in pyproject.toml are what users get, and Dependabot
+    # must never raise a lower bound there.
+    versioning-strategy: lockfile-only
+    groups:
+      uv:
+        applies-to: version-updates
+        patterns: ["*"]
+      uv-security:
+        applies-to: security-updates
+        patterns: ["*"]

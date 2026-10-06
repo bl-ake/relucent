@@ -14,7 +14,10 @@ on:
     - cron: "0 0 1 * *"
 
 jobs:
+  # The only job that installs from uv.lock: ruff and basedpyright run at the versions `uv run` gives locally,
+  # and Dependabot's lock updates get tested. Every other job resolves fresh, as `pip install relucent` does.
   lint:
+    name: Lint, type-check and test (uv.lock)
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -22,16 +25,21 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: "3.13"
-    - name: Install dependencies
+    - name: Install the locked environment
+      # --locked fails if uv.lock no longer matches pyproject.toml.
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ".[dev,torch]"
+        python -m pip install uv
+        uv sync --locked --python 3.13 --extra dev --extra torch
     - name: Lint with ruff
-      run: ruff check .
+      run: uv run --no-sync ruff check .
     - name: Check formatting with ruff
-      run: ruff format --check .
+      run: uv run --no-sync ruff format --check .
     - name: Type-check with basedpyright
-      run: basedpyright
+      run: uv run --no-sync basedpyright
+    - name: Test with pytest
+      env:
+        RELUCENT_CAREFUL_MODE: "1"
+      run: uv run --no-sync pytest -m "not requires_c_gf2"
 
   docs:
     name: Docs (warnings are errors)
@@ -67,9 +75,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
+      # On Linux, PyPI's torch pulls in the CUDA libraries, which these runners can't use, so take the CPU build.
+      # (macOS and Windows torch on PyPI is already CPU-only, and the CPU index lags it on macOS.)
+      # --torch-backend is a uv preview option.
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ".[dev,torch]"
+        python -m pip install uv
+        uv pip install --system ${{ runner.os == 'Linux' && '--torch-backend cpu' || '' }} ".[dev,torch]"
     - name: Test with pytest
       env:
         RELUCENT_CAREFUL_MODE: "1"
@@ -86,10 +97,10 @@ jobs:
         python-version: "3.11"
     - name: Install the oldest versions pyproject.toml allows
       run: |
-        python -m pip install --upgrade pip uv
+        python -m pip install uv
         uv pip install --system --resolution lowest-direct .
         uv pip install --system "pytest>=9.0.2"
-        uv pip install --system "torch>=2.5.0" --index-url https://download.pytorch.org/whl/cpu
+        uv pip install --system --resolution lowest-direct "torch>=2.5.0" --index-url https://download.pytorch.org/whl/cpu
         uv pip list --system | grep -iE "^(numpy|scipy|networkx|plotly|tqdm|gurobipy|torch) "
     - name: Test with pytest
       env:
@@ -109,8 +120,8 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y gcc
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ".[dev,torch]"
+        python -m pip install uv
+        uv pip install --system --torch-backend cpu ".[dev,torch]"
     - name: Require C backend and run parity tests
       env:
         RELUCENT_CAREFUL_MODE: "1"
@@ -130,8 +141,8 @@ jobs:
         python-version: "3.13"
     - name: Install dependencies (without torch extra)
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ".[dev]"
+        python -m pip install uv
+        uv pip install --system ".[dev]"
     - name: Verify torch is not installed
       run: |
         python - <<'PY'
