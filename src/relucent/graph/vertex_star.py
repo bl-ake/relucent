@@ -111,7 +111,7 @@ PARALLEL_SCREEN_MIN_ROOTS = 2048
 
 
 def _screen_roots_chunk(lo: int, hi: int) -> list[tuple[int, tuple[int, ...]]]:
-    """Worker: surviving ``(root index, combo)`` pairs for roots ``lo:hi`` of :data:`_screen_state`."""
+    """Worker: surviving ``(root index, combo)`` pairs for roots ``lo:hi`` of ``_screen_state``."""
     assert _screen_state is not None
     roots, incidents, ambient_dim, n_more = _screen_state
     out: list[tuple[int, tuple[int, ...]]] = []
@@ -149,7 +149,7 @@ def _generate_vertex_candidates(
     avoids redundant checks of the same candidate from different cofaces.
 
     With ``screen``, each root's candidates are first screened together by
-    :func:`_provably_not_vertices`, and only the survivors (a few per root) are materialized and
+    ``_provably_not_vertices()``, and only the survivors (a few per root) are materialized and
     deduped. Since the verdict does not depend on the witness, a candidate screened out from one
     root would be screened out from any other, so no record of screened-out ones is kept. On
     large complexes the screening runs across ``nworkers`` forked processes; the survivors are
@@ -199,8 +199,8 @@ def _provably_not_vertices(root: Polyhedron, zeros: np.ndarray) -> np.ndarray:
 
     Most candidates are not vertices (on real checkpoints ~50 per vertex): the point where their
     zeroed rows vanish lies clearly outside another row of the witness cell. This is the same
-    rigorous test :meth:`Polyhedron.verify_vertex_covector` applies first
-    (:func:`relucent._internal.rounding.solve_equalities` then ``classify_rows``), vectorized over
+    rigorous test :meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector` applies first
+    (``relucent._internal.rounding.solve_equalities()`` then ``classify_rows``), vectorized over
     the candidates: True only when the exact point provably violates some row. Candidates it
     cannot rule out, including those whose rows are dependent within their error, are False and
     left for the full check.
@@ -257,7 +257,7 @@ def _verify_candidate_chunk(
 ) -> list[tuple[bytes, np.ndarray | None]]:
     """Verify one chunk of candidates in a worker process.
 
-    Calls :meth:`Polyhedron.verify_vertex_covector` verbatim (no reimplemented
+    Calls :meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector` verbatim (no reimplemented
     math) so this can never silently drift from the sequential path.
     """
     results: list[tuple[bytes, np.ndarray | None]] = []
@@ -365,19 +365,19 @@ def find_vertices(
 ) -> dict[bytes, VertexRecord]:
     """Seed every candidate vertex reachable from ``top_cells``, and verify it.
 
-    With ``screen`` (only when ``verify_vertex`` is :meth:`Polyhedron.verify_vertex_covector`),
-    candidates are first screened in batches per witness by :func:`_provably_not_vertices`,
+    With ``screen`` (only when ``verify_vertex`` is :meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector`),
+    candidates are first screened in batches per witness by ``_provably_not_vertices()``,
     which drops only those that check would reject.
 
-    Candidate generation (:func:`_generate_vertex_candidates`) is always
+    Candidate generation (``_generate_vertex_candidates()``) is always
     sequential -- it's cheap combinatorics. Verification of each candidate
-    (typically :meth:`Polyhedron.verify_vertex_covector`: one float64
+    (typically :meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector`: one float64
     equality solve plus a check of every other row) is what dominates
     runtime on large complexes, since it runs once per candidate. Each
     candidate's check is independent of every other's, so when ``net`` is
     supplied and there are enough candidates to be worth Pool startup cost,
     verification is farmed out across ``nworkers`` processes, which run
-    :meth:`Polyhedron.verify_vertex_covector` itself instead of ``verify_vertex``.
+    :meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector` itself instead of ``verify_vertex``.
     The parallel path is therefore only for that ``verify_vertex``; the parallel
     and sequential paths must otherwise produce identical results.
     """
@@ -535,7 +535,7 @@ def build_chain_complex(source: Complex, verbose: int | None = None) -> list[Com
 
     Candidate vertices receive one float64 equality solve followed by a
     check against every other row of their witness cell
-    (:meth:`Polyhedron.verify_vertex_covector`);
+    (:meth:`~relucent.core.poly.Polyhedron.verify_vertex_covector`);
     no facet or boundedness LP is used here. Every recovered cell of
     dimension ``k >= 1`` has, by construction, at least one verified
     vertex among its own faces (its generating vertex), so a cell can

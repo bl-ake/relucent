@@ -10,8 +10,10 @@ breaks the public API bumps the major version. The public API is
 * every name in ``relucent.__all__``, and
 * every name in the ``__all__`` of a module documented in the API reference,
 
-with their documented arguments and behavior. These are excluded and may change in any
-release:
+with their documented arguments and behavior. A subpackage's ``__init__`` (such as
+``relucent.search`` or ``relucent.core``) re-exports names for convenience. A re-exported name
+is public only if the module that defines it is documented. These are excluded and may change
+in any release:
 
 * ``relucent._internal`` and any name that starts with an underscore;
 * the solver-tuning settings in :mod:`relucent.config.advanced`;
@@ -110,7 +112,7 @@ Other changes
 * **Networks.** ``Complex.net`` is the converted
   :class:`~relucent.model.model.ReLUNetwork`; the model you passed is ``Complex.source_model``.
   ``mlp()`` always returns a NumPy ``ReLUNetwork``; ``torch_mlp()`` builds the PyTorch module.
-* **Conversion.** :func:`~relucent.convert` checks every ``torch.nn.Module`` against its own
+* **Conversion.** :func:`~relucent.model.convert_model.convert` checks every ``torch.nn.Module`` against its own
   forward pass and raises if the result differs, so a ``forward`` with a skip connection is
   refused instead of converted to a different function. ``Conv2d`` with dilation, groups,
   a non-zero padding mode or ``padding="same"`` raises instead of converting wrongly.

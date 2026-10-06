@@ -54,6 +54,7 @@ class TorchMLP(nn.Sequential):
             return torch.float64
 
 
+#: Names accepted by the ``init`` argument of :func:`mlp` and :func:`torch_mlp`.
 MLP_INIT_METHODS = frozenset(
     {
         "uniform",
@@ -128,14 +129,14 @@ def mlp(
 ) -> ReLUNetwork:
     """Create a fully connected ReLU network with random weights, as a :class:`~relucent.model.model.ReLUNetwork`.
 
-    Weights come from NumPy's global RNG (seed it with :func:`set_seeds`), so the same seed
+    Weights come from NumPy's global RNG (seed it with :func:`~relucent.model.builders.set_seeds`), so the same seed
     gives the same network whether or not PyTorch is installed. For a PyTorch module, use
-    :func:`torch_mlp`.
+    :func:`~relucent.model.builders.torch_mlp`.
 
     Args:
         widths: Layer widths including input and output widths, e.g. ``[2, 10, 5, 1]``.
         add_last_relu: If ``True``, append a ReLU after the final linear layer.
-        init: Weight initialization, one of :data:`MLP_INIT_METHODS` (default ``"uniform"``,
+        init: Weight initialization, one of :data:`~relucent.model.builders.MLP_INIT_METHODS` (default ``"uniform"``,
             PyTorch's ``nn.Linear`` default). Each follows the PyTorch initializer of the same
             name; the ``kaiming_*`` ones use the ReLU gain.
 
@@ -160,9 +161,10 @@ def torch_mlp(
     add_last_relu: bool = False,
     init: str = "uniform",
 ) -> TorchMLP:
-    """Like :func:`mlp`, but as a float64 PyTorch module (needs PyTorch; seeded by :func:`set_seeds`).
+    """Like :func:`~relucent.model.builders.mlp`, but as a float64 PyTorch module (needs PyTorch).
 
-    Its weights come from PyTorch's RNG, so they differ from :func:`mlp`'s for the same seed.
+    Seed it with :func:`~relucent.model.builders.set_seeds`. Its weights come from PyTorch's RNG, so
+    they differ from :func:`~relucent.model.builders.mlp`'s for the same seed.
     """
     if init not in MLP_INIT_METHODS:
         raise ValueError(f"Unknown init {init!r}; expected one of {sorted(MLP_INIT_METHODS)}")
@@ -260,7 +262,7 @@ def add_output_relu(model: Any) -> Any:
     ReLU while keeping all earlier weights unchanged.
 
     Args:
-        model: A :class:`TorchMLP`, plain :class:`torch.nn.Sequential`, or
+        model: A :class:`~relucent.model.builders.TorchMLP`, plain :class:`torch.nn.Sequential`, or
             :class:`~relucent.model.model.ReLUNetwork`.
 
     Returns:

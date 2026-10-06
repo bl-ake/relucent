@@ -15,21 +15,22 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # Fetch all history for gh-pages action
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13' # Use your preferred Python version
+        python-version: '3.13'
 
     - name: Install dependencies
       run: |
+        # torch is needed to render signatures that name torch types; the CPU build is enough.
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
         pip install ".[docs]"
 
     - name: Build Sphinx HTML documentation
-      run: |
-        cd docs
-        make html
+      # Warnings are checked on every push by the Docs job in python-package.yml.
+      run: sphinx-build -E -b html docs docs/_build/html
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
@@ -37,4 +38,3 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: docs/_build/html
         publish_branch: gh-pages
-        

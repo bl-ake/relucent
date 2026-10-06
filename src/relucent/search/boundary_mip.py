@@ -75,7 +75,7 @@ def _configure_pricing_mip_logging(model: Model, *, log_path: Path | None) -> No
 
     Controlled by :data:`~relucent.config.BOUNDARY_MIP_GUROBI_LOG`, not by the
     relucent verbosity. Model parameters override the cached
-    :func:`~relucent._internal.gurobi.get_env` defaults.
+    ``get_env()`` defaults.
     """
     if cfg.BOUNDARY_MIP_GUROBI_LOG:
         model.Params.OutputFlag = 1

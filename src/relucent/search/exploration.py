@@ -156,7 +156,7 @@ def explore_for_topology(
 ) -> None:
     """BFS from ``start`` and require a complete, verified ambient complex.
 
-    When ``start`` is None, :func:`generic_topology_start` picks an interior point.
+    When ``start`` is None, :func:`~relucent.search.exploration.generic_topology_start` picks an interior point.
     """
     if start is None:
         start = generic_topology_start(cplx, seed=seed)

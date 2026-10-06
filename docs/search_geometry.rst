@@ -14,7 +14,7 @@ some geometric properties, such as ``volume``, rely on this data, so you can cho
 The ``geometry_properties`` option lets you choose between:
 
 1. **Default search** (topology-only: SHIs, ``finite``, ``center``, and ``inradius`` only).
-2. **Full geometry search** (pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`).
+2. **Full geometry search** (pass :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES`).
 3. **Custom in-search geometry** (a chosen subset of optional geometric properties).
 4. **Two-phase pipelines** (topology first, then a targeted geometry pass).
 
@@ -28,7 +28,7 @@ required geometry for adjacency and feasibility, namely ``finite``, ``center``, 
 If you then run a command like ``cplx.compute_geometric_properties(properties=["volume"])``, relucent will 
 have to recompute the h-representation / affine map for each region, which can be slow.
 
-Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` to compute every property supported by
+Pass :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES` to compute every property supported by
 :meth:`~relucent.core.poly.Polyhedron.compute_geometric_properties` (including Qhull-derived
 ``vertices``, ``volume``).
 
@@ -46,7 +46,7 @@ In practice:
 
 - Use the **default** (topology-only) for large frontier growth when you only need
   adjacency or meta-graph structure.
-- Pass :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a **custom geometry set** when downstream steps immediately
+- Pass :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES` or a **custom geometry set** when downstream steps immediately
   need those values (for example, filtrations that read interior points or affine
   maps).
 
@@ -81,9 +81,7 @@ Full geometry during search
 
 .. code-block:: python
 
-   from relucent.search import ALL_GEOMETRY_PROPERTIES
-
-   cplx.bfs(max_polys=1000, geometry_properties=ALL_GEOMETRY_PROPERTIES)
+   cplx.bfs(max_polys=1000, geometry_properties=relucent.Polyhedron.GEOMETRY_PROPERTIES)
 
 Compute selected geometry during search
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -107,7 +105,7 @@ Property names
 
 ``geometry_properties`` / ``properties`` take names from
 :attr:`Polyhedron.GEOMETRY_PROPERTIES <relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES>`
-(also :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`); any other name raises ``ValueError``:
+(also :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES`); any other name raises ``ValueError``:
 
 - ``"halfspaces"``, ``"W"``, ``"b"``
 - ``"finite"``, ``"center"``, ``"inradius"``

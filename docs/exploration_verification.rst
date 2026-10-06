@@ -101,9 +101,9 @@ Two paths build a decision-boundary complex:
 
 * **Full ambient complex first** — explore the input space (BFS or
   :func:`~relucent.search.exploration.explore_for_topology`), then
-  :meth:`~relucent.core.complex.Complex.boundary_complex(i)` extracts faces on
+  :meth:`boundary_complex(i) <relucent.core.complex.Complex.boundary_complex>` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
-* **Direct boundary discovery** — :meth:`~relucent.core.complex.Complex.discover_boundary_complex(i)`
+* **Direct boundary discovery** — :meth:`discover_boundary_complex(i) <relucent.core.complex.Complex.discover_boundary_complex>`
   uses MIP pricing plus slice-restricted BFS per connected component, then
   :func:`~relucent.search.exploration.finalize_boundary_complex` for slice SHI assignment,
   dual graph, and verification. Does not require a full ambient BFS first.
@@ -125,6 +125,5 @@ Lower-dimensional 1-skeleton dual graphs walk each cell's finalized ``poly.shis`
 You can re-run certification manually with :meth:`~relucent.core.complex.Complex.certify`.
 
 See also :doc:`topology` for Betti-number prerequisites. For the full search →
-SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`. The markdown
-file ``docs/betti_computation.md`` walks through the homology pipeline in more
-detail.
+SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`.
+:doc:`betti_computation` walks through the homology pipeline in more detail.

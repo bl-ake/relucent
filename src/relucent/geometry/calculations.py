@@ -126,12 +126,12 @@ def _drop_degenerate_halfspaces_tracked(
 
     A row ``a^T x + b <= 0`` with ``a = 0`` either always holds (``b < 0``) or makes the region
     empty (``b > 0``). Keeping such rows can trigger Qhull errors (e.g. QH6023) and destabilize
-    interior-point solves. See :func:`_degenerate_rows` for how rows are judged against their
+    interior-point solves. See ``_degenerate_rows()`` for how rows are judged against their
     float64 error.
 
     ``old_to_new[i]`` is the row index in the returned array corresponding to
     original row ``i``, or ``-1`` if that row was dropped. ``errors`` is the rows' float64 error
-    scale (:mod:`relucent._internal.rounding`); without it the rows are treated as exact data.
+    scale (``relucent._internal.rounding``); without it the rows are treated as exact data.
     """
     from relucent._internal import rounding
 
@@ -320,7 +320,7 @@ def verify_interior_point(
 ) -> bool:
     """True iff the exact point nearest ``x`` on the cell's affine hull is strictly inside every inequality row.
 
-    Each row is judged against its own float64 error at ``x`` (:mod:`relucent._internal.rounding`),
+    Each row is judged against its own float64 error at ``x`` (``relucent._internal.rounding``),
     widened by the distance from ``x`` to the exact affine hull when ``zero_indices`` is given.
     """
     from relucent._internal import rounding
@@ -443,7 +443,7 @@ def solve_radius(
 
     Every nonempty answer is checked in float64: the returned center must lie strictly inside
     every inequality row beyond that row's own error (``errors``, the rows' error scale from
-    :mod:`relucent._internal.rounding`; exact data when omitted). A cell the LP calls nonempty
+    ``relucent._internal.rounding``; exact data when omitted). A cell the LP calls nonempty
     but whose center fails that check, or whose largest inscribed ball has radius 0 (a closed
     cell with empty interior, which an activation region cannot be), raises
     :class:`~relucent.core.errors.AmbiguousGeometryError` instead of being called empty or
@@ -667,7 +667,7 @@ def adjacent_polyhedra(
     """Polyhedra adjacent to ``poly`` across one bounding hyperplane (one SHI flip).
 
     Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
-    array to the corresponding :class:`Polyhedron` (e.g. ``Complex.ss2poly``).
+    array to the corresponding :class:`~relucent.core.poly.Polyhedron` (e.g. ``Complex.ss2poly``).
     """
     ps: set[Polyhedron] = set()
     for shi in poly.shis:
@@ -1015,7 +1015,7 @@ def shis(
 
     Candidate row ``i`` is relaxed by ``push_size`` and maximised. The LP only proposes; each
     answer is certified in float64 against the rows' own error (``poly.halfspaces_err_np``,
-    :mod:`relucent._internal.rounding`) by :func:`_certify_facet`: a facet needs a witness point
+    ``relucent._internal.rounding``) by ``_certify_facet()``: a facet needs a witness point
     where row ``i`` is strictly positive and every other row strictly negative beyond their errors,
     and a non-facet needs row ``i`` to be an exact nonnegative combination of the LP's tight rows
     with a negative constant, verified by bounding the exact multipliers (so it holds on the whole
@@ -1027,7 +1027,7 @@ def shis(
         collect_info: If true, also return debug info; ``"All"`` adds more detail.
         bound: Hypercube bound for the Gurobi variable box.
         subset: Halfspace indices to consider; default is all.
-        env: Gurobi environment; default uses :func:`~relucent._internal.gurobi.get_env`.
+        env: Gurobi environment; default uses ``get_env()``.
         shi_pbar: Show a progress bar.
         push_size: RHS relaxation size when testing a candidate SHI.
         escalate_bound: If False, use only the requested ``bound`` (no automatic box-radius
@@ -1365,7 +1365,7 @@ _SHI_LP_RETRY_SCALE_FLAGS: tuple[int, ...] = (0,)
 
 
 def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]:
-    """Re-solve a failed SHI LP ``model`` from scratch under each of :data:`_SHI_LP_RETRY_SCALE_FLAGS`.
+    """Re-solve a failed SHI LP ``model`` from scratch under each of ``_SHI_LP_RETRY_SCALE_FLAGS``.
 
     Warm starts and the configured scaling (:data:`relucent.config.advanced.GUROBI_SHI_SCALE_FLAG`) are
     what typically fail on a badly conditioned cell; every answer is certified afterwards, so the
@@ -1389,7 +1389,7 @@ def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]
 def _recover_relaxed_shi_lp(
     model: Model, poly: "Polyhedron", i: int, decide: Callable[[], bool | None] | None = None
 ) -> bool | None:
-    """Re-solve a failed SHI LP for halfspace ``i`` (:func:`_cold_retry`), else decide without it, else raise.
+    """Re-solve a failed SHI LP for halfspace ``i`` (``_cold_retry()``), else decide without it, else raise.
 
     The LP relaxes one row of a feasible cell and caps its objective, so it is feasible and bounded:
     any non-optimal status is a solver failure. Returns None once a re-solve succeeds (``model``
@@ -1431,7 +1431,7 @@ def _raise_if_coincident_facet(
     """Raise when LP row ``j`` (halfspace ``i``) was judged no facet only because a duplicate hides it.
 
     ``partners`` are LP rows equal to row ``j`` up to a positive scale within their float64 error
-    (:func:`_near_duplicate_rows`). They are relaxed together with row ``j``; if row ``j`` is then
+    (``_near_duplicate_rows()``). They are relaxed together with row ``j``; if row ``j`` is then
     certified a facet, the cell has a facet made of several rows that are the same hyperplane to
     float64 precision, which the one-sign-flip neighbor structure cannot represent.
     """
@@ -1515,8 +1515,8 @@ def certified_bounded(poly: "Polyhedron", env: Env | None = None) -> bool:
     ``A^T y + A_eq^T z = 0`` for some ``y > 0``. One LP finds ``y >= 1``; it is accepted when a
     basis of the rows stays nonsingular, and the correction that cancels the exact rows' residual
     on that basis keeps ``y`` positive, under every perturbation within the rows' error
-    (:mod:`relucent._internal.rounding`). Anything else is decided by an exact simplex on the
-    recession cone (:func:`relucent._internal.exact.exact_recession_cone_is_zero`).
+    (``relucent._internal.rounding``). Anything else is decided by an exact simplex on the
+    recession cone (``relucent._internal.exact.exact_recession_cone_is_zero()``).
 
     Raises:
         AmbiguousGeometryError: If the float64 test fails and the exact rows are unavailable or
@@ -1652,7 +1652,7 @@ def _certify_facet(
     exists -- a point where row ``j`` is strictly positive and every other row strictly negative,
     each beyond its float64 error (``err_red``) -- found at ``z`` or on the segment from ``z`` to
     the cell's verified interior point. Returns False when the LP's tight rows (``tight``, from
-    its basis) certify row ``j`` strictly negative on the whole cell (:func:`_certify_not_facet`).
+    its basis) certify row ``j`` strictly negative on the whole cell (``_certify_not_facet()``).
     Returns None when neither holds.
     """
     from relucent._internal import rounding
@@ -1712,7 +1712,7 @@ def _certify_facet_from_model(
     err_red: np.ndarray,
     interior_point: Callable[[], np.ndarray],
 ) -> bool | None:
-    """Run :func:`_certify_facet` on an SHI LP solution (from :func:`_read_lp_solution`).
+    """Run ``_certify_facet()`` on an SHI LP solution (from ``_read_lp_solution()``).
 
     The basis's tight rows feed the non-facet certificate only when the LP is optimal.
     """

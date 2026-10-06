@@ -139,7 +139,7 @@ def _facets_for_sidedness_propagation(
     Bi-infinite line facets (no cubical 0-face anchor) are dropped when ``poly`` is set:
     inheriting bilateral openness from them onto a unilateral coface creates phantom
     0-faces. This filter is an *inheritance* policy only — not an existence test for
-    whether the coface needs a truncation cap (see :func:`_open_cap_count`).
+    whether the coface needs a truncation cap (see ``_open_cap_count()``).
     """
     candidates = _raw_unbounded_facets(orig, meta, unbounded, km1_dim)
     if candidates and any(meta.nodes[v].get("poly") is not None for v in candidates):
@@ -427,7 +427,7 @@ def truncate_meta_graph(meta: nx.MultiDiGraph[Any]) -> None:
     ``face_tag`` rebuild. Faces between cells with disagreeing openness (e.g. a
     unilateral coface and a bi-infinite line) are intentionally omitted: restoring them
     without a matching sphere-cut breaks ``∂²=0``. Those cofaces receive a trunc-cap
-    instead (see :func:`_open_cap_count`).
+    instead (see ``_open_cap_count()``).
 
     Called by :func:`relucent.topology.betti_numbers` when ``compactify="truncate"``
     (the default for :meth:`~relucent.core.complex.Complex.betti_numbers`), and by persistent-homology code in

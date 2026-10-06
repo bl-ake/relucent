@@ -370,7 +370,7 @@ def verify_boundary_cell(poly: Polyhedron, boundary_shi: int) -> None:
 def _one_cell_endpoint_map(poly: Polyhedron) -> dict[bytes, tuple[int, np.ndarray, float]]:
     """Map combinatorial 0-face tags to ``(witness shi, point, error radius)`` for a 1-cell.
 
-    Each endpoint is certified by :meth:`Polyhedron._halfspace_point_with_error`: strictly inside
+    Each endpoint is certified by ``Polyhedron._halfspace_point_with_error()``: strictly inside
     every other row of the cell beyond its float64 error, or the call raises.
     """
     if int(poly.dim) != 1:

@@ -36,8 +36,8 @@ __all__ = ["Polyhedron"]
 class Polyhedron:
     """Represents a polyhedron (linear region) in d-dimensional space.
 
-    Prefer creating instances via :meth:`~relucent.Complex.add_point`,
-    :meth:`~relucent.Complex.add_ss`, or search methods — not direct construction.
+    Prefer creating instances via :meth:`~relucent.core.complex.Complex.add_point`,
+    :meth:`~relucent.core.complex.Complex.add_ss`, or search methods — not direct construction.
 
     A polyhedron is identified by its sign sequence, which is fixed at construction. Its
     geometry is computed lazily: the first read of a property such as :attr:`halfspaces`,
@@ -93,7 +93,7 @@ class Polyhedron:
             ss: Sign sequence defining the polyhedron (values in {-1, 0, 1}).
             halfspaces: Precomputed rows ``[A | b]`` of ``Ax + b <= 0``.
             halfspaces_err: Float64 error scale of ``halfspaces`` (see
-                :mod:`relucent._internal.rounding`). Rows given without it, and without
+                ``relucent._internal.rounding``). Rows given without it, and without
                 ``halfspaces_ss``, are taken as exact data.
             halfspaces_ss: Sign sequence the ``halfspaces`` rows were composed for, when
                 they come from another cell.
@@ -192,7 +192,7 @@ class Polyhedron:
 
         Solves ``hs[eq_indices, :-1] @ x = -hs[eq_indices, -1]`` and judges each other row at
         the solution against its own float64 error (``errors``, the rows' error scale from
-        :mod:`relucent._internal.rounding`; exact data when omitted), widened by the solve error.
+        ``relucent._internal.rounding``; exact data when omitted), widened by the solve error.
 
         Returns:
             The point, or ``None`` when the equality system has no solution or some other row
@@ -213,10 +213,10 @@ class Polyhedron:
         errors: np.ndarray | None = None,
         exact_rows: Callable[[], list[list[Any]] | None] | None = None,
     ) -> tuple[np.ndarray, float] | None:
-        """:meth:`_halfspace_point` plus a bound on the point's distance to the exact point.
+        """``_halfspace_point()`` plus a bound on the point's distance to the exact point.
 
         When float64 cannot decide and ``exact_rows`` can rebuild the rows exactly, the decision
-        is made in exact arithmetic (:func:`relucent._internal.exact.exact_point`) instead.
+        is made in exact arithmetic (``relucent._internal.exact.exact_point()``) instead.
         """
         try:
             return Polyhedron._halfspace_point_float(hs, eq_indices, errors)
@@ -232,7 +232,7 @@ class Polyhedron:
     def _halfspace_point_float(
         hs: np.ndarray, eq_indices: np.ndarray, errors: np.ndarray | None = None
     ) -> tuple[np.ndarray, float] | None:
-        """Float64 half of :meth:`_halfspace_point_with_error`; raises when it cannot decide."""
+        """Float64 half of ``_halfspace_point_with_error()``; raises when it cannot decide."""
         H = np.asarray(hs, dtype=np.float64)
         E = rounding.exact_rows_error(H) if errors is None else np.asarray(errors, dtype=np.float64)
         eq_idx = np.asarray(eq_indices, dtype=np.intp)
@@ -263,7 +263,7 @@ class Polyhedron:
         a vertex of this cell's closure exactly when the point where those rows vanish satisfies
         every other row of this cell strictly, and then its covector is ``vertex_ss`` (a unit's
         preactivation equals this cell's affine row on the whole closure). Both are decided in
-        float64 against each row's own error by :meth:`_halfspace_point`, or exactly when that
+        float64 against each row's own error by ``_halfspace_point()``, or exactly when that
         cannot decide and the rows can be rebuilt exactly. Rows with an exactly zero normal (dead
         units) are constants, not hyperplanes, and do not take part.
 
@@ -321,17 +321,17 @@ class Polyhedron:
         For 1-cells (whose faces are 0-cells, i.e., points), the induced vertex is
         the unique solution of the current equality constraints extended by hyperplane
         ``shi``.  Feasibility reduces to linear-system consistency, which is checked
-        cheaply via :meth:`_halfspace_point` (numpy lstsq + slack test, no LP).
+        cheaply via ``_halfspace_point()`` (numpy lstsq + slack test, no LP).
 
         For all other dimensions this method returns ``True`` without checking.  Faces
         of k-cells with k > 1 are themselves polytopes; checking their feasibility
         requires finding an interior point via LP.  In practice the dual-graph /
         covector recovery path and construction-time
-        :func:`relucent.graph.boundary._codim_one_face_kwargs` checks (boundary
+        ``relucent.graph.boundary._codim_one_face_kwargs()`` checks (boundary
         faces) prevent phantom cells at dimensions > 0, so this check is not needed there.
 
         **Invariant**: every 1-cell that passes through boundary-face construction
-        (via :func:`relucent.graph.boundary._codim_one_face_kwargs`) is constructed
+        (via ``relucent.graph.boundary._codim_one_face_kwargs()``) is constructed
         with ``halfspaces`` set from its coface, so halfspaces are always available.
         A ``ValueError`` is raised when this invariant is violated (i.e. a 1-cell is
         encountered without cached halfspaces), which indicates the cell was
@@ -407,7 +407,7 @@ class Polyhedron:
 
     @property
     def ss(self) -> np.ndarray | torch.Tensor:
-        """The sign sequence: a 1-D array with one entry in {-1, 0, 1} per ReLU unit.
+        """The sign sequence, a 1-D array with one entry in {-1, 0, 1} per ReLU unit.
 
         Fixed at construction: it is the polyhedron's identity (:attr:`tag`, ``==``, ``hash``).
         """
@@ -526,7 +526,7 @@ class Polyhedron:
     def _halfspaces_with_bounding_box_err(
         self, bound: float, env: Any = None
     ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray]:
-        """:meth:`_halfspaces_with_bounding_box` plus the float64 error scale of the returned rows."""
+        """``_halfspaces_with_bounding_box()`` plus the float64 error scale of the returned rows."""
         dim = self.halfspaces_np.shape[1] - 1
         bounds_lhs = np.eye(dim)
         bounds_rhs = -np.ones((dim, 1)) * bound
@@ -854,7 +854,7 @@ class Polyhedron:
 
     @property
     def volume(self) -> float | None:
-        """Volume (within the affine hull): ``inf`` if unbounded, ``None`` if empty or if Qhull fails."""
+        """Volume within the affine hull. ``inf`` if unbounded, ``None`` if empty or if Qhull fails."""
         finite = self.finite
         if finite is None:
             return None
@@ -899,7 +899,7 @@ class Polyhedron:
 
     @property
     def halfspaces_err_np(self) -> np.ndarray:
-        """Float64 error scale of :attr:`halfspaces_np`, row for row (see :mod:`relucent._internal.rounding`)."""
+        """Float64 error scale of :attr:`halfspaces_np`, row for row (see ``relucent._internal.rounding``)."""
         if self._halfspaces_err is None:
             hs = self.halfspaces_np
             if self._rows_data:
@@ -986,14 +986,14 @@ class Polyhedron:
         return float(torch.linalg.norm(w).item())
 
     def _ensure_chebyshev(self, env: Any = None) -> tuple[np.ndarray | None, float | None]:
-        """Run the Chebyshev LP once and cache ``(center, inradius)`` (see :meth:`_chebyshev_ball`)."""
+        """Run the Chebyshev LP once and cache ``(center, inradius)`` (see ``_chebyshev_ball()``)."""
         if self._chebyshev is UNSET:
             self._chebyshev = self._chebyshev_ball(env=env)
         return self._chebyshev
 
     @property
     def center(self) -> np.ndarray | None:
-        """Chebyshev center: the center of the largest ball in the cell (within its affine hull).
+        """The Chebyshev center, the center of the largest ball in the cell (within its affine hull).
 
         ``None`` if the cell is empty or that ball is unbounded. An unbounded cell can still have
         a center, when its recession cone is lower-dimensional (see :attr:`finite`).
@@ -1015,7 +1015,7 @@ class Polyhedron:
 
     @property
     def finite(self) -> bool | None:
-        """Whether the polyhedron is bounded: ``True``, unbounded nonempty ``False``, or empty ``None``.
+        """Whether the polyhedron is bounded. ``True`` if bounded, ``False`` if unbounded, ``None`` if empty.
 
         Decided from the recession cone, not the Chebyshev ball: a half-infinite prism is
         unbounded with a finite inradius. See

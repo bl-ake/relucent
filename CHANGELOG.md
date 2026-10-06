@@ -37,6 +37,17 @@ every rename.
 
 ### Fixed
 
+- Geometric decisions no longer depend on tolerances scaled to the network. In 0.9.5–0.9.7,
+  `Complex(net)` set process-wide tolerances from the network's weights (the last `Complex`
+  built set them for every complex in the process). On networks with very large or very small
+  weights, such as deep networks trained with Adam, real facets and vertices could be
+  rejected without an error: search could miss regions, and Betti numbers could be wrong,
+  non-manifold, or computed on an empty boundary. Facets, emptiness, vertices, genericity,
+  membership and Morse signs are now each checked against a float64 error bound computed from
+  the rows involved, decided in exact arithmetic when that bound cannot settle them, and
+  otherwise raise `AmbiguousGeometryError`. An SHI LP that fails under Gurobi's scaling is
+  re-solved without scaling before falling back to exact arithmetic. Results from 0.9.5–0.9.7
+  on such networks should be recomputed.
 - Searches (`bfs`, `dfs`, `random_walk`, `searcher`, `hamming_astar`, boundary discovery) and
   the other parallel steps could hang forever while shutting down their worker pool. They used
   `multiprocessing.Pool.terminate()`, which can kill a worker while it holds the result queue's

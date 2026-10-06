@@ -68,7 +68,7 @@ Entry points
      - Configurable
      - Generic traversal
 
-All delegate to :func:`~relucent.search.searcher`, which runs a parallel frontier
+All delegate to ``searcher()``, which runs a parallel frontier
 expansion over flip-neighbors.
 
 Boundary complexes use a separate path:
@@ -94,8 +94,8 @@ Search loop
    task per SHI: ``(neighbor_ss, crossed_shi, depth, parent_index)``.
 2. **Workers** — Each task builds a :class:`~relucent.core.poly.Polyhedron`, runs
    Chebyshev geometry (``finite``, ``center``, ``inradius``), then
-   ``calculations.shis()``. See :func:`~relucent.search.engine.search_calculations` and
-   ``_worker_prepare_poly`` in :mod:`relucent.search`.
+   ``calculations.shis()``. See ``search_calculations()`` and
+   ``_worker_prepare_poly`` in ``relucent.search``.
 3. **Main process** — On success, add the polyhedron and enqueue new neighbors
    for every SHI except the one just crossed. Failed flips are recorded so the
    same ``(poly, shi)`` pair is not retried. Since queued neighbors lie across
@@ -116,7 +116,7 @@ Multiprocessing
 ~~~~~~~~~~~~~~~
 
 Search uses a process pool with initializer
-:func:`~relucent.search.worker_context.set_worker_context`. Workers read
+``set_worker_context()``. Workers read
 ``(net, env, dim)`` from module-level state — do not call ``set_worker_context``
 from the main process.
 
@@ -143,7 +143,7 @@ seeds SHI candidates from its sign sequence::
    SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
 
 The crossing hyperplane is already zeroed, so it is not included.
-:func:`relucent.graph.boundary._codim_one_face_kwargs` applies this at face
+``relucent.graph.boundary._codim_one_face_kwargs()`` applies this at face
 creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
 :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
@@ -206,10 +206,10 @@ The LP algorithm (:func:`~relucent.geometry.calculations.shis`):
    When float64 cannot decide, the question is answered in exact arithmetic, or
    :class:`~relucent.core.errors.AmbiguousGeometryError` is raised. The exact step first
    checks the LP's own dual: one small rational solve on the tight rows
-   (:func:`relucent._internal.exact.exact_dual_bound`). This settles the usual case in deep
+   (``relucent._internal.exact.exact_dual_bound()``). This settles the usual case in deep
    networks, a row that is exactly a nonnegative combination of tight rows with a zero
    multiplier, which float64 cannot prove. Only if that is inconclusive does an exact
-   simplex (:func:`relucent._internal.exact.exact_facet_by_simplex`) decide.
+   simplex (``relucent._internal.exact.exact_facet_by_simplex()``) decide.
 
 LP solver failures
 ~~~~~~~~~~~~~~~~~~
@@ -227,7 +227,7 @@ changes which answer the LP proposes: every answer is still certified.
 
 **Deciding without the LP.** If the re-solve fails too, the question the LP was asking, whether
 row ``i`` is a facet of the cell, is settled in exact rational arithmetic instead, by
-:func:`relucent._internal.exact.exact_facet_by_simplex`. It starts from the cell's verified
+``relucent._internal.exact.exact_facet_by_simplex()``. It starts from the cell's verified
 interior point, and it is the same routine ``calculations.shis`` uses when float64 cannot certify an
 LP answer. If it cannot decide either,
 :class:`~relucent.core.errors.AmbiguousGeometryError` is raised, naming the halfspace and
@@ -309,7 +309,7 @@ after a **complete** search via ``finalize_ambient_search`` at
   (:func:`~relucent.verify.certify.verify_lp_flip_neighbors_in_complex`).
 * ``GEOMETRIC`` — additionally recompute SHIs on every cached cell whose list was not
   computed by ``calculations.shis`` on that cell, and require an exact match
-  (:func:`~relucent.verify.certify.verify_shi_geometry`).
+  (``verify_shi_geometry()``).
 
 When certification runs
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -533,5 +533,5 @@ Related reading
 
 * :doc:`exploration_verification` — flags, caps, dual-graph SHI model
 * :doc:`search_geometry` — ``geometry_properties`` and memory
-* ``docs/betti_computation.md`` — chain complex → meta-graph → Betti pipeline
+* :doc:`betti_computation` — chain complex → meta-graph → Betti pipeline
 * :doc:`topology` — Betti-number prerequisites and caveats

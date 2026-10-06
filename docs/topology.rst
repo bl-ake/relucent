@@ -7,9 +7,6 @@ routines build on the same meta-graph convention as dual-graph and face-poset
 analysis: a codimension-one face of a cell is obtained by zeroing one supporting
 hyperplane index (SHI) in the cell's sign sequence.
 
-These routines are under active research use. If you're working on related questions and
-would like to collaborate, please reach out (blake@uconn.edu).
-
 Prerequisites
 -------------
 

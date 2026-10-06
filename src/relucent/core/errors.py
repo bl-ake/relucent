@@ -1,7 +1,7 @@
 """Exception hierarchy for polyhedral-complex verification and repair.
 
 Every error raised by :mod:`relucent.graph.incidence`, :mod:`relucent.verify.certify`,
-:mod:`relucent.graph.meta_graph`, and :mod:`relucent.core.complex` when a complex fails an
+:mod:`relucent.graph.meta_graph`, and :class:`~relucent.core.complex.Complex` when a complex fails an
 invariant check lives here, so callers only need one import to catch domain
 errors from the verification pipeline.
 """

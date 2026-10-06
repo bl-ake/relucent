@@ -454,7 +454,7 @@ def discover_boundary_complex(
         net: Canonical :class:`~relucent.model.model.ReLUNetwork`.
         boundary_shi: Global supporting-hyperplane index for the decision boundary.
         bound: Gurobi box bound for SHI LPs; defaults to
-            :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
+            ``default_polyhedron_bound()``.
         nworkers: Worker process count for slice BFS.
         verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` pricing and
             search detail. ``None`` uses :data:`relucent.config.VERBOSE`.

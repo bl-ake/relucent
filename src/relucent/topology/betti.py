@@ -55,13 +55,13 @@ __all__ = [
 # Warn when a single ∂_k rank may take a long time (nearly square, large, pure-Python only).
 _SLOW_RANK_MIN_DIM = 50_000
 
-# Public flag: True when _gf2_rank.c compiled and loaded successfully.
+#: True when the C GF(2) rank backend (``_gf2_rank.c``) compiled and loaded.
 C_BACKEND_AVAILABLE: bool = _c_backend
 
-# How unbounded cells are handled when computing homology:
-#   "truncate": combinatorial truncation at infinity (cap unbounded cells with new faces).
-#   "borel_moore": Borel–Moore homology; only faces with at least two cofaces count.
-#   "one_point": one-point compactification (a single extra 0-cell at infinity).
+#: How unbounded cells are handled when computing homology:
+#: ``"truncate"`` caps unbounded cells with new faces (combinatorial truncation at infinity),
+#: ``"borel_moore"`` computes Borel–Moore homology, and ``"one_point"`` adds a single 0-cell
+#: at infinity (one-point compactification).
 Compactify = Literal["truncate", "borel_moore", "one_point"]
 COMPACTIFY_MODES: tuple[Compactify, ...] = ("truncate", "borel_moore", "one_point")
 
@@ -246,7 +246,7 @@ def _sparse_boundary_maps(
 ) -> dict[int, tuple[list[set[int]], int]]:
     """Every ∂_k as ``(row sets, ncols)`` from one pass over ``meta``'s edges.
 
-    Matches :func:`_packed_boundary_matrix` entry for entry: rows index (k−1)-cells, columns
+    Matches ``_packed_boundary_matrix()`` entry for entry: rows index (k−1)-cells, columns
     k-cells, and repeated incidences cancel mod 2. With ``require_shared_faces`` a (k−1)-cell
     keeps its incidences only when at least two edges come into it from k-cells.
     """
@@ -501,12 +501,12 @@ def gf2_matmul_packed_stacked_rows(
 ) -> np.ndarray:
     """Matrix product ``left @ right`` over GF(2) using row-packed ``uint64`` blocks.
 
-    Both operands use the same layout as :func:`_packed_boundary_matrix`: each row is a
+    Both operands use the same layout as ``_packed_boundary_matrix()``: each row is a
     bit vector of length ``ncols_*`` stored in ``ceil(ncols_*/64)`` little-endian words
     (column ``j`` lives in bit ``j & 63`` of word ``j >> 6``).
 
     Multiplication extracts the sparse nonzero patterns of both factors and composes
-    them with :func:`gf2_matmul_sparse_rowlists`, so cost tracks intermediate nonzeros
+    them with ``gf2_matmul_sparse_rowlists()``, so cost tracks intermediate nonzeros
     rather than a dense ``O(m · n · p)`` pass or an ``O(m · n)`` packed-column scan.
 
     Args:
@@ -518,7 +518,7 @@ def gf2_matmul_packed_stacked_rows(
     Returns:
         Packed product of shape ``(m, nwords_R)``, ``uint64``.  Bits beyond
         ``ncols_right`` in the last word may be nonzero; callers that need a strict
-        width should use :func:`_mask_trailing_bits_in_last_word`.
+        width should use ``_mask_trailing_bits_in_last_word()``.
     """
     if left.size == 0 or right.size == 0 or ncols_left == 0 or ncols_right == 0:
         return np.zeros((int(left.shape[0]), (int(ncols_right) + 63) // 64), dtype=np.uint64)
@@ -580,7 +580,7 @@ def betti_numbers(
     Args:
         meta: Face poset as a NetworkX ``MultiDiGraph``, e.g. from
             :meth:`~relucent.core.complex.Complex.meta_graph`.
-        compactify: How to treat unbounded cells (see :data:`Compactify`). ``None``
+        compactify: How to treat unbounded cells (see :data:`~relucent.topology.Compactify`). ``None``
             (default) ranks ``meta`` exactly as given. ``"truncate"`` and ``"one_point"``
             first add the truncation or point-at-infinity cells to ``meta`` **in place**
             (pass a copy to keep the original). ``"borel_moore"`` leaves ``meta`` alone and

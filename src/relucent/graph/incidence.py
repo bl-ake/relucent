@@ -98,7 +98,7 @@ def ss_nonzero_indices(ss: np.ndarray) -> tuple[int, ...]:
     cells.
 
     Not used when building the contraction chain
-    (:func:`relucent.graph.boundary._codim_one_face_kwargs` seeds candidates
+    (``relucent.graph.boundary._codim_one_face_kwargs()`` seeds candidates
     from this, then :func:`set_contracted_shis` finalizes). Propagated
     ``poly._shis`` can be a strict subset after coface intersection; using it
     for edge discovery omits valid faces and breaks ``∂² = 0``.
@@ -124,7 +124,7 @@ def face_tag(ss: np.ndarray, shi: int) -> bytes:
 def flip_tag(ss: np.ndarray, shi: int) -> bytes:
     """Tag of the same-dimension neighbor across hyperplane ``shi``.
 
-    Used by :func:`_dual_edges_flip_neighbors` and :func:`cubical_cell_shis` when deciding
+    Used by ``_dual_edges_flip_neighbors()`` and :func:`cubical_cell_shis` when deciding
     whether a nonzero sign-sequence entry has a same-dimension flip neighbor in the slice.
     """
     row = np.asarray(ss, dtype=np.int8).ravel()
@@ -154,7 +154,7 @@ def cubical_cell_shis(
 
     Authoritative flip-SHI list for meta-graph node metadata (:func:`meta_node_attrs`),
     contracted slices (:func:`set_contracted_shis`), and debug checks
-    (:func:`verify_shi_flip_neighbors`, :func:`verify_meta_graph_incidence`).
+    (:func:`verify_shi_flip_neighbors`, :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`).
     """
     # Own a mutable C-contiguous int8 copy so we can flip one entry in place, read the tag,
     # and flip back -- avoiding a fresh array allocation and full re-coercion per neighbor.
@@ -521,7 +521,7 @@ def set_contracted_shis(cplx: Complex, *, nworkers: int | None = None) -> int:
     slice-wide tag set, so the ``cubical_cell_shis`` pass is embarrassingly parallel (the
     same shape of work as ``graph.vertex_star.find_vertices`` and
     ``topology.morse.critical_flags_for_vertices``, which already farm out). It is the
-    dominant serial cost of :meth:`Complex.chain_complex` on large d=4 / deep slices,
+    dominant serial cost of :meth:`~relucent.core.complex.Complex.chain_complex` on large d=4 / deep slices,
     so it is farmed across a worker pool once the slice is big enough to justify Pool
     startup; below the gate, or in a daemon worker, it is the plain sequential loop.
 

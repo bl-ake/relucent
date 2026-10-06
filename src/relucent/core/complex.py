@@ -97,6 +97,7 @@ class Complex:
                 :func:`~relucent.model.convert_model.convert` accepts (e.g. a PyTorch
                 ``nn.Sequential``).
         """
+        #: The model passed to the constructor, before conversion to :attr:`net`.
         self.source_model: Any = net
         self._net: ReLUNetwork = net if isinstance(net, ReLUNetwork) else convert(net)
 
@@ -217,7 +218,7 @@ class Complex:
                 immediately without scanning for duplicates.
 
         Returns:
-            The matching :class:`Polyhedron`.
+            The matching :class:`~relucent.core.poly.Polyhedron`.
 
         Raises:
             KeyError: If no polyhedron with the given name is in the complex.
@@ -332,7 +333,7 @@ class Complex:
         """The network as relucent's canonical :class:`~relucent.model.model.ReLUNetwork`.
 
         The model passed to the constructor (e.g. a PyTorch module) is kept as
-        :attr:`source_model`.
+        :attr:`~relucent.core.complex.Complex.source_model`.
         """
         return self._net
 
@@ -579,7 +580,7 @@ class Complex:
                 Defaults to config.DEFAULT_PARALLEL_ADD_BOUND.
             geometry_properties: Iterable of cache/property names to compute and
                 retain on each polyhedron. Defaults to
-                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
+                :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES`.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`
@@ -638,7 +639,7 @@ class Complex:
                 BlockingQueue (FIFO). Defaults to None.
             bound: Constraint radius for numerical stability when computing halfspaces.
                 Important for numerical stability. When ``None``, uses
-                :func:`~relucent._internal.network_scale.default_polyhedron_bound`.
+                ``default_polyhedron_bound()``.
             nworkers: Number of worker processes for parallel computation. If None,
                 uses the number of CPU cores. Defaults to None.
             cube_radius: Half-width of the cube ``[-r, r]^d`` that ``cube_mode`` refers to.
@@ -648,14 +649,14 @@ class Complex:
             geometry_properties: Iterable of polyhedron cache/property names to
                 compute and retain for each discovered polyhedron during search.
                 ``None`` (default) performs topology-only search. Pass
-                :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES` or a subset for
+                :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES` or a subset for
                 optional caches. ``finite``, ``center``, and ``inradius`` are always
                 computed.
             verify: When True (default), require complete exploration and run
                 :func:`~relucent.verify.certify.certify_complex` at the end. Certification
                 is skipped when exploration hits ``max_polys`` before the frontier is
                 exhausted. A finite ``max_depth`` cap can leave ``complete=False``; with
-                ``verify=True`` that raises :class:`~relucent.core.complex.IncompleteDualGraphError`
+                ``verify=True`` that raises :class:`~relucent.core.errors.IncompleteDualGraphError`
                 unless the cap was hit. Frontier SHIs are certified facets, so certification
                 reuses them after dual-graph sync.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
@@ -703,7 +704,7 @@ class Complex:
         Args:
             nworkers: Number of worker processes (defaults to CPU count).
             properties: Iterable of cache/property names to compute and retain.
-                Defaults to :data:`~relucent.search.ALL_GEOMETRY_PROPERTIES`.
+                Defaults to :attr:`~relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES`.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         """
@@ -906,6 +907,9 @@ class Complex:
 
         See :func:`relucent.graph.boundary.boundary_complex`. To find it without exploring
         the whole input space, use :meth:`discover_boundary_complex`.
+
+        Known issue: the returned complex's :meth:`dual_graph` can contain an edge between two
+        cells whose shared face is empty. Its Betti numbers are not affected.
 
         Raises:
             IncompleteDualGraphError: If top-dimensional adjacency is incomplete.
@@ -1129,7 +1133,7 @@ class Complex:
         )
 
     def verify_arrangement_genericity(self) -> None:
-        """Raise :class:`NonGenericArrangementError` on degenerate 1-cell arrangements.
+        """Raise :class:`~relucent.core.errors.NonGenericArrangementError` on degenerate 1-cell arrangements.
 
         Checks that combinatorial 0-face endpoints are geometrically distinct on each
         1-cell and that geometrically coincident endpoints share a combinatorial tag.
@@ -1185,7 +1189,7 @@ class Complex:
         Args:
             relabel: If True, nodes are indexed by integers matching self.index2poly
                 indices. If False, nodes are Polyhedron objects. Defaults to False.
-            require_complete: If True, raise :class:`IncompleteDualGraphError` when
+            require_complete: If True, raise :class:`~relucent.core.errors.IncompleteDualGraphError` when
                 boundary neighbors are missing (checked via an LP facet recompute on
                 full ambient top cells). Defaults to False.
             repair: If True (default), overwrite each top cell's ``_shis`` from the

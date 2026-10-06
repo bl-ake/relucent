@@ -269,7 +269,7 @@ def without_last_layer_neuron(cplx: Complex, neuron_idx: int) -> Complex:
             layer has width ``1``.
 
     Returns:
-        A new :class:`Complex` over the smaller network.  The dual graph is not
+        A new :class:`~relucent.core.complex.Complex` over the smaller network.  The dual graph is not
         copied.
 
     Raises:

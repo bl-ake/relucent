@@ -33,7 +33,7 @@ class Filtration(ABC):
 
     Subclasses implement :meth:`raw_cell_value` for each meta-graph node. Values are
     then promoted to a lower-star (sublevel-set) filtration on the face poset via
-    :func:`lower_star_extension` when :attr:`lower_star` is True (the default).
+    :func:`lower_star_extension` when ``lower_star`` is True (the default).
     """
 
     lower_star: bool = True
@@ -134,7 +134,7 @@ class AffineOutputFiltration(Filtration):
     """Filtration by an affine output functional ``w^T x + b`` on each cell.
 
     Uses the per-region affine map ``Polyhedron.W``, ``Polyhedron.b`` (from sign
-    sequences) and one interior point per cell. By default, :attr:`lower_star` extends
+    sequences) and one interior point per cell. By default, ``lower_star`` extends
     values to higher cells by max over faces (sublevel-set convention on the face
     poset). Set ``lower_star=False`` to rank each cell only by its representative point.
     """
@@ -214,7 +214,7 @@ class TrainingDistanceFiltration(Filtration):
     """Filtration by distance from a cell representative point to training data.
 
     Uses one interior point per cell and ``numpy`` norms—no explicit Voronoi or
-    distance-transform geometry. By default, :attr:`lower_star` extends each cell's
+    distance-transform geometry. By default, ``lower_star`` extends each cell's
     value by max over faces (sublevel-set convention).
     """
 
