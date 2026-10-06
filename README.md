@@ -112,5 +112,5 @@ This package was made possible by the following work:
   - Liu, Y., Caglar, T., Peterson, C., & Kirby, M. (2023). Integrating geometries of ReLU feedforward neural networks. Frontiers in Big Data, 6, 1274831. https://doi.org/10.3389/fdata.2023.1274831
   - Masden, M. (2025). Algorithmic Determination of the Combinatorial Structure of the Linear Regions of ReLU Neural Networks. SIAM Journal on Applied Algebra and Geometry, 9(2), 374–404. https://doi.org/10.1137/24M1646996
   - Xu, S., Vaughan, J., Chen, J., Zhang, A., & Sudjianto, A. (2022). Traversing the Local Polytopes of ReLU Neural Networks. The AAAI-22 Workshop on Adversarial Machine Learning and Beyond. https://openreview.net/forum?id=EQjwT2-Vaba
-  - Yajing Liu, Christina M Cole, Chris Peterson, & Michael Kirby. (2023). ReLU Neural Networks, Polyhedral Decompositions, and Persistent Homolog. TAG-ML.
+  - Yajing Liu, Christina M Cole, Chris Peterson, & Michael Kirby. (2023). ReLU Neural Networks, Polyhedral Decompositions, and Persistent Homolog. TAG-ML. https://proceedings.mlr.press/v221/liu23a.html
   - Zhang, X., & Wu, D. (2019, September 25). Empirical Studies on the Properties of Linear Regions in Deep Neural Networks. International Conference on Learning Representations. https://openreview.net/forum?id=SkeFl1HKwr
