@@ -1,5 +1,7 @@
 """Search and pathfinding over a polyhedral complex."""
 
+from __future__ import annotations
+
 import contextlib
 import os
 import random
@@ -23,7 +25,7 @@ from relucent._internal.parallel import (
     process_aware_cpu_count,
     worker_pool,
 )
-from relucent._internal.torch_compat import torch
+from relucent._internal.torch_compat import is_torch_tensor, torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
@@ -86,7 +88,7 @@ def blocking_bad_shi_computations(bad_shi_computations: list[Any]) -> list[Any]:
 
 
 def _cancel_pending_neighbor(
-    cx: "Complex",
+    cx: Complex,
     pending_neighbors: dict[bytes, list[tuple[int, int]]],
     node: Polyhedron,
     shi: int,
@@ -232,7 +234,7 @@ def geometric_calculations(
 
 @with_verbosity
 def parallel_compute_geometric_properties(
-    cx: "Complex",
+    cx: Complex,
     nworkers: int | None = None,
     geometry_properties: Iterable[str] = ALL_GEOMETRY_PROPERTIES,
     verbose: int | None = None,
@@ -284,7 +286,7 @@ def parallel_compute_geometric_properties(
 
 @with_verbosity
 def parallel_add(
-    cx: "Complex",
+    cx: Complex,
     points: Iterable[torch.Tensor | np.ndarray],
     nworkers: int | None = None,
     bound: float | None = None,
@@ -319,7 +321,7 @@ def parallel_add(
     nworkers = nworkers or process_aware_cpu_count()
     logger.info("parallel_add using %d workers", nworkers)
     sss = [
-        (s.detach().cpu().numpy() if isinstance(s := cx.point2ss(p), torch.Tensor) else s)
+        (s.detach().cpu().numpy() if is_torch_tensor(s := cx.point2ss(p)) else s)
         for p in progress(points, desc="Getting SSs", mininterval=5)
     ]  # materialize SSs up front so pool tasks are plain numpy arrays
 
@@ -389,8 +391,8 @@ CubeMode = Literal["unrestricted", "intersect", "clipped", "exclude"]
 
 @with_verbosity
 def searcher(
-    cx: "Complex",
-    start: "torch.Tensor | np.ndarray | Polyhedron | None" = None,
+    cx: Complex,
+    start: torch.Tensor | np.ndarray | Polyhedron | None = None,
     max_depth: float = float("inf"),
     max_polys: float = float("inf"),
     queue: Any = None,
@@ -653,7 +655,7 @@ def searcher(
     )
 
 
-def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None) -> list[Polyhedron]:
+def _greedy_path_helper(cx: Complex, start: Polyhedron, end: Polyhedron, diffs: set[int] | None = None) -> list[Polyhedron]:
     if start == end:
         return [start]
 
@@ -676,7 +678,7 @@ def _greedy_path_helper(cx: "Complex", start: Polyhedron, end: Polyhedron, diffs
 
 
 def greedy_path(
-    cx: "Complex",
+    cx: Complex,
     start: torch.Tensor | np.ndarray | Polyhedron,
     end: torch.Tensor | np.ndarray | Polyhedron,
 ) -> list[Polyhedron] | None:
@@ -702,7 +704,7 @@ def greedy_path(
 
 @with_verbosity
 def hamming_astar(
-    cx: "Complex",
+    cx: Complex,
     start: torch.Tensor | np.ndarray | Polyhedron,
     end: torch.Tensor | np.ndarray | Polyhedron,
     nworkers: int | None = None,

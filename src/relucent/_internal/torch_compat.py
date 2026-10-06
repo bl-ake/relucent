@@ -1,24 +1,94 @@
-"""Torch compatibility layer for optional dependency support."""
+"""Torch compatibility layer for optional dependency support.
+
+torch is imported on first use, not when relucent is: ``torch`` and ``nn`` stand in for the modules and
+import them when an attribute is first read. Importing torch takes seconds, and each worker of a pool
+started with ``spawn`` (Windows, macOS) would otherwise pay that even when it only handles numpy arrays.
+Code that may receive numpy input checks for tensors with :func:`is_torch_tensor` and disables gradients
+with :func:`no_grad`; neither imports torch.
+"""
 
 from __future__ import annotations
 
+import functools
+import importlib
+import importlib.util
+import sys
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-__all__ = ["TORCH_AVAILABLE", "nn", "torch"]
+if TYPE_CHECKING:
+    from typing_extensions import TypeIs
+
+__all__ = ["TORCH_AVAILABLE", "is_torch_tensor", "nn", "no_grad", "torch"]
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 
 def _missing_torch(*_args: Any, **_kwargs: Any) -> Any:
     raise ImportError('This relucent feature requires PyTorch. Install it with `pip install "relucent[torch]"`.')
 
 
-try:
-    import torch  # type: ignore[assignment]
-    import torch.nn as nn  # type: ignore[assignment]
+def _torch_installed() -> bool:
+    try:
+        return importlib.util.find_spec("torch") is not None
+    except (ImportError, ValueError):
+        return False
 
-    _torch_available = True
-except ImportError:
-    _torch_available = False
+
+TORCH_AVAILABLE: bool = _torch_installed()
+
+
+def is_torch_tensor(x: object) -> TypeIs[torch.Tensor]:
+    """Whether ``x`` is a torch tensor. Never imports torch: a tensor can only exist once torch is loaded."""
+    torch_module = sys.modules.get("torch")
+    return torch_module is not None and isinstance(x, torch_module.Tensor)
+
+
+def no_grad(func: F) -> F:
+    """``@torch.no_grad()`` that imports nothing: gradients are disabled when torch is loaded at call time.
+
+    A tensor that tracks gradients can only exist once torch is loaded, so if it is not, there is nothing
+    to disable.
+    """
+    wrapped: Callable[..., Any] | None = None
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        nonlocal wrapped
+        target = wrapped
+        if target is None:
+            torch_module = sys.modules.get("torch")
+            if torch_module is None:
+                return func(*args, **kwargs)
+            target = wrapped = torch_module.no_grad()(func)
+        return target(*args, **kwargs)
+
+    return cast(F, wrapper)
+
+
+class _LazyModule:
+    """Stands in for a module and imports it when an attribute is first read."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self._module: Any = None
+
+    def __getattr__(self, attr: str) -> Any:
+        if self._module is None:
+            self._module = importlib.import_module(self._name)
+        return getattr(self._module, attr)
+
+    def __repr__(self) -> str:
+        return f"<lazily imported module {self._name!r}>"
+
+
+if TYPE_CHECKING:
+    import torch
+    import torch.nn as nn
+elif TORCH_AVAILABLE:
+    torch = _LazyModule("torch")
+    nn = _LazyModule("torch.nn")
+else:
 
     class _MissingModule:
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
@@ -57,7 +127,5 @@ except ImportError:
         def __getattr__(self, _name: str) -> Callable[..., Any]:
             return _missing_torch
 
-    torch = _TorchStub()  # type: ignore[assignment]
-    nn = _NNStub()  # type: ignore[assignment]
-
-TORCH_AVAILABLE: bool = _torch_available
+    torch = _TorchStub()
+    nn = _NNStub()

@@ -37,6 +37,8 @@ _REFERENCE_ALIASES = [
     (re.compile(r"^np\.(.+)$"), r"numpy.\1"),
     (re.compile(r"^numpy\._typing(?:\.\w+)*\.(\w+)$"), r"numpy.typing.\1"),
     (re.compile(r"^nx\.(.+)$"), r"networkx.\1"),
+    (re.compile(r"^nn\.(.+)$"), r"torch.nn.\1"),
+    (re.compile(r"^(ConvexHull|HalfspaceIntersection)$"), r"scipy.spatial.\1"),
     (re.compile(r"^go\.(.+)$"), r"plotly.graph_objects.\1"),
     (re.compile(r"^plotly\.graph_objs\._\w+\.(\w+)$"), r"plotly.graph_objects.\1"),
     (re.compile(r"^gurobipy\._core\.(\w+)$"), r"\1"),
@@ -47,6 +49,9 @@ nitpick_ignore = [
     ("py:class", "CubeMode"),
     # Private node type in a signature of the experimental boundary-search trie.
     ("py:class", "relucent.search.boundary_exclusion_trie._TrieNode"),
+    # Type-checking-only alias in convert()'s signature (defining it at runtime would import torch);
+    # the docstring lists the accepted (weight, bias) pair forms.
+    ("py:class", "AffineLayerPair"),
 ]
 
 autodoc_default_options = {

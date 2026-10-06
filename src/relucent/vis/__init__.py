@@ -20,7 +20,7 @@ from scipy.spatial import ConvexHull
 
 import relucent.config as cfg
 from relucent._internal.logging import logger, progress
-from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent._internal.torch_compat import TORCH_AVAILABLE, is_torch_tensor, torch
 
 if TYPE_CHECKING:
     from relucent.core.complex import Complex
@@ -414,7 +414,7 @@ def _poly_traces_2d_graph(
                 else np.asarray([x, y], dtype=np.float64).T
             )
             z_raw = net(inputs)
-            z_arr = z_raw.detach().cpu().numpy() if isinstance(z_raw, torch.Tensor) else np.asarray(z_raw)
+            z_arr = z_raw.detach().cpu().numpy() if is_torch_tensor(z_raw) else np.asarray(z_raw)
             z = z_arr.squeeze()[:, 1]
         else:
             z = [project] * len(x)
@@ -1011,7 +1011,7 @@ def _complex_figure_graph(
                 else np.asarray(poly.center, dtype=np.float64).T
             )
             center_out = cpx._net(center_in)
-            center_arr = center_out.detach().cpu().numpy() if isinstance(center_out, torch.Tensor) else np.asarray(center_out)
+            center_arr = center_out.detach().cpu().numpy() if is_torch_tensor(center_out) else np.asarray(center_out)
             fig.add_trace(
                 go.Scatter3d(
                     x=[poly.center[0]],

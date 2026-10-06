@@ -5,11 +5,13 @@ Provides :class:`SSManager`, a dict-like container that maps sign sequences
 testing and insertion via a bytes-encoded hash key.
 """
 
+from __future__ import annotations
+
 from collections.abc import Iterator
 
 import numpy as np
 
-from relucent._internal.torch_compat import torch
+from relucent._internal.torch_compat import is_torch_tensor, torch
 
 __all__ = ["SSManager", "encode_ss", "flip_ss_at_shi", "flip_ss_at_shi_inplace"]
 
@@ -94,7 +96,7 @@ def encode_ss(ss: np.ndarray | torch.Tensor) -> bytes:
     if type(ss) is np.ndarray and ss.dtype == np.int8 and ss.flags["C_CONTIGUOUS"]:
         return ss.tobytes()
 
-    ss = ss.detach().cpu().numpy() if isinstance(ss, torch.Tensor) else np.asarray(ss)
+    ss = ss.detach().cpu().numpy() if is_torch_tensor(ss) else np.asarray(ss)
 
     ss = ss.astype(np.int8, copy=False)
     return ss.ravel().tobytes()
@@ -114,7 +116,7 @@ def flip_ss_at_shi(ss: np.ndarray | torch.Tensor, shi: int) -> np.ndarray:
 
     Codimension-1 neighbors across supporting hyperplane ``shi`` differ by this flip.
     """
-    if isinstance(ss, torch.Tensor):
+    if is_torch_tensor(ss):
         ss = ss.detach().cpu().numpy()
     flipped = np.asarray(ss, dtype=np.int8).copy()
     flip_ss_at_shi_inplace(flipped, shi)

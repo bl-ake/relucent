@@ -18,7 +18,7 @@ import numpy as np
 import relucent.config as cfg
 import relucent.verify.certify as certify
 from relucent._internal.logging import progress
-from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent._internal.torch_compat import is_torch_tensor, torch
 from relucent.core.ss import flip_ss_at_shi
 from relucent.model.model import Layer, LinearLayer, ReLULayer, ReLUNetwork
 from relucent.verify.certify import CertifyLevel
@@ -46,7 +46,7 @@ def delete_ss_columns(ss: np.ndarray | torch.Tensor, deleted_shis: Iterable[int]
     for shi in sorted(set(int(s) for s in deleted_shis), reverse=True):
         if isinstance(ss, np.ndarray):
             ss = np.delete(ss, shi, axis=axis)
-        elif TORCH_AVAILABLE and isinstance(ss, torch.Tensor):
+        elif is_torch_tensor(ss):
             keep = [i for i in range(ss.shape[axis]) if i != shi]
             ss = ss.index_select(axis, torch.tensor(keep, device=ss.device))
         else:

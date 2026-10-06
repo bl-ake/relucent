@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
-from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent._internal.torch_compat import is_torch_tensor
 
 if TYPE_CHECKING:
     from relucent.core.poly import Polyhedron
@@ -114,9 +114,9 @@ def _affine_output_at_representative(
     if isinstance(w, np.ndarray):
         w_np = w
         b_np = np.asarray(b).reshape(-1)
-    elif TORCH_AVAILABLE and isinstance(w, torch.Tensor):
+    elif is_torch_tensor(w):
         w_np = w.detach().cpu().numpy()
-        b_np = b.detach().cpu().numpy().reshape(-1) if isinstance(b, torch.Tensor) else np.asarray(b).reshape(-1)
+        b_np = b.detach().cpu().numpy().reshape(-1) if is_torch_tensor(b) else np.asarray(b).reshape(-1)
     else:
         raise TypeError(f"Unsupported affine map type: {type(w)}")
 
