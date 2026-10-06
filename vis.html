@@ -1,0 +1,752 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relucent Documentation: Visualization</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="_static/custom.js?v=add1a637"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Utility Functions" href="utilities.html" />
+    <link rel="prev" title="Morse Theory" href="morse.html" />
+   
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            relucent
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#search-and-geometry-guide">Search and Geometry Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#working-with-regions">Working With Regions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-pytorch-model">1) Pass A PyTorch Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#append-a-final-relu-for-decision-boundary-topology">5) Append A Final ReLU For Decision-Boundary Topology</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Memory Management</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#default-behavior">Default behavior</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#certification-and-caps">Certification and caps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-focused-search-default">Topology-focused search (default)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#full-geometry-during-search">Full geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#property-names">Property names</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_shi_and_graphs.html">Search, SHI Assignment, Verification, and Graph Structures</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#background-sign-sequences-and-shis">Background: sign sequences and SHIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#how-search-works">How search works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#entry-points">Entry points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#search-loop">Search loop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#multiprocessing">Multiprocessing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#shi-assignment-three-roles">SHI assignment: three roles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-1-boundary-faces-and-lower-dimensional-slices">Role 1 — Boundary faces and lower-dimensional slices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-2-meta-graph-face-edges">Role 2 — Meta-graph face edges</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-3-meta-graph-node-metadata">Role 3 — Meta-graph node metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#shi-assignment-over-the-pipeline">SHI assignment over the pipeline</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#during-search-frontier-heuristic">During search (frontier heuristic)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#lp-solver-failures">LP solver failures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#after-complete-ambient-search-authoritative-top-cells">After complete ambient search (authoritative top cells)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#on-lower-dimensional-slices-boundary-chain-complex">On lower-dimensional slices (boundary, chain complex)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#certification">Certification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#when-certification-runs">When certification runs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#boundary-specific-checks">Boundary-specific checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#exploration-flags">Exploration flags</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#dual-graph">Dual graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#edge-construction-rules">Edge construction rules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#uses">Uses</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#meta-graph">Meta-graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#construction-pipeline">Construction pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#dual-graph-vs-meta-graph">Dual graph vs meta-graph</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#boundary-discovery">Boundary discovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#related-reading">Related reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exploration_verification.html">Exploration and Verification</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#exploration-flags">Exploration flags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#default-verify-behavior">Default verify behavior</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="exploration_verification.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#topology-prerequisites">Topology prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#boundary-discovery">Boundary discovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#dual-graph-shi-model">Dual-graph SHI model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#graph-representations">Graph representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#betti-numbers">Betti numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#persistent-homology-workflow">Persistent homology workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="betti_computation.html">How Betti numbers are computed</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#the-default-pipeline">The default pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-1-build-the-chain-complex">Step 1: Build the chain complex</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#how-vertex-star-recovery-works">How vertex-star recovery works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#dual-graph-rules">Dual-graph rules</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-2-build-the-meta-graph">Step 2: Build the meta-graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#face-edges-what-defines-the-betti-numbers">Face edges: what defines the Betti numbers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#bounded-and-unbounded-labels">Bounded and unbounded labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#node-shis-and-face-edges">Node <code class="docutils literal notranslate"><span class="pre">shis</span></code> and face edges</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-3-truncate-at-infinity">Step 3: Truncate at infinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-4-rank-boundary-matrices">Step 4: Rank boundary matrices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#exploration-and-certification">Exploration and certification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#other-options">Other options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#function-map">Function map</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#by-pipeline-step">By pipeline step</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#cells-and-1-cells-at-a-glance">0-cells and 1-cells at a glance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#environment-variables">Environment variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#settings-reference">Settings reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#geometry">Geometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#search-and-boundary-discovery">Search and boundary discovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#plotting">Plotting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#logging">Logging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#module-relucent.config.advanced">Advanced settings (unstable)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.GUROBI_SHI_OPTIMALITY_TOL"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_OPTIMALITY_TOL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.GUROBI_SHI_SCALE_FLAG"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_SCALE_FLAG</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.INTERIOR_POINT_RADIUS_SEQUENCE"><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.ASTAR_BIAS_WEIGHT"><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT"><code class="docutils literal notranslate"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_PRICING_BRUTE_FORCE_MAX_N</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_BATCH_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_WORKERS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_CUT_ORDER"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_ORDER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BULK_NOGOOD_EMIT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_WAVE_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_PRIORITY_ENABLED</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="migrating.html">Stability and migrating to 1.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#api-stability">API stability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#renamed-in-1-0">Renamed in 1.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#other-changes">Other changes</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.core.complex.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.assert_topology_ready"><code class="docutils literal notranslate"><span class="pre">Complex.assert_topology_ready()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.betti_numbers"><code class="docutils literal notranslate"><span class="pre">Complex.betti_numbers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.certify"><code class="docutils literal notranslate"><span class="pre">Complex.certify()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.chain_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.critical_points"><code class="docutils literal notranslate"><span class="pre">Complex.critical_points()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.persistent_homology()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2preactivations"><code class="docutils literal notranslate"><span class="pre">Complex.point2preactivations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.preactivation_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.preactivation_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.save"><code class="docutils literal notranslate"><span class="pre">Complex.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.set_exploration_state"><code class="docutils literal notranslate"><span class="pre">Complex.set_exploration_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.slice_affine"><code class="docutils literal notranslate"><span class="pre">Complex.slice_affine()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">Complex.verify_arrangement_genericity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.SAVE_FORMAT_VERSION"><code class="docutils literal notranslate"><span class="pre">Complex.SAVE_FORMAT_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.complete"><code class="docutils literal notranslate"><span class="pre">Complex.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.source_model"><code class="docutils literal notranslate"><span class="pre">Complex.source_model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verified"><code class="docutils literal notranslate"><span class="pre">Complex.verified</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_halfspaces()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_vertices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Polyhedron.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.face"><code class="docutils literal notranslate"><span class="pre">Polyhedron.face()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.find_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.find_interior_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_shi_face_feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_shi_face_feasible()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.neighbor()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.plot"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.verify_vertex_covector"><code class="docutils literal notranslate"><span class="pre">Polyhedron.verify_vertex_covector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.GEOMETRY_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.QHULL_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.QHULL_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.convex_hull"><code class="docutils literal notranslate"><span class="pre">Polyhedron.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.faces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_err_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_err_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_rows_ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_rows_ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inequalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inequalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.non_zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.non_zero_indices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exploration.html">Exploration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult"><code class="docutils literal notranslate"><span class="pre">SearchResult</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.bad_shi_computations"><code class="docutils literal notranslate"><span class="pre">SearchResult.bad_shi_computations</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.complete"><code class="docutils literal notranslate"><span class="pre">SearchResult.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.depth"><code class="docutils literal notranslate"><span class="pre">SearchResult.depth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.mean_facets"><code class="docutils literal notranslate"><span class="pre">SearchResult.mean_facets</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.search_time"><code class="docutils literal notranslate"><span class="pre">SearchResult.search_time</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.verified"><code class="docutils literal notranslate"><span class="pre">SearchResult.verified</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.explore_for_topology"><code class="docutils literal notranslate"><span class="pre">explore_for_topology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_ambient_search"><code class="docutils literal notranslate"><span class="pre">finalize_ambient_search()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex"><code class="docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.generic_topology_start"><code class="docutils literal notranslate"><span class="pre">generic_topology_start()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="boundary_search.html">Boundary Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.BoundaryDiscoveryStats"><code class="docutils literal notranslate"><span class="pre">BoundaryDiscoveryStats</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.boundary_searcher"><code class="docutils literal notranslate"><span class="pre">boundary_searcher()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_mip.BoundaryPricingIncompleteError"><code class="docutils literal notranslate"><span class="pre">BoundaryPricingIncompleteError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_mip.price_boundary_witness"><code class="docutils literal notranslate"><span class="pre">price_boundary_witness()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats"><code class="docutils literal notranslate"><span class="pre">CompileStats</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.compile_seconds"><code class="docutils literal notranslate"><span class="pre">CompileStats.compile_seconds</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.compression_ratio"><code class="docutils literal notranslate"><span class="pre">CompileStats.compression_ratio</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.fully_saturated"><code class="docutils literal notranslate"><span class="pre">CompileStats.fully_saturated</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_constraints"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_constraints</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_saturated_nodes"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_saturated_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_tags"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_tags</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.from_tags"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.from_tags()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.collect_saturated_specs"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.collect_saturated_specs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.compile_to_model()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.count_saturated_constraints"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.count_saturated_constraints()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.insert"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.insert()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.is_saturated"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.is_saturated()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="certify.html">Certification</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel"><code class="docutils literal notranslate"><span class="pre">CertifyLevel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.COMBINATORIAL"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.COMBINATORIAL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.COMPLETE"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.COMPLETE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.GEOMETRIC"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.GEOMETRIC</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.certify_complex"><code class="docutils literal notranslate"><span class="pre">certify_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.AmbiguousGeometryError"><code class="docutils literal notranslate"><span class="pre">AmbiguousGeometryError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalConsistencyError"><code class="docutils literal notranslate"><span class="pre">CubicalConsistencyError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.DualGraphAsymmetricEdgeError"><code class="docutils literal notranslate"><span class="pre">DualGraphAsymmetricEdgeError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.IncompleteDualGraphError"><code class="docutils literal notranslate"><span class="pre">IncompleteDualGraphError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.NonGenericArrangementError"><code class="docutils literal notranslate"><span class="pre">NonGenericArrangementError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiFlipInvariantError"><code class="docutils literal notranslate"><span class="pre">ShiFlipInvariantError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiProofError"><code class="docutils literal notranslate"><span class="pre">ShiProofError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Network Model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.FlattenLayer"><code class="docutils literal notranslate"><span class="pre">FlattenLayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer"><code class="docutils literal notranslate"><span class="pre">LinearLayer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.bias"><code class="docutils literal notranslate"><span class="pre">LinearLayer.bias</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.weight"><code class="docutils literal notranslate"><span class="pre">LinearLayer.weight</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLULayer"><code class="docutils literal notranslate"><span class="pre">ReLULayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.all_layer_outputs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.forward"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.shi2weights"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.shi2weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.layers"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.layers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.num_relus"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.num_relus</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.convert_model.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP"><code class="docutils literal notranslate"><span class="pre">TorchMLP</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.device"><code class="docutils literal notranslate"><span class="pre">TorchMLP.device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.dtype"><code class="docutils literal notranslate"><span class="pre">TorchMLP.dtype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.layers"><code class="docutils literal notranslate"><span class="pre">TorchMLP.layers</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.initialize_linear"><code class="docutils literal notranslate"><span class="pre">initialize_linear()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.mlp"><code class="docutils literal notranslate"><span class="pre">mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.normalize_weights"><code class="docutils literal notranslate"><span class="pre">normalize_weights()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.split_sequential"><code class="docutils literal notranslate"><span class="pre">split_sequential()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.torch_mlp"><code class="docutils literal notranslate"><span class="pre">torch_mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.MLP_INIT_METHODS"><code class="docutils literal notranslate"><span class="pre">MLP_INIT_METHODS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sign_sequences.html">Sign Sequences</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager"><code class="docutils literal notranslate"><span class="pre">SSManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager.add"><code class="docutils literal notranslate"><span class="pre">SSManager.add()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi_inplace"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi_inplace()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="geometry.html">Geometry Calculations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry"><code class="docutils literal notranslate"><span class="pre">QhullGeometry</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.convex_hull"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.vertices"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.volume"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.volume</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">adjacent_polyhedra()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.certified_bounded"><code class="docutils literal notranslate"><span class="pre">certified_bounded()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.compute_properties"><code class="docutils literal notranslate"><span class="pre">compute_properties()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.halfspaces"><code class="docutils literal notranslate"><span class="pre">halfspaces()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.shis"><code class="docutils literal notranslate"><span class="pre">shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.solve_radius"><code class="docutils literal notranslate"><span class="pre">solve_radius()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.slicing.slice_complex"><code class="docutils literal notranslate"><span class="pre">slice_complex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="meta_graph.html">Meta-graph and Network Surgery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.build_meta_graph"><code class="docutils literal notranslate"><span class="pre">build_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">finite_cells_subgraph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">one_point_compactify_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.rebuild_meta_graph_face_edges"><code class="docutils literal notranslate"><span class="pre">rebuild_meta_graph_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">truncate_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_incidence"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_incidence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_one_cells"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_one_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.contract_dual_graph_for_shi"><code class="docutils literal notranslate"><span class="pre">contract_dual_graph_for_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.delete_ss_columns"><code class="docutils literal notranslate"><span class="pre">delete_ss_columns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.net_without_last_ss_layer_neuron"><code class="docutils literal notranslate"><span class="pre">net_without_last_ss_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">without_last_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_cells"><code class="docutils literal notranslate"><span class="pre">boundary_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_complex"><code class="docutils literal notranslate"><span class="pre">boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_edges"><code class="docutils literal notranslate"><span class="pre">boundary_edges()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="incidence.html">Incidence (combinatorial primitives)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.assemble_face_edges_by_dim"><code class="docutils literal notranslate"><span class="pre">assemble_face_edges_by_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.build_dual_graph"><code class="docutils literal notranslate"><span class="pre">build_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.certify_dual_graph"><code class="docutils literal notranslate"><span class="pre">certify_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_ascending"><code class="docutils literal notranslate"><span class="pre">classify_finite_ascending()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_combinatorial"><code class="docutils literal notranslate"><span class="pre">classify_finite_combinatorial()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_lp_fallback"><code class="docutils literal notranslate"><span class="pre">classify_finite_lp_fallback()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_lazy_face_polys"><code class="docutils literal notranslate"><span class="pre">classify_lazy_face_polys()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_one_cells_finite_from_face_edges"><code class="docutils literal notranslate"><span class="pre">classify_one_cells_finite_from_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.collect_meta_face_edges"><code class="docutils literal notranslate"><span class="pre">collect_meta_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.cubical_cell_shis"><code class="docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_edges_top_dim"><code class="docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_graph_edge_top_dim"><code class="docutils literal notranslate"><span class="pre">dual_graph_edge_top_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.face_tag"><code class="docutils literal notranslate"><span class="pre">face_tag()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.flip_tag"><code class="docutils literal notranslate"><span class="pre">flip_tag()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.geometric_infeasible_one_cells"><code class="docutils literal notranslate"><span class="pre">geometric_infeasible_one_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.meta_node_attrs"><code class="docutils literal notranslate"><span class="pre">meta_node_attrs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.parallel_collect_meta_face_edges"><code class="docutils literal notranslate"><span class="pre">parallel_collect_meta_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.propagate_infeasible_exclusion"><code class="docutils literal notranslate"><span class="pre">propagate_infeasible_exclusion()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.set_contracted_shis"><code class="docutils literal notranslate"><span class="pre">set_contracted_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.ss_nonzero_indices"><code class="docutils literal notranslate"><span class="pre">ss_nonzero_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.sync_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">sync_shis_from_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_contracted_shis"><code class="docutils literal notranslate"><span class="pre">verify_contracted_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_dual_graph_cubical"><code class="docutils literal notranslate"><span class="pre">verify_dual_graph_cubical()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_flip_shi_symmetry"><code class="docutils literal notranslate"><span class="pre">verify_flip_shi_symmetry()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shi_flip_neighbors"><code class="docutils literal notranslate"><span class="pre">verify_shi_flip_neighbors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.build_chain_complex"><code class="docutils literal notranslate"><span class="pre">build_chain_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">cells_from_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.verified_vertices"><code class="docutils literal notranslate"><span class="pre">verified_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.vertex_polyhedron"><code class="docutils literal notranslate"><span class="pre">vertex_polyhedron()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.combine"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.combine</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration"><code class="docutils literal notranslate"><span class="pre">Filtration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">Filtration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.values_for_meta"><code class="docutils literal notranslate"><span class="pre">Filtration.values_for_meta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.lower_star"><code class="docutils literal notranslate"><span class="pre">Filtration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.LogitSublevelFiltration"><code class="docutils literal notranslate"><span class="pre">LogitSublevelFiltration</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration.raw_cell_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.lower_star_extension"><code class="docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ConnectedComponentsMismatch"><code class="docutils literal notranslate"><span class="pre">ConnectedComponentsMismatch</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.betti_numbers"><code class="docutils literal notranslate"><span class="pre">betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.C_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">C_BACKEND_AVAILABLE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.Compactify"><code class="docutils literal notranslate"><span class="pre">Compactify</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="morse.html">Morse Theory</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint"><code class="docutils literal notranslate"><span class="pre">CriticalPoint</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.index"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.is_critical"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.is_critical</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.point"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.polyhedron"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.polyhedron</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.ss"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.tag"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.tag</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians"><code class="docutils literal notranslate"><span class="pre">LayerJacobians</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.W_out"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.W_out</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.full"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.full</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.n_terms"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.n_terms</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.assert_scalar_output"><code class="docutils literal notranslate"><span class="pre">assert_scalar_output()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.coface_sign_sequence"><code class="docutils literal notranslate"><span class="pre">coface_sign_sequence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_flags_for_vertices"><code class="docutils literal notranslate"><span class="pre">critical_flags_for_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_points"><code class="docutils literal notranslate"><span class="pre">critical_points()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.gradient_on_cell"><code class="docutils literal notranslate"><span class="pre">gradient_on_cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.is_pl_critical_vertex"><code class="docutils literal notranslate"><span class="pre">is_pl_critical_vertex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.layer_jacobians"><code class="docutils literal notranslate"><span class="pre">layer_jacobians()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_on_1cell"><code class="docutils literal notranslate"><span class="pre">partial_derivative_on_1cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_sign"><code class="docutils literal notranslate"><span class="pre">partial_derivative_sign()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_value"><code class="docutils literal notranslate"><span class="pre">partial_derivative_value()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.shi_to_relu_neuron"><code class="docutils literal notranslate"><span class="pre">shi_to_relu_neuron()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.vis.colors"><code class="docutils literal notranslate"><span class="pre">colors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.vis.plot_complex"><code class="docutils literal notranslate"><span class="pre">plot_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.vis.plot_persistence_diagram"><code class="docutils literal notranslate"><span class="pre">plot_persistence_diagram()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.vis.plot_polyhedron"><code class="docutils literal notranslate"><span class="pre">plot_polyhedron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.vis.pyvis_dual_graph"><code class="docutils literal notranslate"><span class="pre">pyvis_dual_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">relucent</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Visualization</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/vis.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-relucent.vis">
+<span id="visualization"></span><h1>Visualization<a class="headerlink" href="#module-relucent.vis" title="Link to this heading"></a></h1>
+<p>Plotly visualization of complexes, polyhedra, and persistence diagrams.</p>
+<p>Most users call <a class="reference internal" href="complex.html#relucent.core.complex.Complex.plot" title="relucent.core.complex.Complex.plot"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Complex.plot</span></code></a> or
+<a class="reference internal" href="#relucent.vis.plot_complex" title="relucent.vis.plot_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_complex()</span></code></a>; <a class="reference internal" href="#relucent.vis.plot_polyhedron" title="relucent.vis.plot_polyhedron"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_polyhedron()</span></code></a> builds traces for a single cell.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.vis.colors">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">colors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'viridis'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.vis.colors" title="Link to this definition"></a></dt>
+<dd><p>Map numeric values to hex color strings via a Plotly colorscale (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;viridis&quot;</span></code>).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.vis.plot_complex">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">plot_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cpx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="complex.html#relucent.core.complex.Complex" title="relucent.core.complex.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'cells'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'graph'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'1-skeleton'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide_unbounded</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Figure" title="(in )"><span class="pre">go.Figure</span></a></span></span><a class="headerlink" href="#relucent.vis.plot_complex" title="Link to this definition"></a></dt>
+<dd><p>Plot an entire <code class="docutils literal notranslate"><span class="pre">Complex</span></code> as one Plotly figure. Each polyhedron is plotted as a separate trace.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cells</span></code> — cells in input space; 2D vs 3D layout is chosen from <code class="docutils literal notranslate"><span class="pre">cpx.dim</span></code> (network input
+dimension), which must be 2 or 3.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">graph</span></code> — 2D cells with third coordinate from the network (optional projected copy).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1-skeleton</span></code> — 1-cells obtained from <code class="docutils literal notranslate"><span class="pre">Complex.chain_complex()</span></code>; each trace hover
+label reports adjacent top-dimensional sign sequences.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hide_unbounded</span></code> — if True, skip unbounded cells/regions in all modes.</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.vis.plot_persistence_diagram">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">plot_persistence_diagram</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">diagram</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram" title="relucent.topology.persistence.PersistenceDiagram"><span class="pre">PersistenceDiagram</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_death</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_diagonal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Persistence</span> <span class="pre">diagram'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_cmap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'Plotly'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">marker_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">layout_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Figure" title="(in )"><span class="pre">go.Figure</span></a></span></span><a class="headerlink" href="#relucent.vis.plot_persistence_diagram" title="Link to this definition"></a></dt>
+<dd><p>Plot a persistence diagram (birth vs death) as a Plotly figure.</p>
+<p>Finite pairs are drawn at <code class="docutils literal notranslate"><span class="pre">(birth,</span> <span class="pre">death)</span></code>. Essential classes (<code class="docutils literal notranslate"><span class="pre">death=inf</span></code>)
+are shown along the top of the plot at <code class="docutils literal notranslate"><span class="pre">y=max_death</span></code> (computed from finite deaths
+plus padding unless <code class="docutils literal notranslate"><span class="pre">max_death</span></code> is given).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>diagram</strong> – <a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram" title="relucent.topology.persistence.PersistenceDiagram"><code class="xref py py-class docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a> from
+<a class="reference internal" href="persistence.html#relucent.topology.persistence.compute_persistent_homology" title="relucent.topology.persistence.compute_persistent_homology"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a>.</p></li>
+<li><p><strong>max_death</strong> – Upper <code class="docutils literal notranslate"><span class="pre">death</span></code> axis limit and y-position for essential points.</p></li>
+<li><p><strong>show_diagonal</strong> – If True, draw the diagonal <code class="docutils literal notranslate"><span class="pre">birth=death</span></code> reference line.</p></li>
+<li><p><strong>title</strong> – Figure title; <code class="docutils literal notranslate"><span class="pre">None</span></code> omits the title.</p></li>
+<li><p><strong>dim_cmap</strong> – Plotly qualitative colorscale name for homological degree.</p></li>
+<li><p><strong>marker_size</strong> – Scatter marker size.</p></li>
+<li><p><strong>**layout_kwargs</strong> – Forwarded to <a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Figure.update_layout" title="(in )"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plotly.graph_objects.Figure.update_layout()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Figure" title="(in )"><code class="xref py py-class docutils literal notranslate"><span class="pre">plotly.graph_objects.Figure</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.vis.plot_polyhedron">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">plot_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron" title="relucent.core.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'cells'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide_unbounded</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Scatter" title="(in )"><span class="pre">Scatter</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Mesh3d" title="(in )"><span class="pre">Mesh3d</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Scatter3d" title="(in )"><span class="pre">Scatter3d</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.vis.plot_polyhedron" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">plot_polyhedron</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">poly</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron" title="relucent.core.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.14)"><span class="pre">Literal</span></a><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'graph'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hide_unbounded</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Mesh3d" title="(in )"><span class="pre">Mesh3d</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://plotly.com/python-api-reference/generated/plotly.graph_objects.html#plotly.graph_objects.Scatter3d" title="(in )"><span class="pre">Scatter3d</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span></dt>
+<dd><p>Build plotly traces for one polyhedron.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cells</span></code> — cell in input space: uses <code class="docutils literal notranslate"><span class="pre">poly.ambient_dim</span></code> to choose 2D (<code class="docutils literal notranslate"><span class="pre">go.Scatter</span></code>)
+vs 3D (<code class="docutils literal notranslate"><span class="pre">go.Mesh3d</span></code> / <code class="docutils literal notranslate"><span class="pre">go.Scatter3d</span></code>) traces (supports ambient dimensions 2 and 3).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">graph</span></code> — 2D cell lifted through the network (mesh/outline dict or similar).</p></li>
+</ul>
+<p>Uses <code class="docutils literal notranslate"><span class="pre">plot_mode</span></code> (keyword-only) so Plotly kwargs such as <code class="docutils literal notranslate"><span class="pre">mode=&quot;lines&quot;</span></code> are not ambiguous.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.vis.pyvis_dual_graph">
+<span class="sig-prename descclassname"><span class="pre">relucent.vis.</span></span><span class="sig-name descname"><span class="pre">pyvis_dual_graph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cplx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="complex.html#relucent.core.complex.Complex" title="relucent.core.complex.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'Wl2'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'volume'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">node_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'volume'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'viridis'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">match_locations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_node_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_edge_labels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://networkx.org/documentation/stable/reference/classes/graph.html#networkx.Graph" title="(in NetworkX v3.7)"><span class="pre">nx.Graph</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.vis.pyvis_dual_graph" title="Link to this definition"></a></dt>
+<dd><p>The dual graph with PyVis styling attributes, nodes relabeled <code class="docutils literal notranslate"><span class="pre">0..len(cplx)-1</span></code>.</p>
+<p>Pass the result to <code class="docutils literal notranslate"><span class="pre">pyvis.network.Network.from_nx</span></code> (PyVis is not a relucent dependency).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cplx</strong> – The complex.</p></li>
+<li><p><strong>node_color</strong> – Color nodes by <code class="docutils literal notranslate"><span class="pre">&quot;Wl2&quot;</span></code> (weight norm) or <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">None</span></code> leaves
+PyVis’s default.</p></li>
+<li><p><strong>node_size</strong> – <code class="docutils literal notranslate"><span class="pre">&quot;volume&quot;</span></code> sizes nodes by volume; <code class="docutils literal notranslate"><span class="pre">None</span></code> uses a fixed size.</p></li>
+<li><p><strong>cmap</strong> – Plotly colorscale for <code class="docutils literal notranslate"><span class="pre">node_color</span></code>.</p></li>
+<li><p><strong>match_locations</strong> – Place nodes at their cells’ interior points (2-D complexes only).</p></li>
+<li><p><strong>show_node_labels</strong> – Label nodes with their cell names.</p></li>
+<li><p><strong>show_edge_labels</strong> – Label edges with their SHI.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">match_locations</span></code> is True and the complex is not 2-D.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="morse.html" class="btn btn-neutral float-left" title="Morse Theory" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="utilities.html" class="btn btn-neutral float-right" title="Utility Functions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Blake B. Gaines.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

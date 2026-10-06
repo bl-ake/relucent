@@ -13,16 +13,15 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
-      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
       <script src="_static/custom.js?v=add1a637"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Complex" href="complex.html" />
-    <link rel="prev" title="Topology and Persistent Homology" href="topology.html" />
+    <link rel="next" title="Stability and migrating to 1.0" href="migrating.html" />
+    <link rel="prev" title="How Betti numbers are computed" href="betti_computation.html" />
    
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
 </head>
@@ -75,7 +74,7 @@
 <li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#useful-property-names">Useful property names</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#property-names">Property names</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="search_shi_and_graphs.html">Search, SHI Assignment, Verification, and Graph Structures</a><ul>
@@ -94,6 +93,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#shi-assignment-over-the-pipeline">SHI assignment over the pipeline</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#during-search-frontier-heuristic">During search (frontier heuristic)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#lp-solver-failures">LP solver failures</a></li>
 <li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#after-complete-ambient-search-authoritative-top-cells">After complete ambient search (authoritative top cells)</a></li>
 <li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#on-lower-dimensional-slices-boundary-chain-complex">On lower-dimensional slices (boundary, chain complex)</a></li>
 </ul>
@@ -137,18 +137,57 @@
 <li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="betti_computation.html">How Betti numbers are computed</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#the-default-pipeline">The default pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-1-build-the-chain-complex">Step 1: Build the chain complex</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#how-vertex-star-recovery-works">How vertex-star recovery works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#dual-graph-rules">Dual-graph rules</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-2-build-the-meta-graph">Step 2: Build the meta-graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#face-edges-what-defines-the-betti-numbers">Face edges: what defines the Betti numbers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#bounded-and-unbounded-labels">Bounded and unbounded labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#node-shis-and-face-edges">Node <code class="docutils literal notranslate"><span class="pre">shis</span></code> and face edges</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-3-truncate-at-infinity">Step 3: Truncate at infinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-4-rank-boundary-matrices">Step 4: Rank boundary matrices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#exploration-and-certification">Exploration and certification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#other-options">Other options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#function-map">Function map</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#by-pipeline-step">By pipeline step</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#cells-and-1-cells-at-a-glance">0-cells and 1-cells at a glance</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#automatic-tolerance-defaults">Automatic tolerance defaults</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#changing-settings">Changing settings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#settings-reference">Settings reference</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#polyhedron-and-halfspace-geometry">Polyhedron and halfspace geometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#geometry">Geometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#search-and-boundary-discovery">Search and boundary discovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#plotting">Plotting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#logging">Logging</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#complex-search-and-parallel-add">Complex search and parallel add</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#boundary-discovery-mip-pricing">Boundary discovery (MIP pricing)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#topology-and-logging">Topology and logging</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#utilities-and-visualization">Utilities and visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-relucent.config.advanced">Advanced settings (unstable)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.GUROBI_SHI_OPTIMALITY_TOL"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_OPTIMALITY_TOL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.GUROBI_SHI_SCALE_FLAG"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_SCALE_FLAG</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.INTERIOR_POINT_RADIUS_SEQUENCE"><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.ASTAR_BIAS_WEIGHT"><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT"><code class="docutils literal notranslate"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_PRICING_BRUTE_FORCE_MAX_N</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_BATCH_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_WORKERS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_CUT_ORDER"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_ORDER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BULK_NOGOOD_EMIT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_WAVE_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_PRIORITY_ENABLED</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.config.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#api">API</a><ul>
@@ -157,127 +196,157 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="migrating.html">Stability and migrating to 1.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#api-stability">API stability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#renamed-in-1-0">Renamed in 1.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#other-changes">Other changes</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers_from_meta"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers_from_meta()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">Complex.finite_cells_subgraph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.one_point_compactify_meta_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.truncate_meta_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.assert_topology_ready"><code class="docutils literal notranslate"><span class="pre">Complex.assert_topology_ready()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.certify"><code class="docutils literal notranslate"><span class="pre">Complex.certify()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.discover_boundary_complex()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">Complex.get_betti_numbers()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_cells()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_complex()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_edges"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_edges()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_boundary_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_boundary_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.get_chain_complex()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_critical_points"><code class="docutils literal notranslate"><span class="pre">Complex.get_critical_points()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_dual_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.get_meta_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.get_persistent_homology()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.get_poly_attrs"><code class="docutils literal notranslate"><span class="pre">Complex.get_poly_attrs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.intrinsic_vertex_coords"><code class="docutils literal notranslate"><span class="pre">Complex.intrinsic_vertex_coords()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.partial_derivative_on_1cell"><code class="docutils literal notranslate"><span class="pre">Complex.partial_derivative_on_1cell()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2preactivations"><code class="docutils literal notranslate"><span class="pre">Complex.point2preactivations()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.preactivation_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.preactivation_iterator()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.recover_from_dual_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.save"><code class="docutils literal notranslate"><span class="pre">Complex.save()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.set_exploration_state"><code class="docutils literal notranslate"><span class="pre">Complex.set_exploration_state()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.slice_affine"><code class="docutils literal notranslate"><span class="pre">Complex.slice_affine()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.truncation_vertex_id_mapper"><code class="docutils literal notranslate"><span class="pre">Complex.truncation_vertex_id_mapper()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">Complex.verify_arrangement_genericity()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">Complex.without_last_layer_neuron()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.complete"><code class="docutils literal notranslate"><span class="pre">Complex.complete</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.Complex.verified"><code class="docutils literal notranslate"><span class="pre">Complex.verified</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.core.complex.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.assert_topology_ready"><code class="docutils literal notranslate"><span class="pre">Complex.assert_topology_ready()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.betti_numbers"><code class="docutils literal notranslate"><span class="pre">Complex.betti_numbers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.certify"><code class="docutils literal notranslate"><span class="pre">Complex.certify()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.chain_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.critical_points"><code class="docutils literal notranslate"><span class="pre">Complex.critical_points()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.persistent_homology()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2preactivations"><code class="docutils literal notranslate"><span class="pre">Complex.point2preactivations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.preactivation_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.preactivation_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.save"><code class="docutils literal notranslate"><span class="pre">Complex.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.set_exploration_state"><code class="docutils literal notranslate"><span class="pre">Complex.set_exploration_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.slice_affine"><code class="docutils literal notranslate"><span class="pre">Complex.slice_affine()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">Complex.verify_arrangement_genericity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.SAVE_FORMAT_VERSION"><code class="docutils literal notranslate"><span class="pre">Complex.SAVE_FORMAT_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.complete"><code class="docutils literal notranslate"><span class="pre">Complex.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.source_model"><code class="docutils literal notranslate"><span class="pre">Complex.source_model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verified"><code class="docutils literal notranslate"><span class="pre">Complex.verified</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_halfspaces()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_bounded_vertices()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_center_inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_center_inradius()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_face"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_face()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_face_by_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_face_by_shis()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_geometry"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_geometry()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_interior_point()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.get_neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.get_neighbor()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.is_shi_face_feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_shi_face_feasible()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.plot_cells"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot_cells()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.plot_graph"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot_graph()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.verify_vertex_covector"><code class="docutils literal notranslate"><span class="pre">Polyhedron.verify_vertex_covector()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ch"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ch</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.faces</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.hs"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.hyperplanes"><code class="docutils literal notranslate"><span class="pre">Polyhedron.hyperplanes</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.inequalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inequalities</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.non_zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.non_zero_indices</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_dead_relus"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_dead_relus</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_faces</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_halfspaces()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_vertices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Polyhedron.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.face"><code class="docutils literal notranslate"><span class="pre">Polyhedron.face()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.find_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.find_interior_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_shi_face_feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_shi_face_feasible()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.neighbor()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.plot"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.verify_vertex_covector"><code class="docutils literal notranslate"><span class="pre">Polyhedron.verify_vertex_covector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.GEOMETRY_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.QHULL_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.QHULL_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.convex_hull"><code class="docutils literal notranslate"><span class="pre">Polyhedron.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.faces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_err_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_err_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_rows_ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_rows_ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inequalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inequalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.non_zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.non_zero_indices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="exploration.html">Exploration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult"><code class="docutils literal notranslate"><span class="pre">SearchResult</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.bad_shi_computations"><code class="docutils literal notranslate"><span class="pre">SearchResult.bad_shi_computations</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.complete"><code class="docutils literal notranslate"><span class="pre">SearchResult.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.depth"><code class="docutils literal notranslate"><span class="pre">SearchResult.depth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.mean_facets"><code class="docutils literal notranslate"><span class="pre">SearchResult.mean_facets</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.search_time"><code class="docutils literal notranslate"><span class="pre">SearchResult.search_time</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.verified"><code class="docutils literal notranslate"><span class="pre">SearchResult.verified</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.explore_for_topology"><code class="docutils literal notranslate"><span class="pre">explore_for_topology()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_ambient_search"><code class="docutils literal notranslate"><span class="pre">finalize_ambient_search()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex"><code class="docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.generic_topology_start"><code class="docutils literal notranslate"><span class="pre">generic_topology_start()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.search_stats_dict"><code class="docutils literal notranslate"><span class="pre">search_stats_dict()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="boundary_search.html">Boundary Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.BoundaryDiscoveryStats"><code class="docutils literal notranslate"><span class="pre">BoundaryDiscoveryStats</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.boundary_searcher"><code class="docutils literal notranslate"><span class="pre">boundary_searcher()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_search.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_mip.BoundaryPricingIncompleteError"><code class="docutils literal notranslate"><span class="pre">BoundaryPricingIncompleteError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_mip.price_boundary_witness"><code class="docutils literal notranslate"><span class="pre">price_boundary_witness()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats"><code class="docutils literal notranslate"><span class="pre">CompileStats</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.compile_seconds"><code class="docutils literal notranslate"><span class="pre">CompileStats.compile_seconds</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.compression_ratio"><code class="docutils literal notranslate"><span class="pre">CompileStats.compression_ratio</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.fully_saturated"><code class="docutils literal notranslate"><span class="pre">CompileStats.fully_saturated</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_constraints"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_constraints</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_saturated_nodes"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_saturated_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.CompileStats.n_tags"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_tags</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.from_tags"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.from_tags()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.collect_saturated_specs"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.collect_saturated_specs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.compile_to_model()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.count_saturated_constraints"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.count_saturated_constraints()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.insert"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.insert()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="boundary_search.html#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.is_saturated"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.is_saturated()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="certify.html">Certification</a><ul>
@@ -291,6 +360,7 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.AmbiguousGeometryError"><code class="docutils literal notranslate"><span class="pre">AmbiguousGeometryError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
@@ -300,6 +370,84 @@
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.NonGenericArrangementError"><code class="docutils literal notranslate"><span class="pre">NonGenericArrangementError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiFlipInvariantError"><code class="docutils literal notranslate"><span class="pre">ShiFlipInvariantError</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiProofError"><code class="docutils literal notranslate"><span class="pre">ShiProofError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Network Model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.FlattenLayer"><code class="docutils literal notranslate"><span class="pre">FlattenLayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer"><code class="docutils literal notranslate"><span class="pre">LinearLayer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.bias"><code class="docutils literal notranslate"><span class="pre">LinearLayer.bias</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.weight"><code class="docutils literal notranslate"><span class="pre">LinearLayer.weight</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLULayer"><code class="docutils literal notranslate"><span class="pre">ReLULayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.all_layer_outputs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.forward"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.shi2weights"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.shi2weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.layers"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.layers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.num_relus"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.num_relus</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.convert_model.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP"><code class="docutils literal notranslate"><span class="pre">TorchMLP</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.device"><code class="docutils literal notranslate"><span class="pre">TorchMLP.device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.dtype"><code class="docutils literal notranslate"><span class="pre">TorchMLP.dtype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.layers"><code class="docutils literal notranslate"><span class="pre">TorchMLP.layers</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.initialize_linear"><code class="docutils literal notranslate"><span class="pre">initialize_linear()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.mlp"><code class="docutils literal notranslate"><span class="pre">mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.normalize_weights"><code class="docutils literal notranslate"><span class="pre">normalize_weights()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.split_sequential"><code class="docutils literal notranslate"><span class="pre">split_sequential()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.torch_mlp"><code class="docutils literal notranslate"><span class="pre">torch_mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.MLP_INIT_METHODS"><code class="docutils literal notranslate"><span class="pre">MLP_INIT_METHODS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sign_sequences.html">Sign Sequences</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager"><code class="docutils literal notranslate"><span class="pre">SSManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager.add"><code class="docutils literal notranslate"><span class="pre">SSManager.add()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi_inplace"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi_inplace()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="geometry.html">Geometry Calculations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry"><code class="docutils literal notranslate"><span class="pre">QhullGeometry</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.convex_hull"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.vertices"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.volume"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.volume</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">adjacent_polyhedra()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.certified_bounded"><code class="docutils literal notranslate"><span class="pre">certified_bounded()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.compute_properties"><code class="docutils literal notranslate"><span class="pre">compute_properties()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.halfspaces"><code class="docutils literal notranslate"><span class="pre">halfspaces()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.shis"><code class="docutils literal notranslate"><span class="pre">shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.solve_radius"><code class="docutils literal notranslate"><span class="pre">solve_radius()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.slicing.slice_complex"><code class="docutils literal notranslate"><span class="pre">slice_complex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="meta_graph.html">Meta-graph and Network Surgery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.build_meta_graph"><code class="docutils literal notranslate"><span class="pre">build_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">finite_cells_subgraph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">one_point_compactify_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.rebuild_meta_graph_face_edges"><code class="docutils literal notranslate"><span class="pre">rebuild_meta_graph_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">truncate_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_incidence"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_incidence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_one_cells"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_one_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.contract_dual_graph_for_shi"><code class="docutils literal notranslate"><span class="pre">contract_dual_graph_for_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.delete_ss_columns"><code class="docutils literal notranslate"><span class="pre">delete_ss_columns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.net_without_last_ss_layer_neuron"><code class="docutils literal notranslate"><span class="pre">net_without_last_ss_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">without_last_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_cells"><code class="docutils literal notranslate"><span class="pre">boundary_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_complex"><code class="docutils literal notranslate"><span class="pre">boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_edges"><code class="docutils literal notranslate"><span class="pre">boundary_edges()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="incidence.html">Incidence (combinatorial primitives)</a><ul>
@@ -340,9 +488,13 @@
 <li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.build_chain_complex"><code class="docutils literal notranslate"><span class="pre">build_chain_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">cells_from_vertices()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.verified_vertices"><code class="docutils literal notranslate"><span class="pre">verified_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.vertex_polyhedron"><code class="docutils literal notranslate"><span class="pre">vertex_polyhedron()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
@@ -398,27 +550,57 @@
 <li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ConnectedComponentsMismatch"><code class="docutils literal notranslate"><span class="pre">ConnectedComponentsMismatch</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.get_betti_numbers"><code class="docutils literal notranslate"><span class="pre">get_betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.betti_numbers"><code class="docutils literal notranslate"><span class="pre">betti_numbers()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.C_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">C_BACKEND_AVAILABLE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.Compactify"><code class="docutils literal notranslate"><span class="pre">Compactify</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_env"><code class="docutils literal notranslate"><span class="pre">get_env()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.mlp"><code class="docutils literal notranslate"><span class="pre">mlp()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.split_sequential"><code class="docutils literal notranslate"><span class="pre">split_sequential()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.explore_for_topology"><code class="docutils literal notranslate"><span class="pre">explore_for_topology()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.generic_topology_start"><code class="docutils literal notranslate"><span class="pre">generic_topology_start()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.plot_complex"><code class="docutils literal notranslate"><span class="pre">plot_complex()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.plot_polyhedron"><code class="docutils literal notranslate"><span class="pre">plot_polyhedron()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="utilities.html#relucent.get_colors"><code class="docutils literal notranslate"><span class="pre">get_colors()</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="morse.html">Morse Theory</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint"><code class="docutils literal notranslate"><span class="pre">CriticalPoint</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.index"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.is_critical"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.is_critical</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.point"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.polyhedron"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.polyhedron</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.ss"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.tag"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.tag</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians"><code class="docutils literal notranslate"><span class="pre">LayerJacobians</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.W_out"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.W_out</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.full"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.full</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.n_terms"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.n_terms</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.assert_scalar_output"><code class="docutils literal notranslate"><span class="pre">assert_scalar_output()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.coface_sign_sequence"><code class="docutils literal notranslate"><span class="pre">coface_sign_sequence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_flags_for_vertices"><code class="docutils literal notranslate"><span class="pre">critical_flags_for_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_points"><code class="docutils literal notranslate"><span class="pre">critical_points()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.gradient_on_cell"><code class="docutils literal notranslate"><span class="pre">gradient_on_cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.is_pl_critical_vertex"><code class="docutils literal notranslate"><span class="pre">is_pl_critical_vertex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.layer_jacobians"><code class="docutils literal notranslate"><span class="pre">layer_jacobians()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_on_1cell"><code class="docutils literal notranslate"><span class="pre">partial_derivative_on_1cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_sign"><code class="docutils literal notranslate"><span class="pre">partial_derivative_sign()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_value"><code class="docutils literal notranslate"><span class="pre">partial_derivative_value()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.shi_to_relu_neuron"><code class="docutils literal notranslate"><span class="pre">shi_to_relu_neuron()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vis.html">Visualization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.colors"><code class="docutils literal notranslate"><span class="pre">colors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_complex"><code class="docutils literal notranslate"><span class="pre">plot_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_persistence_diagram"><code class="docutils literal notranslate"><span class="pre">plot_persistence_diagram()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_polyhedron"><code class="docutils literal notranslate"><span class="pre">plot_polyhedron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.pyvis_dual_graph"><code class="docutils literal notranslate"><span class="pre">pyvis_dual_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
 </ul>
 
         </div>
@@ -445,53 +627,50 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="configuration">
-<h1>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h1>
-<p>Relucent exposes numeric defaults and tolerances as <strong>module-level attributes</strong> on
-<code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>. Library code reads these values when routines run, so you
+  <section id="module-relucent.config">
+<span id="configuration"></span><h1>Configuration<a class="headerlink" href="#module-relucent.config" title="Link to this heading"></a></h1>
+<p>Relucent exposes numeric defaults as <strong>module-level attributes</strong> on
+<a class="reference internal" href="#module-relucent.config" title="relucent.config"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code></a>. Library code reads these values when routines run, so you
 can tune behavior for your model or hardware without editing source files.</p>
-<section id="automatic-tolerance-defaults">
-<h2>Automatic tolerance defaults<a class="headerlink" href="#automatic-tolerance-defaults" title="Link to this heading"></a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">relucent</span></code> computes float64-safe defaults for tolerance settings
-(<code class="docutils literal notranslate"><span class="pre">TOL_*</span></code>, SHI thresholds, etc.) and writes them to <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>.
-Per-key <code class="docutils literal notranslate"><span class="pre">RELUCENT_&lt;SETTING_NAME&gt;</span></code> environment variables are not overwritten.
-Set <code class="docutils literal notranslate"><span class="pre">RELUCENT_SKIP_NUMERIC_BOOTSTRAP=1</span></code> before import to keep the legacy
-literals in <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>.</p>
-<p><a class="reference internal" href="complex.html#relucent.Complex" title="relucent.core.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> calls
-<code class="xref py py-func docutils literal notranslate"><span class="pre">apply_tolerances()</span></code> for its network by default
-(<code class="docutils literal notranslate"><span class="pre">auto_tolerances=True</span></code>). Pass <code class="docutils literal notranslate"><span class="pre">auto_tolerances=False</span></code> to skip that step.</p>
-</section>
+<p>Nothing in relucent writes to these settings: importing the package and creating a
+<a class="reference internal" href="complex.html#relucent.core.complex.Complex" title="relucent.core.complex.Complex"><code class="xref py py-class docutils literal notranslate"><span class="pre">Complex</span></code></a> leave them as you set them. Settings that depend
+on the network (the boundary MIP margin <code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EPS</span></code>, the default SHI LP box) are
+<code class="docutils literal notranslate"><span class="pre">None</span></code> or omitted by default and computed per network where they are used.</p>
+<p>The topology path does not rely on tolerance settings for its decisions. Facets,
+emptiness, vertices, genericity, membership, and Morse signs are each checked against a
+float64 error bound computed from the rows involved, decided exactly when that bound
+can’t settle them, and otherwise raise <a class="reference internal" href="certify.html#relucent.core.errors.AmbiguousGeometryError" title="relucent.core.errors.AmbiguousGeometryError"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmbiguousGeometryError</span></code></a>.
+None of this has a setting to tune.</p>
 <section id="changing-settings">
 <h2>Changing settings<a class="headerlink" href="#changing-settings" title="Link to this heading"></a></h2>
 <p>Import the module (or the package namespace) and assign new values:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">relucent</span>
-<span class="n">relucent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">TOL_HALFSPACE_CONTAINMENT</span> <span class="o">=</span> <span class="mf">1e-7</span>
+<span class="n">relucent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">VERBOSE</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">relucent</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">MAX_RADIUS</span> <span class="o">=</span> <span class="mi">500</span>
 </pre></div>
 </div>
 <p>To set several attributes at once, use <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">relucent.config.update_settings()</span></code></a>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">relucent.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">update_settings</span>
 <span class="n">update_settings</span><span class="p">(</span>
-    <span class="n">TOL_HALFSPACE_CONTAINMENT</span><span class="o">=</span><span class="mf">1e-7</span><span class="p">,</span>
+    <span class="n">VERBOSE</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
     <span class="n">DEFAULT_SEARCH_BOUND</span><span class="o">=</span><span class="mf">1e7</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">update_settings</span></code> only accepts names listed under <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>
-(excluding the helper itself). Unknown keys raise <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">update_settings</span></code> accepts the names in <code class="docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code> and
+<code class="docutils literal notranslate"><span class="pre">relucent.config.advanced.__all__</span></code>. Unknown keys raise <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>, and a string
+setting given a value outside its allowed set raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p>
 </section>
 <section id="environment-variables">
 <h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
-<p>All public config settings can also be controlled with environment variables.
-The naming convention is:</p>
-<p><code class="docutils literal notranslate"><span class="pre">RELUCENT_&lt;SETTING_NAME&gt;</span></code></p>
-<p>For example, to override <code class="docutils literal notranslate"><span class="pre">MAX_RADIUS</span></code> and <code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code>:</p>
+<p>Every setting, including the advanced ones, can also be set with an environment variable
+named <code class="docutils literal notranslate"><span class="pre">RELUCENT_&lt;SETTING_NAME&gt;</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_MAX_RADIUS</span><span class="o">=</span><span class="m">500</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_TOL_HALFSPACE_CONTAINMENT</span><span class="o">=</span>1e-7
+<span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_VERBOSE</span><span class="o">=</span><span class="m">0</span>
 </pre></div>
 </div>
-<p>Read values are parsed at import time of <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code>, so set
-environment variables before importing <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent</span></code>.</p>
+<p>Values are read when <a class="reference internal" href="#module-relucent.config" title="relucent.config"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code></a> is imported, so set environment variables
+before importing <code class="docutils literal notranslate"><span class="pre">relucent</span></code>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code> accepts either comma-separated values or a
 bracketed comma-separated form:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">RELUCENT_INTERIOR_POINT_RADIUS_SEQUENCE</span><span class="o">=</span><span class="m">0</span>.01,0.1,1,10,100
@@ -506,337 +685,226 @@ overrides the module setting for that call.</p>
 </section>
 <section id="settings-reference">
 <h2>Settings reference<a class="headerlink" href="#settings-reference" title="Link to this heading"></a></h2>
-<p>The following tables summarize each public setting. Types and defaults match the
-shipped <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code> module.</p>
-<section id="polyhedron-and-halfspace-geometry">
-<h3>Polyhedron and halfspace geometry<a class="headerlink" href="#polyhedron-and-halfspace-geometry" title="Link to this heading"></a></h3>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">QHULL_MODE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">&quot;IGNORE&quot;</span></code></p></td>
-<td><p>How Qhull warnings from <code class="docutils literal notranslate"><span class="pre">HalfspaceIntersection</span></code> are handled: <code class="docutils literal notranslate"><span class="pre">&quot;IGNORE&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;WARN_ALL&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;HIGH_PRECISION&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;JITTERED&quot;</span></code> (retry with QJ).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">CAREFUL_MODE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>When True, run extra consistency checks (Chebyshev vs. propagated boundedness, forward-pass vs. affine reconstruction, conversion spot-checks, graph invariants). The test suite and CI enable this (see <code class="docutils literal notranslate"><span class="pre">tests/conftest.py</span></code> and <code class="docutils literal notranslate"><span class="pre">RELUCENT_CAREFUL_MODE</span></code>).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">MAX_RADIUS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
-<td><p>Maximum Chebyshev / interior-point search radius when solving with Gurobi.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VERTEX_TRUST_THRESHOLD</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
-<td><p>Threshold for trusting vertex positions from HalfspaceIntersection.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
-<td><p>Feasibility tolerance for halfspace containment (<span class="math notranslate nohighlight">\(a^\top x + b \le 0\)</span>) in checks and related geometry.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_INTERIOR_VERIFY</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-5</span></code></p></td>
-<td><p>After Chebyshev / interior LP, maximum allowed halfspace violation vs. degenerate-halfspace rows (slightly looser than <code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_CONTAINMENT</span></code> for solver noise).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_DEAD_RELU</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-8</span></code></p></td>
-<td><p>Column norm below which a ReLU is treated as dead.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_HYPERPLANE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
-<td><p>Hyperplane equality tolerance in SHI computation.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_HALFSPACE_NORMAL</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-12</span></code></p></td>
-<td><p>Norms below this are treated as degenerate halfspace normals.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_OBJ_STOP</span></code> / <code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_BEST_BD_STOP</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code> / <code class="docutils literal notranslate"><span class="pre">-1e-6</span></code></p></td>
-<td><p>Gurobi early-stop tolerances for the SHI MIP models.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_OBJECTIVE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-8</span></code></p></td>
-<td><p>Minimum SHI LP objective to accept a supporting hyperplane (rejects near-zero numerical false positives).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_NEARLY_VERTICAL</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-10</span></code></p></td>
-<td><p>2D plotting: halfspace normals with small <code class="docutils literal notranslate"><span class="pre">w[1]</span></code> are treated as vertical.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PLOT_BOUND</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
-<td><p>Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERIFY_AB_ATOL</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">allclose</span></code> atol when verifying halfspace <code class="docutils literal notranslate"><span class="pre">(A,</span> <span class="pre">b)</span></code> against network outputs.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOL_VERTEX_SIGN_MARGIN</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-12</span></code></p></td>
-<td><p>Floor for the vertex sign check; each nonzero preactivation must also beat its own float64 rounding at that point.</p></td>
-</tr>
-</tbody>
-</table>
+<section id="geometry">
+<h3>Geometry<a class="headerlink" href="#geometry" title="Link to this heading"></a></h3>
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.CAREFUL_MODE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">CAREFUL_MODE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#relucent.config.CAREFUL_MODE" title="Link to this definition"></a></dt>
+<dd><p>When True, run extra consistency checks (Chebyshev vs. propagated boundedness, forward-pass vs. affine reconstruction, conversion spot-checks, graph invariants). The test suite and CI enable this (see <code class="docutils literal notranslate"><span class="pre">tests/conftest.py</span></code> and <code class="docutils literal notranslate"><span class="pre">RELUCENT_CAREFUL_MODE</span></code>).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.QHULL_MODE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">QHULL_MODE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&quot;IGNORE&quot;</span></span><a class="headerlink" href="#relucent.config.QHULL_MODE" title="Link to this definition"></a></dt>
+<dd><p>How Qhull warnings from <code class="docutils literal notranslate"><span class="pre">HalfspaceIntersection</span></code> are handled: <code class="docutils literal notranslate"><span class="pre">&quot;IGNORE&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;WARN_ALL&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;HIGH_PRECISION&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;JITTERED&quot;</span></code> (retry with QJ).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.MAX_RADIUS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">MAX_RADIUS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></span><a class="headerlink" href="#relucent.config.MAX_RADIUS" title="Link to this definition"></a></dt>
+<dd><p>Maximum Chebyshev / interior-point search radius when solving with Gurobi.</p>
+</dd></dl>
+
+</section>
+<section id="search-and-boundary-discovery">
+<h3>Search and boundary discovery<a class="headerlink" href="#search-and-boundary-discovery" title="Link to this heading"></a></h3>
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.DEFAULT_PARALLEL_ADD_BOUND">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_PARALLEL_ADD_BOUND</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e8</span></span><a class="headerlink" href="#relucent.config.DEFAULT_PARALLEL_ADD_BOUND" title="Link to this definition"></a></dt>
+<dd><p>Default halfspace bound for <a class="reference internal" href="complex.html#relucent.core.complex.Complex.parallel_add" title="relucent.core.complex.Complex.parallel_add"><code class="xref py py-meth docutils literal notranslate"><span class="pre">parallel_add()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.DEFAULT_SEARCH_BOUND">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_SEARCH_BOUND</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e8</span></span><a class="headerlink" href="#relucent.config.DEFAULT_SEARCH_BOUND" title="Link to this definition"></a></dt>
+<dd><p>Fallback halfspace bound for <a class="reference internal" href="complex.html#relucent.core.complex.Complex.hamming_astar" title="relucent.core.complex.Complex.hamming_astar"><code class="xref py py-meth docutils literal notranslate"><span class="pre">hamming_astar()</span></code></a> when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted. BFS / <a class="reference internal" href="complex.html#relucent.core.complex.Complex.searcher" title="relucent.core.complex.Complex.searcher"><code class="xref py py-meth docutils literal notranslate"><span class="pre">searcher()</span></code></a> instead use a network-scaled bound (layerwise <code class="docutils literal notranslate"><span class="pre">|W|_1</span></code> propagation × <code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BOUND_MARGIN</span></code>) when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.BOUNDARY_MIP_BOUND_MARGIN">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_BOUND_MARGIN</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5.0</span></span><a class="headerlink" href="#relucent.config.BOUNDARY_MIP_BOUND_MARGIN" title="Link to this definition"></a></dt>
+<dd><p>Multiplier on the layerwise preactivation bound, used as the default SHI LP box radius and as the boundary MIP big-M.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.BOUNDARY_MIP_EPS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_EPS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#relucent.config.BOUNDARY_MIP_EPS" title="Link to this definition"></a></dt>
+<dd><p>Strict margin for boundary MIP witness pricing (<code class="docutils literal notranslate"><span class="pre">z_j</span> <span class="pre">=</span> <span class="pre">0</span></code> at the boundary SHI; <code class="docutils literal notranslate"><span class="pre">|z_j|</span> <span class="pre">&gt;=</span> <span class="pre">eps</span></code> elsewhere). <code class="docutils literal notranslate"><span class="pre">None</span></code> computes <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">·</span> <span class="pre">max(1e-4,</span> <span class="pre">1e-6</span> <span class="pre">·</span> <span class="pre">max</span> <span class="pre">preactivation)</span></code> for each network, which stays above Gurobi’s feasibility tolerance at that network’s scale.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.BOUNDARY_MIP_TIME_LIMIT">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_TIME_LIMIT</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></span><a class="headerlink" href="#relucent.config.BOUNDARY_MIP_TIME_LIMIT" title="Link to this definition"></a></dt>
+<dd><p>Optional Gurobi time limit (seconds) per pricing MIP; <code class="docutils literal notranslate"><span class="pre">0</span></code> means no limit.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.BOUNDARY_MIP_GUROBI_LOG">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_GUROBI_LOG</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#relucent.config.BOUNDARY_MIP_GUROBI_LOG" title="Link to this definition"></a></dt>
+<dd><p>Emit full Gurobi solver logs during boundary pricing (independent of <code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code>).</p>
+</dd></dl>
+
+</section>
+<section id="plotting">
+<h3>Plotting<a class="headerlink" href="#plotting" title="Link to this heading"></a></h3>
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.DEFAULT_PLOT_BOUND">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_PLOT_BOUND</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></span><a class="headerlink" href="#relucent.config.DEFAULT_PLOT_BOUND" title="Link to this definition"></a></dt>
+<dd><p>Default half-width of the bounding box for polyhedron plotting and bounded vertices when not passed explicitly.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.DEFAULT_COMPLEX_PLOT_BOUND">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_COMPLEX_PLOT_BOUND</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10000</span></span><a class="headerlink" href="#relucent.config.DEFAULT_COMPLEX_PLOT_BOUND" title="Link to this definition"></a></dt>
+<dd><p>Default bound for <a class="reference internal" href="complex.html#relucent.core.complex.Complex.plot" title="relucent.core.complex.Complex.plot"><code class="xref py py-meth docutils literal notranslate"><span class="pre">plot()</span></code></a> of a 2D complex when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.PLOT_MARGIN_FACTOR">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">PLOT_MARGIN_FACTOR</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.1</span></span><a class="headerlink" href="#relucent.config.PLOT_MARGIN_FACTOR" title="Link to this definition"></a></dt>
+<dd><p>Axis margin multiplier when deriving plot extent from interior points.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.PLOT_DEFAULT_MAXCOORD">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">PLOT_DEFAULT_MAXCOORD</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></span><a class="headerlink" href="#relucent.config.PLOT_DEFAULT_MAXCOORD" title="Link to this definition"></a></dt>
+<dd><p>Fallback axis half-extent when no interior points exist (2D complex plots).</p>
+</dd></dl>
+
+</section>
+<section id="logging">
+<h3>Logging<a class="headerlink" href="#logging" title="Link to this heading"></a></h3>
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.VERBOSE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">VERBOSE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></span><a class="headerlink" href="#relucent.config.VERBOSE" title="Link to this definition"></a></dt>
+<dd><p>Default for every <code class="docutils literal notranslate"><span class="pre">verbose=None</span></code> argument: <code class="docutils literal notranslate"><span class="pre">0</span></code> → warnings only; <code class="docutils literal notranslate"><span class="pre">1</span></code> → progress bars and one-line summaries; <code class="docutils literal notranslate"><span class="pre">2</span></code> → per-stage debug detail. Each call sets the <code class="docutils literal notranslate"><span class="pre">&quot;relucent&quot;</span></code> logger to the matching level (<code class="docutils literal notranslate"><span class="pre">WARNING</span></code>, <code class="docutils literal notranslate"><span class="pre">INFO</span></code>, <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code>) while it runs; a relucent call made inside another inherits the outer call’s level. Progress bars appear only after a one-second delay, so quick calls print nothing.</p>
+</dd></dl>
+
 </section>
 </section>
-<section id="complex-search-and-parallel-add">
-<h2>Complex search and parallel add<a class="headerlink" href="#complex-search-and-parallel-add" title="Link to this heading"></a></h2>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">list[float]</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">[0.01,</span> <span class="pre">0.1,</span> <span class="pre">1,</span> <span class="pre">10,</span> <span class="pre">100]</span></code></p></td>
-<td><p>Radii tried in order when locating an interior point for a neighbor in <code class="xref py py-func docutils literal notranslate"><span class="pre">get_ip()</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">MIN_SEARCH_INRADIUS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TOL_SHI_OBJECTIVE</span> <span class="pre">/</span> <span class="pre">2</span></code></p></td>
-<td><p>During BFS/A* search, thin cells below this floor trigger an interior witness-point check; search continues if a witness is found and raises only if witness search fails.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_PARALLEL_ADD_BOUND</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
-<td><p>Default halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">parallel_add()</span></code> and <code class="xref py py-meth docutils literal notranslate"><span class="pre">parallel_add()</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_SEARCH_BOUND</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e8</span></code></p></td>
-<td><p>Fallback halfspace bound for <code class="xref py py-func docutils literal notranslate"><span class="pre">hamming_astar()</span></code> when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted. Ambient BFS / <code class="xref py py-func docutils literal notranslate"><span class="pre">searcher()</span></code> instead use a network-scaled bound from <code class="xref py py-func docutils literal notranslate"><span class="pre">default_polyhedron_bound()</span></code> (<code class="docutils literal notranslate"><span class="pre">estimate_input_bound</span></code> × <code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BOUND_MARGIN</span></code>) when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.9</span></code></p></td>
-<td><p>Weight on Euclidean-distance bias in the A* heuristic.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_MARGIN_FACTOR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1.1</span></code></p></td>
-<td><p>Axis margin multiplier when deriving plot extent from interior points.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">PLOT_DEFAULT_MAXCOORD</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
-<td><p>Fallback axis half-extent when no interior points exist (2D complex plots).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">DEFAULT_COMPLEX_PLOT_BOUND</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">10000</span></code></p></td>
-<td><p>Default bound for <code class="xref py py-meth docutils literal notranslate"><span class="pre">plot_cells()</span></code> when <code class="docutils literal notranslate"><span class="pre">bound</span></code> is omitted.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BOUND_MARGIN</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">5.0</span></code></p></td>
-<td><p>Multiplier applied to layerwise bound propagation when estimating network scale for SHI LPs, boundary MIPs, and automatic tolerance selection.</p></td>
-</tr>
-</tbody>
-</table>
-<section id="boundary-discovery-mip-pricing">
-<h3>Boundary discovery (MIP pricing)<a class="headerlink" href="#boundary-discovery-mip-pricing" title="Link to this heading"></a></h3>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EPS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1e-4</span></code></p></td>
-<td><p>Strict-margin tolerance for boundary MIP witness pricing (<code class="docutils literal notranslate"><span class="pre">z_j</span> <span class="pre">=</span> <span class="pre">0</span></code> at the boundary SHI; <code class="docutils literal notranslate"><span class="pre">|z_j|</span> <span class="pre">&gt;=</span> <span class="pre">eps</span></code> elsewhere).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_PRICING_BRUTE_FORCE_MAX_N</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">18</span></code></p></td>
-<td><p>When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_TIME_LIMIT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.0</span></code></p></td>
-<td><p>Optional Gurobi time limit (seconds) per pricing MIP; <code class="docutils literal notranslate"><span class="pre">0</span></code> means no limit.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_GUROBI_LOG</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Emit full Gurobi solver logs during boundary pricing (independent of <code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code>).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1000</span></code></p></td>
-<td><p>Compile <code class="docutils literal notranslate"><span class="pre">exclude_tags</span></code> into a compressed trie when at least this many tags are present (<code class="docutils literal notranslate"><span class="pre">0</span></code> = always).</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1000</span></code></p></td>
-<td><p>Bulk-add per-tag no-goods statically before optimize when at least this many tags are excluded.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">2.0</span></code></p></td>
-<td><p>Static-add all leaf nogoods when trie compression ratio falls below this threshold.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_BATCH_SIZE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">4096</span></code></p></td>
-<td><p>Chunk size for batched Gurobi <code class="docutils literal notranslate"><span class="pre">addConstrs</span></code> when emitting exclusion nogoods.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_WORKERS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
-<td><p>Workers for parallel nogood compilation; <code class="docutils literal notranslate"><span class="pre">0</span></code> = auto, <code class="docutils literal notranslate"><span class="pre">1</span></code> = serial.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_ORDER</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">&quot;tag_lex&quot;</span></code></p></td>
-<td><p>Cut ordering for static/lazy nogoods (<code class="docutils literal notranslate"><span class="pre">as_is</span></code>, <code class="docutils literal notranslate"><span class="pre">tag_lex</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_major</span></code>, …).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BULK_NOGOOD_EMIT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">str</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code></p></td>
-<td><p>Bulk matrix emit for static nogoods: <code class="docutils literal notranslate"><span class="pre">auto</span></code>, <code class="docutils literal notranslate"><span class="pre">on</span></code>, or <code class="docutils literal notranslate"><span class="pre">off</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_WAVE_SIZE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
-<td><p>Static nogood wave size; <code class="docutils literal notranslate"><span class="pre">0</span></code> = add all constraints before a single optimize.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_PRIORITY_ENABLED</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">bool</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
-<td><p>Assign higher Gurobi priority to trie-compressed / deeper-path cuts.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">50000</span></code></p></td>
-<td><p>Skip trie/static precompilation and rely on lazy MIPSOL cuts when this many tags are excluded.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="topology-and-logging">
-<h3>Topology and logging<a class="headerlink" href="#topology-and-logging" title="Link to this heading"></a></h3>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TOPOLOGY_INTRINSIC_VERTEX_MATCH_TOL_FACTOR</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">2.0</span></code></p></td>
-<td><p>When merging geometric vertices with combinatorial intrinsic vertices, accept a match if <span class="math notranslate nohighlight">\(\|x - x_\mathrm{intrinsic}\|_\infty \le\)</span> this factor times the containment tolerance.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VERBOSE</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">int</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">1</span></code></p></td>
-<td><p>Package logging level during search and parallel work: <code class="docutils literal notranslate"><span class="pre">0</span></code> → WARNING only; <code class="docutils literal notranslate"><span class="pre">1</span></code> → INFO (worker counts, meta-graph progress, …). Also adjustable at runtime via <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a>.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="utilities-and-visualization">
-<h3>Utilities and visualization<a class="headerlink" href="#utilities-and-visualization" title="Link to this heading"></a></h3>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 19.6%" />
-<col style="width: 25.0%" />
-<col style="width: 10.7%" />
-<col style="width: 44.6%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Name</p></th>
-<th class="head"><p>Type</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Role</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.5</span></code></p></td>
-<td><p>Seconds to wait on <code class="docutils literal notranslate"><span class="pre">Condition.wait</span></code> when polling a <code class="xref py py-class docutils literal notranslate"><span class="pre">BlockingQueue</span></code>.</p></td>
-</tr>
-</tbody>
-</table>
-</section>
+<section id="module-relucent.config.advanced">
+<span id="advanced-settings-unstable"></span><h2>Advanced settings (unstable)<a class="headerlink" href="#module-relucent.config.advanced" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="#module-relucent.config.advanced" title="relucent.config.advanced"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config.advanced</span></code></a> holds solver-tuning knobs. They change performance or
+solver details rather than what relucent computes, and <strong>may change or disappear in any
+release</strong>. Set them the same ways as the settings above, e.g.
+<code class="docutils literal notranslate"><span class="pre">relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS</span> <span class="pre">=</span> <span class="pre">4</span></code>.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.GUROBI_SHI_OPTIMALITY_TOL">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">GUROBI_SHI_OPTIMALITY_TOL</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1e-9</span></span><a class="headerlink" href="#relucent.config.advanced.GUROBI_SHI_OPTIMALITY_TOL" title="Link to this definition"></a></dt>
+<dd><p>Gurobi <code class="docutils literal notranslate"><span class="pre">OptimalityTol</span></code> for the SHI LP (Gurobi’s minimum is <code class="docutils literal notranslate"><span class="pre">1e-9</span></code>). At the Gurobi default of <code class="docutils literal notranslate"><span class="pre">1e-6</span></code> the final basis can have a slightly negative exact multiplier, which the exact facet check rejects.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.GUROBI_SHI_SCALE_FLAG">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">GUROBI_SHI_SCALE_FLAG</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></span><a class="headerlink" href="#relucent.config.advanced.GUROBI_SHI_SCALE_FLAG" title="Link to this definition"></a></dt>
+<dd><p>Gurobi <code class="docutils literal notranslate"><span class="pre">ScaleFlag</span></code> for the SHI LP (<code class="docutils literal notranslate"><span class="pre">-1</span></code> auto, <code class="docutils literal notranslate"><span class="pre">0</span></code> off, <code class="docutils literal notranslate"><span class="pre">1</span></code>-<code class="docutils literal notranslate"><span class="pre">3</span></code> scaling methods). Rows can span orders of magnitude and be nearly parallel; geometric-mean scaling (<code class="docutils literal notranslate"><span class="pre">2</span></code>) avoids spurious infeasibility from automatic scaling. If an SHI LP still fails, it is re-solved from scratch with no scaling (<code class="docutils literal notranslate"><span class="pre">0</span></code>), and if that fails too, decided in exact arithmetic; see <a class="reference internal" href="search_shi_and_graphs.html"><span class="doc">Search, SHI Assignment, Verification, and Graph Structures</span></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.INTERIOR_POINT_RADIUS_SEQUENCE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[0.01,</span> <span class="pre">0.1,</span> <span class="pre">1,</span> <span class="pre">10,</span> <span class="pre">100]</span></span><a class="headerlink" href="#relucent.config.advanced.INTERIOR_POINT_RADIUS_SEQUENCE" title="Link to this definition"></a></dt>
+<dd><p>Radii tried in order when locating an interior point for a neighbor during search.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.ASTAR_BIAS_WEIGHT">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">ASTAR_BIAS_WEIGHT</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.9</span></span><a class="headerlink" href="#relucent.config.advanced.ASTAR_BIAS_WEIGHT" title="Link to this definition"></a></dt>
+<dd><p>Weight on Euclidean-distance bias in the A* heuristic.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.5</span></span><a class="headerlink" href="#relucent.config.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT" title="Link to this definition"></a></dt>
+<dd><p>Seconds to wait on <code class="docutils literal notranslate"><span class="pre">Condition.wait</span></code> when polling the work queue shared by search workers.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_PRICING_BRUTE_FORCE_MAX_N</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">18</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N" title="Link to this definition"></a></dt>
+<dd><p>When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1000</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS" title="Link to this definition"></a></dt>
+<dd><p>Compile <code class="docutils literal notranslate"><span class="pre">exclude_tags</span></code> into a compressed trie when at least this many tags are present (<code class="docutils literal notranslate"><span class="pre">0</span></code> = always).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1000</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS" title="Link to this definition"></a></dt>
+<dd><p>Bulk-add per-tag no-goods statically before optimize when at least this many tags are excluded.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO" title="Link to this definition"></a></dt>
+<dd><p>Static-add all leaf nogoods when trie compression ratio falls below this threshold.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_EXCLUSION_BATCH_SIZE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4096</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE" title="Link to this definition"></a></dt>
+<dd><p>Chunk size for batched Gurobi <code class="docutils literal notranslate"><span class="pre">addConstrs</span></code> when emitting exclusion nogoods.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_EXCLUSION_WORKERS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS" title="Link to this definition"></a></dt>
+<dd><p>Workers for parallel nogood compilation; <code class="docutils literal notranslate"><span class="pre">0</span></code> = auto, <code class="docutils literal notranslate"><span class="pre">1</span></code> = serial.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_CUT_ORDER">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_CUT_ORDER</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&quot;tag_lex&quot;</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_CUT_ORDER" title="Link to this definition"></a></dt>
+<dd><p>Cut ordering for static/lazy nogoods: <code class="docutils literal notranslate"><span class="pre">as_is</span></code>, <code class="docutils literal notranslate"><span class="pre">tag_lex</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_major</span></code>, <code class="docutils literal notranslate"><span class="pre">hamming_median</span></code>, <code class="docutils literal notranslate"><span class="pre">literal_count_asc</span></code>, <code class="docutils literal notranslate"><span class="pre">trie_depth_desc</span></code>, or <code class="docutils literal notranslate"><span class="pre">random</span></code>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_BULK_NOGOOD_EMIT</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&quot;auto&quot;</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT" title="Link to this definition"></a></dt>
+<dd><p>Bulk matrix emit for static nogoods: <code class="docutils literal notranslate"><span class="pre">auto</span></code>, <code class="docutils literal notranslate"><span class="pre">on</span></code>, or <code class="docutils literal notranslate"><span class="pre">off</span></code>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_STATIC_WAVE_SIZE</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE" title="Link to this definition"></a></dt>
+<dd><p>Static nogood wave size; <code class="docutils literal notranslate"><span class="pre">0</span></code> = add all constraints before a single optimize.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_CUT_PRIORITY_ENABLED</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED" title="Link to this definition"></a></dt>
+<dd><p>Assign higher Gurobi priority to trie-compressed / deeper-path cuts.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="relucent.config.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS">
+<span class="sig-prename descclassname"><span class="pre">relucent.config.advanced.</span></span><span class="sig-name descname"><span class="pre">BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">50000</span></span><a class="headerlink" href="#relucent.config.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS" title="Link to this definition"></a></dt>
+<dd><p>Skip trie/static precompilation and rely on lazy MIPSOL cuts when this many tags are excluded.</p>
+</dd></dl>
+
 </section>
 <section id="api">
 <h2>API<a class="headerlink" href="#api" title="Link to this heading"></a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="relucent.config.update_settings">
-<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">update_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#relucent.config.update_settings" title="Link to this definition"></a></dt>
-<dd><p>Set one or more <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code> attributes.</p>
-<p>Keys must be names listed in <code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code> (excluding
-<code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself). Values replace the current module-level
-constants.</p>
-<p>Changing <code class="xref py py-data docutils literal notranslate"><span class="pre">VERBOSE</span></code> also immediately updates the level of the
-<code class="docutils literal notranslate"><span class="pre">&quot;relucent&quot;</span></code> package logger (see <code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent._internal.logging</span></code>).</p>
+<span class="sig-prename descclassname"><span class="pre">relucent.config.</span></span><span class="sig-name descname"><span class="pre">update_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#relucent.config.update_settings" title="Link to this definition"></a></dt>
+<dd><p>Set one or more settings from <a class="reference internal" href="#module-relucent.config" title="relucent.config"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config</span></code></a> or <a class="reference internal" href="#module-relucent.config.advanced" title="relucent.config.advanced"><code class="xref py py-mod docutils literal notranslate"><span class="pre">relucent.config.advanced</span></code></a>.</p>
+<p>Changing <a class="reference internal" href="#relucent.config.VERBOSE" title="relucent.config.VERBOSE"><code class="xref py py-data docutils literal notranslate"><span class="pre">VERBOSE</span></code></a> also updates the <code class="docutils literal notranslate"><span class="pre">&quot;relucent&quot;</span></code> logger level.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>**kwargs</strong> – <code class="docutils literal notranslate"><span class="pre">NAME=value</span></code> pairs matching public config attributes.</p>
+<dd class="field-odd"><p><strong>**kwargs</strong> – <code class="docutils literal notranslate"><span class="pre">NAME=value</span></code> pairs.</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>TypeError</strong> – If any key is not a known setting name.</p>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#TypeError" title="(in Python v3.14)"><strong>TypeError</strong></a> – If any key is not a known setting name.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If a string setting gets a value outside its allowed set.</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
 
-<p>Valid keys for <a class="reference internal" href="#relucent.config.update_settings" title="relucent.config.update_settings"><code class="xref py py-func docutils literal notranslate"><span class="pre">update_settings()</span></code></a> are the names listed in
-<code class="docutils literal notranslate"><span class="pre">relucent.config.__all__</span></code>, except <code class="docutils literal notranslate"><span class="pre">update_settings</span></code> itself.</p>
 </section>
 </section>
 
@@ -844,8 +912,8 @@ constants.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="topology.html" class="btn btn-neutral float-left" title="Topology and Persistent Homology" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="complex.html" class="btn btn-neutral float-right" title="Complex" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="betti_computation.html" class="btn btn-neutral float-left" title="How Betti numbers are computed" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="migrating.html" class="btn btn-neutral float-right" title="Stability and migrating to 1.0" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

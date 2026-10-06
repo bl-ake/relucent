@@ -27,7 +27,7 @@ accept ``verify=True`` by default. After a **complete** search, relucent:
 
 1. Rebuilds combinatorial dual-graph edges and syncs top-cell ``_shis`` from them
    (:func:`~relucent.search.exploration.finalize_ambient_search` via
-   :meth:`~relucent.core.complex.Complex.get_dual_graph`).
+   :meth:`~relucent.core.complex.Complex.dual_graph`).
 2. Runs certification (:func:`~relucent.verify.certify.certify_complex` at
    :class:`~relucent.verify.certify.CertifyLevel.COMPLETE`).
 
@@ -37,7 +37,7 @@ completeness check would false-fail.
 
 A finite ``max_depth`` cap can leave ``complete=False`` even when the queue is
 empty (neighbors beyond the depth limit were not queued). With ``verify=True``,
-that raises :class:`~relucent.core.complex.IncompleteDualGraphError` unless
+that raises :class:`~relucent.core.errors.IncompleteDualGraphError` unless
 ``max_polys`` was hit.
 
 For intentional partial exploration, pass ``verify=False`` or accept
@@ -79,16 +79,20 @@ Topology prerequisites
 ----------------------
 
 :meth:`~relucent.core.complex.Complex.contract` and
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` call
+:meth:`~relucent.core.complex.Complex.boundary_complex` call
 :meth:`~relucent.core.complex.Complex.assert_topology_ready`, which requires
 ``complete=True`` and ``verified=True``. Run BFS or
 :func:`~relucent.search.exploration.explore_for_topology` first. For trusted loads
 (deserialized complexes), call
 :meth:`~relucent.core.complex.Complex.set_exploration_state` explicitly.
 
-:meth:`~relucent.core.complex.Complex.get_betti_numbers` does **not** require
-``assert_topology_ready`` — it can run on partial complexes, but results may be
-wrong if neighbors are missing.
+:meth:`~relucent.core.complex.Complex.chain_complex`,
+:meth:`~relucent.core.complex.Complex.meta_graph`,
+:meth:`~relucent.core.complex.Complex.betti_numbers`, and
+:meth:`~relucent.core.complex.Complex.persistent_homology` also go through
+``assert_topology_ready``. On an incomplete or unverified complex they raise
+:class:`~relucent.core.errors.ComplexNotCompleteError` or
+:class:`~relucent.core.errors.ComplexNotVerifiedError`.
 
 Boundary discovery
 ------------------
@@ -97,12 +101,14 @@ Two paths build a decision-boundary complex:
 
 * **Full ambient complex first** — explore the input space (BFS or
   :func:`~relucent.search.exploration.explore_for_topology`), then
-  :meth:`~relucent.core.complex.Complex.get_boundary_complex(i)` extracts faces on
+  :meth:`boundary_complex(i) <relucent.core.complex.Complex.boundary_complex>` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
-* **Direct boundary discovery** — :meth:`~relucent.core.complex.Complex.discover_boundary_complex(i)`
+* **Direct boundary discovery** — :meth:`discover_boundary_complex(i) <relucent.core.complex.Complex.discover_boundary_complex>`
   uses MIP pricing plus slice-restricted BFS per connected component, then
   :func:`~relucent.search.exploration.finalize_boundary_complex` for slice SHI assignment,
   dual graph, and verification. Does not require a full ambient BFS first.
+  **Experimental**: verification covers only the components pricing finds, and pricing
+  can miss some (see :doc:`boundary_search`).
 
 Dual-graph SHI model
 --------------------
@@ -119,6 +125,5 @@ Lower-dimensional 1-skeleton dual graphs walk each cell's finalized ``poly.shis`
 You can re-run certification manually with :meth:`~relucent.core.complex.Complex.certify`.
 
 See also :doc:`topology` for Betti-number prerequisites. For the full search →
-SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`. The markdown
-file ``docs/betti_computation.md`` walks through the homology pipeline in more
-detail.
+SHI → dual/meta-graph pipeline, see :doc:`search_shi_and_graphs`.
+:doc:`betti_computation` walks through the homology pipeline in more detail.

@@ -3,6 +3,8 @@
 Persistence API
 ===============
 
+.. py:module:: relucent.topology.persistence
+
 .. autoclass:: relucent.topology.persistence.PersistencePair
    :no-members:
    :show-inheritance:

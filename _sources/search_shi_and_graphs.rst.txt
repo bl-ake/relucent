@@ -27,20 +27,21 @@ Neighbors across a codimension-one face differ by flipping one nonzero ``ss``
 entry to ``0`` (crossing that hyperplane). The SHI labels which hyperplane was
 crossed.
 
-+----------------------------+--------------------------------------------------+
-| Concept                    | Role                                             |
-+============================+==================================================+
-| ``ss``                     | Stable cell identity (injective for nonempty     |
-|                            | regions)                                         |
-+----------------------------+--------------------------------------------------+
-| ``Polyhedron._shis``       | Which halfspace rows are true boundary facets    |
-+----------------------------+--------------------------------------------------+
-| Dual-graph edge ``shi``    | Hyperplane shared by two adjacent top cells      |
-+----------------------------+--------------------------------------------------+
+.. list-table::
+   :header-rows: 1
 
-SHIs are computed by Gurobi LPs in :func:`~relucent.geometry.calculations.get_shis` and
+   * - Concept
+     - Role
+   * - ``ss``
+     - Stable cell identity (injective for nonempty regions)
+   * - ``Polyhedron._shis``
+     - Which halfspace rows are true boundary facets
+   * - Dual-graph edge ``shi``
+     - Hyperplane shared by two adjacent top cells
+
+SHIs are computed by Gurobi LPs in :func:`~relucent.geometry.calculations.shis` and
 cached on ``Polyhedron._shis``. The public :attr:`~relucent.core.poly.Polyhedron.shis`
-property lazily calls ``get_shis()`` when the cache is empty.
+property lazily calls ``calculations.shis()`` when the cache is empty.
 
 How search works
 ----------------
@@ -48,19 +49,26 @@ How search works
 Entry points
 ~~~~~~~~~~~~
 
-+----------------------------+-------------+-----------------------------------+
-| Method                     | Queue       | Use                               |
-+============================+=============+===================================+
-| :meth:`~relucent.core.complex.Complex.bfs` | FIFO        | Default local exploration          |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.dfs` | LIFO        | Depth-first variant                |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.random_walk` | Random pop  | Stochastic exploration             |
-+----------------------------+-------------+-----------------------------------+
-| :meth:`~relucent.core.complex.Complex.searcher` | Configurable | Generic traversal                 |
-+----------------------------+-------------+-----------------------------------+
+.. list-table::
+   :header-rows: 1
 
-All delegate to :func:`~relucent.search.searcher`, which runs a parallel frontier
+   * - Method
+     - Queue
+     - Use
+   * - :meth:`~relucent.core.complex.Complex.bfs`
+     - FIFO
+     - Default local exploration
+   * - :meth:`~relucent.core.complex.Complex.dfs`
+     - LIFO
+     - Depth-first variant
+   * - :meth:`~relucent.core.complex.Complex.random_walk`
+     - Random pop
+     - Stochastic exploration
+   * - :meth:`~relucent.core.complex.Complex.searcher`
+     - Configurable
+     - Generic traversal
+
+All delegate to ``searcher()``, which runs a parallel frontier
 expansion over flip-neighbors.
 
 Boundary complexes use a separate path:
@@ -72,7 +80,7 @@ Search loop
 
 ::
 
-   add_point(start) → get_shis(start) → seed frontier
+   add_point(start) → calculations.shis(start) → seed frontier
         ↓
    worker pool: search_calculations per (ss, crossed_shi, depth, parent)
         ↓
@@ -86,11 +94,12 @@ Search loop
    task per SHI: ``(neighbor_ss, crossed_shi, depth, parent_index)``.
 2. **Workers** — Each task builds a :class:`~relucent.core.poly.Polyhedron`, runs
    Chebyshev geometry (``finite``, ``center``, ``inradius``), then
-   ``get_shis()``. See :func:`~relucent.search.search_calculations` and
-   ``_worker_prepare_poly`` in :mod:`relucent.search`.
+   ``calculations.shis()``. See ``search_calculations()`` and
+   ``_worker_prepare_poly`` in ``relucent.search``.
 3. **Main process** — On success, add the polyhedron and enqueue new neighbors
    for every SHI except the one just crossed. Failed flips are recorded so the
-   same ``(poly, shi)`` pair is not retried.
+   same ``(poly, shi)`` pair is not retried. Since queued neighbors lie across
+   certified facets, an empty neighbor is never excused: it blocks completeness.
 4. **Termination** — Search is **complete** when the frontier is empty, no
    ``max_polys`` cap was hit, and no ``max_depth`` neighbor was left unqueued.
 5. **Finalize** — :func:`~relucent.search.exploration.finalize_ambient_search`
@@ -98,8 +107,8 @@ Search loop
    runs verification.
 
 Workers always compute ``finite``, ``center``, and ``inradius`` even in
-topology-only mode (``geometry_properties=None``). SHI reliability checks and
-thin-cell guards depend on Chebyshev data. Optional geometry (halfspaces,
+topology-only mode (``geometry_properties=None``). The facet checks depend on a
+Chebyshev center verified strictly inside every row. Optional geometry (halfspaces,
 vertices, volume, …) is controlled by ``geometry_properties``; see
 :doc:`search_geometry`.
 
@@ -107,15 +116,15 @@ Multiprocessing
 ~~~~~~~~~~~~~~~
 
 Search uses a process pool with initializer
-:func:`~relucent.search.worker_context.set_worker_context`. Workers read
+``set_worker_context()``. Workers read
 ``(net, env, dim)`` from module-level state — do not call ``set_worker_context``
 from the main process.
 
-When ``verify=True`` (the default for ``bfs``), frontier search keeps SHI LPs
-non-strict (heuristic neighbor discovery). After a complete search,
-:func:`~relucent.search.exploration.finalize_ambient_search` syncs top-cell SHIs from the
-dual graph and runs :func:`~relucent.verify.certify.certify_complex`, which applies strict
-facet checks.
+Every SHI list frontier search computes is certified: each facet decision is proven in
+float64 or exact arithmetic, or raises. After a complete search (``verify=True``, the
+default for ``bfs``), :func:`~relucent.search.exploration.finalize_ambient_search` syncs
+top-cell SHIs from the dual graph and runs :func:`~relucent.verify.certify.certify_complex`,
+which reuses those lists rather than recomputing them.
 
 SHI assignment: three roles
 ---------------------------
@@ -128,19 +137,19 @@ Role 1 — Boundary faces and lower-dimensional slices
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When creating faces for a boundary complex via
-:meth:`~relucent.core.complex.Complex.get_boundary_cells`, each codimension-one face
+:meth:`~relucent.core.complex.Complex.boundary_cells`, each codimension-one face
 seeds SHI candidates from its sign sequence::
 
    SHI_candidates(face) = { i : ss_i ≠ 0 on the face sign sequence }
 
 The crossing hyperplane is already zeroed, so it is not included.
-:meth:`~relucent.core.complex.Complex._codim_one_face_kwargs` applies this at face
+``relucent.graph.boundary._codim_one_face_kwargs()`` applies this at face
 creation (via :func:`~relucent.graph.incidence.ss_nonzero_indices`). Infeasible
 1-cells are dropped with
 :meth:`~relucent.core.poly.Polyhedron.is_shi_face_feasible`.
 
 The ambient **chain complex**
-(:meth:`~relucent.core.complex.Complex.get_chain_complex`) recovers faces differently —
+(:meth:`~relucent.core.complex.Complex.chain_complex`) recovers faces differently —
 by seeding and verifying vertices, then expanding each verified vertex's local
 cubical star (:mod:`relucent.graph.vertex_star`) — but still finalizes slice
 ``_shis`` the same way: after the full slice is known,
@@ -165,12 +174,12 @@ strict subset of SS crossings, so using only ``_shis`` here would omit valid
 faces.
 
 Role 3 — Meta-graph node metadata
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.graph.incidence.meta_node_attrs` derives ``shis`` (flip-neighbor
 crossings) and ``crossings`` (``ss_nonzero_indices``) from each cell's sign
 sequence and same-dimension slice. For **1-cells**,
-:meth:`~relucent.core.complex.Complex.get_meta_graph` replaces node ``shis`` with
+:meth:`~relucent.core.complex.Complex.meta_graph` replaces node ``shis`` with
 the SHI labels of verified 0-face incidences from role-2 face edges (same rule as
 :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence`).
 1-cell boundedness uses 0-face incidence in meta face edges
@@ -183,27 +192,77 @@ SHI assignment over the pipeline
 During search (frontier heuristic)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For each discovered cell, workers call ``get_shis()`` and store the result in
+For each discovered cell, workers call ``calculations.shis()`` and store the result in
 ``poly._shis``. This list drives which neighbors to enqueue.
 
-The LP algorithm (:func:`~relucent.geometry.calculations.get_shis`):
+The LP algorithm (:func:`~relucent.geometry.calculations.shis`):
 
 1. Build halfspaces from the sign sequence; drop degenerate rows.
 2. Work in intrinsic coordinates (null-space of zero-sign equalities).
 3. For each candidate index ``i``: relax halfspace ``i``, maximize along its normal.
-4. If the objective exceeds ``TOL_SHI_OBJECTIVE``, ``i`` is a facet SHI.
-5. With ``strict=True`` (opt-in via ``get_shis`` kwargs), invalid proofs raise
-   :class:`~relucent.core.errors.ShiProofError`; during default ambient search they
-   emit warnings instead.
+4. Certify the answer: ``i`` is a facet when a witness point puts row ``i`` strictly
+   positive and every other row strictly negative beyond their float64 error, and not a
+   facet when a verified dual certificate bounds row ``i`` below zero on the whole cell.
+   When float64 cannot decide, the question is answered in exact arithmetic, or
+   :class:`~relucent.core.errors.AmbiguousGeometryError` is raised. The exact step first
+   checks the LP's own dual: one small rational solve on the tight rows
+   (``relucent._internal.exact.exact_dual_bound()``). This settles the usual case in deep
+   networks, a row that is exactly a nonnegative combination of tight rows with a zero
+   multiplier, which float64 cannot prove. Only if that is inconclusive does an exact
+   simplex (``relucent._internal.exact.exact_facet_by_simplex()``) decide.
 
-This is a **heuristic for exploration**: it must be good enough to find neighbors,
-but it is not the final authority on top-cell SHIs after a complete search.
+LP solver failures
+~~~~~~~~~~~~~~~~~~
+
+Each SHI LP relaxes one row of a cell already solved as feasible, and its objective is
+capped, so it is feasible and bounded. Any status other than optimal is a solver failure,
+not a fact about the cell. On badly conditioned cells, where rows span orders of magnitude
+or are nearly parallel, Gurobi does report ``NUMERIC``, ``UNBOUNDED``, ``INFEASIBLE`` or
+``INF_OR_UNBD`` for such LPs.
+
+When that happens, ``calculations.shis`` re-solves the LP once from scratch with no scaling
+(``ScaleFlag=0``), discarding the warm-start basis. The configured
+:data:`~relucent.config.advanced.GUROBI_SHI_SCALE_FLAG` is restored afterwards. The setting only
+changes which answer the LP proposes: every answer is still certified.
+
+**Deciding without the LP.** If the re-solve fails too, the question the LP was asking, whether
+row ``i`` is a facet of the cell, is settled in exact rational arithmetic instead, by
+``relucent._internal.exact.exact_facet_by_simplex()``. It starts from the cell's verified
+interior point, and it is the same routine ``calculations.shis`` uses when float64 cannot certify an
+LP answer. If it cannot decide either,
+:class:`~relucent.core.errors.AmbiguousGeometryError` is raised, naming the halfspace and
+every LP status seen. That happens when:
+
+* the network is too large for exact rows (see ``exact_rows_affordable``);
+* the search uses a fixed box (``escalate_bound=False``), because the exact question is over
+  the unbounded cell;
+* the row has a near-duplicate partner, whose coincidence check needs the LP; or
+* the exact simplex hits its iteration limit.
+
+The re-solve comes first because it is much cheaper: a few milliseconds per row. The exact
+decision took 3–50 ms per row on the cells below (input dimension 3–4,
+width 8–16). It grows steeply with input dimension and depth: about 1 s per row for input
+dimension 8 and width 64 at depth 6, and about 15 s for input dimension 16 and width 128 at
+depth 4.
+
+**How often this happens.** Failures are rare and cluster in a few cells.
+
+* In a census of 100,812 cells, sampled uniformly from 60 trained networks (input dimension
+  2–4, width 8–16, up to 6 hidden layers), 1 of 4.8 million SHI LPs failed under the default
+  scaling, and a re-solve with no scaling recovers it.
+* Most networks have no failures at all, so a whole complex rarely needs a fallback. Among
+  232 hard training checkpoints, 8 complete searches hit a failure that automatic scaling
+  alone could not recover. Retrying with no scaling recovers five of those cells. In the
+  other three, some row fails under every scaling and is decided exactly. In each such case
+  the row was not a facet.
+* All eight are kept as fixtures in ``tests/integration/test_shi_lp_recovery.py``, with SHIs
+  that agree with an independent HiGHS LP.
 
 After complete ambient search (authoritative top cells)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :func:`~relucent.search.exploration.finalize_ambient_search` calls
-:meth:`~relucent.core.complex.Complex.get_dual_graph`, which:
+:meth:`~relucent.core.complex.Complex.dual_graph`, which:
 
 1. Builds combinatorial edges with
    :func:`~relucent.graph.incidence.dual_edges_top_dim` (flip neighbors for all
@@ -220,8 +279,8 @@ recovery and topology.
 On lower-dimensional slices (boundary, chain complex)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-After :meth:`~relucent.core.complex.Complex.get_chain_complex` or
-:meth:`~relucent.core.complex.Complex.get_boundary_cells` materializes faces, SHIs are
+After :meth:`~relucent.core.complex.Complex.chain_complex` or
+:meth:`~relucent.core.complex.Complex.boundary_cells` materializes faces, SHIs are
 finalized by :func:`~relucent.graph.incidence.set_contracted_shis` to
 :func:`~relucent.graph.incidence.cubical_cell_shis`. Lower-dimensional 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
@@ -248,28 +307,26 @@ after a **complete** search via ``finalize_ambient_search`` at
 * ``COMPLETE`` — additionally requires every LP facet on a top cell to flip to a
   same-dimension neighbor in the complex
   (:func:`~relucent.verify.certify.verify_lp_flip_neighbors_in_complex`).
-* ``GEOMETRIC`` — additionally recompute SHIs with ``strict=True`` on every cached
-  cell and require an exact match
-  (:func:`~relucent.verify.certify.verify_shi_geometry`).
+* ``GEOMETRIC`` — additionally recompute SHIs on every cached cell whose list was not
+  computed by ``calculations.shis`` on that cell, and require an exact match
+  (``verify_shi_geometry()``).
 
 When certification runs
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-+-------------------------------+------------------------------------------------+
-| Situation                     | Behavior                                       |
-+===============================+================================================+
-| Complete search,              | Dual-graph sync +                              |
-| ``verify=True``               | ``certify_complex(level=COMPLETE)``            |
-+-------------------------------+------------------------------------------------+
-| ``max_polys`` cap hit         | Certification skipped                          |
-|                               | (``complete=False``, ``verified=False``)       |
-+-------------------------------+------------------------------------------------+
-| ``max_depth`` cap with        | ``complete=False``; with ``verify=True``       |
-| unqueued neighbors            | raises :class:`~relucent.core.complex.IncompleteDualGraphError` |
-+-------------------------------+------------------------------------------------+
-| Intentional partial           | Pass ``verify=False``                          |
-| exploration                   |                                                |
-+-------------------------------+------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Situation
+     - Behavior
+   * - Complete search, ``verify=True``
+     - Dual-graph sync + ``certify_complex(level=COMPLETE)``
+   * - ``max_polys`` cap hit
+     - Certification skipped (``complete=False``, ``verified=False``)
+   * - ``max_depth`` cap with unqueued neighbors
+     - ``complete=False``; with ``verify=True`` raises :class:`~relucent.core.errors.IncompleteDualGraphError`
+   * - Intentional partial exploration
+     - Pass ``verify=False``
 
 Boundary-specific checks
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -299,21 +356,23 @@ Dual graph
 
 **Purpose:** adjacency among **top-dimensional** cells only.
 
-**Entry point:** :meth:`~relucent.core.complex.Complex.get_dual_graph`
+**Entry point:** :meth:`~relucent.core.complex.Complex.dual_graph`
 
-+------------------+----------------------------------------------------------+
-| Aspect           | Detail                                                   |
-+==================+==========================================================+
-| Type             | ``networkx.Graph``                                       |
-+------------------+----------------------------------------------------------+
-| Nodes            | Top-dimensional ``Polyhedron`` objects (or relabeled ints)|
-+------------------+----------------------------------------------------------+
-| Edges            | Adjacent cells sharing a codimension-one face            |
-+------------------+----------------------------------------------------------+
-| Edge attribute   | ``shi`` — hyperplane crossed between endpoints           |
-+------------------+----------------------------------------------------------+
-| Cache            | Stored on ``Complex._dual_graph``; property ``G``        |
-+------------------+----------------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Aspect
+     - Detail
+   * - Type
+     - ``networkx.Graph``
+   * - Nodes
+     - Top-dimensional ``Polyhedron`` objects (or relabeled ints)
+   * - Edges
+     - Adjacent cells sharing a codimension-one face
+   * - Edge attribute
+     - ``shi`` — hyperplane crossed between endpoints
+   * - Cache
+     - Stored on ``Complex._dual_graph``; property ``G``
 
 Edge construction rules
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,12 +398,12 @@ Uses
 ~~~~
 
 * Finalize after ambient BFS (``finalize_ambient_search``)
-* :meth:`~relucent.core.complex.Complex.get_chain_complex` /
+* :meth:`~relucent.core.complex.Complex.chain_complex` /
   :meth:`~relucent.core.complex.Complex.contract` and
-  :meth:`~relucent.core.complex.Complex.get_boundary_complex`
+  :meth:`~relucent.core.complex.Complex.boundary_complex`
 * :meth:`~relucent.core.complex.Complex.recover_from_dual_graph` — reconstruct from
   stored graph + SHI edge labels
-* Visualization (``plot=True`` prepares a PyVis layout)
+* Visualization (:func:`relucent.vis.pyvis_dual_graph` returns a copy styled for PyVis)
 
 Meta-graph
 ----------
@@ -352,26 +411,28 @@ Meta-graph
 **Purpose:** the full **face poset** across all dimensions — the combinatorial
 input to Betti numbers and persistent homology.
 
-**Entry point:** :meth:`~relucent.core.complex.Complex.get_meta_graph`
+**Entry point:** :meth:`~relucent.core.complex.Complex.meta_graph`
 
-+------------------+----------------------------------------------------------+
-| Aspect           | Detail                                                   |
-+==================+==========================================================+
-| Type             | ``networkx.MultiDiGraph``                                |
-+------------------+----------------------------------------------------------+
-| Nodes            | All cells ``k = 0 … d`` from the chain complex           |
-+------------------+----------------------------------------------------------+
-| Node attrs       | ``poly``, ``dim``, ``ss``, ``finite``, ``crossings``, ``shis`` |
-+------------------+----------------------------------------------------------+
-| Edges            | Directed ``k-cell → (k−1)-face``                         |
-+------------------+----------------------------------------------------------+
-| Edge attr        | ``shi`` — hyperplane zeroed to reach the face            |
-+------------------+----------------------------------------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - Aspect
+     - Detail
+   * - Type
+     - ``networkx.MultiDiGraph``
+   * - Nodes
+     - All cells ``k = 0 … d`` from the chain complex
+   * - Node attrs
+     - ``poly``, ``dim``, ``ss``, ``finite``, ``crossings``, ``shis``
+   * - Edges
+     - Directed ``k-cell → (k−1)-face``
+   * - Edge attr
+     - ``shi`` — hyperplane zeroed to reach the face
 
 Construction pipeline
 ~~~~~~~~~~~~~~~~~~~~~
 
-1. :meth:`~relucent.core.complex.Complex.get_chain_complex` — recover faces by
+1. :meth:`~relucent.core.complex.Complex.chain_complex` — recover faces by
    seeding and verifying vertices, then expanding each verified vertex's local
    cubical star, via :mod:`relucent.graph.vertex_star` (Masden 2022, Theorem 20).
    Every materialized cell has a verified vertex among its own faces by
@@ -385,12 +446,12 @@ Construction pipeline
 4. **Node assembly** — :func:`~relucent.graph.incidence.meta_node_attrs` derives
    ``crossings`` and flip-neighbor ``shis`` per dimension slice.
 5. **Optional truncation** — applied later by
-   :meth:`~relucent.core.complex.Complex.get_betti_numbers` via
+   :meth:`~relucent.core.complex.Complex.betti_numbers` via
    :func:`~relucent.graph.meta_graph.truncate_meta_graph` or
    :func:`~relucent.graph.meta_graph.one_point_compactify_meta_graph` (not by
-   ``get_meta_graph`` itself).
+   ``meta_graph`` itself).
 
-Pass ``verify=True`` to ``get_meta_graph`` only for debugging:
+Pass ``verify=True`` to ``meta_graph`` only for debugging:
 :func:`~relucent.graph.meta_graph.verify_meta_graph_incidence` checks edges, SHIs, and
 finite labels match the incidence engine.
 
@@ -401,32 +462,36 @@ Dual graph vs meta-graph
 
    BFS / finalize  →  dual graph (top-cell adjacency, edge shi)
                          ↓
-                    get_chain_complex()  (covector face recovery)
+                    chain_complex()  (covector face recovery)
                          ↓
                     meta-graph (all dims, face incidences)
                          ↓
-                    get_betti_numbers()
+                    betti_numbers()
 
-+----------------------+---------------------------+---------------------------+
-|                      | Dual graph                | Meta-graph                |
-+======================+===========================+===========================+
-| Dimension scope      | Top cells only            | All dims in chain complex |
-+----------------------+---------------------------+---------------------------+
-| Edge meaning         | Same-dim adjacency        | Codim-one face incidence  |
-+----------------------+---------------------------+---------------------------+
-| SHI on edges         | Crossing hyperplane       | Hyperplane zeroed to face |
-+----------------------+---------------------------+---------------------------+
-| SHI on nodes         | Synced from edges (top)   | ``cubical_cell_shis``     |
-|                      | or ``cubical_cell_shis``  | (role 3)                  |
-|                      | on lower-dim slices       |                           |
-+----------------------+---------------------------+---------------------------+
-| Face discovery       | Flip neighbors /          | All ``ss_i ≠ 0`` crossings|
-|                      | 0-face sharing            | (role 2)                  |
-+----------------------+---------------------------+---------------------------+
-| Primary consumers    | Search finalize,          | Topology, persistence,    |
-|                      | chain complex, dual-graph | Morse                     |
-|                      | recover                   |                           |
-+----------------------+---------------------------+---------------------------+
+.. list-table::
+   :header-rows: 1
+
+   * - 
+     - Dual graph
+     - Meta-graph
+   * - Dimension scope
+     - Top cells only
+     - All dims in chain complex
+   * - Edge meaning
+     - Same-dim adjacency
+     - Codim-one face incidence
+   * - SHI on edges
+     - Crossing hyperplane
+     - Hyperplane zeroed to face
+   * - SHI on nodes
+     - Synced from edges (top) or ``cubical_cell_shis`` on lower-dim slices
+     - ``cubical_cell_shis`` (role 3)
+   * - Face discovery
+     - Flip neighbors / 0-face sharing
+     - All ``ss_i ≠ 0`` crossings (role 2)
+   * - Primary consumers
+     - Search finalize, chain complex, dual-graph recover
+     - Topology, persistence, Morse
 
 **Critical invariant:** meta-graph **face edges** use
 :func:`~relucent.graph.incidence.ss_nonzero_indices` (role 2), not propagated
@@ -435,6 +500,17 @@ conflating the two breaks ``∂² = 0`` for GF(2) boundary maps.
 
 Boundary discovery
 ------------------
+
+.. warning::
+
+   Boundary discovery is **experimental** and outside relucent's stability guarantees.
+   Certification covers only the components it finds. MIP pricing can miss a component
+   that lies outside its input box (``estimate_input_bound``, which shrinks as the weights
+   shrink while the boundary moves outward) or on which some other unit stays within
+   ``BOUNDARY_MIP_EPS`` of zero (for example a dead unit under weight decay), and the
+   result is still reported as complete. For a verified boundary, explore the input space
+   with :meth:`~relucent.core.complex.Complex.bfs` and take
+   :meth:`~relucent.core.complex.Complex.boundary_complex`.
 
 :meth:`~relucent.core.complex.Complex.discover_boundary_complex` builds the
 decision-boundary complex for neuron ``i`` without a full ambient BFS:
@@ -449,7 +525,7 @@ decision-boundary complex for neuron ``i`` without a full ambient BFS:
    dual graph, genericity check, ``certify_complex``.
 
 Alternatively, explore the full ambient complex first, then
-:meth:`~relucent.core.complex.Complex.get_boundary_complex` (requires
+:meth:`~relucent.core.complex.Complex.boundary_complex` (requires
 ``assert_topology_ready``).
 
 Related reading
@@ -457,5 +533,5 @@ Related reading
 
 * :doc:`exploration_verification` — flags, caps, dual-graph SHI model
 * :doc:`search_geometry` — ``geometry_properties`` and memory
-* ``docs/betti_computation.md`` — chain complex → meta-graph → Betti pipeline
+* :doc:`betti_computation` — chain complex → meta-graph → Betti pipeline
 * :doc:`topology` — Betti-number prerequisites and caveats

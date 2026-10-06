@@ -1,0 +1,871 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Relucent Documentation: Boundary Discovery</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=8d563738"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="_static/custom.js?v=add1a637"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Certification" href="certify.html" />
+    <link rel="prev" title="Exploration" href="exploration.html" />
+   
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            relucent
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#first-run-example">First Run Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#search-and-geometry-guide">Search and Geometry Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#working-with-regions">Working With Regions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#gurobi-license-note">Gurobi License Note</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="network_definitions.html">Network Definition Options</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-pytorch-model">1) Pass A PyTorch Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-a-relunetwork">2) Pass A ReLUNetwork</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#pass-an-iterable-of-w-i-b-i-tuples">3) Pass An Iterable Of <code class="docutils literal notranslate"><span class="pre">(W_i,</span> <span class="pre">b_i)</span></code> Tuples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#use-relucent-convert-explicitly">4) Use <code class="docutils literal notranslate"><span class="pre">relucent.convert(...)</span></code> Explicitly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="network_definitions.html#append-a-final-relu-for-decision-boundary-topology">5) Append A Final ReLU For Decision-Boundary Topology</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_geometry.html">Search Geometry and Memory Management</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#why-these-options-exist">Why these options exist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#default-behavior">Default behavior</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#certification-and-caps">Certification and caps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#common-workflows">Common workflows</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#topology-focused-search-default">Topology-focused search (default)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#full-geometry-during-search">Full geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#compute-selected-geometry-during-search">Compute selected geometry during search</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_geometry.html#two-phase-approach-topology-first-geometry-later">Two-phase approach: topology first, geometry later</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_geometry.html#property-names">Property names</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="search_shi_and_graphs.html">Search, SHI Assignment, Verification, and Graph Structures</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#background-sign-sequences-and-shis">Background: sign sequences and SHIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#how-search-works">How search works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#entry-points">Entry points</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#search-loop">Search loop</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#multiprocessing">Multiprocessing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#shi-assignment-three-roles">SHI assignment: three roles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-1-boundary-faces-and-lower-dimensional-slices">Role 1 — Boundary faces and lower-dimensional slices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-2-meta-graph-face-edges">Role 2 — Meta-graph face edges</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#role-3-meta-graph-node-metadata">Role 3 — Meta-graph node metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#shi-assignment-over-the-pipeline">SHI assignment over the pipeline</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#during-search-frontier-heuristic">During search (frontier heuristic)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#lp-solver-failures">LP solver failures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#after-complete-ambient-search-authoritative-top-cells">After complete ambient search (authoritative top cells)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#on-lower-dimensional-slices-boundary-chain-complex">On lower-dimensional slices (boundary, chain complex)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#certification">Certification</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#when-certification-runs">When certification runs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#boundary-specific-checks">Boundary-specific checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#exploration-flags">Exploration flags</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#dual-graph">Dual graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#edge-construction-rules">Edge construction rules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#uses">Uses</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#meta-graph">Meta-graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#construction-pipeline">Construction pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="search_shi_and_graphs.html#dual-graph-vs-meta-graph">Dual graph vs meta-graph</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#boundary-discovery">Boundary discovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="search_shi_and_graphs.html#related-reading">Related reading</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exploration_verification.html">Exploration and Verification</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#exploration-flags">Exploration flags</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#default-verify-behavior">Default verify behavior</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="exploration_verification.html#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#topology-prerequisites">Topology prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#boundary-discovery">Boundary discovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration_verification.html#dual-graph-shi-model">Dual-graph SHI model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology.html">Topology and Persistent Homology</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#graph-representations">Graph representations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#betti-numbers">Betti numbers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#persistent-homology-workflow">Persistent homology workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology.html#performance">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="betti_computation.html">How Betti numbers are computed</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#the-default-pipeline">The default pipeline</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-1-build-the-chain-complex">Step 1: Build the chain complex</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#how-vertex-star-recovery-works">How vertex-star recovery works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#dual-graph-rules">Dual-graph rules</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-2-build-the-meta-graph">Step 2: Build the meta-graph</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#face-edges-what-defines-the-betti-numbers">Face edges: what defines the Betti numbers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#bounded-and-unbounded-labels">Bounded and unbounded labels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#node-shis-and-face-edges">Node <code class="docutils literal notranslate"><span class="pre">shis</span></code> and face edges</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-3-truncate-at-infinity">Step 3: Truncate at infinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#step-4-rank-boundary-matrices">Step 4: Rank boundary matrices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#exploration-and-certification">Exploration and certification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#other-options">Other options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="betti_computation.html#function-map">Function map</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#by-pipeline-step">By pipeline step</a></li>
+<li class="toctree-l3"><a class="reference internal" href="betti_computation.html#cells-and-1-cells-at-a-glance">0-cells and 1-cells at a glance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#changing-settings">Changing settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#environment-variables">Environment variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#settings-reference">Settings reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#geometry">Geometry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#search-and-boundary-discovery">Search and boundary discovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#plotting">Plotting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#logging">Logging</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#module-relucent.config.advanced">Advanced settings (unstable)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.GUROBI_SHI_OPTIMALITY_TOL"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_OPTIMALITY_TOL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.GUROBI_SHI_SCALE_FLAG"><code class="docutils literal notranslate"><span class="pre">GUROBI_SHI_SCALE_FLAG</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.INTERIOR_POINT_RADIUS_SEQUENCE"><code class="docutils literal notranslate"><span class="pre">INTERIOR_POINT_RADIUS_SEQUENCE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.ASTAR_BIAS_WEIGHT"><code class="docutils literal notranslate"><span class="pre">ASTAR_BIAS_WEIGHT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BLOCKING_QUEUE_WAIT_TIMEOUT"><code class="docutils literal notranslate"><span class="pre">BLOCKING_QUEUE_WAIT_TIMEOUT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_PRICING_BRUTE_FORCE_MAX_N"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_PRICING_BRUTE_FORCE_MAX_N</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_BATCH_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_BATCH_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EXCLUSION_WORKERS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_CUT_ORDER"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_ORDER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_BULK_NOGOOD_EMIT"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_BULK_NOGOOD_EMIT</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_STATIC_WAVE_SIZE"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_STATIC_WAVE_SIZE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_CUT_PRIORITY_ENABLED"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_CUT_PRIORITY_ENABLED</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.advanced.BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS"><code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html#api">API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="configuration.html#relucent.config.update_settings"><code class="docutils literal notranslate"><span class="pre">update_settings()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="migrating.html">Stability and migrating to 1.0</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#api-stability">API stability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#renamed-in-1-0">Renamed in 1.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="migrating.html#other-changes">Other changes</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="complex.html">Complex</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="complex.html#relucent.core.complex.Complex"><code class="docutils literal notranslate"><span class="pre">Complex</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.load"><code class="docutils literal notranslate"><span class="pre">Complex.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_point"><code class="docutils literal notranslate"><span class="pre">Complex.add_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_polyhedron"><code class="docutils literal notranslate"><span class="pre">Complex.add_polyhedron()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.add_ss"><code class="docutils literal notranslate"><span class="pre">Complex.add_ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.assert_topology_ready"><code class="docutils literal notranslate"><span class="pre">Complex.assert_topology_ready()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.betti_numbers"><code class="docutils literal notranslate"><span class="pre">Complex.betti_numbers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.bfs"><code class="docutils literal notranslate"><span class="pre">Complex.bfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_cells"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_cells()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.certify"><code class="docutils literal notranslate"><span class="pre">Complex.certify()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.chain_complex"><code class="docutils literal notranslate"><span class="pre">Complex.chain_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.clean_data"><code class="docutils literal notranslate"><span class="pre">Complex.clean_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Complex.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.contract"><code class="docutils literal notranslate"><span class="pre">Complex.contract()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.critical_points"><code class="docutils literal notranslate"><span class="pre">Complex.critical_points()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dfs"><code class="docutils literal notranslate"><span class="pre">Complex.dfs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">Complex.discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.greedy_path"><code class="docutils literal notranslate"><span class="pre">Complex.greedy_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.hamming_astar"><code class="docutils literal notranslate"><span class="pre">Complex.hamming_astar()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.meta_graph"><code class="docutils literal notranslate"><span class="pre">Complex.meta_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.parallel_add"><code class="docutils literal notranslate"><span class="pre">Complex.parallel_add()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.persistent_homology"><code class="docutils literal notranslate"><span class="pre">Complex.persistent_homology()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.plot"><code class="docutils literal notranslate"><span class="pre">Complex.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2poly"><code class="docutils literal notranslate"><span class="pre">Complex.point2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2preactivations"><code class="docutils literal notranslate"><span class="pre">Complex.point2preactivations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.point2ss"><code class="docutils literal notranslate"><span class="pre">Complex.point2ss()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.preactivation_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.preactivation_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.random_walk"><code class="docutils literal notranslate"><span class="pre">Complex.random_walk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">Complex.recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.save"><code class="docutils literal notranslate"><span class="pre">Complex.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.searcher"><code class="docutils literal notranslate"><span class="pre">Complex.searcher()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.set_exploration_state"><code class="docutils literal notranslate"><span class="pre">Complex.set_exploration_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.slice_affine"><code class="docutils literal notranslate"><span class="pre">Complex.slice_affine()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss2poly"><code class="docutils literal notranslate"><span class="pre">Complex.ss2poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.ss_iterator"><code class="docutils literal notranslate"><span class="pre">Complex.ss_iterator()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.str_to_poly"><code class="docutils literal notranslate"><span class="pre">Complex.str_to_poly()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">Complex.verify_arrangement_genericity()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.G"><code class="docutils literal notranslate"><span class="pre">Complex.G</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.SAVE_FORMAT_VERSION"><code class="docutils literal notranslate"><span class="pre">Complex.SAVE_FORMAT_VERSION</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.complete"><code class="docutils literal notranslate"><span class="pre">Complex.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.dim"><code class="docutils literal notranslate"><span class="pre">Complex.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.n"><code class="docutils literal notranslate"><span class="pre">Complex.n</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.net"><code class="docutils literal notranslate"><span class="pre">Complex.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.source_model"><code class="docutils literal notranslate"><span class="pre">Complex.source_model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="complex.html#relucent.core.complex.Complex.verified"><code class="docutils literal notranslate"><span class="pre">Complex.verified</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="polyhedron.html">Polyhedron</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron"><code class="docutils literal notranslate"><span class="pre">Polyhedron</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_halfspaces()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.bounded_vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.bounded_vertices()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.compute_geometric_properties"><code class="docutils literal notranslate"><span class="pre">Polyhedron.compute_geometric_properties()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.face"><code class="docutils literal notranslate"><span class="pre">Polyhedron.face()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.find_interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.find_interior_point()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_face_of"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_face_of()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.is_shi_face_feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.is_shi_face_feasible()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.neighbor"><code class="docutils literal notranslate"><span class="pre">Polyhedron.neighbor()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.nflips"><code class="docutils literal notranslate"><span class="pre">Polyhedron.nflips()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.plot"><code class="docutils literal notranslate"><span class="pre">Polyhedron.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.verify_vertex_covector"><code class="docutils literal notranslate"><span class="pre">Polyhedron.verify_vertex_covector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.GEOMETRY_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.GEOMETRY_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.QHULL_PROPERTIES"><code class="docutils literal notranslate"><span class="pre">Polyhedron.QHULL_PROPERTIES</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.W"><code class="docutils literal notranslate"><span class="pre">Polyhedron.W</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.Wl2"><code class="docutils literal notranslate"><span class="pre">Polyhedron.Wl2</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ambient_dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ambient_dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.b"><code class="docutils literal notranslate"><span class="pre">Polyhedron.b</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.center"><code class="docutils literal notranslate"><span class="pre">Polyhedron.center</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.codim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.codim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.convex_hull"><code class="docutils literal notranslate"><span class="pre">Polyhedron.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.dim"><code class="docutils literal notranslate"><span class="pre">Polyhedron.dim</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.equalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.equalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.faces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.faces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.feasible"><code class="docutils literal notranslate"><span class="pre">Polyhedron.feasible</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.finite"><code class="docutils literal notranslate"><span class="pre">Polyhedron.finite</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_err_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_err_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.halfspaces_rows_ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.halfspaces_rows_ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inequalities"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inequalities</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.inradius"><code class="docutils literal notranslate"><span class="pre">Polyhedron.inradius</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.interior_point_norm"><code class="docutils literal notranslate"><span class="pre">Polyhedron.interior_point_norm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.net"><code class="docutils literal notranslate"><span class="pre">Polyhedron.net</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.non_zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.non_zero_indices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.num_shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.num_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.shis"><code class="docutils literal notranslate"><span class="pre">Polyhedron.shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.ss_np"><code class="docutils literal notranslate"><span class="pre">Polyhedron.ss_np</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.tag"><code class="docutils literal notranslate"><span class="pre">Polyhedron.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.vertices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.volume"><code class="docutils literal notranslate"><span class="pre">Polyhedron.volume</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron.zero_indices"><code class="docutils literal notranslate"><span class="pre">Polyhedron.zero_indices</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exploration.html">Exploration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult"><code class="docutils literal notranslate"><span class="pre">SearchResult</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.bad_shi_computations"><code class="docutils literal notranslate"><span class="pre">SearchResult.bad_shi_computations</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.complete"><code class="docutils literal notranslate"><span class="pre">SearchResult.complete</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.depth"><code class="docutils literal notranslate"><span class="pre">SearchResult.depth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.mean_facets"><code class="docutils literal notranslate"><span class="pre">SearchResult.mean_facets</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.search_time"><code class="docutils literal notranslate"><span class="pre">SearchResult.search_time</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult.verified"><code class="docutils literal notranslate"><span class="pre">SearchResult.verified</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.explore_for_topology"><code class="docutils literal notranslate"><span class="pre">explore_for_topology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_ambient_search"><code class="docutils literal notranslate"><span class="pre">finalize_ambient_search()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex"><code class="docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exploration.html#relucent.search.exploration.generic_topology_start"><code class="docutils literal notranslate"><span class="pre">generic_topology_start()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Boundary Discovery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_search.BoundaryDiscoveryStats"><code class="docutils literal notranslate"><span class="pre">BoundaryDiscoveryStats</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_search.boundary_searcher"><code class="docutils literal notranslate"><span class="pre">boundary_searcher()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_search.discover_boundary_complex"><code class="docutils literal notranslate"><span class="pre">discover_boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_mip.BoundaryPricingIncompleteError"><code class="docutils literal notranslate"><span class="pre">BoundaryPricingIncompleteError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_mip.price_boundary_witness"><code class="docutils literal notranslate"><span class="pre">price_boundary_witness()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats"><code class="docutils literal notranslate"><span class="pre">CompileStats</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.compile_seconds"><code class="docutils literal notranslate"><span class="pre">CompileStats.compile_seconds</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.compression_ratio"><code class="docutils literal notranslate"><span class="pre">CompileStats.compression_ratio</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.fully_saturated"><code class="docutils literal notranslate"><span class="pre">CompileStats.fully_saturated</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_constraints"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_constraints</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_saturated_nodes"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_saturated_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_tags"><code class="docutils literal notranslate"><span class="pre">CompileStats.n_tags</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.from_tags"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.from_tags()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.collect_saturated_specs"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.collect_saturated_specs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.compile_to_model()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.count_saturated_constraints"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.count_saturated_constraints()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.insert"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.insert()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.is_saturated"><code class="docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.is_saturated()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="certify.html">Certification</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel"><code class="docutils literal notranslate"><span class="pre">CertifyLevel</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.COMBINATORIAL"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.COMBINATORIAL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.COMPLETE"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.COMPLETE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="certify.html#relucent.verify.certify.CertifyLevel.GEOMETRIC"><code class="docutils literal notranslate"><span class="pre">CertifyLevel.GEOMETRIC</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.certify_complex"><code class="docutils literal notranslate"><span class="pre">certify_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_arrangement_genericity"><code class="docutils literal notranslate"><span class="pre">verify_arrangement_genericity()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_boundary_cell"><code class="docutils literal notranslate"><span class="pre">verify_boundary_cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.verify.certify.verify_lp_flip_neighbors_in_complex"><code class="docutils literal notranslate"><span class="pre">verify_lp_flip_neighbors_in_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.AmbiguousGeometryError"><code class="docutils literal notranslate"><span class="pre">AmbiguousGeometryError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotCompleteError"><code class="docutils literal notranslate"><span class="pre">ComplexNotCompleteError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ComplexNotVerifiedError"><code class="docutils literal notranslate"><span class="pre">ComplexNotVerifiedError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalAmbiguityError"><code class="docutils literal notranslate"><span class="pre">CubicalAmbiguityError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.CubicalConsistencyError"><code class="docutils literal notranslate"><span class="pre">CubicalConsistencyError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.DualGraphAsymmetricEdgeError"><code class="docutils literal notranslate"><span class="pre">DualGraphAsymmetricEdgeError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.IncompleteDualGraphError"><code class="docutils literal notranslate"><span class="pre">IncompleteDualGraphError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.NonGenericArrangementError"><code class="docutils literal notranslate"><span class="pre">NonGenericArrangementError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiFlipInvariantError"><code class="docutils literal notranslate"><span class="pre">ShiFlipInvariantError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="certify.html#relucent.core.errors.ShiProofError"><code class="docutils literal notranslate"><span class="pre">ShiProofError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="model.html">Network Model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.FlattenLayer"><code class="docutils literal notranslate"><span class="pre">FlattenLayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer"><code class="docutils literal notranslate"><span class="pre">LinearLayer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.bias"><code class="docutils literal notranslate"><span class="pre">LinearLayer.bias</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.LinearLayer.weight"><code class="docutils literal notranslate"><span class="pre">LinearLayer.weight</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLULayer"><code class="docutils literal notranslate"><span class="pre">ReLULayer</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.all_layer_outputs"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.all_layer_outputs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.forward"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.forward()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.shi2weights"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.shi2weights()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.layers"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.layers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork.num_relus"><code class="docutils literal notranslate"><span class="pre">ReLUNetwork.num_relus</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.convert_model.convert"><code class="docutils literal notranslate"><span class="pre">convert()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP"><code class="docutils literal notranslate"><span class="pre">TorchMLP</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.device"><code class="docutils literal notranslate"><span class="pre">TorchMLP.device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.dtype"><code class="docutils literal notranslate"><span class="pre">TorchMLP.dtype</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="model.html#relucent.model.builders.TorchMLP.layers"><code class="docutils literal notranslate"><span class="pre">TorchMLP.layers</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.add_output_relu"><code class="docutils literal notranslate"><span class="pre">add_output_relu()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.initialize_linear"><code class="docutils literal notranslate"><span class="pre">initialize_linear()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.mlp"><code class="docutils literal notranslate"><span class="pre">mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.normalize_weights"><code class="docutils literal notranslate"><span class="pre">normalize_weights()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.set_seeds"><code class="docutils literal notranslate"><span class="pre">set_seeds()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.split_sequential"><code class="docutils literal notranslate"><span class="pre">split_sequential()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.torch_mlp"><code class="docutils literal notranslate"><span class="pre">torch_mlp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="model.html#relucent.model.builders.MLP_INIT_METHODS"><code class="docutils literal notranslate"><span class="pre">MLP_INIT_METHODS</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sign_sequences.html">Sign Sequences</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager"><code class="docutils literal notranslate"><span class="pre">SSManager</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.SSManager.add"><code class="docutils literal notranslate"><span class="pre">SSManager.add()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.encode_ss"><code class="docutils literal notranslate"><span class="pre">encode_ss()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="sign_sequences.html#relucent.core.ss.flip_ss_at_shi_inplace"><code class="docutils literal notranslate"><span class="pre">flip_ss_at_shi_inplace()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="geometry.html">Geometry Calculations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry"><code class="docutils literal notranslate"><span class="pre">QhullGeometry</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.convex_hull"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.convex_hull</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.halfspace_intersection"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.halfspace_intersection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.vertices"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.vertices</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.QhullGeometry.volume"><code class="docutils literal notranslate"><span class="pre">QhullGeometry.volume</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.adjacent_polyhedra"><code class="docutils literal notranslate"><span class="pre">adjacent_polyhedra()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.certified_bounded"><code class="docutils literal notranslate"><span class="pre">certified_bounded()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.compute_properties"><code class="docutils literal notranslate"><span class="pre">compute_properties()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.halfspaces"><code class="docutils literal notranslate"><span class="pre">halfspaces()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.shis"><code class="docutils literal notranslate"><span class="pre">shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.calculations.solve_radius"><code class="docutils literal notranslate"><span class="pre">solve_radius()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="geometry.html#relucent.geometry.slicing.slice_complex"><code class="docutils literal notranslate"><span class="pre">slice_complex()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="meta_graph.html">Meta-graph and Network Surgery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.build_meta_graph"><code class="docutils literal notranslate"><span class="pre">build_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.finite_cells_subgraph"><code class="docutils literal notranslate"><span class="pre">finite_cells_subgraph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.one_point_compactify_meta_graph"><code class="docutils literal notranslate"><span class="pre">one_point_compactify_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.rebuild_meta_graph_face_edges"><code class="docutils literal notranslate"><span class="pre">rebuild_meta_graph_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.truncate_meta_graph"><code class="docutils literal notranslate"><span class="pre">truncate_meta_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_incidence"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_incidence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.meta_graph.verify_meta_graph_one_cells"><code class="docutils literal notranslate"><span class="pre">verify_meta_graph_one_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.contract_dual_graph_for_shi"><code class="docutils literal notranslate"><span class="pre">contract_dual_graph_for_shi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.delete_ss_columns"><code class="docutils literal notranslate"><span class="pre">delete_ss_columns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.net_without_last_ss_layer_neuron"><code class="docutils literal notranslate"><span class="pre">net_without_last_ss_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.recover_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">recover_from_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.complex_graph.without_last_layer_neuron"><code class="docutils literal notranslate"><span class="pre">without_last_layer_neuron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_cells"><code class="docutils literal notranslate"><span class="pre">boundary_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_complex"><code class="docutils literal notranslate"><span class="pre">boundary_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="meta_graph.html#relucent.graph.boundary.boundary_edges"><code class="docutils literal notranslate"><span class="pre">boundary_edges()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="incidence.html">Incidence (combinatorial primitives)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.assemble_face_edges_by_dim"><code class="docutils literal notranslate"><span class="pre">assemble_face_edges_by_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.build_dual_graph"><code class="docutils literal notranslate"><span class="pre">build_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.certify_dual_graph"><code class="docutils literal notranslate"><span class="pre">certify_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_ascending"><code class="docutils literal notranslate"><span class="pre">classify_finite_ascending()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_combinatorial"><code class="docutils literal notranslate"><span class="pre">classify_finite_combinatorial()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_finite_lp_fallback"><code class="docutils literal notranslate"><span class="pre">classify_finite_lp_fallback()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_lazy_face_polys"><code class="docutils literal notranslate"><span class="pre">classify_lazy_face_polys()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.classify_one_cells_finite_from_face_edges"><code class="docutils literal notranslate"><span class="pre">classify_one_cells_finite_from_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.collect_meta_face_edges"><code class="docutils literal notranslate"><span class="pre">collect_meta_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.cubical_cell_shis"><code class="docutils literal notranslate"><span class="pre">cubical_cell_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_edges_top_dim"><code class="docutils literal notranslate"><span class="pre">dual_edges_top_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.dual_graph_edge_top_dim"><code class="docutils literal notranslate"><span class="pre">dual_graph_edge_top_dim()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.face_tag"><code class="docutils literal notranslate"><span class="pre">face_tag()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.flip_tag"><code class="docutils literal notranslate"><span class="pre">flip_tag()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.geometric_infeasible_one_cells"><code class="docutils literal notranslate"><span class="pre">geometric_infeasible_one_cells()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.meta_node_attrs"><code class="docutils literal notranslate"><span class="pre">meta_node_attrs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.parallel_collect_meta_face_edges"><code class="docutils literal notranslate"><span class="pre">parallel_collect_meta_face_edges()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.propagate_infeasible_exclusion"><code class="docutils literal notranslate"><span class="pre">propagate_infeasible_exclusion()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.set_contracted_shis"><code class="docutils literal notranslate"><span class="pre">set_contracted_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.ss_nonzero_indices"><code class="docutils literal notranslate"><span class="pre">ss_nonzero_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.sync_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">sync_shis_from_dual_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_contracted_shis"><code class="docutils literal notranslate"><span class="pre">verify_contracted_shis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_dual_graph_cubical"><code class="docutils literal notranslate"><span class="pre">verify_dual_graph_cubical()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_flip_shi_symmetry"><code class="docutils literal notranslate"><span class="pre">verify_flip_shi_symmetry()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shi_flip_neighbors"><code class="docutils literal notranslate"><span class="pre">verify_shi_flip_neighbors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="incidence.html#relucent.graph.incidence.verify_shis_from_dual_graph"><code class="docutils literal notranslate"><span class="pre">verify_shis_from_dual_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vertex_star.html">Vertex star (face lattice recovery)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord"><code class="docutils literal notranslate"><span class="pre">VertexRecord</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.point"><code class="docutils literal notranslate"><span class="pre">VertexRecord.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.ss"><code class="docutils literal notranslate"><span class="pre">VertexRecord.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.tag</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.varying_shis"><code class="docutils literal notranslate"><span class="pre">VertexRecord.varying_shis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.VertexRecord.witness_tag"><code class="docutils literal notranslate"><span class="pre">VertexRecord.witness_tag</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.build_chain_complex"><code class="docutils literal notranslate"><span class="pre">build_chain_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">cells_from_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.expand_vertex_star"><code class="docutils literal notranslate"><span class="pre">expand_vertex_star()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.find_vertices"><code class="docutils literal notranslate"><span class="pre">find_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.recover_cells_from_vertices"><code class="docutils literal notranslate"><span class="pre">recover_cells_from_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.verified_vertices"><code class="docutils literal notranslate"><span class="pre">verified_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vertex_star.html#relucent.graph.vertex_star.vertex_polyhedron"><code class="docutils literal notranslate"><span class="pre">vertex_polyhedron()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="filtration.html">Filtrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.AffineOutputFiltration.combine"><code class="docutils literal notranslate"><span class="pre">AffineOutputFiltration.combine</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.ConstantFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">ConstantFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration"><code class="docutils literal notranslate"><span class="pre">Filtration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">Filtration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.values_for_meta"><code class="docutils literal notranslate"><span class="pre">Filtration.values_for_meta()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.Filtration.lower_star"><code class="docutils literal notranslate"><span class="pre">Filtration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.LogitSublevelFiltration"><code class="docutils literal notranslate"><span class="pre">LogitSublevelFiltration</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.raw_cell_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.NeuronActivationFiltration.lower_star"><code class="docutils literal notranslate"><span class="pre">NeuronActivationFiltration.lower_star</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="filtration.html#relucent.topology.filtration.TrainingDistanceFiltration.raw_cell_value"><code class="docutils literal notranslate"><span class="pre">TrainingDistanceFiltration.raw_cell_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="filtration.html#relucent.topology.filtration.lower_star_extension"><code class="docutils literal notranslate"><span class="pre">lower_star_extension()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="persistence.html">Persistence API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair"><code class="docutils literal notranslate"><span class="pre">PersistencePair</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.dimension"><code class="docutils literal notranslate"><span class="pre">PersistencePair.dimension</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.birth"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.death"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.birth_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.birth_cell</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistencePair.death_cell"><code class="docutils literal notranslate"><span class="pre">PersistencePair.death_cell</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.plot"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.plot()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.cell_filtration"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.cell_filtration</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="persistence.html#relucent.topology.persistence.PersistenceDiagram.pairs"><code class="docutils literal notranslate"><span class="pre">PersistenceDiagram.pairs</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.compute_persistent_homology"><code class="docutils literal notranslate"><span class="pre">compute_persistent_homology()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.betti_at_filtration_end"><code class="docutils literal notranslate"><span class="pre">betti_at_filtration_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="persistence.html#relucent.topology.persistence.betti_curve"><code class="docutils literal notranslate"><span class="pre">betti_curve()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="topology_api.html">Topology (GF(2))</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ChainComplexInconsistent"><code class="docutils literal notranslate"><span class="pre">ChainComplexInconsistent</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.ConnectedComponentsMismatch"><code class="docutils literal notranslate"><span class="pre">ConnectedComponentsMismatch</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.betti_numbers"><code class="docutils literal notranslate"><span class="pre">betti_numbers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_matmul_packed_stacked_rows"><code class="docutils literal notranslate"><span class="pre">gf2_matmul_packed_stacked_rows()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_boundary"><code class="docutils literal notranslate"><span class="pre">gf2_rank_boundary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_packed"><code class="docutils literal notranslate"><span class="pre">gf2_rank_packed()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.gf2_rank_sparse_rowsets"><code class="docutils literal notranslate"><span class="pre">gf2_rank_sparse_rowsets()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.C_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">C_BACKEND_AVAILABLE</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology_api.html#relucent.topology.Compactify"><code class="docutils literal notranslate"><span class="pre">Compactify</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="morse.html">Morse Theory</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint"><code class="docutils literal notranslate"><span class="pre">CriticalPoint</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.index"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.is_critical"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.is_critical</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.point"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.point</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.polyhedron"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.polyhedron</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.ss"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.ss</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.CriticalPoint.tag"><code class="docutils literal notranslate"><span class="pre">CriticalPoint.tag</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians"><code class="docutils literal notranslate"><span class="pre">LayerJacobians</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.W_out"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.W_out</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.by_relu_layer_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.by_relu_layer_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.full"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.full</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.gradient_abs"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.gradient_abs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="morse.html#relucent.topology.morse.LayerJacobians.n_terms"><code class="docutils literal notranslate"><span class="pre">LayerJacobians.n_terms</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.assert_scalar_output"><code class="docutils literal notranslate"><span class="pre">assert_scalar_output()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.coface_sign_sequence"><code class="docutils literal notranslate"><span class="pre">coface_sign_sequence()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_flags_for_vertices"><code class="docutils literal notranslate"><span class="pre">critical_flags_for_vertices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.critical_points"><code class="docutils literal notranslate"><span class="pre">critical_points()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.gradient_on_cell"><code class="docutils literal notranslate"><span class="pre">gradient_on_cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.is_pl_critical_vertex"><code class="docutils literal notranslate"><span class="pre">is_pl_critical_vertex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.layer_jacobians"><code class="docutils literal notranslate"><span class="pre">layer_jacobians()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_on_1cell"><code class="docutils literal notranslate"><span class="pre">partial_derivative_on_1cell()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_sign"><code class="docutils literal notranslate"><span class="pre">partial_derivative_sign()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.partial_derivative_value"><code class="docutils literal notranslate"><span class="pre">partial_derivative_value()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="morse.html#relucent.topology.morse.shi_to_relu_neuron"><code class="docutils literal notranslate"><span class="pre">shi_to_relu_neuron()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vis.html">Visualization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.colors"><code class="docutils literal notranslate"><span class="pre">colors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_complex"><code class="docutils literal notranslate"><span class="pre">plot_complex()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_persistence_diagram"><code class="docutils literal notranslate"><span class="pre">plot_persistence_diagram()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.plot_polyhedron"><code class="docutils literal notranslate"><span class="pre">plot_polyhedron()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="vis.html#relucent.vis.pyvis_dual_graph"><code class="docutils literal notranslate"><span class="pre">pyvis_dual_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utilities.html">Utility Functions</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">relucent</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Boundary Discovery</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/boundary_search.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="boundary-discovery">
+<h1>Boundary Discovery<a class="headerlink" href="#boundary-discovery" title="Link to this heading"></a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Boundary discovery is <strong>experimental</strong> and outside relucent’s stability guarantees.
+Certification covers only the components it finds. MIP pricing can miss a component
+that lies outside its input box (<code class="docutils literal notranslate"><span class="pre">estimate_input_bound</span></code>, which shrinks as the weights
+shrink while the boundary moves outward) or on which some other unit stays within
+<code class="docutils literal notranslate"><span class="pre">BOUNDARY_MIP_EPS</span></code> of zero (for example a dead unit under weight decay), and the
+result is still reported as complete. For a verified boundary, explore the input space
+with <a class="reference internal" href="complex.html#relucent.core.complex.Complex.bfs" title="relucent.core.complex.Complex.bfs"><code class="xref py py-meth docutils literal notranslate"><span class="pre">bfs()</span></code></a> and take
+<a class="reference internal" href="complex.html#relucent.core.complex.Complex.boundary_complex" title="relucent.core.complex.Complex.boundary_complex"><code class="xref py py-meth docutils literal notranslate"><span class="pre">boundary_complex()</span></code></a>.</p>
+</div>
+<p id="module-relucent.search.boundary_search">Slice-restricted BFS and MIP-driven boundary complex discovery.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.search.boundary_search.BoundaryDiscoveryStats">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_search.</span></span><span class="sig-name descname"><span class="pre">BoundaryDiscoveryStats</span></span><a class="headerlink" href="#relucent.search.boundary_search.BoundaryDiscoveryStats" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Any</span></code></a>]</p>
+<p>Statistics returned by <a class="reference internal" href="#relucent.search.boundary_search.discover_boundary_complex" title="relucent.search.boundary_search.discover_boundary_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">discover_boundary_complex()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.boundary_search.boundary_searcher">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_search.</span></span><span class="sig-name descname"><span class="pre">boundary_searcher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="complex.html#relucent.core.complex.Complex" title="relucent.core.complex.Complex"><span class="pre">Complex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron" title="relucent.core.poly.Polyhedron"><span class="pre">Polyhedron</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_polys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">inf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">geometry_properties</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult" title="relucent.search.exploration.SearchResult"><span class="pre">SearchResult</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_search.boundary_searcher" title="Link to this definition"></a></dt>
+<dd><p>BFS on a bent hyperplane slice with <code class="docutils literal notranslate"><span class="pre">ss[boundary_shi]</span> <span class="pre">=</span> <span class="pre">0</span></code> fixed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cx</strong> – Boundary complex under construction (typically empty).</p></li>
+<li><p><strong>boundary_shi</strong> – Global SHI index pinned to zero on every discovered cell.</p></li>
+<li><p><strong>start</strong> – Witness polyhedron with exactly one zero at <code class="docutils literal notranslate"><span class="pre">boundary_shi</span></code>.</p></li>
+<li><p><strong>max_depth</strong> – Maximum flip depth from the start cell.</p></li>
+<li><p><strong>max_polys</strong> – Maximum cells to discover in this component.</p></li>
+<li><p><strong>bound</strong> – Gurobi box bound for SHI LPs.</p></li>
+<li><p><strong>nworkers</strong> – Worker process count.</p></li>
+<li><p><strong>verbose</strong> – Output level: <code class="docutils literal notranslate"><span class="pre">0</span></code> quiet, <code class="docutils literal notranslate"><span class="pre">1</span></code> progress bars and summaries, <code class="docutils literal notranslate"><span class="pre">2</span></code> pricing and
+search detail. <code class="docutils literal notranslate"><span class="pre">None</span></code> uses <a class="reference internal" href="configuration.html#relucent.config.VERBOSE" title="relucent.config.VERBOSE"><code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.VERBOSE</span></code></a>.</p></li>
+<li><p><strong>geometry_properties</strong> – Optional geometry caches (default topology-only).</p></li>
+<li><p><strong>verify</strong> – When True (default), require complete exploration. Certification runs
+later in <a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex" title="relucent.search.exploration.finalize_boundary_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a>.</p></li>
+<li><p><strong>**kwargs</strong> – Forwarded to <a class="reference internal" href="geometry.html#relucent.geometry.calculations.shis" title="relucent.geometry.calculations.shis"><code class="xref py py-func docutils literal notranslate"><span class="pre">shis()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="exploration.html#relucent.search.exploration.SearchResult" title="relucent.search.exploration.SearchResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">SearchResult</span></code></a>. <code class="docutils literal notranslate"><span class="pre">verified</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (or
+<code class="docutils literal notranslate"><span class="pre">False</span></code> if the search stopped early) because certification runs later, in
+<a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex" title="relucent.search.exploration.finalize_boundary_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">start</span></code> is not a top-dimensional boundary cell.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.boundary_search.discover_boundary_complex">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_search.</span></span><span class="sig-name descname"><span class="pre">discover_boundary_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork" title="relucent.model.model.ReLUNetwork"><span class="pre">ReLUNetwork</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nworkers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verify</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="complex.html#relucent.core.complex.Complex" title="relucent.core.complex.Complex"><span class="pre">Complex</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#relucent.search.boundary_search.BoundaryDiscoveryStats" title="relucent.search.boundary_search.BoundaryDiscoveryStats"><span class="pre">BoundaryDiscoveryStats</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.boundary_search.discover_boundary_complex" title="Link to this definition"></a></dt>
+<dd><p>Discover the boundary complex via MIP pricing + slice BFS per component.</p>
+<p>Experimental: see <a class="reference internal" href="complex.html#relucent.core.complex.Complex.discover_boundary_complex" title="relucent.core.complex.Complex.discover_boundary_complex"><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.core.complex.Complex.discover_boundary_complex()</span></code></a> for the
+components pricing can miss.</p>
+<p>Repeatedly calls <a class="reference internal" href="#relucent.search.boundary_mip.price_boundary_witness" title="relucent.search.boundary_mip.price_boundary_witness"><code class="xref py py-func docutils literal notranslate"><span class="pre">price_boundary_witness()</span></code></a> to find
+a new connected component on the slice <code class="docutils literal notranslate"><span class="pre">ss[boundary_shi]</span> <span class="pre">=</span> <span class="pre">0</span></code>, explores it
+with <a class="reference internal" href="#relucent.search.boundary_search.boundary_searcher" title="relucent.search.boundary_search.boundary_searcher"><code class="xref py py-func docutils literal notranslate"><span class="pre">boundary_searcher()</span></code></a>, and merges cells into one complex. Finalizes
+with <a class="reference internal" href="exploration.html#relucent.search.exploration.finalize_boundary_complex" title="relucent.search.exploration.finalize_boundary_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">finalize_boundary_complex()</span></code></a> (ambient coface
+SHIs, dual graph, genericity, and <a class="reference internal" href="certify.html#relucent.verify.certify.certify_complex" title="relucent.verify.certify.certify_complex"><code class="xref py py-func docutils literal notranslate"><span class="pre">certify_complex()</span></code></a>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>net</strong> – Canonical <a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork" title="relucent.model.model.ReLUNetwork"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReLUNetwork</span></code></a>.</p></li>
+<li><p><strong>boundary_shi</strong> – Global supporting-hyperplane index for the decision boundary.</p></li>
+<li><p><strong>bound</strong> – Gurobi box bound for SHI LPs; defaults to
+<code class="docutils literal notranslate"><span class="pre">default_polyhedron_bound()</span></code>.</p></li>
+<li><p><strong>nworkers</strong> – Worker process count for slice BFS.</p></li>
+<li><p><strong>verbose</strong> – Output level: <code class="docutils literal notranslate"><span class="pre">0</span></code> quiet, <code class="docutils literal notranslate"><span class="pre">1</span></code> progress bars and summaries, <code class="docutils literal notranslate"><span class="pre">2</span></code> pricing and
+search detail. <code class="docutils literal notranslate"><span class="pre">None</span></code> uses <a class="reference internal" href="configuration.html#relucent.config.VERBOSE" title="relucent.config.VERBOSE"><code class="xref py py-data docutils literal notranslate"><span class="pre">relucent.config.VERBOSE</span></code></a>.</p></li>
+<li><p><strong>verify</strong> – When True (default), run full certification during finalize.</p></li>
+<li><p><strong>**kwargs</strong> – Forwarded to slice BFS / SHI routines.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(complex,</span> <span class="pre">stats)</span></code> where <code class="docutils literal notranslate"><span class="pre">stats</span></code> records component counts and timings.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p id="module-relucent.search.boundary_mip">MIP pricing for undiscovered bent-hyperplane boundary cells.</p>
+<dl class="py exception">
+<dt class="sig sig-object py" id="relucent.search.boundary_mip.BoundaryPricingIncompleteError">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_mip.</span></span><span class="sig-name descname"><span class="pre">BoundaryPricingIncompleteError</span></span><a class="headerlink" href="#relucent.search.boundary_mip.BoundaryPricingIncompleteError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">RuntimeError</span></code></a></p>
+<p>Boundary MIP pricing stopped without a witness or proven infeasibility.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="relucent.search.boundary_mip.price_boundary_witness">
+<span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_mip.</span></span><span class="sig-name descname"><span class="pre">price_boundary_witness</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">net</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="model.html#relucent.model.model.ReLUNetwork" title="relucent.model.model.ReLUNetwork"><span class="pre">ReLUNetwork</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude_tags</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#set" title="(in Python v3.14)"><span class="pre">set</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.14)"><span class="pre">bytes</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">bound</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.gurobi.com/projects/optimizer/en/current/reference/python/env.html#Env" title="(in Gurobi Optimizer Reference Manual v13.0)"><span class="pre">Env</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pricing_call</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="polyhedron.html#relucent.core.poly.Polyhedron" title="relucent.core.poly.Polyhedron"><span class="pre">Polyhedron</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_mip.price_boundary_witness" title="Link to this definition"></a></dt>
+<dd><p>Find a new top-dimensional cell on <code class="docutils literal notranslate"><span class="pre">boundary_shi</span></code> not in <code class="docutils literal notranslate"><span class="pre">exclude_tags</span></code>.</p>
+<p>Tries brute-force sign scan on tiny networks, then a Gurobi MIP pricing model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>no uncut sign
+pattern has a point in the box <code class="docutils literal notranslate"><span class="pre">|x|</span> <span class="pre">&lt;=</span> <span class="pre">bound</span></code> with every other unit at least <code class="docutils literal notranslate"><span class="pre">eps</span></code>
+from zero. That does not prove no boundary cell remains; a cell outside the box, or
+one where some unit stays within <code class="docutils literal notranslate"><span class="pre">eps</span></code> of zero, is not seen (experimental; see
+<a class="reference internal" href="complex.html#relucent.core.complex.Complex.discover_boundary_complex" title="relucent.core.complex.Complex.discover_boundary_complex"><code class="xref py py-meth docutils literal notranslate"><span class="pre">relucent.core.complex.Complex.discover_boundary_complex()</span></code></a>).</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new witness polyhedron, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when the MIP is infeasible</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#relucent.search.boundary_mip.BoundaryPricingIncompleteError" title="relucent.search.boundary_mip.BoundaryPricingIncompleteError"><strong>BoundaryPricingIncompleteError</strong></a> – If pricing stops without a witness or proven
+    infeasibility (e.g. time limit without solution, or solver stall).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<p id="module-relucent.search.boundary_exclusion_trie">Trie-based compression of boundary MIP sign-pattern exclusions.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_exclusion_trie.</span></span><span class="sig-name descname"><span class="pre">CompileStats</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_tags</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_constraints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_saturated_nodes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">fully_saturated</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Statistics from <a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model" title="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ForbiddenPatternTrie.compile_to_model()</span></code></a>.</p>
+<dl class="simple">
+<dt>Fields:</dt><dd><p>n_tags: Number of forbidden patterns inserted.
+n_constraints: Number of no-good constraints emitted.
+n_saturated_nodes: Number of saturated subtrees compiled.
+compile_seconds: Wall-clock compile time.
+fully_saturated: True if every pattern is forbidden (no feasible cell remains).</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.compile_seconds">
+<span class="sig-name descname"><span class="pre">compile_seconds</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.compile_seconds" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.compression_ratio">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">compression_ratio</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.compression_ratio" title="Link to this definition"></a></dt>
+<dd><p>Tags per emitted constraint (higher means better compression).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.fully_saturated">
+<span class="sig-name descname"><span class="pre">fully_saturated</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.fully_saturated" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.n_constraints">
+<span class="sig-name descname"><span class="pre">n_constraints</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_constraints" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.n_saturated_nodes">
+<span class="sig-name descname"><span class="pre">n_saturated_nodes</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_saturated_nodes" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.CompileStats.n_tags">
+<span class="sig-name descname"><span class="pre">n_tags</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.CompileStats.n_tags" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">relucent.search.boundary_exclusion_trie.</span></span><span class="sig-name descname"><span class="pre">ForbiddenPatternTrie</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Binary trie of forbidden sign patterns over free ReLU indicators.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.from_tags">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_tags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tags</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><span class="pre">Iterable</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.14)"><span class="pre">bytes</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_shi</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie" title="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie"><span class="pre">ForbiddenPatternTrie</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.from_tags" title="Link to this definition"></a></dt>
+<dd><p>Build a trie from bytes-encoded sign sequences of length <code class="docutils literal notranslate"><span class="pre">n</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.collect_saturated_specs">
+<span class="sig-name descname"><span class="pre">collect_saturated_specs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_leaves</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.collect_saturated_specs" title="Link to this definition"></a></dt>
+<dd><p>Return each saturated subtree as a path of <code class="docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">sign)</span></code> pairs (plus single leaves if requested).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model">
+<span class="sig-name descname"><span class="pre">compile_to_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.gurobi.com/projects/optimizer/en/current/reference/python/model.html#Model" title="(in Gurobi Optimizer Reference Manual v13.0)"><span class="pre">Model</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_vars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_idx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_leaves</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#relucent.search.boundary_exclusion_trie.CompileStats" title="relucent.search.boundary_exclusion_trie.CompileStats"><span class="pre">CompileStats</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.compile_to_model" title="Link to this definition"></a></dt>
+<dd><p>Emit compressed no-good constraints; return compile statistics.</p>
+<p>By default only saturated subtrees are compiled. Unsaturated leaves are
+left to static or lazy exclusion paths when compression is poor.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.count_saturated_constraints">
+<span class="sig-name descname"><span class="pre">count_saturated_constraints</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_leaves</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.count_saturated_constraints" title="Link to this definition"></a></dt>
+<dd><p>Count saturated-subtree constraints without traversing the trie.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.insert">
+<span class="sig-name descname"><span class="pre">insert</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tag</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.14)"><span class="pre">bytes</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.insert" title="Link to this definition"></a></dt>
+<dd><p>Add one bytes-encoded sign sequence of length <code class="docutils literal notranslate"><span class="pre">n</span></code> to the forbidden set.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.is_saturated">
+<span class="sig-name descname"><span class="pre">is_saturated</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">_TrieNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#relucent.search.boundary_exclusion_trie.ForbiddenPatternTrie.is_saturated" title="Link to this definition"></a></dt>
+<dd><p>Whether <code class="docutils literal notranslate"><span class="pre">node</span></code> at <code class="docutils literal notranslate"><span class="pre">depth</span></code> has every possible completion forbidden.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="exploration.html" class="btn btn-neutral float-left" title="Exploration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="certify.html" class="btn btn-neutral float-right" title="Certification" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Blake B. Gaines.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
