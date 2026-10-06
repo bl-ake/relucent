@@ -126,11 +126,11 @@ class TestReLUNetwork:
         else:
             assert net.num_relus == 3
 
-    def test_get_all_layer_outputs(self, seeded):
+    def test_all_layer_outputs(self, seeded):
         assert seeded is not None
         net = mlp(widths=[3, 5, 2])
         x = np.random.randn(4, 3)
-        outs = net.get_all_layer_outputs(x)
+        outs = net.all_layer_outputs(x)
         assert list(outs) == list(net.layers)
         assert all(isinstance(t, np.ndarray) and t.shape[0] == 4 for t in outs.values())
         assert np.allclose(outs["fc1"], net.forward(x))

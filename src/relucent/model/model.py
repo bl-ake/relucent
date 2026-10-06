@@ -109,7 +109,7 @@ class ReLUNetwork:
             return x.reshape(x.shape[0], -1)
         raise ValueError(f"Unsupported canonical layer: {type(layer)}")
 
-    def get_all_layer_outputs(
+    def all_layer_outputs(
         self, data: np.ndarray | Any, layers: Container[str] | None = None
     ) -> OrderedDict[str, np.ndarray | Any]:
         """Return the output of each layer for ``data``.

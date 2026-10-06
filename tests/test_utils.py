@@ -12,7 +12,7 @@ from relucent._internal.parallel import BlockingQueue, NonBlockingQueue, Updatab
 from relucent.core.ss import encode_ss, flip_ss_at_shi, flip_ss_at_shi_inplace
 from relucent.model import LinearLayer, ReLULayer, ReLUNetwork
 from relucent.model.builders import TorchMLP, add_output_relu, normalize_weights, set_seeds, split_sequential
-from relucent.vis import get_colors
+from relucent.vis import colors
 
 
 class TestSetSeeds:
@@ -162,17 +162,17 @@ class TestUpdatablePriorityQueue:
         assert pq.pop() == "beta"
 
 
-class TestGetColors:
+class TestColors:
     def test_empty(self):
-        assert get_colors([]) == []
+        assert colors([]) == []
 
     def test_single(self):
-        out = get_colors([0.5])
+        out = colors([0.5])
         assert len(out) == 1
         assert out[0].startswith("#") and len(out[0]) == 7
 
     def test_range(self):
-        out = get_colors([0, 0.5, 1.0])
+        out = colors([0, 0.5, 1.0])
         assert len(out) == 3
         assert out[0] != out[-1]
 

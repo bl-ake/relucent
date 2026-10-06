@@ -23,4 +23,4 @@ Utility Functions
 
 .. autofunction:: relucent.plot_polyhedron
 
-.. autofunction:: relucent.get_colors
+.. autofunction:: relucent.colors

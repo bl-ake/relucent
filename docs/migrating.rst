@@ -78,6 +78,12 @@ verb names (``bfs``, ``certify``, ``plot``, ``slice_affine``,
      - ``relucent.geometry.halfspaces(poly, per_layer=...)``
    * - ``relucent.geometry.get_shis(poly)``
      - ``relucent.geometry.shis(poly)``
+   * - ``ReLUNetwork.get_all_layer_outputs(data)``
+     - ``ReLUNetwork.all_layer_outputs(data)``
+   * - ``relucent.topology.morse.get_layer_jacobians(net, ss)``
+     - ``relucent.topology.morse.layer_jacobians(net, ss)``
+   * - ``relucent.get_colors(data)``
+     - ``relucent.colors(data)``
    * - ``compactify=False`` / ``True``
      - ``compactify="truncate"`` / ``"borel_moore"`` (``"one_point"`` is unchanged)
    * - ``relucent.utils``

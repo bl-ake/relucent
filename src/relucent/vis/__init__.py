@@ -37,7 +37,7 @@ _TOL_RANK = 1e-6
 _TOL_VERTICAL = 1e-10
 
 __all__ = [
-    "get_colors",
+    "colors",
     "pyvis_dual_graph",
     "plot_complex",
     "plot_persistence_diagram",
@@ -45,7 +45,7 @@ __all__ = [
 ]
 
 
-def get_colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
+def colors(data: Sequence[float], cmap: str = "viridis") -> list[str]:
     """Map numeric values to hex color strings via a Plotly colorscale (e.g. ``"viridis"``)."""
     if not data:
         return []
@@ -582,7 +582,7 @@ def _equitable_colors(
 
 def _per_poly_colors(cpx: Complex, polys: list[Polyhedron], color: str | None, *, remap_equitable: bool) -> list[str]:
     if color == "Wl2":
-        return get_colors([poly.Wl2 for poly in polys])
+        return colors([poly.Wl2 for poly in polys])
     return _equitable_colors(cpx.dual_graph(), polys, remap=remap_equitable)
 
 
@@ -1161,12 +1161,12 @@ def pyvis_dual_graph(
         )
 
     if node_color == "Wl2":
-        colors = get_colors([poly.Wl2 for poly in plot_graph.nodes], cmap=cmap)
-        for c, poly in zip(colors, plot_graph.nodes, strict=True):
+        node_colors = colors([poly.Wl2 for poly in plot_graph.nodes], cmap=cmap)
+        for c, poly in zip(node_colors, plot_graph.nodes, strict=True):
             plot_graph.nodes[poly]["color"] = c
     elif node_color == "volume":
-        colors = get_colors(_capped_volumes(plot_graph.nodes), cmap=cmap)
-        for c, poly in zip(colors, plot_graph.nodes, strict=True):
+        node_colors = colors(_capped_volumes(plot_graph.nodes), cmap=cmap)
+        for c, poly in zip(node_colors, plot_graph.nodes, strict=True):
             plot_graph.nodes[poly]["color"] = c
 
     if node_size == "volume":

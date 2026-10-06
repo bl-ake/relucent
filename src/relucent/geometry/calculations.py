@@ -756,7 +756,7 @@ def _halfspaces_torch(
     abs_b: Any = None
     if data is not None:
         assert poly._net is not None
-        outs: Mapping[str, object] | None = poly._net.get_all_layer_outputs(data)
+        outs: Mapping[str, object] | None = poly._net.all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []
@@ -873,7 +873,7 @@ def _halfspaces_numpy(
     abs_b: Any = None
     if data is not None:
         assert poly._net is not None
-        outs: Mapping[str, object] | None = poly._net.get_all_layer_outputs(data)
+        outs: Mapping[str, object] | None = poly._net.all_layer_outputs(data)
     else:
         outs = None
     all_Ab = []

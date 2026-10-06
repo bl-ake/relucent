@@ -27,7 +27,7 @@ __all__ = [
     "coface_sign_sequence",
     "critical_flags_for_vertices",
     "critical_points",
-    "get_layer_jacobians",
+    "layer_jacobians",
     "gradient_on_cell",
     "is_pl_critical_vertex",
     "partial_derivative_sign",
@@ -85,7 +85,7 @@ def _coerce_ss(ss: np.ndarray) -> np.ndarray:
     return arr
 
 
-# Opt-in, thread-local memoization for `get_layer_jacobians`.
+# Opt-in, thread-local memoization for `layer_jacobians`.
 # `is_pl_critical_vertex` needs the same coface Jacobian twice per edge
 # (`_is_collapsed_edge`, then `partial_derivative_sign`); `_JacobianCacheScope` lets
 # the second call reuse the first. Off by default so other callers stay cache-free;
@@ -94,7 +94,7 @@ _jacobian_cache_state = threading.local()
 
 
 class _JacobianCacheScope:
-    """Scope in which ``get_layer_jacobians`` memoizes by ``(id(net), ss bytes)``.
+    """Scope in which ``layer_jacobians`` memoizes by ``(id(net), ss bytes)``.
 
     Intended to wrap a single vertex's criticality check (see
     ``is_pl_critical_vertex``): small, short-lived cache, reset on exit so it can
@@ -112,7 +112,7 @@ class _JacobianCacheScope:
         _jacobian_cache_state.cache = self._previous
 
 
-def get_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
+def layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians:
     """Lemma 9: cell Jacobians and input gradient; pre-activation rows for Lemma 10.
 
     Hidden ``Linear→ReLU`` blocks update a running map. For each block we store the
@@ -208,7 +208,7 @@ def _compute_layer_jacobians(net: ReLUNetwork, ss: np.ndarray) -> LayerJacobians
 def gradient_on_cell(net: ReLUNetwork, ss: np.ndarray) -> np.ndarray:
     """Lemma 9: ``∇F|_C`` as a length-``n_in`` vector (scalar output)."""
     assert_scalar_output(net)
-    return get_layer_jacobians(net, ss).gradient
+    return layer_jacobians(net, ss).gradient
 
 
 def coface_sign_sequence(edge_ss: np.ndarray) -> np.ndarray:
@@ -324,7 +324,7 @@ def partial_derivative_value(
 
     # Gradient is evaluated on a top cell containing the edge (Lemma 10 coface).
     coface = coface_sign_sequence(edge_ss)
-    jac = get_layer_jacobians(net, coface)
+    jac = layer_jacobians(net, coface)
     direction = _vertex_edge_direction(
         vertex_ss,
         edge_ss,
@@ -360,7 +360,7 @@ def partial_derivative_value_with_error(
     if not np.all((e != 0) | (v == 0)):
         raise ValueError("vertex must be a face of the edge (edge zeros are also zeros at the vertex)")
     coface = coface_sign_sequence(edge_ss)
-    jac = get_layer_jacobians(net, coface)
+    jac = layer_jacobians(net, coface)
     assert jac.by_relu_layer_abs is not None and jac.gradient_abs is not None
     g_rel = 2.0 * rounding.gamma(jac.n_terms)
 
@@ -417,7 +417,7 @@ def _is_collapsed_edge(
 
     coface = coface_sign_sequence(edge_ss)
     assert_scalar_output(net)
-    jac = get_layer_jacobians(net, coface)
+    jac = layer_jacobians(net, coface)
     assert jac.gradient_abs is not None
     # Zero, or zero to within every entry's own float64 error: F cannot be shown to vary.
     return bool(np.all(np.abs(jac.gradient) <= 2.0 * rounding.gamma(jac.n_terms) * jac.gradient_abs))

@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from .model.convert_model import convert
     from .search.exploration import SearchResult, explore_for_topology, generic_topology_start
     from .verify.certify import CertifyLevel
-    from .vis import get_colors, plot_complex, plot_polyhedron
+    from .vis import colors, plot_complex, plot_polyhedron
 
 __all__ = [
     "__version__",
@@ -54,7 +54,7 @@ __all__ = [
     "config",
     "update_settings",
     "convert",
-    "get_colors",
+    "colors",
     "add_output_relu",
     "explore_for_topology",
     "generic_topology_start",
@@ -77,7 +77,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "Polyhedron": ("relucent.core.poly", "Polyhedron"),
     "SearchResult": ("relucent.search.exploration", "SearchResult"),
     "convert": ("relucent.model.convert_model", "convert"),
-    "get_colors": ("relucent.vis", "get_colors"),
+    "colors": ("relucent.vis", "colors"),
     "add_output_relu": ("relucent.model.builders", "add_output_relu"),
     "explore_for_topology": ("relucent.search.exploration", "explore_for_topology"),
     "generic_topology_start": ("relucent.search.exploration", "generic_topology_start"),

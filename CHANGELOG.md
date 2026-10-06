@@ -15,7 +15,8 @@ every rename.
   `critical_points()`, `boundary_cells()`, `boundary_complex()`;
   `Polyhedron.neighbor()`, `face()`, `bounded_halfspaces()`, `bounded_vertices()`,
   `find_interior_point()`, `compute_geometric_properties()`;
-  `relucent.geometry.halfspaces()` and `shis()` (all were `get_*`).
+  `relucent.geometry.halfspaces()` and `shis()`; `ReLUNetwork.all_layer_outputs()`,
+  `relucent.topology.morse.layer_jacobians()` and `relucent.colors()` (all were `get_*`).
 - Search functions return a `SearchResult` dataclass and take keyword-only options.
 - `compactify` takes `"truncate"`, `"borel_moore"` or `"one_point"`.
 - One verbosity convention: `verbose: int | None` everywhere.

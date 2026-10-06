@@ -16,6 +16,6 @@ def test_submodules_are_importable_without_torch():
     assert relucent.Complex is not None
     assert relucent.Polyhedron is not None
     assert callable(relucent.convert)
-    assert callable(relucent.get_colors)
+    assert callable(relucent.colors)
     assert callable(relucent.plot_complex)
     assert callable(relucent.plot_polyhedron)

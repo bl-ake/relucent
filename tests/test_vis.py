@@ -68,9 +68,9 @@ def _complex_with_polys(dim: int, polys: list[Polyhedron]) -> Complex:
     return cx
 
 
-def test_get_colors_empty_and_basic():
-    assert vis.get_colors([]) == []
-    colors = vis.get_colors([0.0, 1.0, 2.0])
+def test_colors_empty_and_basic():
+    assert vis.colors([]) == []
+    colors = vis.colors([0.0, 1.0, 2.0])
     assert len(colors) == 3
     assert all(c.startswith("#") and len(c) == 7 for c in colors)
 
