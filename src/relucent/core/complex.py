@@ -16,7 +16,7 @@ import relucent.config as cfg
 import relucent.verify.certify as certify
 from relucent._internal.logging import with_verbosity
 from relucent._internal.parallel import BlockingQueue
-from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent._internal.torch_compat import TORCH_AVAILABLE, is_torch_tensor, no_grad, torch
 from relucent.core.errors import (
     ComplexNotCompleteError,
     ComplexNotVerifiedError,
@@ -199,7 +199,7 @@ class Complex:
         """
         if isinstance(key, Polyhedron):
             tag = key.tag
-        elif isinstance(key, (np.ndarray, torch.Tensor)):
+        elif isinstance(key, np.ndarray) or is_torch_tensor(key):
             tag = encode_ss(key)
         else:
             raise KeyError("Complex can only be indexed by Polyhedra, arrays, or tensors")
@@ -239,7 +239,7 @@ class Complex:
     def __contains__(self, key: Polyhedron | np.ndarray | torch.Tensor) -> bool:
         if isinstance(key, Polyhedron):
             return key.tag in self.tag2poly
-        elif isinstance(key, (np.ndarray, torch.Tensor)):
+        elif isinstance(key, np.ndarray) or is_torch_tensor(key):
             return encode_ss(key) in self.tag2poly
         return False
 
@@ -353,13 +353,13 @@ class Complex:
         """The number of bent hyperplanes/neurons in the network."""
         return len(self.ssi2maski)
 
-    @torch.no_grad()
+    @no_grad
     def preactivation_iterator(
         self,
         batch: torch.Tensor | np.ndarray,
     ) -> Generator[torch.Tensor | np.ndarray, None, None]:
         """Yield the preactivation values used by the sign sequence."""
-        if TORCH_AVAILABLE and isinstance(batch, torch.Tensor):
+        if is_torch_tensor(batch):
             x: torch.Tensor | np.ndarray = batch.reshape((-1, *self._net.input_shape))
         else:
             x = np.asarray(batch, dtype=np.float64).reshape((-1, *self._net.input_shape))
@@ -370,7 +370,7 @@ class Complex:
                 if i == self.ss_layers[-1]:
                     break
 
-    @torch.no_grad()
+    @no_grad
     def ss_iterator(self, batch: torch.Tensor | np.ndarray) -> Generator[torch.Tensor | np.ndarray, None, None]:
         """Generate sign sequences for each ReLU layer from a batch of data points.
 
@@ -382,7 +382,7 @@ class Complex:
             torch.Tensor: Sign sequences for each ReLU layer in
                 the network, indicating the activation pattern of that layer.
         """
-        use_torch = TORCH_AVAILABLE and isinstance(batch, torch.Tensor)
+        use_torch = is_torch_tensor(batch)
         for values in self.preactivation_iterator(batch):
             if use_torch:
                 yield torch.sign(torch.as_tensor(values))
@@ -391,7 +391,7 @@ class Complex:
 
     def point2preactivations(self, batch: torch.Tensor | np.ndarray) -> np.ndarray | torch.Tensor:
         """Return stacked ReLU preactivations in sign-sequence order."""
-        is_tensor = TORCH_AVAILABLE and isinstance(batch, torch.Tensor)
+        is_tensor = is_torch_tensor(batch)
         values = list(self.preactivation_iterator(batch))
         if is_tensor:
             return torch.hstack([torch.as_tensor(value) for value in values])
@@ -411,7 +411,7 @@ class Complex:
                 (batch_size, total_ReLU_neurons). Returns a torch.Tensor if batch is a
                 torch.Tensor, otherwise a np.ndarray.
         """
-        is_tensor = isinstance(batch, torch.Tensor)
+        is_tensor = is_torch_tensor(batch)
         ss_parts = list(self.ss_iterator(batch))
         if is_tensor and TORCH_AVAILABLE:
             return torch.hstack([torch.as_tensor(s) for s in ss_parts])

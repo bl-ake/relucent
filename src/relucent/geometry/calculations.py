@@ -4,6 +4,8 @@ Functions here take a :class:`~relucent.core.poly.Polyhedron` instance; the clas
 ``poly.py`` to avoid import cycles.
 """
 
+from __future__ import annotations
+
 import warnings
 from collections.abc import Callable, Iterable, Mapping
 from functools import partial
@@ -17,7 +19,7 @@ from tqdm.auto import tqdm
 import relucent.config as cfg
 from relucent._internal.cache import UNSET
 from relucent._internal.gurobi import get_env
-from relucent._internal.torch_compat import TORCH_AVAILABLE, torch
+from relucent._internal.torch_compat import is_torch_tensor, no_grad, torch
 from relucent.core.ss import flip_ss_at_shi
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer
 
@@ -476,7 +478,7 @@ def solve_radius(
     from relucent._internal import rounding
     from relucent.core.errors import AmbiguousGeometryError
 
-    if isinstance(halfspaces, torch.Tensor):
+    if is_torch_tensor(halfspaces):
         halfspaces = halfspaces.detach().cpu().numpy()
 
     if not np.isfinite(halfspaces).all():
@@ -659,11 +661,11 @@ def solve_radius(
             raise ValueError(f"Chebyshev LP ended with unexpected status: {status}")
 
 
-@torch.no_grad()
+@no_grad
 def adjacent_polyhedra(
-    poly: "Polyhedron",
-    ss2poly: Callable[..., "Polyhedron"],
-) -> "set[Polyhedron]":
+    poly: Polyhedron,
+    ss2poly: Callable[..., Polyhedron],
+) -> set[Polyhedron]:
     """Polyhedra adjacent to ``poly`` across one bounding hyperplane (one SHI flip).
 
     Also works on lower-dimensional polyhedra. ``ss2poly`` maps a sign sequence
@@ -679,7 +681,7 @@ def adjacent_polyhedra(
 
 @overload
 def halfspaces(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[False] = False,
@@ -689,7 +691,7 @@ def halfspaces(
 
 @overload
 def halfspaces(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[True],
@@ -698,7 +700,7 @@ def halfspaces(
 
 
 def halfspaces(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: bool = False,
@@ -718,14 +720,14 @@ def halfspaces(
         If ``per_layer`` is False: ``(halfspaces, W, b)``.
         If True: list of dicts with ``A``, ``b``, and ``layer`` keys.
     """
-    if TORCH_AVAILABLE and isinstance(poly._ss, torch.Tensor) and not force_numpy:
+    if is_torch_tensor(poly._ss) and not force_numpy:
         return _halfspaces_torch(poly, data, per_layer=per_layer)
     return _halfspaces_numpy(poly, data, per_layer=per_layer)
 
 
 @overload
 def _halfspaces_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[False] = False,
@@ -734,16 +736,16 @@ def _halfspaces_torch(
 
 @overload
 def _halfspaces_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[True],
 ) -> list[dict[str, object]]: ...
 
 
-@torch.no_grad()
+@no_grad
 def _halfspaces_torch(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: bool = False,
@@ -843,7 +845,7 @@ def _halfspaces_torch(
 
 @overload
 def _halfspaces_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[False] = False,
@@ -852,16 +854,16 @@ def _halfspaces_numpy(
 
 @overload
 def _halfspaces_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: Literal[True],
 ) -> list[dict[str, object]]: ...
 
 
-@torch.no_grad()
+@no_grad
 def _halfspaces_numpy(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     data: torch.Tensor | None = None,
     *,
     per_layer: bool = False,
@@ -931,7 +933,7 @@ def _halfspaces_numpy(
             assert isinstance(current_b, np.ndarray)
             assert outs is not None
             expected = outs[name]
-            if isinstance(expected, torch.Tensor):
+            if is_torch_tensor(expected):
                 expected = expected.detach().cpu().numpy()
             expected = np.asarray(expected)
             if cfg.CAREFUL_MODE and abs_A is not None and abs_b is not None:
@@ -971,7 +973,7 @@ def shis_are_certified(shis_kwargs: Mapping[str, Any]) -> bool:
 
 @overload
 def shis(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     collect_info: Literal[False] = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
@@ -984,7 +986,7 @@ def shis(
 
 @overload
 def shis(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     collect_info: Literal[True] | Literal["All"],
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
@@ -996,7 +998,7 @@ def shis(
 
 
 def shis(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     collect_info: bool | str = False,
     bound: float = GRB.INFINITY,
     subset: Iterable[int] | None = None,
@@ -1387,7 +1389,7 @@ def _cold_retry(model: Model, ok: tuple[int, ...] = (GRB.OPTIMAL,)) -> list[int]
 
 
 def _recover_relaxed_shi_lp(
-    model: Model, poly: "Polyhedron", i: int, decide: Callable[[], bool | None] | None = None
+    model: Model, poly: Polyhedron, i: int, decide: Callable[[], bool | None] | None = None
 ) -> bool | None:
     """Re-solve a failed SHI LP for halfspace ``i`` (``_cold_retry()``), else decide without it, else raise.
 
@@ -1413,7 +1415,7 @@ def _recover_relaxed_shi_lp(
 
 
 def _raise_if_coincident_facet(
-    poly: "Polyhedron",
+    poly: Polyhedron,
     model: Model,
     z: Any,
     lp_constrs: list[Any],
@@ -1461,7 +1463,7 @@ def _raise_if_coincident_facet(
         )
 
 
-def _raise_if_coincident_across(poly: "Polyhedron", i: int, zero_units: np.ndarray, eq_orig_idx: list[int]) -> None:
+def _raise_if_coincident_across(poly: Polyhedron, i: int, zero_units: np.ndarray, eq_orig_idx: list[int]) -> None:
     """Raise when a unit identically zero in this cell coincides with facet ``i`` on its other side.
 
     Such a unit's preactivation vanishes on the facet and is a nonzero multiple of halfspace ``i``'s
@@ -1501,7 +1503,7 @@ def _raise_if_coincident_across(poly: "Polyhedron", i: int, zero_units: np.ndarr
             )
 
 
-def certified_bounded(poly: "Polyhedron", env: Env | None = None) -> bool:
+def certified_bounded(poly: Polyhedron, env: Env | None = None) -> bool:
     """Whether the nonempty cell ``poly`` is bounded, decided for its exact rows.
 
     A nonempty cell ``{A x + b <= 0, A_eq x + b_eq = 0}`` is bounded exactly when its recession
@@ -1810,7 +1812,7 @@ def _interval_endpoints(halfspaces: np.ndarray) -> np.ndarray:
     return np.array([[lower], [upper]], dtype=np.float64)
 
 
-def compute_properties(poly: "Polyhedron", qhull_mode: str | None = None) -> QhullGeometry:
+def compute_properties(poly: Polyhedron, qhull_mode: str | None = None) -> QhullGeometry:
     """Qhull geometry of a nonempty cell: halfspace intersection, vertices, convex hull, volume.
 
     :class:`~relucent.core.poly.Polyhedron` caches the result behind its ``vertices``,

@@ -1,5 +1,7 @@
 """Polyhedron: a single linear region of a ReLU network in input space."""
 
+from __future__ import annotations
+
 import hashlib
 from collections.abc import Callable, Iterable
 from functools import cached_property
@@ -13,7 +15,7 @@ import relucent.config as cfg
 from relucent._internal import rounding
 from relucent._internal.cache import UNSET, Unset
 from relucent._internal.gurobi import get_env
-from relucent._internal.torch_compat import torch
+from relucent._internal.torch_compat import is_torch_tensor, torch
 from relucent.core.errors import AmbiguousGeometryError
 from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry import calculations
@@ -175,7 +177,7 @@ class Polyhedron:
             if isinstance(raw, np.ndarray):
                 self._halfspaces_np = raw
                 return raw
-            if isinstance(raw, torch.Tensor):
+            if is_torch_tensor(raw):
                 result = raw.detach().cpu().numpy()
                 self._halfspaces_np = result
                 return result
@@ -377,7 +379,7 @@ class Polyhedron:
             if value.dtype.kind not in "iu":
                 value = value.astype(np.int8, copy=False)
             return value
-        if isinstance(value, torch.Tensor):
+        if is_torch_tensor(value):
             # Preserve device but ensure integer dtype.
             if value.dtype not in (
                 torch.int8,
@@ -418,7 +420,7 @@ class Polyhedron:
         """The sign sequence as a NumPy ``int8`` array."""
         if isinstance(self._ss, np.ndarray):
             return self._ss
-        if isinstance(self._ss, torch.Tensor):
+        if is_torch_tensor(self._ss):
             return self._ss.detach().cpu().numpy().astype(np.int8, copy=False)
         raise TypeError(f"Unsupported ss type: {type(self._ss)}")
 
@@ -596,7 +598,7 @@ class Polyhedron:
             "bound": self.bound,
         }
 
-    def neighbor(self, shi: int) -> "Polyhedron":
+    def neighbor(self, shi: int) -> Polyhedron:
         """The neighbor polyhedron across the supporting hyperplane at index shi.
 
         Args:
@@ -615,7 +617,7 @@ class Polyhedron:
             return Polyhedron(None, ss, **self._same_rows_kwargs())
         return Polyhedron(self._net, ss)
 
-    def face(self, shis: int | Iterable[int]) -> "Polyhedron":
+    def face(self, shis: int | Iterable[int]) -> Polyhedron:
         """The face where the supporting hyperplane(s) ``shis`` hold with equality.
 
         One index gives a facet; several give a higher-codimension face. This is a purely
@@ -642,11 +644,11 @@ class Polyhedron:
         return Polyhedron(self._net, ss, bound=self.bound)
 
     @property
-    def faces(self) -> list["Polyhedron"]:
+    def faces(self) -> list[Polyhedron]:
         """All codimension-1 faces of the polyhedron."""
         return [self.face(shi) for shi in self.shis]
 
-    def nflips(self, other: "Polyhedron") -> int:
+    def nflips(self, other: Polyhedron) -> int:
         """Calculate the number of non-zero sign sequence elements that differ.
 
         Args:
@@ -657,7 +659,7 @@ class Polyhedron:
         """
         return int((self.ss * other.ss == -1).sum().item())
 
-    def is_face_of(self, other: "Polyhedron") -> bool:
+    def is_face_of(self, other: Polyhedron) -> bool:
         """Check if this polyhedron is a face of another polyhedron.
 
         Args:
@@ -671,7 +673,7 @@ class Polyhedron:
         eq = (self * other).ss == other.ss
         if isinstance(eq, np.ndarray):
             return bool(eq.all())
-        return bool(cast(torch.Tensor, eq).all())
+        return bool(cast("torch.Tensor", eq).all())
 
     def bounded_vertices(self, bound: float, qhull_mode: str | None = None) -> np.ndarray | None:
         """Get the vertices of the polyhedron within a bounding hypercube.
@@ -881,7 +883,7 @@ class Polyhedron:
                 self._halfspaces = self._halfspaces_np
             else:
                 self._ensure_affine_data()
-        assert isinstance(self._halfspaces, (torch.Tensor, np.ndarray))
+        assert isinstance(self._halfspaces, np.ndarray) or is_torch_tensor(self._halfspaces)
         return self._halfspaces
 
     @property
@@ -891,7 +893,7 @@ class Polyhedron:
             hs = self.halfspaces
             if isinstance(hs, np.ndarray):
                 self._halfspaces_np = hs
-            elif isinstance(hs, torch.Tensor):
+            elif is_torch_tensor(hs):
                 self._halfspaces_np = hs.detach().cpu().numpy()
             else:
                 raise TypeError(f"Unsupported halfspaces type: {type(hs)}")
@@ -962,7 +964,7 @@ class Polyhedron:
         """
         if self._w is None:
             self._ensure_affine_data()
-        assert isinstance(self._w, (torch.Tensor, np.ndarray))
+        assert isinstance(self._w, np.ndarray) or is_torch_tensor(self._w)
         return self._w
 
     @property
@@ -974,7 +976,7 @@ class Polyhedron:
         """
         if self._b is None:
             self._ensure_affine_data()
-        assert isinstance(self._b, (torch.Tensor, np.ndarray))
+        assert isinstance(self._b, np.ndarray) or is_torch_tensor(self._b)
         return self._b
 
     @property
@@ -1141,7 +1143,7 @@ class Polyhedron:
             f"point lies on rows {np.flatnonzero(undecided).tolist()} of {self!r} to within float64 error"
         )
 
-    def __mul__(self, other: "Polyhedron") -> "Polyhedron":
+    def __mul__(self, other: Polyhedron) -> Polyhedron:
         """Returns a new Polyhedron object based on sign sequence multiplication"""
         return Polyhedron(self._net, self.ss + other.ss * (self.ss == 0))
 
@@ -1197,7 +1199,7 @@ class Polyhedron:
             return self.halfspaces_err_np
         return self._halfspaces_err
 
-    def __reduce__(self) -> tuple[type["Polyhedron"], tuple[None, np.ndarray], dict[str, Any]]:
+    def __reduce__(self) -> tuple[type[Polyhedron], tuple[None, np.ndarray], dict[str, Any]]:
         return (
             Polyhedron,
             (None, self.ss_np),

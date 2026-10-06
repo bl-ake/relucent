@@ -5,22 +5,27 @@ This module provides utilities to convert various PyTorch model architectures
 which consists of Linear and ReLU layers only.
 """
 
+from __future__ import annotations
+
 import copy
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeGuard
 
 import numpy as np
-import numpy.typing as npt
 
 from relucent._internal.logging import progress
-from relucent._internal.torch_compat import nn, torch
+from relucent._internal.torch_compat import is_torch_tensor, nn, no_grad, torch
 from relucent.model.model import FlattenLayer, LinearLayer, ReLULayer, ReLUNetwork
 
-__all__ = ["convert"]
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
-AffineArrayLike = npt.ArrayLike | torch.Tensor
-AffineLayerPair = Sequence[AffineArrayLike]
+    # Annotation-only: evaluating ``torch.Tensor`` at import would import torch.
+    AffineArrayLike: TypeAlias = npt.ArrayLike | torch.Tensor
+    AffineLayerPair: TypeAlias = Sequence[AffineArrayLike]
+
+__all__ = ["convert"]
 
 
 def _canonicalize_layer(layer: object) -> LinearLayer | ReLULayer | FlattenLayer:
@@ -111,7 +116,7 @@ def _check_avgpool_supported(pool: nn.AvgPool2d) -> None:
 
 
 # https://gist.github.com/vvolhejn/e265665c65d3df37e381316bf57b8421
-@torch.no_grad()
+@no_grad
 def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]) -> nn.Linear:
     """Convert a Conv2d layer to an equivalent Linear layer.
 
@@ -187,7 +192,7 @@ def torch_conv_layer_to_affine(conv: nn.Conv2d, input_size: tuple[int, int, int]
     return fc
 
 
-@torch.no_grad()
+@no_grad
 def avgpool2d_to_affine(avgpool: nn.AvgPool2d, input_size: tuple[int, int, int]) -> nn.Linear:
     """Convert an AvgPool2d layer to an equivalent Linear layer.
 
@@ -229,7 +234,7 @@ def avgpool2d_to_affine(avgpool: nn.AvgPool2d, input_size: tuple[int, int, int])
 
 
 def _as_float64(value: Any) -> np.ndarray:
-    if isinstance(value, torch.Tensor):
+    if is_torch_tensor(value):
         return value.detach().double().cpu().numpy()
     return np.asarray(value, dtype=np.float64)
 
@@ -349,9 +354,9 @@ def combine_linear_layers(old_layers: OrderedDict[str, nn.Module]) -> OrderedDic
     return new_layers
 
 
-@torch.no_grad()
+@no_grad
 def convert(
-    model: "ReLUNetwork | nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerPair]",
+    model: ReLUNetwork | nn.Module | Iterable[nn.Module] | Mapping[str, nn.Module] | Sequence[AffineLayerPair],
     input_shape: tuple[int, ...] | None = None,
 ) -> ReLUNetwork:
     """Convert a PyTorch model to canonical NN format.
