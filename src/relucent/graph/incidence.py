@@ -44,7 +44,7 @@ import numpy as np
 import relucent.config as cfg
 from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger
-from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count, worker_pool
 from relucent.core.errors import CubicalConsistencyError, DualGraphAsymmetricEdgeError, ShiFlipInvariantError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
@@ -560,7 +560,7 @@ def set_contracted_shis(cplx: Complex, *, nworkers: int | None = None) -> int:
         pool_kwargs: dict[str, Any] = {} if is_fork else {"initializer": _init_contracted_worker, "initargs": (neighbor_tags,)}
         try:
             cubical_results: list[list[int]] = []
-            with ctx.Pool(effective_workers, **pool_kwargs) as pool:
+            with worker_pool(effective_workers, **pool_kwargs) as pool:
                 for chunk_results in pool.map(_cubical_shis_chunk, chunks):
                     cubical_results.extend(chunk_results)
         finally:
@@ -666,7 +666,7 @@ def parallel_collect_meta_face_edges(
     chunks = [cells[i : i + chunk_size] for i in range(0, n, chunk_size)]
     edges: list[tuple[bytes, bytes, int]] = []
     extra_tags: list[bytes] = []
-    with get_mp_context().Pool(nworkers) as pool:
+    with worker_pool(nworkers) as pool:
         for chunk_edges, chunk_extras in pool.starmap(
             collect_meta_face_edges,
             [(chunk, valid_face_tags) for chunk in chunks],

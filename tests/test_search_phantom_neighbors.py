@@ -27,7 +27,7 @@ def test_every_failed_neighbor_blocks_completeness() -> None:
 
 
 class _SyncPool:
-    """In-process Pool stand-in so monkeypatches survive on macOS (spawn workers)."""
+    """In-process ``WorkerPool`` stand-in so monkeypatches survive on macOS (spawn workers)."""
 
     def __init__(self, _nworkers: int, *, initializer=None, initargs=()) -> None:
         if initializer is not None:
@@ -38,10 +38,7 @@ class _SyncPool:
         for item in iterable:
             yield func(item)
 
-    def terminate(self) -> None:
-        pass
-
-    def join(self) -> None:
+    def shutdown(self) -> None:
         pass
 
     def __enter__(self):
@@ -49,11 +46,6 @@ class _SyncPool:
 
     def __exit__(self, *_args) -> None:
         pass
-
-
-class _SyncMpContext:
-    def Pool(self, nworkers: int, initializer=None, initargs=()):
-        return _SyncPool(nworkers, initializer=initializer, initargs=initargs)
 
 
 def _patch_first_worker(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
@@ -76,7 +68,7 @@ def _patch_first_worker(monkeypatch: pytest.MonkeyPatch, error: Exception) -> No
         )
 
     monkeypatch.setattr(search_mod, "_worker_prepare_poly", _fake_worker)
-    monkeypatch.setattr(search_mod, "get_mp_context", lambda: _SyncMpContext())
+    monkeypatch.setattr(search_mod, "worker_pool", _SyncPool)
 
 
 def test_bfs_incomplete_when_a_neighbor_comes_back_empty(monkeypatch: pytest.MonkeyPatch) -> None:

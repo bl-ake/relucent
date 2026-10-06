@@ -30,7 +30,7 @@ import networkx as nx
 import numpy as np
 
 from relucent._internal.logging import logger, progress, with_verbosity
-from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
+from relucent._internal.parallel import process_aware_cpu_count, worker_pool
 from relucent.core.errors import IncompleteDualGraphError, NonGenericArrangementError, ShiProofError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
@@ -291,7 +291,7 @@ def verify_lp_flip_neighbors_in_complex(cplx: Complex, *, nworkers: int | None =
             missing.extend(poly_missing)
             pbar.update()
     elif tasks:
-        with get_mp_context().Pool(
+        with worker_pool(
             worker_count,
             initializer=set_worker_context,
             initargs=(cplx._net, False, 1),

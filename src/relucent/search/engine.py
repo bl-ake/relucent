@@ -20,8 +20,8 @@ from relucent._internal.parallel import (
     BlockingQueue,
     NonBlockingQueue,
     UpdatablePriorityQueue,
-    get_mp_context,
     process_aware_cpu_count,
+    worker_pool,
 )
 from relucent._internal.torch_compat import torch
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
@@ -258,7 +258,7 @@ def parallel_compute_geometric_properties(
     tasks = [(poly.ss_np, poly._shis, bool(getattr(poly, "_shis_strict", False)), i) for i, poly in enumerate(cx)]
     failed: list[tuple[int, str]] = []
     computed = 0
-    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
+    with worker_pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
         for result in progress(
             pool.imap_unordered(
                 partial(
@@ -324,7 +324,7 @@ def parallel_add(
     ]  # materialize SSs up front so pool tasks are plain numpy arrays
 
     tasks = [(ss, None, i) for i, ss in enumerate(sss)]
-    with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net,)) as pool:
+    with worker_pool(nworkers, initializer=set_worker_context, initargs=(cx._net,)) as pool:
         results = pool.map(
             partial(
                 geometric_calculations,
@@ -524,7 +524,7 @@ def searcher(
     depth_limited = False
 
     if unprocessed > 0:
-        with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
+        with worker_pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
             try:
                 for p, shi, depth, node_index in pool.imap_unordered(  # type: ignore[assignment]
                     partial(
@@ -613,12 +613,11 @@ def searcher(
                     if unprocessed == 0 or len(cx) >= max_polys:
                         break
             finally:
+                # Closing the queue lets the pool stop handing out tasks; leaving the ``with``
+                # block then waits for the tasks in flight instead of killing their workers.
                 queue.close()
                 search_time = pbar.format_dict["elapsed"]
                 pbar.close()
-                # imap_unordered can't be cancelled cleanly on early break; kill workers.
-                pool.terminate()
-                pool.join()
     else:
         queue.close()
         search_time = pbar.format_dict["elapsed"]
@@ -858,7 +857,7 @@ def hamming_astar(
     with worker_context_scope(cx._net, get_volumes=False, num_threads=num_threads):
         try:
             if nworkers > 1:
-                pool = get_mp_context().Pool(
+                pool = worker_pool(
                     nworkers,
                     initializer=set_worker_context,
                     initargs=(cx._net, False, num_threads),
@@ -930,8 +929,7 @@ def hamming_astar(
                     break
         finally:
             if pool is not None:
-                pool.terminate()
-                pool.join()
+                pool.shutdown()
             openSet.close()
             # Same stale-lock guard as in searcher().
             tqdm.get_lock().locks = []

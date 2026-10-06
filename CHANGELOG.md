@@ -36,6 +36,12 @@ every rename.
 
 ### Fixed
 
+- Searches (`bfs`, `dfs`, `random_walk`, `searcher`, `hamming_astar`, boundary discovery) and
+  the other parallel steps could hang forever while shutting down their worker pool. They used
+  `multiprocessing.Pool.terminate()`, which can kill a worker while it holds the result queue's
+  lock, after which the pool waits on that lock forever. It was most likely when a search
+  stopped early (`max_polys`) with many workers. Pools now stop handing out tasks, let the
+  ones in flight finish, and close normally.
 - `Polyhedron.finite` reported cells with a lower-dimensional recession cone (half-infinite
   prisms) as bounded, and `vertices`/`volume` followed. It is now decided from the recession
   cone, certified in float64 or decided exactly.

@@ -19,7 +19,7 @@ import relucent.config as cfg
 from relucent._internal.gurobi import get_env
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import boundary_mip_eps, count_relu_units, estimate_input_bound, relu_linear_blocks
-from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
+from relucent._internal.parallel import process_aware_cpu_count, worker_pool
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss
 from relucent.model.model import ReLUNetwork
@@ -351,7 +351,7 @@ def _parallel_build_nogood_specs(
     else:
         chunk_size = max(1, (len(ordered_tags) + workers - 1) // workers)
         chunks = [ordered_tags[i : i + chunk_size] for i in range(0, len(ordered_tags), chunk_size)]
-        with get_mp_context().Pool(workers) as pool:
+        with worker_pool(workers) as pool:
             parts = pool.map(_build_nogood_specs_chunk, [(chunk, boundary_shi, n) for chunk in chunks])
         specs = [spec for part in parts for spec in part]
     return specs

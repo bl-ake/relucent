@@ -22,7 +22,7 @@ import numpy as np
 
 import relucent.config as cfg
 from relucent._internal.logging import logger, with_verbosity
-from relucent._internal.parallel import get_mp_context, process_aware_cpu_count
+from relucent._internal.parallel import get_mp_context, process_aware_cpu_count, worker_pool
 from relucent.core.ss import encode_ss
 from relucent.graph import incidence
 
@@ -166,7 +166,7 @@ def _generate_vertex_candidates(
         ctx = get_mp_context()
         if screen and nworkers > 1 and len(roots) >= PARALLEL_SCREEN_MIN_ROOTS and ctx.get_start_method() == "fork":
             _screen_state = (roots, incidents, ambient_dim, n_more)
-            pool = ctx.Pool(nworkers)
+            pool = worker_pool(nworkers)
             chunk = max(len(roots) // (nworkers * 8), 1)
             ranges = [(lo, min(lo + chunk, len(roots))) for lo in range(0, len(roots), chunk)]
             pairs = (pair for part in pool.imap(_screen_roots_chunk_star, ranges) for pair in part)
@@ -184,8 +184,7 @@ def _generate_vertex_candidates(
             pending.setdefault(encode_ss(candidate), (roots[k], candidate, combo))
     finally:
         if pool is not None:
-            pool.terminate()
-            pool.join()
+            pool.shutdown()
         _screen_state = None
     return pending
 
@@ -316,7 +315,7 @@ def _verify_candidates_parallel(
         verified_fork: dict[bytes, np.ndarray] = {}
         try:
             _verify_state = [(tag, root, candidate) for tag, (root, candidate, _combo) in items]
-            with ctx.Pool(effective_nworkers) as pool:
+            with worker_pool(effective_nworkers) as pool:
                 for part in pool.imap_unordered(_verify_range, [(lo, min(lo + chunk, n)) for lo in range(0, n, chunk)]):
                     verified_fork.update(part)
         finally:
@@ -342,7 +341,7 @@ def _verify_candidates_parallel(
         for i in range(0, n, chunk_size)
     ]
     verified: dict[bytes, np.ndarray] = {}
-    with get_mp_context().Pool(effective_nworkers) as pool:
+    with worker_pool(effective_nworkers) as pool:
         for chunk_results in pool.starmap(
             _verify_candidate_chunk,
             [(chunk, net) for chunk in chunks],

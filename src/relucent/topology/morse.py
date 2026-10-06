@@ -529,14 +529,14 @@ def critical_flags_for_vertices(
     if nworkers <= 1 or n < PARALLEL_CRITICAL_MIN_VERTICES:
         return [is_pl_critical_vertex(ss, net, ssi2maski=ssi2maski, ss_layers=ss_layers) for ss in vertex_ss_list]
 
-    from relucent._internal.parallel import get_mp_context
+    from relucent._internal.parallel import worker_pool
 
     effective_workers = min(nworkers, max(1, n // MIN_VERTICES_PER_WORKER))
     chunk_size = max(n // (effective_workers * 4), 1)
     chunks = [vertex_ss_list[i : i + chunk_size] for i in range(0, n, chunk_size)]
 
     results: list[tuple[bool, int | None]] = []
-    with get_mp_context().Pool(effective_workers) as pool:
+    with worker_pool(effective_workers) as pool:
         for chunk_results in pool.starmap(
             _is_pl_critical_vertex_chunk,
             [(chunk, net, ssi2maski, ss_layers) for chunk in chunks],

@@ -1,18 +1,31 @@
-"""Multiprocessing context, CPU count, and the thread-safe queues the search uses."""
+"""Multiprocessing context, worker pools, CPU count, and the thread-safe queues the search uses."""
 
+import itertools
 import multiprocessing as mp
 import os
 import sys
 from collections import deque
-from collections.abc import Callable, Hashable, Iterator, Sized
+from collections.abc import Callable, Hashable, Iterable, Iterator, Sized
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
+from multiprocessing.pool import IMapIterator
 from threading import Condition
-from typing import Generic, TypeVar
+from types import TracebackType
+from typing import Any, Generic, TypeVar
+from weakref import WeakSet
 
 import relucent.config as cfg
+from relucent._internal.logging import logger
 
-__all__ = ["get_mp_context", "process_aware_cpu_count", "NonBlockingQueue", "BlockingQueue", "UpdatablePriorityQueue"]
+__all__ = [
+    "get_mp_context",
+    "worker_pool",
+    "WorkerPool",
+    "process_aware_cpu_count",
+    "NonBlockingQueue",
+    "BlockingQueue",
+    "UpdatablePriorityQueue",
+]
 
 
 def get_mp_context() -> BaseContext:
@@ -46,6 +59,191 @@ def get_mp_context() -> BaseContext:
     if sys.platform == "darwin":
         return mp.get_context("spawn")
     return mp.get_context("fork" if "fork" in available else "spawn")
+
+
+R = TypeVar("R")
+
+# Seconds to wait for each in-flight result while a pool shuts down before giving up and
+# terminating its workers (only reached if a worker died or a task hangs).
+_DRAIN_TIMEOUT = 300.0
+
+# Set in each worker of a WorkerPool by its initializer: the pool's shared stop flag.
+_worker_stop_flag: Any = None
+
+
+def _init_pool_worker(stop_flag: Any, initializer: Callable[..., object] | None, initargs: tuple[Any, ...]) -> None:
+    global _worker_stop_flag
+    _worker_stop_flag = stop_flag
+    if initializer is not None:
+        initializer(*initargs)
+
+
+class _SkipAfterStop:
+    """Run ``func`` unless the pool has started shutting down; then return ``None`` at once."""
+
+    def __init__(self, func: Callable[..., Any]) -> None:
+        self.func = func
+
+    def __call__(self, *args: Any) -> Any:
+        if _worker_stop_flag is not None and _worker_stop_flag.value:
+            return None
+        return self.func(*args)
+
+
+class _CallOnChunk:
+    """Apply ``func`` to every item of a chunk (the pool's own ``mapstar``, but picklable here)."""
+
+    def __init__(self, func: Callable[[Any], Any]) -> None:
+        self.func = func
+
+    def __call__(self, chunk: list[Any]) -> list[Any]:
+        return [self.func(x) for x in chunk]
+
+
+def _until_stopped(iterable: Iterable[Any], stop_flag: Any) -> Iterator[Any]:
+    # Runs in the pool's task-handler thread: stop handing out tasks once shutdown starts.
+    for item in iterable:
+        if stop_flag.value:
+            return
+        yield item
+
+
+def _chunks(items: Iterator[Any], size: int) -> Iterator[list[Any]]:
+    while chunk := list(itertools.islice(items, size)):
+        yield chunk
+
+
+def _flatten(chunks: Iterator[list[Any] | None]) -> Iterator[Any]:
+    for chunk in chunks:
+        if chunk is not None:  # None marks a chunk skipped after shutdown began
+            yield from chunk
+
+
+class WorkerPool:
+    """A process pool that shuts down without killing workers mid-write.
+
+    ``multiprocessing.Pool.terminate()``, which ``with Pool() as pool`` also calls on exit,
+    kills workers with SIGTERM. A worker killed while it holds the result queue's lock (while
+    it sends a result, including the moment after the parent has read that result) never
+    releases it. The pool's task-handler thread then blocks on that lock forever, and so does
+    ``terminate()``.
+
+    On exit this pool instead raises a shared stop flag, stops handing out tasks, lets tasks
+    already started finish (tasks that start afterwards return ``None`` without running),
+    drains every iterator it returned, and then closes and joins the pool. Iterables passed
+    to :meth:`imap` and :meth:`imap_unordered` must not block forever: close a
+    :class:`BlockingQueue` before leaving the ``with`` block. On ``KeyboardInterrupt`` (or any
+    other non-``Exception``) the workers are terminated at once instead.
+    """
+
+    def __init__(
+        self,
+        processes: int | None = None,
+        initializer: Callable[..., object] | None = None,
+        initargs: Iterable[Any] = (),
+    ) -> None:
+        ctx = get_mp_context()
+        self._stop_flag: Any = ctx.RawValue("b", 0)
+        self._pool = ctx.Pool(
+            processes, initializer=_init_pool_worker, initargs=(self._stop_flag, initializer, tuple(initargs))
+        )
+        # Unfinished iterators stay alive in the pool's own cache, so a WeakSet keeps every one
+        # that still needs draining while letting finished ones go.
+        self._iterators: WeakSet[IMapIterator[Any]] = WeakSet()
+        self._closed = False
+
+    def map(self, func: Callable[[Any], R], iterable: Iterable[Any], chunksize: int | None = None) -> list[R]:
+        """Like :meth:`multiprocessing.pool.Pool.map`."""
+        return self._pool.map(_SkipAfterStop(func), iterable, chunksize)
+
+    def starmap(self, func: Callable[..., R], iterable: Iterable[Iterable[Any]], chunksize: int | None = None) -> list[R]:
+        """Like :meth:`multiprocessing.pool.Pool.starmap`."""
+        return self._pool.starmap(_SkipAfterStop(func), iterable, chunksize)
+
+    def imap(self, func: Callable[[Any], R], iterable: Iterable[Any], chunksize: int = 1) -> Iterator[R]:
+        """Like :meth:`multiprocessing.pool.Pool.imap`."""
+        return self._lazy_map(self._pool.imap, func, iterable, chunksize)
+
+    def imap_unordered(self, func: Callable[[Any], R], iterable: Iterable[Any], chunksize: int = 1) -> Iterator[R]:
+        """Like :meth:`multiprocessing.pool.Pool.imap_unordered`."""
+        return self._lazy_map(self._pool.imap_unordered, func, iterable, chunksize)
+
+    def _lazy_map(
+        self,
+        method: Callable[..., "IMapIterator[Any]"],
+        func: Callable[[Any], Any],
+        iterable: Iterable[Any],
+        chunksize: int,
+    ) -> Iterator[Any]:
+        # Chunk here rather than in the pool: with chunksize > 1, Pool.imap* returns a plain
+        # generator, and only its IMapIterator can be drained with a timeout at shutdown.
+        items = _until_stopped(iterable, self._stop_flag)
+        if chunksize <= 1:
+            it = method(_SkipAfterStop(func), items)
+            self._iterators.add(it)
+            return it
+        it = method(_SkipAfterStop(_CallOnChunk(func)), _chunks(items, chunksize))
+        self._iterators.add(it)
+        return _flatten(it)
+
+    def shutdown(self) -> None:
+        """Stop handing out tasks, finish or skip those in flight, then close and join the pool."""
+        if self._closed:
+            return
+        self._closed = True
+        self._stop_flag.value = 1
+        for it in list(self._iterators):
+            if not _drain(it):
+                logger.warning("A pool worker did not return within %.0f s while shutting down; terminating.", _DRAIN_TIMEOUT)
+                self.terminate()
+                return
+        self._iterators.clear()
+        self._pool.close()
+        self._pool.join()
+
+    def terminate(self) -> None:
+        """Kill the workers at once (``multiprocessing.pool.Pool.terminate``); see the class docstring for the risk."""
+        self._closed = True
+        self._stop_flag.value = 1
+        self._iterators.clear()
+        self._pool.terminate()
+        self._pool.join()
+
+    def __enter__(self) -> "WorkerPool":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        if exc_type is not None and not issubclass(exc_type, Exception):
+            self.terminate()
+        else:
+            self.shutdown()
+
+
+def _drain(it: "IMapIterator[Any]") -> bool:
+    """Consume what is left of ``it``; ``False`` if a result takes longer than ``_DRAIN_TIMEOUT``."""
+    while True:
+        try:
+            it.next(timeout=_DRAIN_TIMEOUT)
+        except StopIteration:
+            return True
+        except mp.TimeoutError:
+            return False
+        except Exception:
+            continue  # a task that raised; its error is not needed during shutdown
+
+
+def worker_pool(
+    processes: int | None = None,
+    initializer: Callable[..., object] | None = None,
+    initargs: Iterable[Any] = (),
+) -> WorkerPool:
+    """Create a :class:`WorkerPool` with the context from :func:`get_mp_context`."""
+    return WorkerPool(processes, initializer=initializer, initargs=initargs)
 
 
 def process_aware_cpu_count() -> int | None:

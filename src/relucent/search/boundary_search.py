@@ -14,7 +14,7 @@ import relucent.config as cfg
 from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
-from relucent._internal.parallel import BlockingQueue, get_mp_context, process_aware_cpu_count
+from relucent._internal.parallel import BlockingQueue, process_aware_cpu_count, worker_pool
 from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
@@ -145,12 +145,11 @@ def _apply_ambient_boundary_shis(
             _set_coface_rows(poly, halfspaces, halfspaces_err, halfspaces_ss)
         return
 
-    from relucent._internal.parallel import get_mp_context
     from relucent.search.worker_context import set_worker_context
 
     tasks = [(poly.ss_np, poly.tag) for poly in polys]
     tag_to_poly = {poly.tag: poly for poly in polys}
-    with get_mp_context().Pool(nw, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
+    with worker_pool(nw, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
         results = pool.starmap(
             partial(
                 _ambient_coface_shis_worker,
@@ -301,7 +300,7 @@ def boundary_searcher(
     t_search = time.perf_counter()
 
     if unprocessed > 0:
-        with get_mp_context().Pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
+        with worker_pool(nworkers, initializer=set_worker_context, initargs=(cx._net, False)) as pool:
             try:
                 for p, shi, depth, node_index in pool.imap_unordered(
                     partial(
@@ -391,8 +390,6 @@ def boundary_searcher(
                 queue.close()
                 search_time = time.perf_counter() - t_search
                 pbar.close()
-                pool.terminate()
-                pool.join()
     else:
         queue.close()
         search_time = time.perf_counter() - t_search
