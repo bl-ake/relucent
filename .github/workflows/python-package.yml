@@ -12,6 +12,13 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: "0 0 1 * *"
+  # publish.yml runs this suite on the release commit before building.
+  workflow_call:
+
+# A new push to a branch or PR cancels its older run that is still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # The only job that installs from uv.lock: ruff and basedpyright run at the versions `uv run` gives locally,
@@ -19,6 +26,7 @@ jobs:
   lint:
     name: Lint, type-check and test (uv.lock)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -44,6 +52,7 @@ jobs:
   docs:
     name: Docs (warnings are errors)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -62,6 +71,8 @@ jobs:
   test:
     name: Test (with torch) - ${{ matrix.os }} py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    # Windows takes about 16 minutes.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +100,7 @@ jobs:
   test-lowest-deps:
     name: Test (lowest allowed dependencies) - ubuntu py3.11
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -110,6 +122,7 @@ jobs:
   gf2-backend:
     name: GF(2) C backend + betti_numbers parity
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -133,6 +146,7 @@ jobs:
   test-no-torch:
     name: Test (no torch) - ubuntu py3.13
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
