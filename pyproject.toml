@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build >= 0.9.5, <0.10.0"]
+requires = ["uv_build >= 0.9.5, < 0.12"]
 build-backend = "uv_build"
 
 [project]
@@ -20,6 +20,30 @@ authors = [{ name = "Blake B. Gaines" }]
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 readme = "README.md"
+keywords = [
+    "relu",
+    "neural networks",
+    "polyhedral complex",
+    "linear regions",
+    "decision boundary",
+    "topology",
+    "betti numbers",
+    "persistent homology",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
+]
 
 [project.optional-dependencies]
 torch = ["torch>=2.5.0"]
@@ -29,6 +53,8 @@ docs = ["sphinx>=9.0.4", "sphinx-rtd-theme"]
 [project.urls]
 Repository = "https://github.com/bl-ake/relucent"
 Documentation = "https://bl-ake.github.io/relucent/"
+Changelog = "https://github.com/bl-ake/relucent/blob/main/CHANGELOG.md"
+Issues = "https://github.com/bl-ake/relucent/issues"
 
 [tool.pytest.ini_options]
 filterwarnings = [

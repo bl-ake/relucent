@@ -3,7 +3,7 @@
 relucent follows [semantic versioning](https://semver.org) from 1.0. What counts as public
 API is listed in [Stability and migrating to 1.0](https://bl-ake.github.io/relucent/migrating.html).
 
-## 1.0.0
+## 1.0.0 (2026-10-06)
 
 First stable release. Code written for 0.9 needs changes; the migration page has a table of
 every rename.
@@ -88,3 +88,12 @@ every rename.
   networkx 3.0 and tqdm 4.60 (plotly 5.20 and gurobipy 12 as before). A CI job runs the
   tests at exactly these versions on Python 3.11.
 - The wheel and sdist include the license text.
+- Search and chain-complex construction are faster.
+- Python 3.11–3.14 are supported (gurobipy 13 is allowed, which has Python 3.14 wheels).
+
+### Known issues
+
+- The dual graph of a boundary complex (`boundary_complex(i).dual_graph()`) can contain an
+  edge between two cells whose shared face is empty. Betti numbers are not affected: the chain
+  complex keeps only vertices that are verified geometrically, and meta-graph face edges come
+  from sign sequences, not from dual-graph edges.
