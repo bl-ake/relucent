@@ -36,7 +36,6 @@ Core capabilities include:
    topology
    betti_computation
    configuration
-   migrating
 
 .. toctree::
    :maxdepth: 1

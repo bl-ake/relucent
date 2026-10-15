@@ -74,7 +74,7 @@ Or, get the adjacency graph of top-dimensional cells in the complex with:
 print(cplx.dual_graph())
 ```
 
-You can view the full documentation for this library at https://bl-ake.github.io/relucent/. Upgrading from 0.9? See [Stability and migrating to 1.0](https://bl-ake.github.io/relucent/migrating.html).
+You can view the full documentation for this library at https://bl-ake.github.io/relucent/.
 
 ## Obtaining a Gurobi License
 `pip install relucent` installs the [Gurobi Python library](https://pypi.org/project/gurobipy/), which works for most applications without a [license](https://support.gurobi.com/hc/en-us/articles/12872879801105-How-do-I-retrieve-and-set-up-a-Gurobi-license). However, without one, Gurobi will only work with a limited feature set. This includes a limit on the number of decision variables in the models it can solve, which limits the size of the networks this code is able to analyze. There are multiple ways to install the software, but we recommend the following steps to those eligible for an academic license:

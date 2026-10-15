@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "relucent"
 description = "Explore the polyhedral complexes of ReLU neural networks."
-version = "1.0.1"
+version = "1.0.2"
 requires-python = ">= 3.11"
 
 dependencies = [
@@ -53,7 +53,6 @@ docs = ["sphinx>=9.0.4", "sphinx-rtd-theme"]
 [project.urls]
 Repository = "https://github.com/bl-ake/relucent"
 Documentation = "https://bl-ake.github.io/relucent/"
-Changelog = "https://github.com/bl-ake/relucent/blob/main/CHANGELOG.md"
 Issues = "https://github.com/bl-ake/relucent/issues"
 
 [tool.pytest.ini_options]
