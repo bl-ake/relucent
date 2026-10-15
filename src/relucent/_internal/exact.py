@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from fractions import Fraction
+from math import gcd
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -153,22 +154,37 @@ def exact_rows_for_ss(net: ReLUNetwork, ss: np.ndarray) -> list[Row]:
 
 
 def _solve(a: list[list[Fraction]], rhs: list[Fraction]) -> tuple[list[Fraction] | None, int, bool]:
-    """Gauss-Jordan on ``a x = rhs``: ``(a solution or None, rank, consistent)``."""
-    m = [list(r) + [c] for r, c in zip(a, rhs, strict=True)]
-    n_rows, n_cols = len(m), len(a[0])
+    """Gauss-Jordan on ``a x = rhs``: ``(a solution or None, rank, consistent)``.
+
+    Each equation is scaled to integers and reduced fraction-free (Bareiss), which gives the same exact answer
+    as rational elimination without a gcd after every step.
+    """
+    n_rows, n_cols = len(a), len(a[0])
+    m: list[list[int]] = []
+    for r, c in zip(a, rhs, strict=True):
+        row = [*r, c]
+        den = 1
+        for v in row:
+            d = v.denominator
+            if den % d:
+                den = den * d // gcd(den, d)
+        m.append([v.numerator * (den // v.denominator) for v in row])
     piv_cols: list[int] = []
     r = 0
+    prev = 1
     for c in range(n_cols):
         p = next((i for i in range(r, n_rows) if m[i][c] != 0), None)
         if p is None:
             continue
         m[r], m[p] = m[p], m[r]
-        inv = 1 / m[r][c]
-        m[r] = [v * inv for v in m[r]]
+        pivot_row = m[r]
+        pv = pivot_row[c]
         for i in range(n_rows):
-            if i != r and m[i][c] != 0:
-                f = m[i][c]
-                m[i] = [vi - f * vr for vi, vr in zip(m[i], m[r], strict=True)]
+            if i != r:
+                mi = m[i]
+                f = mi[c]
+                m[i] = [(pv * vi - f * vr) // prev for vi, vr in zip(mi, pivot_row, strict=True)]
+        prev = pv
         piv_cols.append(c)
         r += 1
         if r == n_rows:
@@ -178,7 +194,7 @@ def _solve(a: list[list[Fraction]], rhs: list[Fraction]) -> tuple[list[Fraction]
         return None, r, consistent
     x = [Fraction(0)] * n_cols
     for i, c in enumerate(piv_cols):
-        x[c] = m[i][n_cols]
+        x[c] = Fraction(m[i][n_cols], m[i][c])
     return x, r, consistent
 
 
