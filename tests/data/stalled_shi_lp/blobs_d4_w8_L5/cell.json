@@ -1,0 +1,75 @@
+{
+  "sign_sequence": [
+    -1,
+    -1,
+    1,
+    1,
+    1,
+    -1,
+    1,
+    1,
+    1,
+    1,
+    -1,
+    1,
+    1,
+    -1,
+    -1,
+    -1,
+    1,
+    -1,
+    -1,
+    -1,
+    -1,
+    1,
+    1,
+    -1,
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    -1,
+    -1,
+    -1,
+    1,
+    -1,
+    1,
+    1,
+    -1,
+    -1,
+    1,
+    1,
+    -1
+  ],
+  "reached_across_shi": 35,
+  "bfs_depth": 15,
+  "bound": 122814.4396391052,
+  "geometry_properties": [
+    "center",
+    "inradius"
+  ],
+  "stuck_halfspace": 27,
+  "stuck_lp": {
+    "rows": 41,
+    "variables": 4,
+    "simplex_iterations_in_10s": 2251174
+  },
+  "facets": [
+    19,
+    22,
+    27,
+    33,
+    34,
+    35
+  ],
+  "source": {
+    "experiment": "mlp_topology work/repro_full betti/deep_adam/blobs_d4_w8_L5_adam0.01_b1000_n0.2_uniform_t1",
+    "step": 9145,
+    "regions_explored_before_stall": 14964
+  },
+  "found_with": {
+    "relucent": "c488c65",
+    "gurobi": "13.0.3"
+  }
+}

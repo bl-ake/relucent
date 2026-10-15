@@ -211,6 +211,8 @@ The LP algorithm (:func:`~relucent.geometry.calculations.shis`):
    multiplier, which float64 cannot prove. Only if that is inconclusive does an exact
    simplex (``relucent._internal.exact.exact_facet_by_simplex()``) decide.
 
+.. _lp-solver-failures:
+
 LP solver failures
 ~~~~~~~~~~~~~~~~~~
 
@@ -238,6 +240,14 @@ every LP status seen. That happens when:
   the unbounded cell;
 * the row has a near-duplicate partner, whose coincidence check needs the LP; or
 * the exact simplex hits its iteration limit.
+
+**Time limit.** Every solve stops at :data:`~relucent.config.GUROBI_TIME_LIMIT` (10 s by default):
+a few badly conditioned SHI LPs otherwise run for hours or days. A timed-out SHI LP is a solver
+failure like the statuses above: it is re-solved from scratch (under the same limit) and then
+decided exactly, and :class:`~relucent.core.errors.SolverTimeLimitError` is raised only if that
+cannot decide it either. A timed-out Chebyshev LP raises
+:class:`~relucent.core.errors.SolverTimeLimitError` at once, and so does a cell's first SHI LP
+solve when it times out in the largest box.
 
 The re-solve comes first because it is much cheaper: a few milliseconds per row. The exact
 decision took 3–50 ms per row on the cells below (input dimension 3–4,

@@ -16,7 +16,7 @@ from gurobipy import GRB, Env, Model, quicksum
 from tqdm.auto import tqdm
 
 import relucent.config as cfg
-from relucent._internal.gurobi import get_env
+from relucent._internal.gurobi import get_env, time_limit_param
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import boundary_mip_eps, count_relu_units, estimate_input_bound, relu_linear_blocks
 from relucent._internal.parallel import process_aware_cpu_count, worker_pool
@@ -820,8 +820,8 @@ def _mip_boundary_witness(
 
     model = Model("boundary_pricing", env)
     _configure_pricing_mip_logging(model, log_path=log_path)
-    if cfg.BOUNDARY_MIP_TIME_LIMIT > 0:
-        model.setParam(GRB.Param.TimeLimit, float(cfg.BOUNDARY_MIP_TIME_LIMIT))
+    # Always set: the environment's TimeLimit is GUROBI_TIME_LIMIT, which is per LP, not per pricing MIP.
+    model.setParam(GRB.Param.TimeLimit, time_limit_param(cfg.BOUNDARY_MIP_TIME_LIMIT))
     model.Params.LazyConstraints = 1
 
     x = model.addMVar((input_dim, 1), lb=-bound, ub=bound, vtype=GRB.CONTINUOUS, name="x")

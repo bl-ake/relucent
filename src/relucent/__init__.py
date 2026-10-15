@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         ComplexNotVerifiedError,
         IncompleteDualGraphError,
         NonGenericArrangementError,
+        SolverTimeLimitError,
     )
     from .core.poly import Polyhedron
     from .model.builders import add_output_relu, mlp, set_seeds, split_sequential, torch_mlp
@@ -51,6 +52,7 @@ __all__ = [
     "NonGenericArrangementError",
     "Polyhedron",
     "SearchResult",
+    "SolverTimeLimitError",
     "config",
     "update_settings",
     "convert",
@@ -74,6 +76,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "ComplexNotVerifiedError": ("relucent.core.errors", "ComplexNotVerifiedError"),
     "IncompleteDualGraphError": ("relucent.core.errors", "IncompleteDualGraphError"),
     "NonGenericArrangementError": ("relucent.core.errors", "NonGenericArrangementError"),
+    "SolverTimeLimitError": ("relucent.core.errors", "SolverTimeLimitError"),
     "Polyhedron": ("relucent.core.poly", "Polyhedron"),
     "SearchResult": ("relucent.search.exploration", "SearchResult"),
     "convert": ("relucent.model.convert_model", "convert"),

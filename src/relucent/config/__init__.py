@@ -78,6 +78,16 @@ BOUNDARY_MIP_TIME_LIMIT: float = env_float("BOUNDARY_MIP_TIME_LIMIT", 0.0)
 BOUNDARY_MIP_GUROBI_LOG: bool = env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
 
 # -----------------------------------------------------------------------------
+# Gurobi
+# -----------------------------------------------------------------------------
+
+# Gurobi time limit (s) for each solve of a model built in relucent's own Gurobi environment;
+# ``0`` = none. A few badly conditioned LPs otherwise never finish. A solve that reaches it is never
+# taken as an answer: relucent re-solves it cold or decides it exactly where it can, and otherwise
+# raises SolverTimeLimitError. Boundary pricing MIPs use BOUNDARY_MIP_TIME_LIMIT instead.
+GUROBI_TIME_LIMIT: float = env_float("GUROBI_TIME_LIMIT", 10.0)
+
+# -----------------------------------------------------------------------------
 # Plotting
 # -----------------------------------------------------------------------------
 
@@ -116,6 +126,7 @@ __all__ = [
     "DEFAULT_PARALLEL_ADD_BOUND",
     "DEFAULT_PLOT_BOUND",
     "DEFAULT_SEARCH_BOUND",
+    "GUROBI_TIME_LIMIT",
     "MAX_RADIUS",
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",

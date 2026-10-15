@@ -580,6 +580,11 @@ def solve_radius(
         model.optimize()
         status = model.status
 
+    if status == GRB.TIME_LIMIT:
+        error = _time_limit_error(model, "the Chebyshev LP")
+        model.close()
+        raise error
+
     if status == GRB.OPTIMAL:
         objVal = model.objVal
         try:
@@ -1336,8 +1341,13 @@ def shis(
             continue
         break
     else:
+        timed_out = None
+        if model is not None and last_status == GRB.TIME_LIMIT:
+            timed_out = _time_limit_error(model, f"the SHI LP for {poly!r}")
         if model is not None:
             model.close()
+        if timed_out is not None:
+            raise timed_out
         # Gurobi found no feasible point under any box. Only a verified interior point inside the
         # largest box tried can contradict that (a cell may simply not reach a finite box); without
         # one, keep the solver's (unverified) verdict.
@@ -1358,6 +1368,16 @@ def shis(
         assert poly_info is not None
         return shis, poly_info
     return shis
+
+
+def _time_limit_error(model: Model, what: str) -> Exception:
+    """The error for a solve of ``model`` (``what`` names it) that stopped at its Gurobi ``TimeLimit``."""
+    from relucent.core.errors import SolverTimeLimitError
+
+    return SolverTimeLimitError(
+        f"{what} reached the Gurobi time limit of {model.Params.TimeLimit:g} s "
+        + "(relucent.config.GUROBI_TIME_LIMIT; 0 for none)"
+    )
 
 
 # ScaleFlag values tried in turn, each from scratch, when a SHI LP fails. In a census of real cells,
@@ -1406,6 +1426,12 @@ def _recover_relaxed_shi_lp(
         return verdict
     from relucent.core.errors import AmbiguousGeometryError
 
+    if model.status == GRB.TIME_LIMIT:
+        error = _time_limit_error(
+            model, f"the SHI LP for halfspace {i} of {poly!r} (warm, then cold; exact arithmetic could not decide it)"
+        )
+        model.close()
+        raise error
     model.close()
     raise AmbiguousGeometryError(
         f"the SHI LP for halfspace {i} of {poly!r} failed although it relaxes a feasible LP (statuses "
@@ -1443,6 +1469,8 @@ def _raise_if_coincident_facet(
         lp_constrs[jj].RHS = -b_red[jj, 0] + push_size
     try:
         model.optimize()
+        if model.status == GRB.TIME_LIMIT:
+            raise _time_limit_error(model, f"the coincident-facet check for halfspace {i} of {poly!r}")
         verdict = None
         if model.status == GRB.OPTIMAL:
             keep = np.array([r for r in range(h_red.shape[0]) if r not in set(partners)], dtype=np.intp)

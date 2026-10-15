@@ -1,0 +1,5 @@
+BestObjStop  0.5
+OptimalityTol  1e-09
+ScaleFlag  2
+LogToConsole  0
+OutputFlag  0

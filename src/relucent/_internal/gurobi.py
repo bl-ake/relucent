@@ -1,4 +1,7 @@
-"""Cached Gurobi environment, started without picking up a stray on-disk license when that fails."""
+"""Cached Gurobi environment, started without picking up a stray on-disk license when that fails.
+
+Every model built in it inherits :data:`relucent.config.GUROBI_TIME_LIMIT` as its ``TimeLimit``.
+"""
 
 import os
 import shutil
@@ -6,15 +9,19 @@ import tempfile
 
 from gurobipy import GRB, Env, GurobiError, disposeDefaultEnv
 
+import relucent.config as cfg
 from relucent._internal.logging import logger
 
-__all__ = ["get_env"]
+__all__ = ["get_env", "time_limit_param"]
 
 
 _env: Env | None = None
 
 
 _default_env_disposed: bool = False
+
+# The GUROBI_TIME_LIMIT value last written to the cached environment's TimeLimit.
+_env_time_limit: float | None = None
 
 
 _LICENSE_ENV_START_FALLBACK_ERRNOS: frozenset[int] = frozenset(
@@ -34,11 +41,27 @@ def _license_env_start_failure(exc: GurobiError) -> bool:
     return "license" in msg or "token server" in msg or "web license service" in msg or "wls" in msg or "compute server" in msg
 
 
+def time_limit_param(seconds: float | None) -> float:
+    """Gurobi's ``TimeLimit`` for a relucent time limit: ``seconds``, or no limit for ``None`` or ``<= 0``."""
+    if seconds is None or not seconds > 0:
+        return GRB.INFINITY
+    return float(seconds)
+
+
 def _configure_cached_gurobi_env(env: Env, num_threads: int | None) -> None:
     if num_threads is not None:
         env.setParam("Threads", num_threads)
     env.setParam("OutputFlag", 0)
     env.setParam("LogToConsole", 0)
+
+
+def _sync_time_limit(env: Env) -> None:
+    """Write :data:`~relucent.config.GUROBI_TIME_LIMIT` to ``env`` if it changed, for the models built next."""
+    global _env_time_limit
+    limit = cfg.GUROBI_TIME_LIMIT
+    if limit != _env_time_limit:
+        env.setParam("TimeLimit", time_limit_param(limit))
+        _env_time_limit = limit
 
 
 def _start_env_with_hidden_license_files(env: Env) -> None:
@@ -88,6 +111,9 @@ def get_env(num_threads: int | None = None) -> Env:
     limited license. Models larger than that license allows may raise
     ``ERROR_SIZE_LIMIT_EXCEEDED`` during solves.
 
+    The environment's ``TimeLimit`` follows :data:`relucent.config.GUROBI_TIME_LIMIT` (``0``: none),
+    re-read on every call, so models built in it stop a solve at that limit.
+
     If ``num_threads`` is provided, the environment's ``Threads`` parameter is
     set accordingly on first creation. Subsequent calls ignore ``num_threads``
     and return the cached environment.
@@ -101,6 +127,7 @@ def get_env(num_threads: int | None = None) -> Env:
     """
     global _env, _default_env_disposed
     if _env is not None:
+        _sync_time_limit(_env)
         return _env
     if not _default_env_disposed:
         disposeDefaultEnv()
@@ -126,4 +153,5 @@ def get_env(num_threads: int | None = None) -> Env:
             exc.message,
         )
     _env = candidate
+    _sync_time_limit(_env)
     return _env

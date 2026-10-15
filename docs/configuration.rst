@@ -130,6 +130,25 @@ Search and boundary discovery
 
    Emit full Gurobi solver logs during boundary pricing (independent of ``VERBOSE``).
 
+Gurobi
+~~~~~~
+
+.. py:data:: GUROBI_TIME_LIMIT
+   :type: float
+   :value: 10.0
+
+   Gurobi time limit (seconds) for each solve of a model built in relucent's own Gurobi
+   environment; ``0`` means no limit. It is Gurobi's ``TimeLimit`` parameter on that
+   environment, so it applies to every SHI, Chebyshev and recession-cone LP, and it is re-read
+   each time relucent hands the environment out, so a change applies to the models built next.
+   A few badly conditioned LPs never finish: a solve that reaches the limit is never taken as an
+   answer. Where exact arithmetic can decide the same question (a SHI LP, see
+   :ref:`lp-solver-failures`), relucent does that; otherwise it raises
+   :class:`~relucent.core.errors.SolverTimeLimitError`, an
+   :class:`~relucent.core.errors.AmbiguousGeometryError`. Models built in an environment you pass
+   yourself keep that environment's ``TimeLimit``. Boundary pricing MIPs always use
+   :data:`BOUNDARY_MIP_TIME_LIMIT` instead.
+
 Plotting
 ~~~~~~~~
 

@@ -19,6 +19,7 @@ __all__ = [
     "NonGenericArrangementError",
     "ShiFlipInvariantError",
     "ShiProofError",
+    "SolverTimeLimitError",
 ]
 
 
@@ -71,4 +72,14 @@ class AmbiguousGeometryError(RuntimeError):
     facet, whether a cell is empty, or whether two computed points coincide, when the computed
     value is within the rounding error of the network's exact rows. A ``RuntimeError`` rather than
     a ``ValueError`` so that handlers written for recoverable ``ValueError`` exceptions do not swallow it.
+    """
+
+
+class SolverTimeLimitError(AmbiguousGeometryError):
+    """A Gurobi solve reached :data:`~relucent.config.GUROBI_TIME_LIMIT`, so the decision it was for is not made.
+
+    A few badly conditioned LPs never finish, and the limit stops them. Where a cold re-solve or
+    exact arithmetic can make the same decision (a SHI LP), relucent does that first and raises
+    only if neither can. An :class:`AmbiguousGeometryError`, so every handler that refuses to guess
+    on an undecidable geometric question also refuses to treat a timed-out solve as an answer.
     """
