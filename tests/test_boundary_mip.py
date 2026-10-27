@@ -286,8 +286,6 @@ def test_price_boundary_witness_static_exclusions_match_lazy(seeded: int):
 
 def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch):
     """Large exclude sets use lazy-only pricing (no trie/static precompile)."""
-    import secrets
-
     import relucent.search.boundary_mip as boundary_mip
 
     compile_called = False
@@ -311,9 +309,14 @@ def test_lazy_only_mode_skips_compile_and_finds_witness(seeded: int, monkeypatch
     assert len(tags) >= 1
     target = next(iter(tags))
     exclude = set(tags) - {target}
+    # Pad with fixed tags that are not real boundary tags; a random pad could equal the target.
     tag_bytes = (cplx.n + 7) // 8
+    pad = 0
     while len(exclude) < 2:
-        exclude.add(secrets.token_bytes(tag_bytes))
+        cand = pad.to_bytes(tag_bytes, "little")
+        pad += 1
+        if cand not in tags:
+            exclude.add(cand)
     witness = price_boundary_witness(cplx._net, shi, exclude)
     assert not compile_called
     assert witness is not None
