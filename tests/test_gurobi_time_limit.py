@@ -132,7 +132,7 @@ def test_timed_out_shi_lps_are_decided_exactly(seeded: int, monkeypatch: pytest.
     timed_out: list[int] = []
 
     class TimesOutAfterFirstSolve(StopsAtTimeLimit):
-        """A SHI LP model whose first solve (the cell's feasibility check) has no limit, and every later one none to spare."""
+        """A SHI LP model whose first solve (the cell's feasibility check) has no limit, and later ones can't spare."""
 
         _solved_once: bool = False
 
