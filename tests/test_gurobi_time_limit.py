@@ -20,8 +20,35 @@ from relucent.geometry import calculations
 from relucent.search import boundary_mip
 from relucent.search.exploration import explore_for_topology
 
-# A limit no solve can meet: every solve stops with status TIME_LIMIT.
+# A limit no solve can meet. Gurobi does not always stop at it: it reads its clock only now and then,
+# and where the clock is coarse (Windows) a small LP often finishes before any time has passed and
+# reports OPTIMAL. So the tests below build models as StopsAtTimeLimit, which reports TIME_LIMIT itself.
 NO_TIME = 1e-9
+
+
+class StopsAtTimeLimit(Model):
+    """A Gurobi model that reports status TIME_LIMIT whenever its own TimeLimit is NO_TIME.
+
+    The limit is read from the model's real parameters, so a test using it still checks that
+    GUROBI_TIME_LIMIT reaches the models relucent builds; only Gurobi's timing is taken out.
+    """
+
+    @property
+    def status(self) -> int:
+        if float(self.Params.TimeLimit) <= NO_TIME:
+            return GRB.TIME_LIMIT
+        return int(self.getAttr("Status"))
+
+    @property
+    def Status(self) -> int:  # pyright: ignore[reportIncompatibleVariableOverride]
+        return self.status
+
+
+@pytest.fixture
+def stops_at_time_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Build relucent's LP models as :class:`StopsAtTimeLimit`."""
+    monkeypatch.setattr(calculations, "Model", StopsAtTimeLimit)
+
 
 # Unit square, rows a . x + b <= 0: its Chebyshev radius is 1.
 SQUARE = np.array([[1.0, 0.0, -1.0], [-1.0, 0.0, -1.0], [0.0, 1.0, -1.0], [0.0, -1.0, -1.0]])
@@ -63,6 +90,7 @@ def test_models_in_relucent_env_follow_the_setting(gurobi_time_limit: Callable[[
     assert math.isinf(_model_time_limit())
 
 
+@pytest.mark.usefixtures("stops_at_time_limit")
 def test_timed_out_chebyshev_lp_raises(gurobi_time_limit: Callable[[float], None]) -> None:
     """A Chebyshev LP that stops at the limit is never read as an empty or unbounded cell."""
     _center, radius = calculations.solve_radius(get_env(), SQUARE, max_radius=10.0)
@@ -72,7 +100,7 @@ def test_timed_out_chebyshev_lp_raises(gurobi_time_limit: Callable[[float], None
         calculations.solve_radius(get_env(), SQUARE, max_radius=10.0)
 
 
-@pytest.mark.usefixtures("seeded")
+@pytest.mark.usefixtures("seeded", "stops_at_time_limit")
 def test_timed_out_search_raises_instead_of_running_on(gurobi_time_limit: Callable[[float], None]) -> None:
     """A search whose solves all time out raises SolverTimeLimitError, never a ValueError.
 
@@ -103,7 +131,7 @@ def test_timed_out_shi_lps_are_decided_exactly(seeded: int, monkeypatch: pytest.
     expected = facets()
     timed_out: list[int] = []
 
-    class TimesOutAfterFirstSolve(Model):
+    class TimesOutAfterFirstSolve(StopsAtTimeLimit):
         """A SHI LP model whose first solve (the cell's feasibility check) has no limit, and every later one none to spare."""
 
         _solved_once: bool = False
