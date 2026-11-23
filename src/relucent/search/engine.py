@@ -34,6 +34,7 @@ from relucent.geometry.calculations import shis_are_certified
 from relucent.search.exploration import (
     SearchResult,
     finalize_ambient_search,
+    finalize_boundary_complex,
 )
 from relucent.search.worker_context import get_worker_context, set_worker_context, worker_context_scope
 
@@ -403,12 +404,18 @@ def searcher(
     cube_mode: CubeMode = "unrestricted",
     geometry_properties: Iterable[str] | None = None,
     verify: bool = True,
+    fixed: Iterable[int] | None = None,
     **kwargs: Any,
 ) -> SearchResult:
     """Search the complex by crossing supporting hyperplanes to find neighbors.
 
     Generic over traversal strategy (BFS, DFS, random walk): the queue decides the order.
     See Complex.bfs(), Complex.dfs(), and Complex.random_walk() for examples.
+
+    With ``fixed``, the search stays on the slice where those neurons are zero (one neuron's bent
+    hyperplane, or where several cross): it never crosses them, keeps only real cells of the slice,
+    and certifies the result as a slice complex. It finds only the connected component of the slice
+    that holds ``start``.
 
     Args:
         cx: The :class:`~relucent.core.complex.Complex` (not the module; workers use
@@ -430,13 +437,18 @@ def searcher(
             :func:`~relucent.verify.certify.certify_complex` at the end. Skipped if
             ``max_polys`` stops the search early. A finite ``max_depth`` can leave
             ``complete=False``, which raises unless the cap was hit.
+        fixed: Neuron indices to hold at zero. ``start`` must then be a Polyhedron or sign
+            sequence that is zero exactly at these indices and is a real cell of that slice
+            (every sign choice on them gives a nonempty cell). ``None`` (default) searches the
+            full-dimensional complex. Fixing a nonzero sign is not supported.
         **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
     Returns:
         :class:`~relucent.search.exploration.SearchResult`.
 
     Raises:
-        ValueError: If the start point lies on a hyperplane (has zero in SS).
+        ValueError: If the start point lies on a hyperplane (has zero in SS), or, with ``fixed``,
+            if ``start`` is not a cell of the slice.
         IncompleteDualGraphError: If ``verify`` is True and exploration stops early
             for reasons other than hitting ``max_polys``.
     """
@@ -472,7 +484,19 @@ def searcher(
             pop=cast(Callable[[deque[object]], object], deque.popleft),
             push=cast(Callable[[deque[object], object], None], deque.append),
         )
-    if start is None:
+    from relucent.search.boundary_search import _all_ambient_lifts_feasible, _is_slice_ss, _slice_start
+
+    fixed_set = frozenset(int(j) for j in fixed) if fixed is not None else frozenset()
+    if fixed_set:
+        if start is None:
+            raise ValueError("a search with fixed indices needs a start cell on that slice")
+        if not isinstance(start, Polyhedron):  # a sign sequence, not a point: a point is almost never on a slice
+            start = np.asarray(start.detach().cpu().numpy() if is_torch_tensor(start) else start)
+        start = cx.add_polyhedron(_slice_start(cx._net, start, tuple(sorted(fixed_set))), check_exists=False)
+        # The fixed hyperplanes are not facets to cross. This makes the frontier SHIs uncertified, so
+        # finalize recomputes them from the sign sequences.
+        shis_kwargs.setdefault("subset", [j for j in range(cx.n) if j not in fixed_set])
+    elif start is None:
         start = cx.add_point(np.zeros(cx._net.input_shape, dtype=np.float64))
     elif isinstance(start, Polyhedron):
         start = cx.add_polyhedron(start)
@@ -491,10 +515,19 @@ def searcher(
             complete=True,
             verified=False,
         )
-    if (start.ss_np == 0).any():
+    if not fixed_set and (start.ss_np == 0).any():
         raise ValueError("Start point must not be on a hyperplane")
-    start._shis = _start_shis_for_search(start, bound=bound, shis_kwargs=shis_kwargs)
-    start._shis_strict = shis_are_certified(shis_kwargs)
+    start_certified = shis_are_certified(shis_kwargs)
+    try:
+        start_shis = _start_shis_for_search(start, bound=bound, shis_kwargs=shis_kwargs)
+    except ValueError as exc:
+        # A thin slice cell can fail its first SHI LP; its sign-sequence crossings still seed the search.
+        if not fixed_set or "Initial Solve Failed" not in str(exc):
+            raise
+        start_shis = [int(j) for j in np.flatnonzero(np.asarray(start.ss_np).ravel() != 0)]
+        start_certified = False
+    start._shis = [s for s in start_shis if int(s) not in fixed_set]
+    start._shis_strict = start_certified
     retain_geometry_caches(start, search_props)
     start_index = cx.ssm[start.ss_np]
     # Seed the frontier: each task is (neighbor ss, shi crossed, depth, parent index).
@@ -547,9 +580,10 @@ def searcher(
                     if not isinstance(p, Polyhedron):
                         bad_shi_computations.append((node, shi, depth, str(p)))
                         _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
-                        if node.num_shis < min(cx.dim, cx.n):
+                        min_shis = min(cx.dim, cx.n) - len(fixed_set)
+                        if node.num_shis < min_shis:
                             warnings.warn(
-                                RuntimeWarning(f"Polyhedron {node} has less than {min(cx.dim, cx.n)} SHIs"),
+                                RuntimeWarning(f"Polyhedron {node} has less than {min_shis} SHIs"),
                                 stacklevel=2,
                             )
                         if unprocessed == 0 or len(cx) >= max_polys:
@@ -558,6 +592,13 @@ def searcher(
 
                     if p._net is None:
                         p._net = cx._net
+
+                    if fixed_set and not (_is_slice_ss(p.ss_np, fixed_set) and _all_ambient_lifts_feasible(p, fixed_set)):
+                        # Not a real cell of the slice (a phantom): don't keep it or search from it.
+                        _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
+                        if unprocessed == 0 or len(cx) >= max_polys:
+                            break
+                        continue
 
                     if cube_mode != "unrestricted" and not _apply_cube_filter(p, cube_mode, cast(float, cube_radius)):
                         _cancel_pending_neighbor(cx, pending_neighbors, node, shi, failed_flips)
@@ -575,7 +616,7 @@ def searcher(
                     if depth < max_depth:
                         poly_index = cx.ssm[p.ss_np]
                         for new_shi in p.shis:
-                            if new_shi != shi and len(cx) < max_polys:
+                            if new_shi != shi and new_shi not in fixed_set and len(cx) < max_polys:
                                 if (p.tag, int(new_shi)) in failed_flips:
                                     continue
                                 ss = flip_ss_at_shi(p.ss_np, new_shi)
@@ -592,7 +633,7 @@ def searcher(
                     elif max_depth != float("inf"):
                         # Queue may drain while neighbors beyond max_depth still exist.
                         for new_shi in p.shis:
-                            if new_shi == shi:
+                            if new_shi == shi or new_shi in fixed_set:
                                 continue
                             if (p.tag, int(new_shi)) in failed_flips:
                                 continue
@@ -633,7 +674,14 @@ def searcher(
     complete = unprocessed == 0 and not hit_cap and not depth_limited and not blocking_mistakes
     # Skip verify when max_polys hit — frontier may still have neighbors (LP false-fail).
     do_verify = verify and complete and not hit_cap
-    finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
+    if not fixed_set:
+        finalize_ambient_search(cx, verify=do_verify, complete=complete)  # sync SHIs + optional certify_complex
+    elif not complete:
+        cx.set_exploration_state(complete=False, verified=False)
+    else:
+        for poly in cx:
+            poly._finite = UNSET  # slice search may leave stale boundedness flags
+        finalize_boundary_complex(cx, fixed_set, bound=bound, nworkers=nworkers, verify=do_verify)
 
     n_phantom = len(bad_shi_computations) - len(blocking_mistakes)
     if n_phantom:

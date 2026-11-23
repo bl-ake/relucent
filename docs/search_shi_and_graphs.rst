@@ -71,9 +71,9 @@ Entry points
 All delegate to ``searcher()``, which runs a parallel frontier
 expansion over flip-neighbors.
 
-One component of a bent hyperplane can be explored on its own:
-:func:`~relucent.search.boundary_search.boundary_component` (slice-restricted BFS from a
-given cell). See `Boundary components`_ below.
+With ``fixed`` indices the same search stays on the slice where those neurons are zero, such as
+one component of a bent hyperplane (:meth:`~relucent.core.complex.Complex.boundary_component`).
+See `Slices and boundary components`_ below.
 
 Search loop
 ~~~~~~~~~~~
@@ -351,7 +351,7 @@ Boundary-specific checks
 
 :func:`~relucent.search.exploration.finalize_boundary_complex` also:
 
-* Verifies ambient coface feasibility per cell
+* Verifies that every ambient lift of each cell is nonempty
   (:func:`~relucent.verify.certify.verify_boundary_cell`)
 * Builds the dual graph with ``require_complete=verify``
 * Runs :func:`~relucent.verify.certify.verify_arrangement_genericity`
@@ -518,20 +518,22 @@ Dual graph vs meta-graph
 ``_shis`` (role 3). Node ``_shis`` can be a strict subset of SS crossings;
 conflating the two breaks ``∂² = 0`` for GF(2) boundary maps.
 
-Boundary components
--------------------
+Slices and boundary components
+------------------------------
 
-:meth:`~relucent.core.complex.Complex.boundary_component` explores the connected component of
-neuron ``i``'s bent hyperplane that contains a top cell you supply, without a full ambient BFS:
+``searcher(start, fixed=F)`` (and ``bfs``, ``dfs``, ``random_walk``) explores the connected
+component of the slice ``ss[F] = 0`` that contains ``start``, without a full ambient BFS.
+:meth:`~relucent.core.complex.Complex.boundary_component` is the case ``F = {i}``.
 
-1. **Slice BFS** — :func:`~relucent.search.boundary_search.boundary_searcher` explores the
-   component with ``ss[i] = 0`` fixed and SHI subsets that exclude the boundary hyperplane.
+1. **Slice search** — the ordinary search loop with the fixed indices left out of the SHI
+   candidates (``subset``), so they are never crossed; each discovered cell must be zero exactly
+   on ``F`` and have every ambient lift (each sign choice on ``F``) nonempty.
 2. **Finalize** — :func:`~relucent.search.exploration.finalize_boundary_complex`:
    slice SHI assignment (``ss_nonzero_indices`` + ``set_contracted_shis``),
    dual graph, genericity check, ``certify_complex``.
 
-It finds only that component and says nothing about others. For the whole hyperplane, explore the
-full ambient complex first, then take :meth:`~relucent.core.complex.Complex.boundary_complex`
+It finds only that component and says nothing about others. For a whole bent hyperplane, explore
+the full ambient complex first, then take :meth:`~relucent.core.complex.Complex.boundary_complex`
 (requires ``assert_topology_ready``).
 
 Related reading

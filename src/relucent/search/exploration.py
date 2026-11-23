@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -57,15 +58,24 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
 
 def finalize_boundary_complex(
     cx: Complex,
-    boundary_shi: int,
+    fixed: int | Iterable[int],
     *,
     bound: float | None = None,
     nworkers: int | None = None,
     verify: bool = True,
     **shis_kwargs: Any,
 ) -> None:
-    """Ambient coface SHIs, dual graph, genericity, and invariant certification."""
-    from relucent.search.boundary_search import _apply_ambient_boundary_shis
+    """Certify a slice complex (cells zero at the ``fixed`` neurons): ambient coface SHIs, dual graph,
+    genericity, and invariant certification.
+
+    ``fixed`` is one neuron (a bent hyperplane) or several (where their bent hyperplanes cross).
+    ``shis_kwargs`` is accepted for symmetry with the search and not used: slice SHIs come from the
+    sign sequences.
+    """
+    from relucent.search.boundary_search import _apply_ambient_boundary_shis, _as_fixed
+
+    del shis_kwargs
+    fixed = _as_fixed(fixed)
 
     if bound is None:
         bound = default_polyhedron_bound(cx._net)
@@ -76,20 +86,13 @@ def finalize_boundary_complex(
     logger.debug(
         f"boundary finalize: {n_cells} cells, ambient coface _shis ({nw} workers) ...",
     )
-    ambient_shis_kwargs = {k: v for k, v in shis_kwargs.items() if k != "subset"}  # slice-only kwarg
-    _apply_ambient_boundary_shis(
-        cx,
-        boundary_shi,
-        bound=bound,
-        nworkers=nw,
-        **ambient_shis_kwargs,
-    )
+    _apply_ambient_boundary_shis(cx, fixed, bound=bound, nworkers=nw)
     logger.debug(
         "boundary finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
     )
     if verify:
         for poly in cx:
-            verify_boundary_cell(poly, boundary_shi)
+            verify_boundary_cell(poly, fixed)
     for poly in cx:
         poly._finite = UNSET  # slice search may leave stale boundedness flags
     t2 = time.perf_counter()

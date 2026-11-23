@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 import numpy as np
 import pytest
 import torch
@@ -150,3 +152,49 @@ def test_boundary_component_rejects_a_start_that_is_not_a_cell(seeded: int):
     # x = 0 (unit 0's hyperplane) lies where unit 1 is negative, never positive.
     with pytest.raises(ValueError, match="not a cell"):
         cplx.boundary_component(0, np.array([0, 1], dtype=np.int8), verbose=0)
+
+
+def test_bfs_fixed_matches_boundary_component(seeded: int):
+    set_seeds(seeded)
+    model = _diamond_boundary_model_l1_ball(radius=1.0)
+    ref, shi = _reference(model, _populate_diamond, np.array([0.1, 0.2]))
+    start = min(ref, key=lambda p: p.tag).ss_np
+    via_bfs = Complex(model)
+    result = via_bfs.bfs(start, fixed=[shi], nworkers=1, verbose=0)
+    assert result.complete and via_bfs.verified
+    via_component = Complex(model).boundary_component(shi, start, nworkers=1, verbose=0)
+    assert {p.tag for p in via_bfs} == {p.tag for p in via_component}
+
+
+def test_searcher_fixed_two_neurons_tiles_their_intersection(seeded: int):
+    """Holding two neurons at zero explores where their bent hyperplanes cross (curves in d = 3)."""
+    set_seeds(seeded)
+    model = add_output_relu(torch_mlp(widths=[3, 5, 5, 1]))
+    cplx = Complex(model)
+    explore_for_topology(cplx)
+    edges = cplx.chain_complex()[2]  # the 1-cells
+    zero_sets = Counter(tuple(np.flatnonzero(np.asarray(p.ss_np).ravel() == 0).tolist()) for p in edges)
+    fixed = max((z for z in zero_sets if len(z) == 2), key=lambda z: (zero_sets[z], z))
+    ref = {p.tag: p for p in edges if tuple(np.flatnonzero(np.asarray(p.ss_np).ravel() == 0).tolist()) == fixed}
+    remaining, covered = dict(ref), set()
+    while remaining:
+        start = min(remaining)
+        comp = Complex(model)
+        result = comp.bfs(remaining[start].ss_np, fixed=fixed, nworkers=1, verbose=0)
+        tags = {p.tag for p in comp}
+        assert result.complete and comp.verified
+        assert start in tags and tags <= set(ref) and not tags & covered
+        covered |= tags
+        for t in tags:
+            remaining.pop(t)
+    assert covered == set(ref)
+
+
+def test_searcher_rejects_a_nonzero_fixed_sign(seeded: int):
+    set_seeds(seeded)
+    model = _diamond_boundary_model_l1_ball(radius=1.0)
+    ref, shi = _reference(model, _populate_diamond, np.array([0.1, 0.2]))
+    start = min(ref, key=lambda p: p.tag).ss_np
+    nonzero = int(np.flatnonzero(np.asarray(start).ravel() != 0)[0])
+    with pytest.raises(ValueError, match="nonzero sign is not supported"):
+        Complex(model).bfs(start, fixed=[shi, nonzero], nworkers=1, verbose=0)

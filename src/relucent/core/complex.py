@@ -616,6 +616,7 @@ class Complex:
         geometry_properties: Iterable[str] | None = None,
         verify: bool = True,
         verbose: int | None = None,
+        fixed: Iterable[int] | None = None,
         **kwargs: Any,
     ) -> SearchResult:
         """Search for polyhedra in the complex by discovering neighbors.
@@ -661,13 +662,18 @@ class Complex:
                 reuses them after dual-graph sync.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
+            fixed: Neuron indices to hold at zero, which restricts the search to the slice where
+                those neurons' bent hyperplanes meet. ``start`` must then be a Polyhedron or sign
+                sequence that is zero exactly there, and only its connected component of the slice
+                is found. See :func:`~relucent.search.engine.searcher`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
         Returns:
             A :class:`~relucent.search.exploration.SearchResult`.
 
         Raises:
-            ValueError: If the start point lies on a hyperplane (has zero in SS).
+            ValueError: If the start point lies on a hyperplane (has zero in SS), or, with
+                ``fixed``, if ``start`` is not a cell of that slice.
             IncompleteDualGraphError: If ``verify`` is True and exploration stops early
                 for reasons other than hitting ``max_polys``.
         """
@@ -688,6 +694,7 @@ class Complex:
             cube_mode=cube_mode,
             geometry_properties=geometry_properties,
             verify=verify,
+            fixed=fixed,
             **kwargs,
         )
 
@@ -728,6 +735,7 @@ class Complex:
         geometry_properties: Iterable[str] | None = None,
         verify: bool = True,
         verbose: int | None = None,
+        fixed: Iterable[int] | None = None,
         **kwargs: Any,
     ) -> SearchResult:
         """Breadth-first search: every cell at depth ``d`` before any at ``d + 1``.
@@ -747,6 +755,7 @@ class Complex:
             geometry_properties=geometry_properties,
             verify=verify,
             verbose=verbose,
+            fixed=fixed,
             **kwargs,
         )
 
@@ -763,6 +772,7 @@ class Complex:
         geometry_properties: Iterable[str] | None = None,
         verify: bool = True,
         verbose: int | None = None,
+        fixed: Iterable[int] | None = None,
         **kwargs: Any,
     ) -> SearchResult:
         """Depth-first search: follow each path as deep as it goes before backtracking.
@@ -782,6 +792,7 @@ class Complex:
             geometry_properties=geometry_properties,
             verify=verify,
             verbose=verbose,
+            fixed=fixed,
             **kwargs,
         )
 
@@ -798,6 +809,7 @@ class Complex:
         geometry_properties: Iterable[str] | None = None,
         verify: bool = True,
         verbose: int | None = None,
+        fixed: Iterable[int] | None = None,
         **kwargs: Any,
     ) -> SearchResult:
         """Search that expands a uniformly random frontier cell at each step.
@@ -821,6 +833,7 @@ class Complex:
             geometry_properties=geometry_properties,
             verify=verify,
             verbose=verbose,
+            fixed=fixed,
             **kwargs,
         )
 

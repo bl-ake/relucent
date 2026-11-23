@@ -104,7 +104,8 @@ Two calls build complexes on neuron ``i``'s bent hyperplane:
   :meth:`boundary_complex(i) <relucent.core.complex.Complex.boundary_complex>` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
 * **One component** — :meth:`boundary_component(i, start) <relucent.core.complex.Complex.boundary_component>`
-  runs a slice-restricted BFS from a top cell you supply, then
+  (``bfs(start, fixed=[i])`` into a new complex) runs a slice-restricted BFS from a top cell you
+  supply, then
   :func:`~relucent.search.exploration.finalize_boundary_complex` for slice SHI assignment,
   dual graph, and verification. It needs no ambient BFS, but it finds only the component
   containing ``start`` (see :doc:`boundary_search`).

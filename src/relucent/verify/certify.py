@@ -354,12 +354,12 @@ def verify_shi_geometry(poly: Polyhedron, *, bound: float | None = None) -> None
         raise ShiProofError(f"Cached _shis {sorted(poly._shis)} != recomputed {sorted(fresh)} on {poly!r}.")
 
 
-def verify_boundary_cell(poly: Polyhedron, boundary_shi: int) -> None:
-    """Both ambient cofaces of a boundary top cell must be nonempty."""
-    from relucent.search.boundary_search import _both_ambient_cofaces_feasible
+def verify_boundary_cell(poly: Polyhedron, fixed: int | Iterable[int]) -> None:
+    """Every ambient lift of a slice top cell (each sign choice on the ``fixed`` entries) must be nonempty."""
+    from relucent.search.boundary_search import _all_ambient_lifts_feasible, _as_fixed
 
-    if not _both_ambient_cofaces_feasible(poly, boundary_shi):
-        raise ValueError(f"Boundary cell {poly!r} fails ambient coface feasibility at shi={boundary_shi}.")
+    if not _all_ambient_lifts_feasible(poly, fixed):
+        raise ValueError(f"Slice cell {poly!r} fails ambient coface feasibility at shi={list(_as_fixed(fixed))}.")
 
 
 # ---------------------------------------------------------------------------
