@@ -945,7 +945,7 @@ class Complex:
 
         Args:
             i: Global supporting-hyperplane index (bent hyperplane).
-            start: A top cell of the hyperplane, as a :class:`Polyhedron` or a sign sequence whose
+            start: A top cell of the hyperplane, as a :class:`~relucent.core.poly.Polyhedron` or a sign sequence whose
                 only zero is at ``i``. Finding one is left to the caller.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.

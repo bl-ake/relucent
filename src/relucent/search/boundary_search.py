@@ -468,7 +468,7 @@ def boundary_component(
         **kwargs: Forwarded to the slice search's SHI routines.
 
     Returns:
-        A new :class:`Complex` of the component's top cells.
+        A new :class:`~relucent.core.complex.Complex` of the component's top cells.
 
     Raises:
         ValueError: If ``start`` is not a top cell of the hyperplane.
