@@ -8,7 +8,7 @@ from collections import deque
 from collections.abc import Callable, Hashable, Iterable, Iterator, Sized
 from heapq import heappop, heappush
 from multiprocessing.context import BaseContext
-from multiprocessing.pool import IMapIterator
+from multiprocessing.pool import IMapIterator, Pool
 from threading import Condition
 from types import TracebackType
 from typing import Any, Generic, TypeVar
@@ -119,6 +119,19 @@ def _flatten(chunks: Iterator[list[Any] | None]) -> Iterator[Any]:
             yield from chunk
 
 
+class _Pool(Pool):
+    """``multiprocessing.pool.Pool`` whose worker-handler thread does not watch the result pipe.
+
+    CPython's worker handler, which only replaces exited workers and notices shutdown, also waits on the pipe that
+    carries results. Results are read by another thread, so until that thread gets a core the pipe stays readable
+    and the handler spins on it: on a one-core job that cost about a quarter of a search. The change notifier still
+    wakes it for every close, terminate and drained task cache, and each worker's sentinel for every worker exit.
+    """
+
+    def _get_sentinels(self) -> list[Any]:
+        return [self._change_notifier._reader]  # pyright: ignore[reportAttributeAccessIssue]
+
+
 class WorkerPool:
     """A process pool that shuts down without killing workers mid-write.
 
@@ -144,8 +157,11 @@ class WorkerPool:
     ) -> None:
         ctx = get_mp_context()
         self._stop_flag: Any = ctx.RawValue("b", 0)
-        self._pool = ctx.Pool(
-            processes, initializer=_init_pool_worker, initargs=(self._stop_flag, initializer, tuple(initargs))
+        self._pool = _Pool(
+            processes,
+            initializer=_init_pool_worker,
+            initargs=(self._stop_flag, initializer, tuple(initargs)),
+            context=ctx,
         )
         # Unfinished iterators stay alive in the pool's own cache, so a WeakSet keeps every one
         # that still needs draining while letting finished ones go.
