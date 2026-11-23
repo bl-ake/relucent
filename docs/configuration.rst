@@ -9,8 +9,8 @@ can tune behavior for your model or hardware without editing source files.
 
 Nothing in relucent writes to these settings: importing the package and creating a
 :class:`~relucent.core.complex.Complex` leave them as you set them. Settings that depend
-on the network (the boundary MIP margin ``BOUNDARY_MIP_EPS``, the default SHI LP box) are
-``None`` or omitted by default and computed per network where they are used.
+on the network (the default SHI LP box) are omitted by default and computed per network
+where they are used.
 
 The topology path does not rely on tolerance settings for its decisions. Facets,
 emptiness, vertices, genericity, membership, and Morse signs are each checked against a
@@ -91,8 +91,8 @@ Geometry
 
    Maximum Chebyshev / interior-point search radius when solving with Gurobi.
 
-Search and boundary discovery
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Search
+~~~~~~
 
 .. py:data:: DEFAULT_PARALLEL_ADD_BOUND
    :type: float
@@ -104,31 +104,13 @@ Search and boundary discovery
    :type: float
    :value: 1e8
 
-   Fallback halfspace bound for :meth:`~relucent.core.complex.Complex.hamming_astar` when ``bound`` is omitted. BFS / :meth:`~relucent.core.complex.Complex.searcher` instead use a network-scaled bound (layerwise ``|W|_1`` propagation × ``BOUNDARY_MIP_BOUND_MARGIN``) when ``bound`` is ``None``.
+   Fallback halfspace bound for :meth:`~relucent.core.complex.Complex.hamming_astar` when ``bound`` is omitted. BFS / :meth:`~relucent.core.complex.Complex.searcher` instead use a network-scaled bound (layerwise ``|W|_1`` propagation × ``POLYHEDRON_BOUND_MARGIN``) when ``bound`` is ``None``.
 
-.. py:data:: BOUNDARY_MIP_BOUND_MARGIN
+.. py:data:: POLYHEDRON_BOUND_MARGIN
    :type: float
    :value: 5.0
 
-   Multiplier on the layerwise preactivation bound, used as the default SHI LP box radius and as the boundary MIP big-M.
-
-.. py:data:: BOUNDARY_MIP_EPS
-   :type: float | None
-   :value: None
-
-   Strict margin for boundary MIP witness pricing (``z_j = 0`` at the boundary SHI; ``|z_j| >= eps`` elsewhere). ``None`` computes ``2 · max(1e-4, 1e-6 · max preactivation)`` for each network, which stays above Gurobi's feasibility tolerance at that network's scale.
-
-.. py:data:: BOUNDARY_MIP_TIME_LIMIT
-   :type: float
-   :value: 0.0
-
-   Optional Gurobi time limit (seconds) per pricing MIP; ``0`` means no limit.
-
-.. py:data:: BOUNDARY_MIP_GUROBI_LOG
-   :type: bool
-   :value: False
-
-   Emit full Gurobi solver logs during boundary pricing (independent of ``VERBOSE``).
+   Multiplier on the layerwise preactivation bound, used as the default SHI LP box radius.
 
 Gurobi
 ~~~~~~
@@ -146,8 +128,7 @@ Gurobi
    :ref:`lp-solver-failures`), relucent does that; otherwise it raises
    :class:`~relucent.core.errors.SolverTimeLimitError`, an
    :class:`~relucent.core.errors.AmbiguousGeometryError`. Models built in an environment you pass
-   yourself keep that environment's ``TimeLimit``. Boundary pricing MIPs always use
-   :data:`BOUNDARY_MIP_TIME_LIMIT` instead.
+   yourself keep that environment's ``TimeLimit``.
 
 Plotting
 ~~~~~~~~
@@ -193,7 +174,7 @@ Advanced settings (unstable)
 :mod:`relucent.config.advanced` holds solver-tuning knobs. They change performance or
 solver details rather than what relucent computes, and **may change or disappear in any
 release**. Set them the same ways as the settings above, e.g.
-``relucent.config.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS = 4``.
+``relucent.config.advanced.ASTAR_BIAS_WEIGHT = 0.5``.
 
 .. py:data:: GUROBI_SHI_OPTIMALITY_TOL
    :type: float
@@ -224,72 +205,6 @@ release**. Set them the same ways as the settings above, e.g.
    :value: 0.5
 
    Seconds to wait on ``Condition.wait`` when polling the work queue shared by search workers.
-
-.. py:data:: BOUNDARY_PRICING_BRUTE_FORCE_MAX_N
-   :type: int
-   :value: 18
-
-   When total ReLU width is at most this value, try brute-force sign-pattern scan before/after MIP pricing.
-
-.. py:data:: BOUNDARY_MIP_COMPILE_EXCLUSIONS_MIN_TAGS
-   :type: int
-   :value: 1000
-
-   Compile ``exclude_tags`` into a compressed trie when at least this many tags are present (``0`` = always).
-
-.. py:data:: BOUNDARY_MIP_STATIC_EXCLUSION_MIN_TAGS
-   :type: int
-   :value: 1000
-
-   Bulk-add per-tag no-goods statically before optimize when at least this many tags are excluded.
-
-.. py:data:: BOUNDARY_MIP_STATIC_EXCLUSION_MIN_RATIO
-   :type: float
-   :value: 2.0
-
-   Static-add all leaf nogoods when trie compression ratio falls below this threshold.
-
-.. py:data:: BOUNDARY_MIP_EXCLUSION_BATCH_SIZE
-   :type: int
-   :value: 4096
-
-   Chunk size for batched Gurobi ``addConstrs`` when emitting exclusion nogoods.
-
-.. py:data:: BOUNDARY_MIP_EXCLUSION_WORKERS
-   :type: int
-   :value: 0
-
-   Workers for parallel nogood compilation; ``0`` = auto, ``1`` = serial.
-
-.. py:data:: BOUNDARY_MIP_CUT_ORDER
-   :type: str
-   :value: "tag_lex"
-
-   Cut ordering for static/lazy nogoods: ``as_is``, ``tag_lex``, ``layer_major``, ``hamming_median``, ``literal_count_asc``, ``trie_depth_desc``, or ``random``.
-
-.. py:data:: BOUNDARY_MIP_BULK_NOGOOD_EMIT
-   :type: str
-   :value: "auto"
-
-   Bulk matrix emit for static nogoods: ``auto``, ``on``, or ``off``.
-
-.. py:data:: BOUNDARY_MIP_STATIC_WAVE_SIZE
-   :type: int
-   :value: 0
-
-   Static nogood wave size; ``0`` = add all constraints before a single optimize.
-
-.. py:data:: BOUNDARY_MIP_CUT_PRIORITY_ENABLED
-   :type: bool
-   :value: False
-
-   Assign higher Gurobi priority to trie-compressed / deeper-path cuts.
-
-.. py:data:: BOUNDARY_MIP_LAZY_ONLY_MIN_TAGS
-   :type: int
-   :value: 50000
-
-   Skip trie/static precompilation and rely on lazy MIPSOL cuts when this many tags are excluded.
 
 API
 ---

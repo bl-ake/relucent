@@ -71,9 +71,9 @@ Entry points
 All delegate to ``searcher()``, which runs a parallel frontier
 expansion over flip-neighbors.
 
-Boundary complexes use a separate path:
-:func:`~relucent.search.boundary_search.discover_boundary_complex` (MIP pricing +
-slice-restricted BFS). See `Boundary discovery`_ below.
+One component of a bent hyperplane can be explored on its own:
+:func:`~relucent.search.boundary_search.boundary_component` (slice-restricted BFS from a
+given cell). See `Boundary components`_ below.
 
 Search loop
 ~~~~~~~~~~~
@@ -303,7 +303,7 @@ finalized by :func:`~relucent.graph.incidence.set_contracted_shis` to
 :func:`~relucent.graph.incidence.cubical_cell_shis`. Lower-dimensional 1-skeleton dual
 graphs walk each cell's finalized ``poly.shis`` (flip neighbors in the slice).
 
-Boundary discovery seeds slice ``_shis`` from SS crossings
+A boundary component search seeds slice ``_shis`` from SS crossings
 (``_apply_ambient_boundary_shis`` in :mod:`relucent.search.boundary_search`), then
 runs the same ``set_contracted_shis`` pass during finalize.
 
@@ -518,35 +518,21 @@ Dual graph vs meta-graph
 ``_shis`` (role 3). Node ``_shis`` can be a strict subset of SS crossings;
 conflating the two breaks ``∂² = 0`` for GF(2) boundary maps.
 
-Boundary discovery
-------------------
+Boundary components
+-------------------
 
-.. warning::
+:meth:`~relucent.core.complex.Complex.boundary_component` explores the connected component of
+neuron ``i``'s bent hyperplane that contains a top cell you supply, without a full ambient BFS:
 
-   Boundary discovery is **experimental** and outside relucent's stability guarantees.
-   Certification covers only the components it finds. MIP pricing can miss a component
-   that lies outside its input box (``estimate_input_bound``, which shrinks as the weights
-   shrink while the boundary moves outward) or on which some other unit stays within
-   ``BOUNDARY_MIP_EPS`` of zero (for example a dead unit under weight decay), and the
-   result is still reported as complete. For a verified boundary, explore the input space
-   with :meth:`~relucent.core.complex.Complex.bfs` and take
-   :meth:`~relucent.core.complex.Complex.boundary_complex`.
-
-:meth:`~relucent.core.complex.Complex.discover_boundary_complex` builds the
-decision-boundary complex for neuron ``i`` without a full ambient BFS:
-
-1. **MIP pricing** — :func:`~relucent.search.boundary_mip.price_boundary_witness` finds
-   witnesses for new connected components on the slice ``ss[i] = 0``.
-2. **Slice BFS** — :func:`~relucent.search.boundary_search.boundary_searcher` explores
-   each component with ``ss[boundary_shi] = 0`` fixed and SHI subsets that
-   exclude the boundary hyperplane.
-3. **Finalize** — :func:`~relucent.search.exploration.finalize_boundary_complex`:
+1. **Slice BFS** — :func:`~relucent.search.boundary_search.boundary_searcher` explores the
+   component with ``ss[i] = 0`` fixed and SHI subsets that exclude the boundary hyperplane.
+2. **Finalize** — :func:`~relucent.search.exploration.finalize_boundary_complex`:
    slice SHI assignment (``ss_nonzero_indices`` + ``set_contracted_shis``),
    dual graph, genericity check, ``certify_complex``.
 
-Alternatively, explore the full ambient complex first, then
-:meth:`~relucent.core.complex.Complex.boundary_complex` (requires
-``assert_topology_ready``).
+It finds only that component and says nothing about others. For the whole hyperplane, explore the
+full ambient complex first, then take :meth:`~relucent.core.complex.Complex.boundary_complex`
+(requires ``assert_topology_ready``).
 
 Related reading
 ---------------

@@ -905,8 +905,8 @@ class Complex:
     def boundary_complex(self, i: int, *, verbose: int | None = None) -> Complex:
         """The certified complex on neuron ``i``'s bent hyperplane, from this explored complex.
 
-        See :func:`relucent.graph.boundary.boundary_complex`. To find it without exploring
-        the whole input space, use :meth:`discover_boundary_complex`.
+        See :func:`relucent.graph.boundary.boundary_complex`. To explore one component of it
+        without exploring the whole input space, use :meth:`boundary_component`.
 
         Known issue: the returned complex's :meth:`dual_graph` can contain an edge between two
         cells whose shared face is empty. Its Betti numbers are not affected.
@@ -929,68 +929,35 @@ class Complex:
 
         return slice_complex(self, x0, V)
 
-    @overload
-    def discover_boundary_complex(
+    def boundary_component(
         self,
         i: int,
-        verbose: int | None = None,
+        start: Polyhedron | np.ndarray,
         *,
-        return_stats: Literal[False] = False,
-        **kwargs: Any,
-    ) -> Complex: ...
-
-    @overload
-    def discover_boundary_complex(
-        self,
-        i: int,
         verbose: int | None = None,
-        *,
-        return_stats: Literal[True],
         **kwargs: Any,
-    ) -> tuple[Complex, Any]: ...
+    ) -> Complex:
+        """The connected component of neuron ``i``'s bent hyperplane that contains ``start``.
 
-    def discover_boundary_complex(
-        self,
-        i: int,
-        verbose: int | None = None,
-        *,
-        return_stats: bool = False,
-        **kwargs: Any,
-    ) -> Complex | tuple[Complex, Any]:
-        """Discover neuron ``i``'s boundary complex without building the full input complex.
-
-        Uses MIP pricing to find new connected components on the slice ``ss[i]=0``,
-        then slice-restricted BFS to complete each component.
-
-        Experimental, and outside relucent's stability guarantees: certification covers only
-        the components pricing finds. A component outside the pricing box
-        (``estimate_input_bound``) or one on which some
-        other unit stays within :data:`~relucent.config.BOUNDARY_MIP_EPS` of zero can be
-        missed, and the result is still reported complete. For a verified boundary use
-        :meth:`bfs` and then :meth:`boundary_complex`.
+        Explores only cells on the hyperplane ``ss[i] = 0``, so its cost grows with the component,
+        not with the input space. It finds no other component and gives no indication whether
+        others exist: for the whole hyperplane use :meth:`bfs` and then :meth:`boundary_complex`.
 
         Args:
             i: Global supporting-hyperplane index (bent hyperplane).
+            start: A top cell of the hyperplane, as a :class:`Polyhedron` or a sign sequence whose
+                only zero is at ``i``. Finding one is left to the caller.
             verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug
                 detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-            return_stats: If True, return ``(complex, stats)`` with timing metadata.
-            **kwargs: Forwarded to :func:`~relucent.search.boundary_search.discover_boundary_complex`.
+            **kwargs: Forwarded to :func:`~relucent.search.boundary_search.boundary_component`
+                (``nworkers``, ``verify``, ``bound``, ...).
 
         Returns:
-            A new :class:`Complex` of boundary cells, or ``(complex, stats)`` when
-            ``return_stats`` is True.
+            A new certified :class:`Complex` of the component's top cells.
         """
-        from relucent.search.boundary_search import discover_boundary_complex as _discover
+        from relucent.search.boundary_search import boundary_component
 
-        boundary, stats = _discover(
-            self._net,
-            i,
-            verbose=verbose,
-            **kwargs,
-        )
-        if return_stats:
-            return boundary, stats
-        return boundary
+        return boundary_component(self._net, i, start, verbose=verbose, **kwargs)
 
     def chain_complex(self, verbose: int | None = None) -> list[Complex]:
         """Recover every cell of every dimension from verified vertices' local stars.

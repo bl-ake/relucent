@@ -74,7 +74,7 @@ def finalize_boundary_complex(
     nw = nworkers or process_aware_cpu_count() or 1
     t0 = time.perf_counter()
     logger.debug(
-        f"discover finalize: {n_cells} cells, ambient coface _shis ({nw} workers) ...",
+        f"boundary finalize: {n_cells} cells, ambient coface _shis ({nw} workers) ...",
     )
     ambient_shis_kwargs = {k: v for k, v in shis_kwargs.items() if k != "subset"}  # slice-only kwarg
     _apply_ambient_boundary_shis(
@@ -85,7 +85,7 @@ def finalize_boundary_complex(
         **ambient_shis_kwargs,
     )
     logger.debug(
-        "discover finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
+        "boundary finalize: ambient coface _shis finished in " + f"{time.perf_counter() - t0:.1f}s",
     )
     if verify:
         for poly in cx:
@@ -93,17 +93,17 @@ def finalize_boundary_complex(
     for poly in cx:
         poly._finite = UNSET  # slice search may leave stale boundedness flags
     t2 = time.perf_counter()
-    logger.debug("discover finalize: building dual graph ...")
+    logger.debug("boundary finalize: building dual graph ...")
     cx._dual_graph = cx.dual_graph(require_complete=verify)
     logger.debug(
-        "discover finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
+        "boundary finalize: dual graph finished in " + f"{time.perf_counter() - t2:.1f}s",
     )
     t4 = time.perf_counter()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # genericity can warn on near-degenerate 1-cells
         cx.verify_arrangement_genericity()
     logger.debug(
-        "discover finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
+        "boundary finalize: genericity verify finished in " + f"{time.perf_counter() - t4:.1f}s",
     )
     set_contracted_shis(cx)  # boundary top cells need contracted SHIs before certify
     if verify:

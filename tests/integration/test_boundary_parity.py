@@ -1,10 +1,10 @@
-"""Strict parity between full BFS + boundary_complex vs discover_boundary_complex."""
+"""Strict parity: components from Complex.boundary_component tile full BFS + boundary_complex."""
 
 from __future__ import annotations
 
 import pytest
 
-from relucent import Complex
+from tests.helpers import cover_by_components, summed_betti
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     load_manifest,
@@ -32,37 +32,33 @@ def test_boundary_method_parity(spec, integration_nworkers: int, integration_out
     shi = boundary_shi_for_spec(ambient, spec)
 
     boundary_full = ambient.boundary_complex(shi, verbose=False)
-    boundary_disc = Complex(model).discover_boundary_complex(
-        shi,
-        verbose=False,
-        nworkers=integration_nworkers,
-    )
+    components = cover_by_components(boundary_full, model, shi, nworkers=integration_nworkers)
 
     tags_full = tag_set(boundary_full)
-    tags_disc = tag_set(boundary_disc)
-    betti_full = truncated_betti(boundary_full)
-    betti_disc = truncated_betti(boundary_disc)
+    tags_comp = set().union(*(tag_set(c) for c in components)) if components else set()
+    betti_full = {k: v for k, v in truncated_betti(boundary_full).items() if v}
+    betti_comp = summed_betti(components, compactify="truncate", verbose=False)
 
-    if tags_full != tags_disc or betti_full != betti_disc:
+    if tags_full != tags_comp or betti_full != betti_comp:
         write_failure_artifacts(
             integration_outdir,
             spec.id,
-            only_full=tags_full - tags_disc,
-            only_discover=tags_disc - tags_full,
+            only_full=tags_full - tags_comp,
+            only_discover=tags_comp - tags_full,
             betti_full=betti_full,
-            betti_discover=betti_disc,
+            betti_discover=betti_comp,
             extra={
                 "n_full": len(tags_full),
-                "n_discover": len(tags_disc),
+                "n_components": len(components),
                 "n_regions": len(ambient),
             },
         )
 
-    assert tags_full == tags_disc, (
-        f"{spec.id}: boundary cell mismatch full={len(tags_full)} discover={len(tags_disc)}; "
+    assert tags_full == tags_comp, (
+        f"{spec.id}: boundary cell mismatch full={len(tags_full)} components={len(tags_comp)}; "
         + f"artifacts in {integration_outdir}/{spec.id}"
     )
-    assert betti_full == betti_disc, f"{spec.id}: truncated Betti mismatch full={betti_full} discover={betti_disc}"
+    assert betti_full == betti_comp, f"{spec.id}: truncated Betti mismatch full={betti_full} components={betti_comp}"
 
     if spec.expected_n_boundary_cells is not None:
         assert len(tags_full) == spec.expected_n_boundary_cells

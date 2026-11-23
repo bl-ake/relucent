@@ -47,8 +47,6 @@ _REFERENCE_ALIASES = [
 # ``Literal`` aliases from undocumented modules; the accepted values are listed where they are used.
 nitpick_ignore = [
     ("py:class", "CubeMode"),
-    # Private node type in a signature of the experimental boundary-search trie.
-    ("py:class", "relucent.search.boundary_exclusion_trie._TrieNode"),
     # Type-checking-only alias in convert()'s signature (defining it at runtime would import torch);
     # the docstring lists the accepted (weight, bias) pair forms.
     ("py:class", "AffineLayerPair"),

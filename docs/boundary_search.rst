@@ -1,27 +1,18 @@
 :tocdepth: 0
 
-Boundary Discovery
-==================
+Boundary Components
+===================
 
-.. warning::
+:meth:`Complex.boundary_component(i, start) <relucent.core.complex.Complex.boundary_component>`
+explores one connected component of neuron ``i``'s bent hyperplane: a slice-restricted BFS over
+cells with ``ss[i] = 0``, starting from a top cell you supply, followed by the same certification
+as any other complex. Its cost grows with the component, not with the input space.
 
-   Boundary discovery is **experimental** and outside relucent's stability guarantees.
-   Certification covers only the components it finds. MIP pricing can miss a component
-   that lies outside its input box (``estimate_input_bound``, which shrinks as the weights
-   shrink while the boundary moves outward) or on which some other unit stays within
-   ``BOUNDARY_MIP_EPS`` of zero (for example a dead unit under weight decay), and the
-   result is still reported as complete. For a verified boundary, explore the input space
-   with :meth:`~relucent.core.complex.Complex.bfs` and take
-   :meth:`~relucent.core.complex.Complex.boundary_complex`.
+It finds only the component that contains ``start`` and says nothing about whether other
+components exist. Finding a starting cell is left to the caller. For the whole hyperplane, explore
+the input space with :meth:`~relucent.core.complex.Complex.bfs` and take
+:meth:`~relucent.core.complex.Complex.boundary_complex`.
 
 .. automodule:: relucent.search.boundary_search
-   :members:
-   :show-inheritance:
-
-.. automodule:: relucent.search.boundary_mip
-   :members:
-   :show-inheritance:
-
-.. automodule:: relucent.search.boundary_exclusion_trie
    :members:
    :show-inheritance:

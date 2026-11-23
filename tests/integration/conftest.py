@@ -22,7 +22,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 @pytest.fixture
 def integration_nworkers() -> int:
-    """Worker count for BFS / boundary discovery (default 1; use 64 on SLURM)."""
+    """Worker count for BFS / boundary component search (default 1; use 64 on SLURM)."""
     raw = os.environ.get("RELUCENT_INTEGRATION_NWORKERS", "1")
     return max(1, int(raw))
 

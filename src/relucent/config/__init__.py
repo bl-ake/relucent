@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from relucent.config import advanced
-from relucent.config._env import check_choice, env_bool, env_choice, env_float, env_int, env_optional_float
+from relucent.config._env import check_choice, env_bool, env_choice, env_float, env_int
 
 # -----------------------------------------------------------------------------
 # Polyhedron geometry
@@ -63,19 +63,8 @@ DEFAULT_PARALLEL_ADD_BOUND: float = env_float("DEFAULT_PARALLEL_ADD_BOUND", 1e8)
 DEFAULT_SEARCH_BOUND: float = env_float("DEFAULT_SEARCH_BOUND", 1e8)
 
 # Multiplier on the layerwise preactivation bound used as the input box radius for SHI
-# LPs (when no ``bound`` is given) and as the boundary MIP big-M.
-BOUNDARY_MIP_BOUND_MARGIN: float = env_float("BOUNDARY_MIP_BOUND_MARGIN", 5.0)
-
-# Strict margin for boundary MIP witness pricing (``z_j = 0`` at ``boundary_shi``,
-# ``|z_j| >= eps`` elsewhere). ``None`` (default): computed per network as
-# ``2 * max(1e-4, 1e-6 * max preactivation)``, above Gurobi's feasibility tolerance.
-BOUNDARY_MIP_EPS: float | None = env_optional_float("BOUNDARY_MIP_EPS")
-
-# Gurobi time limit (s) per boundary pricing MIP; ``0`` = none.
-BOUNDARY_MIP_TIME_LIMIT: float = env_float("BOUNDARY_MIP_TIME_LIMIT", 0.0)
-
-# Show full Gurobi logs during boundary pricing MIPs (separate from :data:`VERBOSE`).
-BOUNDARY_MIP_GUROBI_LOG: bool = env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
+# LPs when no ``bound`` is given (``default_polyhedron_bound``).
+POLYHEDRON_BOUND_MARGIN: float = env_float("POLYHEDRON_BOUND_MARGIN", 5.0)
 
 # -----------------------------------------------------------------------------
 # Gurobi
@@ -84,7 +73,7 @@ BOUNDARY_MIP_GUROBI_LOG: bool = env_bool("BOUNDARY_MIP_GUROBI_LOG", False)
 # Gurobi time limit (s) for each solve of a model built in relucent's own Gurobi environment;
 # ``0`` = none. A few badly conditioned LPs otherwise never finish. A solve that reaches it is never
 # taken as an answer: relucent re-solves it cold or decides it exactly where it can, and otherwise
-# raises SolverTimeLimitError. Boundary pricing MIPs use BOUNDARY_MIP_TIME_LIMIT instead.
+# raises SolverTimeLimitError.
 GUROBI_TIME_LIMIT: float = env_float("GUROBI_TIME_LIMIT", 10.0)
 
 # -----------------------------------------------------------------------------
@@ -117,10 +106,6 @@ VERBOSE: int = env_int("VERBOSE", 1)
 _CHOICES: dict[str, tuple[str, ...]] = {"QHULL_MODE": QHULL_MODES, **advanced.CHOICES}
 
 __all__ = [
-    "BOUNDARY_MIP_BOUND_MARGIN",
-    "BOUNDARY_MIP_EPS",
-    "BOUNDARY_MIP_GUROBI_LOG",
-    "BOUNDARY_MIP_TIME_LIMIT",
     "CAREFUL_MODE",
     "DEFAULT_COMPLEX_PLOT_BOUND",
     "DEFAULT_PARALLEL_ADD_BOUND",
@@ -130,6 +115,7 @@ __all__ = [
     "MAX_RADIUS",
     "PLOT_DEFAULT_MAXCOORD",
     "PLOT_MARGIN_FACTOR",
+    "POLYHEDRON_BOUND_MARGIN",
     "QHULL_MODE",
     "VERBOSE",
     "advanced",

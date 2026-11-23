@@ -1,4 +1,4 @@
-"""Complex exploration: BFS/DFS, boundary discovery, and worker pools."""
+"""Complex exploration: BFS/DFS and worker pools."""
 
 from importlib import import_module
 from typing import TYPE_CHECKING, Any

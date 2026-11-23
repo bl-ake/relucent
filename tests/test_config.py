@@ -11,9 +11,7 @@ import pytest
 
 import relucent.config as cfg
 from relucent import convert, torch_mlp
-from relucent._internal.network_scale import boundary_mip_eps
 from relucent.config import update_settings
-from relucent.model.model import LinearLayer
 
 
 def _settings() -> dict[str, object]:
@@ -30,10 +28,10 @@ def test_import_and_complex_leave_settings_alone() -> None:
     """Neither ``import relucent`` nor ``Complex(net)`` rewrites settings a user has made."""
     code = (
         "import relucent, relucent.config as cfg; "
-        "assert cfg.BOUNDARY_MIP_EPS is None, cfg.BOUNDARY_MIP_EPS; "
-        "cfg.update_settings(MAX_RADIUS=7.0, BOUNDARY_MIP_EPS=0.5); "
+        "assert cfg.POLYHEDRON_BOUND_MARGIN == 5.0, cfg.POLYHEDRON_BOUND_MARGIN; "
+        "cfg.update_settings(MAX_RADIUS=7.0, POLYHEDRON_BOUND_MARGIN=0.5); "
         "relucent.Complex(relucent.torch_mlp([2, 4, 1])); "
-        "assert (cfg.MAX_RADIUS, cfg.BOUNDARY_MIP_EPS) == (7.0, 0.5)"
+        "assert (cfg.MAX_RADIUS, cfg.POLYHEDRON_BOUND_MARGIN) == (7.0, 0.5)"
     )
     proc = _run(code)
     assert proc.returncode == 0, proc.stderr
@@ -47,25 +45,14 @@ def test_complex_does_not_change_any_setting() -> None:
     assert _settings() == before
 
 
-def test_boundary_mip_eps_floor_and_scaling() -> None:
-    small = convert(torch_mlp([2, 4, 1]))
-    assert boundary_mip_eps(small) == 2e-4
-    big = convert(torch_mlp([2, 8, 8, 1]))
-    for layer in big.layers.values():
-        if isinstance(layer, LinearLayer):
-            layer.weight = layer.weight * 1e3
-            layer.bias = layer.bias * 1e3
-    assert boundary_mip_eps(big) > 2e-4
-
-
 def test_update_settings_routes_advanced_settings() -> None:
-    saved = cfg.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS
+    saved = cfg.advanced.ASTAR_BIAS_WEIGHT
     try:
-        update_settings(BOUNDARY_MIP_EXCLUSION_WORKERS=3)
-        assert cfg.advanced.BOUNDARY_MIP_EXCLUSION_WORKERS == 3
-        assert "BOUNDARY_MIP_EXCLUSION_WORKERS" not in vars(cfg)
+        update_settings(ASTAR_BIAS_WEIGHT=0.25)
+        assert cfg.advanced.ASTAR_BIAS_WEIGHT == 0.25
+        assert "ASTAR_BIAS_WEIGHT" not in vars(cfg)
     finally:
-        update_settings(BOUNDARY_MIP_EXCLUSION_WORKERS=saved)
+        update_settings(ASTAR_BIAS_WEIGHT=saved)
 
 
 def test_update_settings_rejects_unknown_and_invalid() -> None:
@@ -73,22 +60,20 @@ def test_update_settings_rejects_unknown_and_invalid() -> None:
         update_settings(NOT_A_SETTING=1)
     with pytest.raises(ValueError, match="QHULL_MODE"):
         update_settings(QHULL_MODE="SOMETIMES")
-    with pytest.raises(ValueError, match="BOUNDARY_MIP_CUT_ORDER"):
-        update_settings(BOUNDARY_MIP_CUT_ORDER="sideways")
     assert cfg.QHULL_MODE == "IGNORE"
 
 
 def test_env_vars_use_the_relucent_prefix() -> None:
-    code = "from relucent.config import advanced as a; print(a.BOUNDARY_MIP_CUT_ORDER, a.BOUNDARY_MIP_BULK_NOGOOD_EMIT)"
-    proc = _run(code, RELUCENT_BOUNDARY_MIP_CUT_ORDER="random", RELUCENT_BOUNDARY_MIP_BULK_NOGOOD_EMIT="off")
+    code = "from relucent.config import advanced as a; print(a.ASTAR_BIAS_WEIGHT, a.GUROBI_SHI_SCALE_FLAG)"
+    proc = _run(code, RELUCENT_ASTAR_BIAS_WEIGHT="0.5", RELUCENT_GUROBI_SHI_SCALE_FLAG="1")
     assert proc.returncode == 0, proc.stderr
-    assert proc.stdout.split() == ["random", "off"]
+    assert proc.stdout.split() == ["0.5", "1"]
     proc = _run("import relucent.config", RELUCENT_QHULL_MODE="SOMETIMES")
     assert proc.returncode != 0 and "QHULL_MODE" in proc.stderr
 
 
-def test_boundary_mip_bound_margin_default() -> None:
-    assert cfg.BOUNDARY_MIP_BOUND_MARGIN == 5.0
+def test_polyhedron_bound_margin_default() -> None:
+    assert cfg.POLYHEDRON_BOUND_MARGIN == 5.0
 
 
 def test_bfs_explores_deep_large_weight_network() -> None:

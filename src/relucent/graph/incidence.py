@@ -525,8 +525,8 @@ def set_contracted_shis(cplx: Complex, *, nworkers: int | None = None) -> int:
 
     Used after :meth:`~relucent.core.complex.Complex.chain_complex` materializes a
     dimension slice, after :meth:`~relucent.core.complex.Complex.boundary_complex` /
-    :meth:`~relucent.core.complex.Complex.boundary_cells`, and at the end of boundary
-    discovery in :func:`~relucent.search.exploration.finalize_boundary_complex`.
+    :meth:`~relucent.core.complex.Complex.boundary_cells`, and at the end of a boundary
+    component search in :func:`~relucent.search.exploration.finalize_boundary_complex`.
     Assigns :func:`cubical_cell_shis` once the full dimension slice is known.
     Call :func:`verify_contracted_shis` to assert flip-neighbor and symmetry invariants.
 

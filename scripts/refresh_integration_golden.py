@@ -44,6 +44,10 @@ from tests.integration.helpers import (  # noqa: E402
 _REFRESH_SKIP = frozenset({"dual_recovery_4392"})
 
 
+def _nonzero(betti: dict[int, int]) -> dict[int, int]:
+    return {k: v for k, v in betti.items() if v}
+
+
 def _compute_golden(
     model: Any,
     spec: WitnessSpec,
@@ -56,24 +60,26 @@ def _compute_golden(
     boundary_full = ambient.boundary_complex(shi, verbose=False)
     tags_full = tag_set(boundary_full)
     betti_full = truncated_betti(boundary_full)
+    # Cover the full boundary with boundary_component calls, each started from a cell not yet found.
     tags_disc: set[bytes] = set()
     betti_disc: dict[int, int] = {}
-    try:
-        boundary_disc = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=nworkers)
-        tags_disc = tag_set(boundary_disc)
-        betti_disc = truncated_betti(boundary_disc)
-    except ValueError as exc:
-        if "Initial Solve Failed" not in str(exc):
-            raise
-        print(f"  WARNING: discover_boundary_complex failed: {exc}", flush=True)
+    remaining = {p.tag: p for p in boundary_full}
+    while remaining:
+        start = min(remaining)
+        comp = Complex(model).boundary_component(shi, remaining[start].ss_np, verbose=0, nworkers=nworkers)
+        tags_disc |= tag_set(comp)
+        for k, v in truncated_betti(comp).items():
+            betti_disc[k] = betti_disc.get(k, 0) + v
+        for t in tag_set(comp) | {start}:  # drop the start too, so a bad component cannot loop forever
+            remaining.pop(t, None)
     return {
         "n_regions": len(ambient),
         "n_boundary_cells": len(tags_full),
         "truncated_betti": betti_full,
-        "methods_agree": tags_full == tags_disc and betti_full == betti_disc,
+        "methods_agree": tags_full == tags_disc and _nonzero(betti_full) == _nonzero(betti_disc),
         "boundary_shi": shi,
-        "n_boundary_discover": len(tags_disc),
-        "truncated_betti_discover": betti_disc,
+        "n_boundary_components_cells": len(tags_disc),
+        "truncated_betti_components": betti_disc,
     }
 
 
@@ -117,8 +123,8 @@ def main() -> None:
         if not golden["methods_agree"]:
             print(
                 "  WARNING: methods disagree:"
-                + f" full={golden['n_boundary_cells']} disc={golden['n_boundary_discover']}"
-                + f" betti_full={golden['truncated_betti']} disc={golden['truncated_betti_discover']}",
+                + f" full={golden['n_boundary_cells']} components={golden['n_boundary_components_cells']}"
+                + f" betti_full={golden['truncated_betti']} components={golden['truncated_betti_components']}",
                 flush=True,
             )
         doc = by_id.setdefault(wid, {"id": wid, "file": spec.file, "widths": spec.widths})

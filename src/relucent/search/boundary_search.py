@@ -1,4 +1,11 @@
-"""Slice-restricted BFS and MIP-driven boundary complex discovery."""
+"""Slice-restricted BFS: one connected component of a neuron's bent hyperplane.
+
+:func:`boundary_component` explores only cells on the hyperplane ``ss[i] = 0``, starting from a
+cell the caller supplies, and returns the certified component that contains it. It finds no other
+component and says nothing about whether others exist. For the whole hyperplane, explore the
+input space (:meth:`~relucent.core.complex.Complex.bfs`) and then call
+:meth:`~relucent.core.complex.Complex.boundary_complex`.
+"""
 
 from __future__ import annotations
 
@@ -15,13 +22,12 @@ from relucent._internal.cache import UNSET
 from relucent._internal.logging import logger, progress, with_verbosity
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent._internal.parallel import BlockingQueue, process_aware_cpu_count, worker_pool
-from relucent.core.errors import AmbiguousGeometryError, NonGenericArrangementError
+from relucent.core.errors import AmbiguousGeometryError, IncompleteDualGraphError, NonGenericArrangementError
 from relucent.core.poly import Polyhedron
 from relucent.core.ss import encode_ss, flip_ss_at_shi
 from relucent.geometry import calculations
 from relucent.geometry.calculations import shis_are_certified
 from relucent.graph.incidence import ss_nonzero_indices
-from relucent.search.boundary_mip import _is_top_boundary_ss, price_boundary_witness
 from relucent.search.engine import (
     SEARCH_REQUIRED_GEOMETRY_PROPERTIES,
     _cancel_pending_neighbor,
@@ -37,14 +43,17 @@ if TYPE_CHECKING:
     from relucent.model.model import ReLUNetwork
 
 __all__ = [
-    "BoundaryDiscoveryStats",
+    "boundary_component",
     "boundary_searcher",
-    "discover_boundary_complex",
 ]
 
 
-class BoundaryDiscoveryStats(dict[str, Any]):
-    """Statistics returned by :func:`discover_boundary_complex`."""
+def _is_top_boundary_ss(ss: np.ndarray, boundary_shi: int) -> bool:
+    """True when ``ss[boundary_shi]`` is the only zero: a top cell of that neuron's bent hyperplane."""
+    row = np.asarray(ss, dtype=np.int8).ravel()
+    if row[int(boundary_shi)] != 0:
+        return False
+    return int(np.count_nonzero(row == 0)) == 1
 
 
 def _ambient_lift_polyhedra(
@@ -164,7 +173,7 @@ def _apply_ambient_boundary_shis(
         tag_to_poly[tag]._shis_strict = False  # slice crossings, not this cell's certified LP facets
         _set_coface_rows(tag_to_poly[tag], halfspaces, halfspaces_err, halfspaces_ss)
     logger.debug(
-        "discover finalize: ambient coface _shis for " + f"{len(polys)} cells ({nw} workers)",
+        "boundary finalize: ambient coface _shis for " + f"{len(polys)} cells ({nw} workers)",
     )
 
 
@@ -213,8 +222,8 @@ def boundary_searcher(
         max_polys: Maximum cells to discover in this component.
         bound: Gurobi box bound for SHI LPs.
         nworkers: Worker process count.
-        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` pricing and
-            search detail. ``None`` uses :data:`relucent.config.VERBOSE`.
+        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` search
+            detail. ``None`` uses :data:`relucent.config.VERBOSE`.
         geometry_properties: Optional geometry caches (default topology-only).
         verify: When True (default), require complete exploration. Certification runs
             later in :func:`~relucent.search.exploration.finalize_boundary_complex`.
@@ -405,7 +414,7 @@ def boundary_searcher(
     if n_phantom:
         logger.info("boundary search: ignored %d true phantom flip-neighbor(s)", n_phantom)
     if not complete:
-        # Certification deferred to finalize_boundary_complex in discover_boundary_complex.
+        # Certification deferred to finalize_boundary_complex in boundary_component.
         cx.set_exploration_state(complete=False, verified=False)
         return SearchResult(
             depth=depth,
@@ -429,146 +438,59 @@ def boundary_searcher(
 
 
 @with_verbosity
-def discover_boundary_complex(
+def boundary_component(
     net: ReLUNetwork,
     boundary_shi: int,
+    start: Polyhedron | np.ndarray,
     *,
     bound: float | None = None,
     nworkers: int | None = None,
     verify: bool = True,
     verbose: int | None = None,
     **kwargs: Any,
-) -> tuple[Complex, BoundaryDiscoveryStats]:
-    """Discover the boundary complex via MIP pricing + slice BFS per component.
+) -> Complex:
+    """The connected component of neuron ``boundary_shi``'s bent hyperplane that contains ``start``.
 
-    Experimental: see :meth:`relucent.core.complex.Complex.discover_boundary_complex` for the
-    components pricing can miss.
-
-    Repeatedly calls :func:`~relucent.search.boundary_mip.price_boundary_witness` to find
-    a new connected component on the slice ``ss[boundary_shi] = 0``, explores it
-    with :func:`boundary_searcher`, and merges cells into one complex. Finalizes
-    with :func:`~relucent.search.exploration.finalize_boundary_complex` (ambient coface
-    SHIs, dual graph, genericity, and :func:`~relucent.verify.certify.certify_complex`).
+    Explores the slice ``ss[boundary_shi] = 0`` by :func:`boundary_searcher` and certifies the result
+    with :func:`~relucent.search.exploration.finalize_boundary_complex`. Only the component holding
+    ``start`` is found; nothing is implied about other components.
 
     Args:
         net: Canonical :class:`~relucent.model.model.ReLUNetwork`.
-        boundary_shi: Global supporting-hyperplane index for the decision boundary.
-        bound: Gurobi box bound for SHI LPs; defaults to
-            ``default_polyhedron_bound()``.
-        nworkers: Worker process count for slice BFS.
-        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` pricing and
-            search detail. ``None`` uses :data:`relucent.config.VERBOSE`.
-        verify: When True (default), run full certification during finalize.
-        **kwargs: Forwarded to slice BFS / SHI routines.
+        boundary_shi: Global supporting-hyperplane index of the neuron whose bent hyperplane to explore.
+        start: A top cell of that hyperplane: a :class:`~relucent.core.poly.Polyhedron` or a sign
+            sequence whose only zero is at ``boundary_shi``, with both ambient cofaces nonempty.
+        bound: Gurobi box bound for SHI LPs; defaults to ``default_polyhedron_bound()``.
+        nworkers: Worker process count.
+        verify: When True (default), require a complete search and certify the component.
+        verbose: Output level: ``0`` quiet, ``1`` progress bars and summaries, ``2`` debug detail.
+            ``None`` uses :data:`relucent.config.VERBOSE`.
+        **kwargs: Forwarded to the slice search's SHI routines.
 
     Returns:
-        ``(complex, stats)`` where ``stats`` records component counts and timings.
+        A new :class:`Complex` of the component's top cells.
+
+    Raises:
+        ValueError: If ``start`` is not a top cell of the hyperplane.
+        IncompleteDualGraphError: If ``verify`` and the search stopped before exhausting the component.
     """
     del verbose  # applied by @with_verbosity
     from relucent.core.complex import Complex
 
-    merged = Complex(net)
-    visited: set[bytes] = set()
-    n_components = 0
-    n_pricing_calls = 0
-    pricing_time = 0.0
-    search_time = 0.0
+    poly = start if isinstance(start, Polyhedron) else Polyhedron(net, np.asarray(start, dtype=np.int8).reshape(-1))
+    if poly._net is None:
+        poly._net = net
+    if not _is_top_boundary_ss(poly.ss_np, boundary_shi):
+        raise ValueError(f"start must have ss[{boundary_shi}]=0 as its only zero entry; got {poly.ss_np!r}")
+    if not poly.feasible or not _both_ambient_cofaces_feasible(poly, boundary_shi):
+        raise ValueError(f"start {poly.ss_np!r} is not a cell of neuron {boundary_shi}'s bent hyperplane")
 
-    while True:
-        n_pricing_calls += 1
-        logger.debug(
-            "discover_boundary_complex: pricing call "
-            + f"{n_pricing_calls} (excluded_tags={len(visited)}, boundary_shi={boundary_shi}) ...",
-        )
-        t0 = time.perf_counter()
-        witness = price_boundary_witness(
-            net,
-            boundary_shi,
-            visited,
-            bound=bound,
-            pricing_call=n_pricing_calls,
-        )
-        call_seconds = time.perf_counter() - t0
-        pricing_time += call_seconds
-        if witness is None:
-            logger.debug(
-                "discover_boundary_complex: pricing call "
-                + f"{n_pricing_calls} proven infeasible after {call_seconds:.3f}s "
-                + "(no more boundary components)",
-            )
-            break
-
-        logger.debug(
-            "discover_boundary_complex: pricing call "
-            + f"{n_pricing_calls} found witness after {call_seconds:.3f}s, "
-            + "starting boundary search ...",
-        )
-
-        cx = Complex(net)
-        search_info = boundary_searcher(
-            cx,
-            boundary_shi,
-            witness,
-            bound=bound,
-            nworkers=nworkers,
-            verify=verify,
-            **kwargs,
-        )
-        n_components += 1
-        search_time += search_info.search_time
-        for poly in cx:
-            merged.add_polyhedron(poly, check_exists=True)
-            visited.add(poly.tag)
-        logger.debug(
-            "discover_boundary_complex: component " + f"{n_components} finished, n_cells={len(cx)}, total_cells={len(merged)}",
-        )
-
-    if len(merged) == 0:
-        stats = BoundaryDiscoveryStats(
-            n_components=0,
-            n_pricing_calls=n_pricing_calls,
-            n_cells=0,
-            pricing_time=pricing_time,
-            search_time=search_time,
-            post_halfspaces_s=0.0,
-            post_classify_s=0.0,
-            post_verify_s=0.0,
-            post_total_s=0.0,
-            mip_failures=0,
-        )
-        return merged, stats
-
-    logger.debug(
-        "discover_boundary_complex: post-processing " + f"{len(merged)} cells (SHI filter, genericity) ...",
-    )
-    t_post = time.perf_counter()
-    t_verify = time.perf_counter()
-    finalize_boundary_complex(
-        merged,
-        boundary_shi,
-        bound=bound,
-        nworkers=nworkers,
-        verify=verify,
-        **kwargs,
-    )
-    post_verify_s = time.perf_counter() - t_verify
-    post_halfspaces_s = post_verify_s  # halfspaces computed inside finalize
-    post_classify_s = 0.0
-    post_total_s = time.perf_counter() - t_post
-    logger.debug(
-        "discover_boundary_complex: post-processing finished in " + f"{post_total_s:.3f}s",
-    )
-
-    stats = BoundaryDiscoveryStats(
-        n_components=n_components,
-        n_pricing_calls=n_pricing_calls,
-        n_cells=len(merged),
-        pricing_time=pricing_time,
-        search_time=search_time,
-        post_halfspaces_s=post_halfspaces_s,
-        post_classify_s=post_classify_s,
-        post_verify_s=post_verify_s,
-        post_total_s=post_total_s,
-        mip_failures=0,
-    )
-    return merged, stats
+    found = Complex(net)
+    info = boundary_searcher(found, boundary_shi, poly, bound=bound, nworkers=nworkers, verify=verify, **kwargs)
+    if verify and not info.complete:
+        raise IncompleteDualGraphError("boundary component search stopped before exhausting the component")
+    component = Complex(net)  # a fresh complex, so finalize starts from no exploration state
+    for p in found:
+        component.add_polyhedron(p, check_exists=True)
+    finalize_boundary_complex(component, boundary_shi, bound=bound, nworkers=nworkers, verify=verify, **kwargs)
+    return component

@@ -34,9 +34,8 @@ After BFS, check :attr:`~relucent.core.complex.Complex.complete` and
 :meth:`~relucent.core.complex.Complex.contract` and
 :meth:`~relucent.core.complex.Complex.boundary_complex` require a complete, verified
 ambient complex via :meth:`~relucent.core.complex.Complex.assert_topology_ready`.
-:meth:`~relucent.core.complex.Complex.discover_boundary_complex` finds a boundary without
-exploring the whole input space, but it is experimental and can miss components (see
-:doc:`boundary_search`).
+:meth:`~relucent.core.complex.Complex.boundary_component` explores the one component that
+contains a given cell without exploring the whole input space (see :doc:`boundary_search`).
 
 **Geometry for filtrations.** Built-in filtrations such as
 :class:`~relucent.topology.filtration.AffineOutputFiltration` and
@@ -118,8 +117,8 @@ Example:
    betti = db.betti_numbers()
    print(betti)  # e.g. {0: 1}
 
-   # Or discover the boundary directly without a full ambient BFS:
-   # db = cplx.discover_boundary_complex(cplx.n - 1, verbose=0)
+   # Or explore only the component containing one boundary cell, without a full ambient BFS:
+   # comp = cplx.boundary_component(cplx.n - 1, next(iter(db)).ss_np, verbose=0)
 
    # Cross-check via persistent homology with a constant filtration
    diagram = compute_persistent_homology(

@@ -94,21 +94,20 @@ Topology prerequisites
 :class:`~relucent.core.errors.ComplexNotCompleteError` or
 :class:`~relucent.core.errors.ComplexNotVerifiedError`.
 
-Boundary discovery
+Boundary complexes
 ------------------
 
-Two paths build a decision-boundary complex:
+Two calls build complexes on neuron ``i``'s bent hyperplane:
 
-* **Full ambient complex first** — explore the input space (BFS or
+* **The whole hyperplane** — explore the input space (BFS or
   :func:`~relucent.search.exploration.explore_for_topology`), then
   :meth:`boundary_complex(i) <relucent.core.complex.Complex.boundary_complex>` extracts faces on
   neuron ``i``. Requires ``assert_topology_ready`` (complete and verified).
-* **Direct boundary discovery** — :meth:`discover_boundary_complex(i) <relucent.core.complex.Complex.discover_boundary_complex>`
-  uses MIP pricing plus slice-restricted BFS per connected component, then
+* **One component** — :meth:`boundary_component(i, start) <relucent.core.complex.Complex.boundary_component>`
+  runs a slice-restricted BFS from a top cell you supply, then
   :func:`~relucent.search.exploration.finalize_boundary_complex` for slice SHI assignment,
-  dual graph, and verification. Does not require a full ambient BFS first.
-  **Experimental**: verification covers only the components pricing finds, and pricing
-  can miss some (see :doc:`boundary_search`).
+  dual graph, and verification. It needs no ambient BFS, but it finds only the component
+  containing ``start`` (see :doc:`boundary_search`).
 
 Dual-graph SHI model
 --------------------

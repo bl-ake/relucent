@@ -2,7 +2,7 @@
 
 For neuron ``i``, each dual-graph edge labelled ``i`` joins two top cells across a common
 facet with ``ss[i] = 0``. Those facets are the top cells of neuron ``i``'s boundary complex.
-To find that complex without exploring the whole input space, see
+To explore one component of it without exploring the whole input space, see
 :mod:`relucent.search.boundary_search`.
 """
 

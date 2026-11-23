@@ -8,8 +8,6 @@ from typing import Any
 
 import numpy as np
 import pytest
-import torch
-import torch.nn as nn
 from gurobipy import GRB, Model
 
 import relucent.config as cfg
@@ -17,8 +15,6 @@ from relucent import AmbiguousGeometryError, Complex, Polyhedron, SolverTimeLimi
 from relucent._internal.gurobi import get_env, time_limit_param
 from relucent._internal.network_scale import default_polyhedron_bound
 from relucent.geometry import calculations
-from relucent.search import boundary_mip
-from relucent.search.exploration import explore_for_topology
 
 # A limit no solve can meet. Gurobi does not always stop at it: it reads its clock only now and then,
 # and where the clock is coarse (Windows) a small LP often finishes before any time has passed and
@@ -147,32 +143,3 @@ def test_timed_out_shi_lps_are_decided_exactly(seeded: int, monkeypatch: pytest.
     monkeypatch.setattr(calculations, "Model", TimesOutAfterFirstSolve)
     assert facets() == expected
     assert timed_out, "no SHI LP timed out, so the exact path was not exercised"
-
-
-@pytest.mark.usefixtures("seeded")
-def test_boundary_pricing_mip_keeps_its_own_time_limit(
-    monkeypatch: pytest.MonkeyPatch, gurobi_time_limit: Callable[[float], None]
-) -> None:
-    """The per-LP GUROBI_TIME_LIMIT never cuts a pricing MIP short: it uses BOUNDARY_MIP_TIME_LIMIT."""
-    fc = nn.Linear(2, 1, bias=False, dtype=torch.float64)
-    fc.weight.data[:] = torch.tensor([[1.0, 0.0]], dtype=torch.float64)
-    cplx = Complex(nn.Sequential(fc, nn.ReLU()))
-    explore_for_topology(cplx, np.array([0.5, 0.0]))
-    shi = cplx.n - 1
-    limits: list[float] = []
-
-    class RecordingModel(Model):
-        def optimize(self, *args: Any, **kwargs: Any) -> None:
-            if self.ModelName == "boundary_pricing":
-                limits.append(float(self.Params.TimeLimit))
-            super().optimize(*args, **kwargs)
-
-    monkeypatch.setattr(boundary_mip, "Model", RecordingModel)
-    monkeypatch.setattr(cfg.advanced, "BOUNDARY_PRICING_BRUTE_FORCE_MAX_N", 0)
-    gurobi_time_limit(1.5)
-    for mip_limit, expected in ((0.0, math.inf), (7.0, 7.0)):
-        monkeypatch.setattr(cfg, "BOUNDARY_MIP_TIME_LIMIT", mip_limit)
-        limits.clear()
-        boundary_mip.price_boundary_witness(cplx._net, shi, set())
-        assert limits, "the pricing MIP was not solved"
-        assert all(limit == expected for limit in limits)

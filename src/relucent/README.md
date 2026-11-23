@@ -9,7 +9,7 @@ The `relucent` package is organized into domain subpackages.
 | **`core/`** | `complex`, `poly`, `ss`, `errors` | `Complex`, `Polyhedron`, sign sequences (encoding, flips, indexing), domain exceptions |
 | **`model/`** | `model`, `convert_model`, `builders` | Canonical `ReLUNetwork`, PyTorch conversion, network builders (`mlp`, `torch_mlp`, `split_sequential`, ...) and `set_seeds` |
 | **`geometry/`** | `calculations`, `slicing` | Gurobi/Qhull/SHI routines for `Polyhedron` geometry; affine slices of a complex |
-| **`search/`** | `engine`, `exploration`, `worker_context`, `boundary_search`, `boundary_mip`, `boundary_exclusion_trie` | BFS/DFS, boundary discovery, multiprocessing workers |
+| **`search/`** | `engine`, `exploration`, `worker_context`, `boundary_search` | BFS/DFS, one bent-hyperplane component (slice BFS), multiprocessing workers |
 | **`graph/`** | `incidence`, `vertex_star`, `meta_graph`, `boundary`, `complex_graph` | Dual graph, chain complex from vertex stars, meta-graph, one neuron's boundary cells, dual-graph recovery and neuron deletion |
 | **`topology/`** | `betti`, `filtration`, `persistence`, `morse`, `_gf2` | Betti numbers, filtrations, persistent homology, PL Morse critical points |
 | **`verify/`** | `certify` | Certification and arrangement verification |

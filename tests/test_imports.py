@@ -15,7 +15,6 @@ _WORKER_MODULES = (
     "relucent.graph.incidence",
     "relucent.graph.vertex_star",
     "relucent.model.model",
-    "relucent.search.boundary_mip",
     "relucent.search.boundary_search",
     "relucent.search.engine",
     "relucent.search.worker_context",

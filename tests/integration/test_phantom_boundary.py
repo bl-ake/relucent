@@ -7,6 +7,7 @@ import pytest
 
 from relucent import Complex
 from relucent.core.poly import Polyhedron
+from tests.helpers import cover_by_components
 from tests.integration.helpers import (
     boundary_shi_for_spec,
     load_witness_model,
@@ -32,16 +33,17 @@ def test_phantom_ss_rejected_by_ambient_coface_gate() -> None:
     assert not _both_ambient_cofaces_feasible(poly, shi)
 
 
-def test_discover_boundary_matches_reference_without_phantom(integration_nworkers: int) -> None:
+def test_boundary_components_match_reference_without_phantom(integration_nworkers: int) -> None:
     spec = witness_by_id("phantom_ckpt0")
     model = load_witness_model(spec)
     ambient = run_bfs_ambient(model, spec, nworkers=integration_nworkers, verify=True)
     shi = boundary_shi_for_spec(ambient, spec)
 
     ref = ambient.boundary_complex(shi, verbose=False)
-    new = Complex(model).discover_boundary_complex(shi, verbose=False, nworkers=integration_nworkers)
+    components = cover_by_components(ref, model, shi, nworkers=integration_nworkers)
+    found = set().union(*(tag_set(c) for c in components)) if components else set()
 
-    assert tag_set(ref) == tag_set(new)
+    assert tag_set(ref) == found
     if spec.expected_n_boundary_cells is not None:
-        assert len(new) == spec.expected_n_boundary_cells
-    assert _PHANTOM_SS.tobytes() not in tag_set(new)
+        assert len(found) == spec.expected_n_boundary_cells
+    assert _PHANTOM_SS.tobytes() not in found
