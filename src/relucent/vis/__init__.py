@@ -1081,10 +1081,12 @@ def _persistence_plot_extent(
     max_death: float | None,
 ) -> tuple[float, float, float, float]:
     """Return (xmin, xmax, ymin, ymax) for diagram axes with padding."""
-    xs: list[float] = list(diagram.cell_filtration.values())
-    ys: list[float] = list(diagram.cell_filtration.values())
+    finite_values = [float(v) for v in diagram.cell_filtration.values() if np.isfinite(v)]
+    xs: list[float] = list(finite_values)
+    ys: list[float] = list(finite_values)
     for p in diagram.pairs:
-        xs.append(float(p.birth))
+        if np.isfinite(p.birth):
+            xs.append(float(p.birth))
         if np.isfinite(p.death):
             ys.append(float(p.death))
     if not xs:
@@ -1200,7 +1202,8 @@ def plot_persistence_diagram(
 
     Finite pairs are drawn at ``(birth, death)``. Essential classes (``death=inf``)
     are shown along the top of the plot at ``y=max_death`` (computed from finite deaths
-    plus padding unless ``max_death`` is given).
+    plus padding unless ``max_death`` is given), and classes born at ``-inf`` along its
+    left edge.
 
     Args:
         diagram: :class:`~relucent.topology.persistence.PersistenceDiagram` from
@@ -1224,17 +1227,24 @@ def plot_persistence_diagram(
     palette = getattr(pc.qualitative, dim_cmap, pc.qualitative.Plotly)
     dim_to_color = {d: palette[i % len(palette)] for i, d in enumerate(dims)}
 
+    # Classes born at -inf (sublevel sets that are nonempty arbitrarily far down) sit on the left edge;
+    # pairs born at +inf or dying at -inf have zero persistence at infinity and are not drawn.
+    drawn = [p for p in diagram.pairs if p.birth < np.inf and p.death > -np.inf]
+
+    def _x(p: Any) -> float:
+        return float(p.birth) if np.isfinite(p.birth) else xmin
+
     fig = go.Figure()
     for dim in dims:
-        finite = [p for p in diagram.pairs if p.dimension == dim and np.isfinite(p.death)]
-        essential = [p for p in diagram.pairs if p.dimension == dim and not np.isfinite(p.death)]
+        finite = [p for p in drawn if p.dimension == dim and np.isfinite(p.death)]
+        essential = [p for p in drawn if p.dimension == dim and not np.isfinite(p.death)]
         color = dim_to_color[dim]
         name = f"H{dim}"
 
         if finite:
             fig.add_trace(
                 go.Scatter(
-                    x=[p.birth for p in finite],
+                    x=[_x(p) for p in finite],
                     y=[p.death for p in finite],
                     mode="markers",
                     name=name,
@@ -1249,7 +1259,7 @@ def plot_persistence_diagram(
         if essential:
             fig.add_trace(
                 go.Scatter(
-                    x=[p.birth for p in essential],
+                    x=[_x(p) for p in essential],
                     y=[essential_y] * len(essential),
                     mode="markers",
                     name=f"{name} (essential)",

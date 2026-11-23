@@ -91,9 +91,15 @@ def _gf2_column_reduce_persistence(
     dimensions: list[int],
     cell_keys: list[Any],
 ) -> list[PersistencePair]:
-    """Left-to-right column reduction (mod 2); row/column indices index the same cells."""
+    """Left-to-right column reduction (mod 2); row/column indices index the same cells.
+
+    Each column is reduced by adding the *reduced* column that owns its current lowest row,
+    so that row cancels and the lowest row strictly decreases until it is new or the column
+    is zero.
+    """
     n = len(boundaries)
     low: dict[int, int] = {}
+    reduced: dict[int, set[int]] = {}
     essential: list[int] = []
 
     for j in range(n):
@@ -103,8 +109,9 @@ def _gf2_column_reduce_persistence(
             assert r is not None
             if r not in low:
                 low[r] = j
+                reduced[j] = col
                 break
-            col = _symmetric_diff(col, boundaries[low[r]])
+            col = _symmetric_diff(col, reduced[low[r]])
         else:
             essential.append(j)
 
@@ -180,6 +187,29 @@ def _cell_boundary_faces(
     return faces
 
 
+def _check_monotone(meta: Any, cell_values: dict[Any, float]) -> None:
+    """Raise unless every face enters no later than each cell it bounds.
+
+    A sublevel complex must be closed under taking faces; otherwise the reduction runs on
+    something that is not a filtration and its pairs mean nothing. NaN values are rejected
+    too: they compare false with everything, so they would pass this check and break the sort.
+    """
+    nan = [k for k, v in cell_values.items() if v != v]
+    if nan:
+        raise ValueError(f"filtration assigns NaN to {len(nan)} cells")
+    bad = [
+        (u, v)
+        for u, v, _ in meta.edges(data=True)
+        if u in cell_values and v in cell_values and cell_values[v] > cell_values[u]
+    ]
+    if bad:
+        u, v = bad[0]
+        raise ValueError(
+            f"filtration is not monotone on {len(bad)} face incidences (e.g. a face at {cell_values[v]!r} "
+            + f"bounds a cell at {cell_values[u]!r}); use lower_star=True"
+        )
+
+
 @with_verbosity
 def compute_persistent_homology(
     cplx: Complex,
@@ -235,6 +265,7 @@ def compute_persistent_homology(
         cell_values = lower_star_extension(meta, raw_values)
     else:
         cell_values = raw_values
+    _check_monotone(meta, cell_values)
 
     nodes: list[tuple[Any, int, float]] = []
     for n, attrs in meta.nodes(data=True):
@@ -337,7 +368,9 @@ def betti_curve(
             if p.dimension != k:
                 continue
             born_ok = ts >= p.birth
-            alive = born_ok & (ts < p.death) if np.isfinite(p.death) else born_ok
+            # Essential classes never die; a class killed by a cell at +inf is dead at t = +inf.
+            essential = p.death_cell is None and p.death == float("inf")
+            alive = born_ok if essential else born_ok & (ts < p.death)
             beta += alive.astype(np.int64)
         out[k] = beta
     return out

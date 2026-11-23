@@ -43,8 +43,7 @@ exploring the whole input space, but it is experimental and can miss components 
 :class:`~relucent.topology.filtration.TrainingDistanceFiltration` need interior points on
 cells. Either compute geometry during search (done by default) or run
 :meth:`~relucent.core.complex.Complex.compute_geometric_properties` afterward with
-``properties=["interior_point", "finite"]`` (and ``"W"``, ``"b"`` when affine
-outputs are required).
+``properties=["interior_point", "finite"]``.
 
 Graph representations
 ---------------------
@@ -143,18 +142,27 @@ Built-in filtrations:
 
 * :class:`~relucent.topology.filtration.ConstantFiltration` — all cells enter at one value.
   Use ``lower_star=False`` to match static Betti numbers on the same complex.
-* :class:`~relucent.topology.filtration.LogitSublevelFiltration` — sublevel sets of a scalar
-  logit (last output or class difference).
-* :class:`~relucent.topology.filtration.AffineOutputFiltration` — general affine output
-  functional on each cell.
+* :class:`~relucent.topology.filtration.LogitSublevelFiltration` — sublevel sets of the logit,
+  the output of the last linear layer (a trailing ReLU, as added by ``add_output_relu``, is
+  ignored), or of logit 0 minus logit 1 with ``binary=True``.
+* :class:`~relucent.topology.filtration.AffineOutputFiltration` — sublevel sets of the network
+  output (``pre_activation=True`` reads the last linear layer instead).
+
+  Both give each cell the supremum of the output over it: vertices their value, rays (and the
+  truncation caps that end them) the limit along the ray, ``±inf`` unless the output is flat
+  there, and every other cell the largest value among its faces. Homology at a finite threshold
+  ``t`` is that of ``{x : output(x) <= t}``; classes born at ``-inf`` are sublevel sets that are
+  nonempty arbitrarily far out. Every cell must be pointed (no cell contains a whole line).
 * :class:`~relucent.topology.filtration.NeuronActivationFiltration` — combinatorial
   filtration by ReLU sign on a chosen SHI.
 * :class:`~relucent.topology.filtration.TrainingDistanceFiltration` — distance from a cell
-  representative point to training data.
+  representative point to training data; unbounded cells and caps enter at ``+inf``.
 
 Lower-star extension (:func:`~relucent.topology.filtration.lower_star_extension`) promotes
 vertex values to higher cells by ``f(σ) = max_{τ face of σ} f(τ)`` when
 ``lower_star=True`` (the default for most filtrations).
+:func:`~relucent.topology.persistence.compute_persistent_homology` raises ``ValueError`` when a
+face would enter after a cell it bounds.
 
 Example:
 
@@ -169,7 +177,7 @@ Example:
    cplx = relucent.Complex(model)
    cplx.bfs(start=np.array([[0.0]]), max_polys=5000)
    cplx.dual_graph(require_complete=True)
-   cplx.compute_geometric_properties(properties=["interior_point", "finite", "W", "b"])
+   cplx.compute_geometric_properties(properties=["interior_point", "finite"])
 
    diagram = cplx.persistent_homology(LogitSublevelFiltration())
    fig = diagram.plot()

@@ -56,6 +56,54 @@ def test_column_reduction_triangle_h0():
     assert sum(1 for p in essential if p.dimension == 1) == 1
 
 
+def _gf2_rank(rows: list[set[int]]) -> int:
+    pivots: dict[int, set[int]] = {}
+    for row in rows:
+        r = set(row)
+        while r:
+            m = max(r)
+            if m not in pivots:
+                pivots[m] = r
+                break
+            r ^= pivots[m]
+    return len(pivots)
+
+
+def test_column_reduction_matches_ranks_on_random_complexes():
+    """Betti curves from the reduction equal dim C_k - rank d_k - rank d_{k+1} on every sublevel complex."""
+    import itertools
+    import random
+
+    rng = random.Random(0)
+    for _ in range(200):
+        nv = rng.randint(4, 8)
+        tops = {tuple(sorted(rng.sample(range(nv), rng.choice([3, 3, 4])))) for _ in range(rng.randint(1, 8))}
+        simplices: set[tuple[int, ...]] = {(v,) for v in range(nv)}
+        for s in tops:
+            for k in range(1, len(s) + 1):
+                simplices.update(itertools.combinations(s, k))
+        value = {s: float(rng.randint(0, 3)) for s in simplices}
+        for s in sorted(simplices, key=len):
+            for f in itertools.combinations(s, len(s) - 1):
+                if f:
+                    value[s] = max(value[s], value[f])
+        order = sorted(simplices, key=lambda s: (value[s], len(s), s))
+        index = {s: i for i, s in enumerate(order)}
+        bnd = [{index[f] for f in itertools.combinations(s, len(s) - 1)} if len(s) > 1 else set() for s in order]
+        filt = [value[s] for s in order]
+        dims = [len(s) - 1 for s in order]
+        diagram = PersistenceDiagram(tuple(_gf2_column_reduce_persistence(bnd, filt, dims, order)), {})
+        ts = sorted(set(filt))
+        curve = betti_curve(diagram, ts, max_dim=3)
+        for i, t in enumerate(ts):
+            cells = [j for j, f in enumerate(filt) if f <= t]
+            for k in range(4):
+                n_k = sum(1 for j in cells if dims[j] == k)
+                r_k = _gf2_rank([bnd[j] for j in cells if dims[j] == k]) if k else 0
+                r_k1 = _gf2_rank([bnd[j] for j in cells if dims[j] == k + 1])
+                assert int(curve[k][i]) == n_k - r_k - r_k1
+
+
 def test_lower_star_extension_max_over_faces():
     meta = nx.MultiDiGraph()
     meta.add_node("a", dim=0, ss=np.array([[1]], dtype=np.int8))
