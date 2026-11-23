@@ -6,13 +6,12 @@ after which ``terminate()`` itself blocks forever. These tests check that leavin
 (exit code 0) rather than by SIGTERM.
 """
 
-import os
-import signal
 import time
+from typing import Any
 
 import pytest
 
-from relucent._internal.parallel import BlockingQueue, worker_pool
+from relucent._internal.parallel import BlockingQueue, _Pool, get_mp_context, worker_pool
 
 
 def _slow_square(x: int) -> int:
@@ -120,20 +119,17 @@ def test_shutdown_is_idempotent():
 
 def test_worker_handler_does_not_watch_the_result_pipe():
     with worker_pool(2) as pool:
-        sentinels = pool._pool._get_sentinels()
-        assert pool._pool._outqueue._reader not in sentinels
-        assert pool._pool._change_notifier._reader in sentinels
+        inner: Any = pool._pool
+        sentinels = inner._get_sentinels()
+        assert inner._outqueue._reader not in sentinels
+        assert inner._change_notifier._reader in sentinels
 
 
-@pytest.mark.skipif(not hasattr(signal, "SIGKILL"), reason="needs SIGKILL")
-def test_killed_idle_worker_is_replaced():
-    """Without the result pipe, a worker's own sentinel must still wake the handler to replace it."""
-    with worker_pool(2) as pool:
-        victim = _worker_processes(pool)[0]
-        os.kill(victim.pid, signal.SIGKILL)
-        deadline = time.monotonic() + 10
-        while victim in _worker_processes(pool) and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert victim not in _worker_processes(pool)
-        assert len(_worker_processes(pool)) == 2
-        assert pool.map(_slow_square, range(10)) == [x * x for x in range(10)]
+def test_handler_still_replaces_exited_workers():
+    """Workers that retire after every task are replaced only if their exit wakes the handler."""
+    pool = _Pool(2, maxtasksperchild=1, context=get_mp_context())
+    try:
+        assert pool.map_async(_slow_square, range(12), chunksize=1).get(timeout=60) == [x * x for x in range(12)]
+    finally:
+        pool.close()
+        pool.join()
