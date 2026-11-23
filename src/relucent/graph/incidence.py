@@ -24,11 +24,13 @@ SHIs get assigned in three places (see ``docs/search_shi_and_graphs.rst``):
 
 Don't mix up the two kinds of SHI:
 
-- Cubical flip SHIs (:func:`cubical_cell_shis`) drive dual-graph adjacency, meta-graph
-  node metadata, and contracted slices.
+- Cubical flip SHIs (:func:`cubical_cell_shis`) drive meta-graph node metadata,
+  contracted slices, and the dual graph of a slice.
 - LP facet SHIs (:func:`~relucent.geometry.calculations.shis`) are the geometric
-  facets of ambient top cells. They can be a strict subset of the cubical set, so
-  they must never build meta-graph edges or node metadata.
+  facets of ambient top cells, and drive the ambient dual graph after a search
+  (:func:`build_dual_graph`). They can be a strict subset of the cubical set (a flip
+  neighbor past the first layer need not share a facet), so they must never build
+  meta-graph edges or node metadata.
 """
 
 from __future__ import annotations
@@ -276,14 +278,25 @@ def build_dual_graph(
     ambient_dim: int,
     repair: bool = True,
 ) -> nx.Graph[Polyhedron]:
-    """Build the combinatorial dual graph on ``top_cells``.
+    """Build the dual graph on ``top_cells``.
 
-    Nodes are the given polyhedra; edges connect cubical flip neighbors (or
-    0-face-sharing neighbors when ``top_dim == 1``). When ``repair`` is True
+    Nodes are the given polyhedra; edges connect flip neighbors across each cell's
+    SHIs (or 0-face-sharing neighbors when ``top_dim == 1``). When ``repair`` is True
     (the default, and the only supported repair in this package), each node's
     ``poly._shis`` is overwritten from the assembled edges via
     :func:`sync_shis_from_dual_graph` -- this is the one place relucent
     corrects an asymmetric or stale LP-derived SHI cache.
+
+    Which SHIs:
+
+    - On a lower-dimensional slice, the cells' own ``_shis`` (set by :func:`set_contracted_shis`).
+    - On an ambient complex whose top cells all carry ``_shis`` -- after a search, the LP facets that
+      :func:`~relucent.geometry.calculations.shis` certified -- those lists. Two regions whose sign
+      sequences differ in one unit need not touch: past the first layer, the units after that one change
+      formula across its hyperplane, so the two regions can lie apart. Only a certified facet makes them
+      adjacent.
+    - Otherwise (an ambient complex with some ``_shis`` not computed yet), every nonzero sign entry with a
+      flip neighbor in the complex: a superset of the adjacencies.
 
     Primary entry point for :meth:`~relucent.core.complex.Complex.dual_graph` and
     :func:`~relucent.verify.certify.certify_complex` (which may pass a pre-built graph).
@@ -294,7 +307,7 @@ def build_dual_graph(
         return graph
     neighbor_tags = {p.tag for p in top_cells}
     edge_top_dim = dual_graph_edge_top_dim(cell_top_dim=top_dim, ambient_dim=ambient_dim)
-    prefer_cell_shis = top_dim < ambient_dim
+    prefer_cell_shis = top_dim < ambient_dim or all(p._shis is not None for p in top_cells)
     edges = dual_edges_top_dim(top_cells, neighbor_tags, top_dim=edge_top_dim, prefer_cell_shis=prefer_cell_shis)
     for u, v, shi in edges:
         graph.add_edge(u, v, shi=shi)

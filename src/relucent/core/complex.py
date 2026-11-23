@@ -1183,8 +1183,10 @@ class Complex:
         sharing a supporting hyperplane). For a PyVis-ready copy, see
         :func:`relucent.vis.pyvis_dual_graph`.
 
-        Edges use combinatorial cubical adjacency via :func:`~relucent.graph.incidence.dual_edges_top_dim`
-        (0-face sharing when ``max_dim == 1``, flip neighbors when ``max_dim >= 2``).
+        Edges come from :func:`~relucent.graph.incidence.build_dual_graph` (0-face sharing when
+        ``max_dim == 1``, flip neighbors when ``max_dim >= 2``). After a search, an ambient complex's edges are
+        its certified facets, so two regions are joined exactly when they share a facet. Regions whose sign
+        sequences differ in one unit can lie apart, so they are not joined on that alone.
 
         Args:
             relabel: If True, nodes are indexed by integers matching self.index2poly

@@ -40,14 +40,11 @@ def finalize_ambient_search(cx: Complex, *, complete: bool, verify: bool) -> Non
                 + "max_polys to opt into a partial complex."
             )
         return
-    # Build dual graph and resync top-cell _shis from it (repair=True, the default).
+    # Build the dual graph from the facets the search certified, and resync top-cell _shis from it (repair=True,
+    # the default). A list that sync leaves unchanged keeps its certified status, so certify_complex trusts it; one
+    # that sync changed (a facet without a neighbor, or an asymmetric pair) loses it, and certify_complex recomputes
+    # that cell's facets by LP and requires a neighbor across each.
     graph = cx.dual_graph(require_complete=False)
-    if verify:
-        top_dim = max(int(p.dim) for p in cx)
-        if top_dim == int(cx.dim):
-            for poly in cx:
-                if int(poly.dim) == top_dim and poly._shis is not None:
-                    poly._shis_strict = True
     cx.set_exploration_state(complete=True, verified=False)
     if verify:
         logger.debug("ambient finalize: certifying %d polyhedra ...", len(cx))

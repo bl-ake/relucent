@@ -6,6 +6,7 @@ import time
 
 import networkx as nx
 import numpy as np
+import pytest
 import torch
 
 from relucent import Complex, set_seeds, torch_mlp
@@ -63,8 +64,14 @@ def test_cubical_dual_graph_on_boundary_has_edges(seeded: int) -> None:
     assert nx.number_connected_components(G) == 1
 
 
+# Seeds 18, 21 and 25 give networks with flip neighbors that do not touch (1, 2 and 5 pairs); seed 0 has none.
+@pytest.mark.parametrize("seed", [0, 18, 21, 25])
 def test_meta_graph_dual_graph_top_dim_consistency(seeded: int) -> None:
-    """Stress: top-dimensional dual edges align with meta-graph coface pairs."""
+    """Top-dimensional dual edges are exactly the pairs of top cells that share a (d-1)-cell of the meta-graph.
+
+    The meta-graph's cells come from verified vertices' stars, not from the dual graph, so this checks adjacency
+    against a separate construction. tests/test_dual_graph_facets.py checks it against ground truth from the
+    weights alone."""
     from collections import defaultdict
 
     set_seeds(seeded)
@@ -87,7 +94,8 @@ def test_meta_graph_dual_graph_top_dim_consistency(seeded: int) -> None:
     meta_pairs = {tuple(sorted(pair)) for pair in face_to_tops.values() if len(pair) == 2}
     dual_pairs = {tuple(sorted((u.tag, v.tag))) for u, v in dual.edges()}
 
-    assert dual_pairs <= meta_pairs
+    assert dual_pairs - meta_pairs == set(), "dual-graph edges between cells that share no (d-1)-cell"
+    assert meta_pairs - dual_pairs == set(), "cells that share a (d-1)-cell but no dual-graph edge"
 
 
 def test_cubical_dual_graph_build_is_fast_enough(seeded: int) -> None:

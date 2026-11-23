@@ -274,17 +274,25 @@ After complete ambient search (authoritative top cells)
 :func:`~relucent.search.exploration.finalize_ambient_search` calls
 :meth:`~relucent.core.complex.Complex.dual_graph`, which:
 
-1. Builds combinatorial edges with
-   :func:`~relucent.graph.incidence.dual_edges_top_dim` (flip neighbors for all
-   complexes built via :func:`~relucent.graph.incidence.build_dual_graph`; see
-   `Edge construction rules`_).
+1. Builds edges with :func:`~relucent.graph.incidence.dual_edges_top_dim` across
+   each top cell's certified LP facets (see `Edge construction rules`_), so two
+   regions are joined exactly when they share a facet.
 2. Syncs ``poly._shis`` from incident edge labels via
    :func:`~relucent.graph.incidence.sync_shis_from_dual_graph` when ``repair=True``
    (the default).
 
-Top-cell ``_shis`` are therefore **re-derived from dual-graph edges**, not left
-as raw LP output. This is the combinatorial cubical model used by chain-complex
-recovery and topology.
+After a complete search every certified facet has a neighbor and the lists are
+symmetric, so the sync leaves them unchanged and they keep their certified status.
+A list the sync does change (a facet without a neighbor, or an asymmetric pair)
+loses it, and :func:`~relucent.verify.certify.verify_lp_flip_neighbors_in_complex`
+recomputes that cell's facets by LP and requires a neighbor across each.
+
+Flip neighbors alone are not adjacency. Two regions whose sign sequences differ in
+one unit share all other signs, but past the first layer the units after that one
+change formula across its hyperplane, so the two regions can lie apart. (The
+output unit has no units after it, so its flip pairs always touch.) An earlier
+version joined every flip pair and overwrote the LP lists with them, which merged
+regions on the same side of a decision boundary that the boundary separates.
 
 On lower-dimensional slices (boundary, chain complex)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -392,14 +400,16 @@ Edge construction rules
 so top-dimensional cells always use **flip-neighbor** adjacency (never the legacy
 ``top_dim == 1`` 0-face pairing in :func:`~relucent.graph.incidence.dual_edges_top_dim`):
 
-* **Default** — For each nonzero ``ss_i``, add an edge to the same-dimension flip
-  neighbor when that neighbor exists in the complex (via
-  :func:`~relucent.graph.incidence.ss_nonzero_indices`).
-* **Contracted slice** (``max_dim == 1`` and ambient ``dim > 1``) — Same flip rule,
-  but candidate crossings come from each cell's finalized ``poly._shis`` (from
+* **Ambient complex after a search** (every top cell carries ``_shis``) — For each
+  certified LP facet in ``poly._shis``, add an edge to the flip neighbor across it.
+* **Contracted slice** (``max_dim`` below the ambient ``dim``) — Same flip rule,
+  with candidate crossings from each cell's finalized ``poly._shis`` (from
   :func:`~relucent.graph.incidence.set_contracted_shis` /
-  :func:`~relucent.graph.incidence.cubical_cell_shis`) instead of the full sign
-  sequence.
+  :func:`~relucent.graph.incidence.cubical_cell_shis`).
+* **Ambient complex with some ``_shis`` not yet computed** — For each nonzero
+  ``ss_i``, add an edge to the same-dimension flip neighbor when that neighbor
+  exists in the complex (via :func:`~relucent.graph.incidence.ss_nonzero_indices`).
+  This is a superset of the adjacencies.
 
 After edge construction, :func:`~relucent.graph.incidence.sync_shis_from_dual_graph`
 sets each node's ``_shis`` from incident edge labels when ``repair=True``.
