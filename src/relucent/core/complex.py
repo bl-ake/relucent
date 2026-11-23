@@ -665,7 +665,7 @@ class Complex:
             fixed: Neuron indices to hold at zero, which restricts the search to the slice where
                 those neurons' bent hyperplanes meet. ``start`` must then be a Polyhedron or sign
                 sequence that is zero exactly there, and only its connected component of the slice
-                is found. See :func:`~relucent.search.engine.searcher`.
+                is found. See :doc:`boundary_search`.
             **kwargs: Additional arguments passed to :func:`~relucent.geometry.calculations.shis`.
 
         Returns:
