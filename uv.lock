@@ -758,7 +758,7 @@ torch = [
 [package.metadata]
 requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.39.0" },
-    { name = "gurobipy", specifier = ">=12,<14" },
+    { name = "gurobipy", specifier = ">=13,<14" },
     { name = "networkx", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "plotly", specifier = ">=5.20" },

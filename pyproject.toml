@@ -9,7 +9,7 @@ version = "1.1.0"
 requires-python = ">= 3.11"
 
 dependencies = [
-    "gurobipy>=12,<14",
+    "gurobipy>=13,<14",
     "networkx>=3.0",
     "numpy>=2.0",
     "plotly>=5.20",
